@@ -1,5 +1,7 @@
 #include "objgen.h"
 
+using namespace std;
+
 void MemberBase::traverse(ObjTrav &trav)
 {
   trav.doMem(trav, *this);

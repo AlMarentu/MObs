@@ -12,7 +12,7 @@ class JsonOut : virtual public ObjTrav {
     virtual void doArrayEnd(ObjTrav &ot, MemBaseVector &vec);
     virtual void doMem(ObjTrav &ot, MemberBase &mem);
 
-    string getString();
+    std::string getString();
     void clear();
   private:
     JsonOutData *data;

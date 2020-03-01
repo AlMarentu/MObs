@@ -3,6 +3,7 @@
 #include "readjson.h"
 #include "dumpjson.h"
 
+using namespace std;
 
 string js = 
 "{\n"

@@ -10,6 +10,7 @@ class Hummel : virtual public NamedObject
   public:
   Hummel() { a = 7; };
   ~Hummel() {};
+  string objName() const { return string("Hummel.") + std::to_string(a); };
     int a;
 };
 

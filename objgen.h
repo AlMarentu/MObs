@@ -8,23 +8,22 @@
 #include <sstream>
 
 
-using namespace std;
 
 #define MemVar(typ, name) Member<typ> name = Member<typ>(#name, this)
 #define MemVector(typ, name) MemberVector<Member<typ> > name = MemberVector<Member<typ> >(#name, this)
 #define ObjVector(typ, name) MemberVector<typ> name = MemberVector<typ>(#name, this)
 #define ObjVar(typ, name) typ name = typ(#name, this)
 #define ObjInit(objname) \
-  objname() { init(); cerr << "OOO()" << endl; }; \
-  objname(string name, ObjectBase *t) { if (t) t->regObj(this); m_varNam = name; cerr << "OOOO " << name << " " << this << endl; }; \
-  objname &operator=(const objname &other) { cerr << "OOO(rhs)" << endl; \
+  objname() { init(); std::cerr << "OOO()" << std::endl; }; \
+  objname(std::string name, ObjectBase *t) { if (t) t->regObj(this); m_varNam = name; std::cerr << "OOOO " << name << " " << this << std::endl; }; \
+  objname &operator=(const objname &other) { std::cerr << "OOO(rhs)" << std::endl; \
     if (this != &other) { \
       doCopy(other); \
     } \
     return *this; \
   }; \
   static ObjectBase *createMe() { return new objname; } ; \
-  virtual string typName() const { return #objname; };
+  virtual std::string typName() const { return #objname; };
 
 #define ObjRegister(name) \
 namespace  { \
@@ -52,33 +51,33 @@ class NullValue {
 
 class MemberBase : public NullValue {
 public:
-  MemberBase(string n) : m_name(n) {};
+  MemberBase(std::string n) : m_name(n) {};
   virtual ~MemberBase() {};
-  string name() const { return m_name; };
-  virtual void strOut(ostream &str) const  = 0;
-  virtual string toStr() const  = 0;
-  virtual void fromStr(const string &s) = 0;
+  std::string name() const { return m_name; };
+  virtual void strOut(std::ostream &str) const  = 0;
+  virtual std::string toStr() const  = 0;
+  virtual void fromStr(const std::string &s) = 0;
   void traverse(ObjTrav &trav);
 
 protected:
-  string m_name;
+  std::string m_name;
 };
 
 class ObjectBase;
 
 class MemBaseVector : public NullValue {
   public:
-    MemBaseVector(string n) : m_name(n) { cerr << "VVVV()" << endl;};
-    virtual ~MemBaseVector() { cerr << "~VVVV()" << endl;};
+    MemBaseVector(std::string n) : m_name(n) { std::cerr << "VVVV()" << std::endl;};
+    virtual ~MemBaseVector() { std::cerr << "~VVVV()" << std::endl;};
     virtual void traverse(ObjTrav &trav) = 0;
     virtual size_t size() const = 0;
     virtual void resize(size_t s) = 0;
-    string name() const { return m_name; };
+    std::string name() const { return m_name; };
     virtual void doCopy(const MemBaseVector &other) = 0;
     virtual MemberBase *getMemInfo(size_t i) = 0;
     virtual ObjectBase *getObjInfo(size_t i) = 0;
   protected:
-    string m_name;
+    std::string m_name;
 };
 
 class ObjectBase : public NullValue {
@@ -88,22 +87,22 @@ class ObjectBase : public NullValue {
   void regMem(MemberBase *mem);
   void regObj(ObjectBase *obj);
   void regArray(MemBaseVector *vec);
-  //void regMemList(list<MemberBase> *m, string n);
+  //void regMemList(std::list<MemberBase> *m, std::string n);
   void traverse(ObjTrav &trav);
-  virtual string typName() const = 0;
+  virtual std::string typName() const = 0;
   virtual void init() {};
-  string name() const { return m_varNam; };
-  MemberBase &get(string name);
-  MemberBase *getMemInfo(const string &name);
-  ObjectBase *getObjInfo(const string &name);
-  MemBaseVector *getVecInfo(const string &name);
+  std::string name() const { return m_varNam; };
+  MemberBase &get(std::string name);
+  MemberBase *getMemInfo(const std::string &name);
+  ObjectBase *getObjInfo(const std::string &name);
+  MemBaseVector *getVecInfo(const std::string &name);
   
-  static void regObject(string n, ObjectBase *fun());
-  static ObjectBase *createObj(string n);
+  static void regObject(std::string n, ObjectBase *fun());
+  static ObjectBase *createObj(std::string n);
   void doCopy(const ObjectBase &other);
 
   protected:
-    string m_varNam;
+    std::string m_varNam;
   private:
     class MlistInfo {
       public:
@@ -112,23 +111,23 @@ class ObjectBase : public NullValue {
         ObjectBase *obj = 0;
         MemBaseVector *vec = 0;
     };
-    list<MlistInfo> mlist;
-    static map<string, ObjectBase *(*)()> createMap;
+    std::list<MlistInfo> mlist;
+    static std::map<std::string, ObjectBase *(*)()> createMap;
 
 };
 
 template<typename T>
 class Member : virtual public MemberBase {
 public:
-  Member() : MemberBase("") {  cerr << "MMMM()" << endl;};  // Konstriktor für Array
-  Member(string n, ObjectBase *o) : MemberBase(n) { if (o) o->regMem(this); cerr << "MMMM " << n << " " << this << endl;}; // Konst. f. Objekt
+  Member() : MemberBase("") {  std::cerr << "MMMM()" << std::endl;};  // Konstriktor für Array
+  Member(std::string n, ObjectBase *o) : MemberBase(n) { if (o) o->regMem(this); std::cerr << "MMMM " << n << " " << this << std::endl;}; // Konst. f. Objekt
   Member &operator=(const Member &other) = delete;
-  ~Member() { cerr << "DDDD " << m_name << endl;};
+  ~Member() { std::cerr << "DDDD " << m_name << std::endl;};
   T operator() () const { return wert; };
-  void operator() (const T &t) { wert = t; cerr << "= " << this << endl;};
-  virtual void strOut(ostream &str) const { str << wert; };
-  virtual string toStr() const { stringstream s; s << wert; return s.str(); };
-  virtual void fromStr(const string &sin) { stringstream s; s.str(sin); T t; s >> t; operator()(t);  };
+  void operator() (const T &t) { wert = t; std::cerr << "= " << this << std::endl;};
+  virtual void strOut(std::ostream &str) const { str << wert; };
+  virtual std::string toStr() const { std::stringstream s; s << wert; return s.str(); };
+  virtual void fromStr(const std::string &sin) { std::stringstream s; s.str(sin); T t; s >> t; operator()(t);  };
   void doCopy(const Member<T> &other) { operator()(other()); };
 private:
   T wert;
@@ -137,8 +136,8 @@ private:
 template<class T>
 class MemberVector : virtual public MemBaseVector {
   public:
-    MemberVector(string n, ObjectBase *o) : MemBaseVector(n) { o->regArray(this); cerr << "MVMV " << n << " " << this << endl;};
-    ~MemberVector() { resize(0); cerr << "DDDD " << m_name << endl;};   // heap Aufräumen
+    MemberVector(std::string n, ObjectBase *o) : MemBaseVector(n) { o->regArray(this); std::cerr << "MVMV " << n << " " << this << std::endl;};
+    ~MemberVector() { resize(0); std::cerr << "DDDD " << m_name << std::endl;};   // heap Aufräumen
     T &operator[] (size_t t) { if (t >= size()) resize(t+1); return *werte[t]; };
     virtual size_t size() const { return werte.size(); };
     virtual void resize(size_t s);
@@ -150,7 +149,7 @@ class MemberVector : virtual public MemBaseVector {
     void doCopy(const  MemBaseVector &other);
   private:
     // Vector von Heap-Elementen verwenden, da sonst Probleme beim Reorg
-    vector<T *> werte;
+    std::vector<T *> werte;
 };
 
 class ObjTrav {
@@ -165,7 +164,7 @@ class ObjTrav {
 template<class T>
 void MemberVector<T>::resize(size_t s)
 {
-  cerr << "RESI " << s << " {" << endl;
+  std::cerr << "RESI " << s << " {" << std::endl;
   size_t old = size();
   if (old > s)
   {
@@ -179,7 +178,7 @@ void MemberVector<T>::resize(size_t s)
     for (size_t i = old; i < s; i++)
       werte[i] = new T;
   }
-  cerr << "} RESI" << endl;
+  std::cerr << "} RESI" << std::endl;
 }
 
 template<class T>
@@ -205,7 +204,7 @@ void MemberVector<T>::doCopy(const MemBaseVector &other)
 {
   const MemberVector<T> *t = dynamic_cast<const MemberVector<T> *>(&other);
   if (not t)
-    throw runtime_error("MemberVector::doCopy invalid");
+    throw std::runtime_error("MemberVector::doCopy invalid");
   doCopy(*t);
 };
 
