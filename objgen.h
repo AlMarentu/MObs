@@ -14,7 +14,7 @@
 #define ObjVector(typ, name) MemberVector<typ> name = MemberVector<typ>(#name, this)
 #define ObjVar(typ, name) typ name = typ(#name, this)
 #define ObjInit(objname) \
-  objname() { init(); std::cerr << "OOO()" << std::endl; }; \
+  objname() { keylist.reset(); init(); std::cerr << "OOO()" << std::endl; }; \
   objname(std::string name, ObjectBase *t) { if (t) t->regObj(this); m_varNam = name; std::cerr << "OOOO " << name << " " << this << std::endl; }; \
   objname &operator=(const objname &other) { std::cerr << "OOO(rhs)" << std::endl; \
     if (this != &other) { \
@@ -38,6 +38,15 @@ RegMe##name RegMe##name::regme; \
 
 class ObjTrav;
 
+class KeyList {
+  public:
+    KeyList() {};
+    int add() { return ++cnt; };
+    void reset() { cnt = 0; };
+  private:
+    int cnt = 0;
+};
+
 class NullValue {
   public:
     bool isNull() const { return m_null and m_nullAllowed; };
@@ -58,9 +67,12 @@ public:
   virtual std::string toStr() const  = 0;
   virtual void fromStr(const std::string &s) = 0;
   void traverse(ObjTrav &trav);
+  void key(int k) { m_key = k; };
+  int key() { return m_key; };
 
 protected:
   std::string m_name;
+  int m_key = 0;
 };
 
 class ObjectBase;
@@ -89,7 +101,7 @@ class ObjectBase : public NullValue {
   void regArray(MemBaseVector *vec);
   //void regMemList(std::list<MemberBase> *m, std::string n);
   void traverse(ObjTrav &trav);
-  virtual std::string typName() const = 0;
+  virtual std::string typName() const { return ""; };
   virtual void init() {};
   std::string name() const { return m_varNam; };
   MemberBase &get(std::string name);
@@ -103,6 +115,7 @@ class ObjectBase : public NullValue {
 
   protected:
     std::string m_varNam;
+    KeyList keylist;
   private:
     class MlistInfo {
       public:
@@ -132,6 +145,9 @@ public:
 private:
   T wert;
 };
+
+template<typename T>
+KeyList & operator<<(KeyList &k, Member<T> &m) { m.key(k.add()); std::cerr << "Key " << m.name() << " " << m.key() << std::endl;  return k; };
 
 template<class T>
 class MemberVector : virtual public MemBaseVector {

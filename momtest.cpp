@@ -82,7 +82,7 @@ public:
   MemVar(string, vorn);
   MemVar(string, hinten);
 };
-ObjRegister(Part);
+//ObjRegister(Part); unnötig,da kein Basis-Objekt
 
 class Info : virtual public NamedObject, virtual public ObjectBase {
 public:
@@ -99,7 +99,8 @@ public:
   MemVector(string, friederich);
 
   virtual string objName() const { return typName() + "." + mom() + "." + std::to_string(otto()); };
-  virtual void init() { otto.nullAllowed(true); pims.nullAllowed(true); pims.setNull(true); luzifer.nullAllowed(true); luzifer.setNull(true); };
+  virtual void init() { otto.nullAllowed(true); pims.nullAllowed(true); pims.setNull(true);
+                        luzifer.nullAllowed(true); luzifer.setNull(true); keylist << peter << otto; };
 };
 ObjRegister(Info);
 

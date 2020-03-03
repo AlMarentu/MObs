@@ -21,3 +21,6 @@ mom: objgen.o dumpjson.o readjson.o objpool.o momtest.o
 
 hw: objpool.o hw.o
 	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $^
+
+db: objgen.o objpool.o db.o
+	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $^
