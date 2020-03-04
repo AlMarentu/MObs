@@ -2,7 +2,7 @@
 
 CXX     = clang++
 
-TARGETS		= mom hw
+TARGETS		= mom hw db
 
 CPPFLAGS	= -I../rapidjson/include
 CXXFLAGS	= -std=c++11 -g
@@ -22,5 +22,5 @@ mom: objgen.o dumpjson.o readjson.o objpool.o momtest.o
 hw: objpool.o hw.o
 	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $^
 
-db: objgen.o objpool.o db.o
+db: objgen.o objpool.o readjson.o dumpjson.o db.o 
 	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $^

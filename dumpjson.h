@@ -2,15 +2,15 @@
 #include "objgen.h"
 
 class JsonOutData;
-class JsonOut : virtual public ObjTrav {
+class JsonOut : virtual public ObjTravConst {
   public:
     JsonOut();
     ~JsonOut();
-    virtual void doObjBeg(ObjTrav &ot, ObjectBase &obj);
-    virtual void doObjEnd(ObjTrav &ot, ObjectBase &obj);
-    virtual void doArrayBeg(ObjTrav &ot, MemBaseVector &vec);
-    virtual void doArrayEnd(ObjTrav &ot, MemBaseVector &vec);
-    virtual void doMem(ObjTrav &ot, MemberBase &mem);
+    virtual void doObjBeg(ObjTravConst &ot, const ObjectBase &obj);
+    virtual void doObjEnd(ObjTravConst &ot, const ObjectBase &obj);
+    virtual void doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec);
+    virtual void doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec);
+    virtual void doMem(ObjTravConst &ot, const MemberBase &mem);
 
     std::string getString();
     void clear();

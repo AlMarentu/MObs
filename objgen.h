@@ -37,6 +37,7 @@ RegMe##name RegMe##name::regme; \
 
 
 class ObjTrav;
+class ObjTravConst;
 
 class KeyList {
   public:
@@ -67,8 +68,9 @@ public:
   virtual std::string toStr() const  = 0;
   virtual void fromStr(const std::string &s) = 0;
   void traverse(ObjTrav &trav);
+  void traverse(ObjTravConst &trav) const;
   void key(int k) { m_key = k; };
-  int key() { return m_key; };
+  int key() const { return m_key; };
 
 protected:
   std::string m_name;
@@ -82,6 +84,7 @@ class MemBaseVector : public NullValue {
     MemBaseVector(std::string n) : m_name(n) { std::cerr << "VVVV()" << std::endl;};
     virtual ~MemBaseVector() { std::cerr << "~VVVV()" << std::endl;};
     virtual void traverse(ObjTrav &trav) = 0;
+    virtual void traverse(ObjTravConst &trav) const = 0;
     virtual size_t size() const = 0;
     virtual void resize(size_t s) = 0;
     std::string name() const { return m_name; };
@@ -101,7 +104,9 @@ class ObjectBase : public NullValue {
   void regArray(MemBaseVector *vec);
   //void regMemList(std::list<MemberBase> *m, std::string n);
   void traverse(ObjTrav &trav);
+  void traverse(ObjTravConst &trav) const;
   virtual std::string typName() const { return ""; };
+  /// wird einmalig im Constructor aufgerufen
   virtual void init() {};
   std::string name() const { return m_varNam; };
   MemberBase &get(std::string name);
@@ -147,7 +152,12 @@ private:
 };
 
 template<typename T>
-KeyList & operator<<(KeyList &k, Member<T> &m) { m.key(k.add()); std::cerr << "Key " << m.name() << " " << m.key() << std::endl;  return k; };
+KeyList & operator<<(KeyList &k, Member<T> &m)
+{ 
+  m.key(k.add());
+  std::cerr << "Key " << m.name() << " " << m.key() << std::endl;
+  return k;
+};
 
 template<class T>
 class MemberVector : virtual public MemBaseVector {
@@ -158,6 +168,7 @@ class MemberVector : virtual public MemBaseVector {
     virtual size_t size() const { return werte.size(); };
     virtual void resize(size_t s);
     virtual void traverse(ObjTrav &trav);
+    virtual void traverse(ObjTravConst &trav) const;
     virtual MemberBase *getMemInfo(size_t i) { if (i >= size()) return 0; return dynamic_cast<MemberBase *>(werte[i]); };
     virtual ObjectBase *getObjInfo(size_t i) { if (i >= size()) return 0; return dynamic_cast<ObjectBase *>(werte[i]); };
   protected:
@@ -175,6 +186,15 @@ class ObjTrav {
     virtual void doArrayBeg(ObjTrav &ot, MemBaseVector &vec) = 0;
     virtual void doArrayEnd(ObjTrav &ot, MemBaseVector &vec) = 0;
     virtual void doMem(ObjTrav &ot, MemberBase &mem) = 0;
+};
+
+class ObjTravConst {
+  public:
+    virtual void doObjBeg(ObjTravConst &ot, const ObjectBase &obj) = 0;
+    virtual void doObjEnd(ObjTravConst &ot, const ObjectBase &obj) = 0;
+    virtual void doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec) = 0;
+    virtual void doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec) = 0;
+    virtual void doMem(ObjTravConst &ot, const MemberBase &mem) = 0;
 };
 
 template<class T>
@@ -199,6 +219,15 @@ void MemberVector<T>::resize(size_t s)
 
 template<class T>
 void MemberVector<T>::traverse(ObjTrav &trav)
+{
+  trav.doArrayBeg(trav, *this);
+  for (auto w:werte)
+    w->traverse(trav);
+  trav.doArrayEnd(trav, *this);
+};
+
+template<class T>
+void MemberVector<T>::traverse(ObjTravConst &trav) const
 {
   trav.doArrayBeg(trav, *this);
   for (auto w:werte)

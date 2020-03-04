@@ -7,6 +7,11 @@ void MemberBase::traverse(ObjTrav &trav)
   trav.doMem(trav, *this);
 }
 
+void MemberBase::traverse(ObjTravConst &trav) const
+{
+  trav.doMem(trav, *this);
+}
+
 void ObjectBase::regMem(MemberBase *mem)
 {
   mlist.push_back(MlistInfo(mem, 0, 0));
@@ -76,6 +81,27 @@ MemberBase &ObjectBase::get(string name)
       return *m.mem;
   }
   throw runtime_error("ObjectBase::get: element not found");
+}
+
+void ObjectBase::traverse(ObjTravConst &trav) const
+{
+  trav.doObjBeg(trav, *this);
+  if (not isNull())
+  {
+    for (auto const &m:mlist)
+    {
+      if (m.mem)
+        m.mem->traverse(trav);
+      if (m.vec)
+        m.vec->traverse(trav);
+      if (m.obj)
+      {
+        //cerr << "ooo " << m.obj->varName()  << endl;
+        m.obj->traverse(trav);
+      }
+    }
+  }
+  trav.doObjEnd(trav, *this);
 }
 
 void ObjectBase::traverse(ObjTrav &trav)

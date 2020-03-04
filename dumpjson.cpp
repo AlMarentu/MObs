@@ -17,15 +17,15 @@ using namespace rapidjson;
 
 
 class JsonDumpData;
-class JsonDump : virtual public ObjTrav {
+class JsonDump : virtual public ObjTravConst {
   public:
     JsonDump();
     ~JsonDump();
-    virtual void doObjBeg(ObjTrav &ot, ObjectBase &obj);
-    virtual void doObjEnd(ObjTrav &ot, ObjectBase &obj);
-    virtual void doArrayBeg(ObjTrav &ot, MemBaseVector &vec);
-    virtual void doArrayEnd(ObjTrav &ot, MemBaseVector &vec);
-    virtual void doMem(ObjTrav &ot, MemberBase &mem);
+    virtual void doObjBeg(ObjTravConst &ot, const ObjectBase &obj);
+    virtual void doObjEnd(ObjTravConst &ot, const ObjectBase &obj);
+    virtual void doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec);
+    virtual void doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec);
+    virtual void doMem(ObjTravConst &ot, const MemberBase &mem);
   private:
     JsonDumpData *data;
 
@@ -61,7 +61,7 @@ string  JsonOut::getString()
    return string(data->buffer.GetString(), data->buffer.GetSize());
 }
 
-void JsonOut::doObjBeg(ObjTrav &ot, ObjectBase &obj)
+void JsonOut::doObjBeg(ObjTravConst &ot, const ObjectBase &obj)
 { 
   if (not data->inArray.empty() and not data->inArray.top())
     data->writer.String(obj.name());
@@ -74,7 +74,7 @@ void JsonOut::doObjBeg(ObjTrav &ot, ObjectBase &obj)
   }
 }
 
-void JsonOut::doObjEnd(ObjTrav &ot, ObjectBase &obj)
+void JsonOut::doObjEnd(ObjTravConst &ot, const ObjectBase &obj)
 { 
   if (not obj.isNull())
   {
@@ -83,7 +83,7 @@ void JsonOut::doObjEnd(ObjTrav &ot, ObjectBase &obj)
   }
 }
 
-void JsonOut::doArrayBeg(ObjTrav &ot, MemBaseVector &vec)
+void JsonOut::doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec)
 { 
   data->writer.String(vec.name());
   if (vec.isNull() and vec.size() == 0)
@@ -95,7 +95,7 @@ void JsonOut::doArrayBeg(ObjTrav &ot, MemBaseVector &vec)
   }
 }
 
-void JsonOut::doArrayEnd(ObjTrav &ot, MemBaseVector &vec)
+void JsonOut::doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec)
 { 
   if (not vec.isNull() or vec.size() != 0)
   {
@@ -104,7 +104,7 @@ void JsonOut::doArrayEnd(ObjTrav &ot, MemBaseVector &vec)
   }
 }
 
-void JsonOut::doMem(ObjTrav &ot, MemberBase &mem)
+void JsonOut::doMem(ObjTravConst &ot, const MemberBase &mem)
 { 
   if (data->inArray.empty() or not data->inArray.top())
     data->writer.String(mem.name());
@@ -112,9 +112,9 @@ void JsonOut::doMem(ObjTrav &ot, MemberBase &mem)
     data->writer.Null();
   else
   {
-    Member<int> *mint = dynamic_cast<Member<int> *>(&mem);
-    Member<double> *mdouble = dynamic_cast<Member<double> *>(&mem);
-    Member<bool> *mbool = dynamic_cast<Member<bool> *>(&mem);
+    const Member<int> *mint = dynamic_cast<const Member<int> *>(&mem);
+    const Member<double> *mdouble = dynamic_cast<const Member<double> *>(&mem);
+    const Member<bool> *mbool = dynamic_cast<const Member<bool> *>(&mem);
     if (mbool)
       data->writer.Bool((*mbool)());
     else if (mint)
@@ -149,7 +149,7 @@ JsonDump::~JsonDump()
 }
 
 
-void JsonDump::doObjBeg(ObjTrav &ot, ObjectBase &obj)
+void JsonDump::doObjBeg(ObjTravConst &ot, const ObjectBase &obj)
 { 
   if (not data->inArray.empty() and not data->inArray.top())
     data->writer.String(obj.name());
@@ -162,7 +162,7 @@ void JsonDump::doObjBeg(ObjTrav &ot, ObjectBase &obj)
   }
 }
 
-void JsonDump::doObjEnd(ObjTrav &ot, ObjectBase &obj)
+void JsonDump::doObjEnd(ObjTravConst &ot, const ObjectBase &obj)
 { 
   if (not obj.isNull())
   {
@@ -171,7 +171,7 @@ void JsonDump::doObjEnd(ObjTrav &ot, ObjectBase &obj)
   }
 }
 
-void JsonDump::doArrayBeg(ObjTrav &ot, MemBaseVector &vec)
+void JsonDump::doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec)
 { 
   data->writer.String(vec.name());
   if (vec.isNull() and vec.size() == 0)
@@ -183,7 +183,7 @@ void JsonDump::doArrayBeg(ObjTrav &ot, MemBaseVector &vec)
   }
 }
 
-void JsonDump::doArrayEnd(ObjTrav &ot, MemBaseVector &vec)
+void JsonDump::doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec)
 { 
   if (not vec.isNull() or vec.size() != 0)
   {
@@ -192,7 +192,7 @@ void JsonDump::doArrayEnd(ObjTrav &ot, MemBaseVector &vec)
   }
 }
 
-void JsonDump::doMem(ObjTrav &ot, MemberBase &mem)
+void JsonDump::doMem(ObjTravConst &ot, const MemberBase &mem)
 { 
   if (data->inArray.empty() or not data->inArray.top())
     data->writer.String(mem.name());
@@ -200,9 +200,9 @@ void JsonDump::doMem(ObjTrav &ot, MemberBase &mem)
     data->writer.Null();
   else
   {
-    Member<int> *mint = dynamic_cast<Member<int> *>(&mem);
-    Member<double> *mdouble = dynamic_cast<Member<double> *>(&mem);
-    Member<bool> *mbool = dynamic_cast<Member<bool> *>(&mem);
+    const Member<int> *mint = dynamic_cast<const Member<int> *>(&mem);
+    const Member<double> *mdouble = dynamic_cast<const Member<double> *>(&mem);
+    const Member<bool> *mbool = dynamic_cast<const Member<bool> *>(&mem);
     if (mbool)
       data->writer.Bool((*mbool)());
     else if (mint)
