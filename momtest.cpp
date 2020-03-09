@@ -3,6 +3,8 @@
 #include "readjson.h"
 #include "dumpjson.h"
 
+#include <iostream>
+
 using namespace std;
 
 string js = 

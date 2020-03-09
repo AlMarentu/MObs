@@ -1,5 +1,6 @@
 
 #include "objpool.h"
+#include "logging.h"
 
 #include <iostream>
 #include <unordered_map>
@@ -21,8 +22,8 @@ namespace {
 
 class NOPData {
   public:
-    NOPData() { cerr << "NOPData" << endl;};
-    ~NOPData() { garbageCollect(); cerr << "~NOPData" << endl;};
+    NOPData() { TRACE(""); };
+    ~NOPData() { TRACE(""); garbageCollect(); };
     unordered_map<string, NOD> pool;
     void assign(string objName, shared_ptr<NamedObject> obj);
     bool lookup(string objName, weak_ptr<NamedObject> &ptr);
@@ -32,6 +33,7 @@ class NOPData {
 
 void NOPData::assign(string objName, shared_ptr<NamedObject> obj)
 {
+  TRACE(PARAM(objName));
   auto search = pool.find(objName);
   if (search != pool.end())
   {
@@ -58,6 +60,7 @@ void NOPData::assign(string objName, shared_ptr<NamedObject> obj)
 
 bool NOPData::lookup(string objName, weak_ptr<NamedObject> &ptr)
 {
+  TRACE(PARAM(objName));
   auto result = pool.find(objName);
   if (result == pool.end())
     return false;
@@ -67,22 +70,26 @@ bool NOPData::lookup(string objName, weak_ptr<NamedObject> &ptr)
 
 NamedObjPool::NamedObjPool()
 {
+  TRACE("");
   data = new NOPData();
 }
 
 NamedObjPool::~NamedObjPool()
 {
+  TRACE("");
   delete data;
   data = 0;
 }
 
 void NamedObjPool::assign(string objName, shared_ptr<NamedObject> obj)
 {
+  TRACE(PARAM(objName));
   return data->assign(objName, obj);
 }
 
 bool NamedObjPool::lookup(string objName, weak_ptr<NamedObject> &ptr)
 {
+  TRACE(PARAM(objName));
   return data->lookup(objName, ptr);
 }
 
@@ -106,6 +113,7 @@ void NOPData::garbageCollect()
 
 void NamedObjPool::garbageCollect()
 {
+  TRACE("");
   data->garbageCollect();
 }
 

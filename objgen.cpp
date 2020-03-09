@@ -1,4 +1,5 @@
 #include "objgen.h"
+//#include <iostream>
 
 using namespace std;
 
@@ -31,8 +32,8 @@ map<string, ObjectBase *(*)()> ObjectBase::createMap;
 
 void ObjectBase::regObject(string n, ObjectBase *fun())
 {
+  TRACE(PARAM(n));
   createMap[n] = fun;
-  cerr << "reg " << n << endl;
 }
 
 ObjectBase *ObjectBase::createObj(string n)

@@ -2,9 +2,9 @@
 
 #include<stack>
 #include<limits.h>
+#include<iostream>
 
 #define RAPIDJSON_HAS_STDSTRING 1
-#include "rapidjson/prettywriter.h"
 #include "rapidjson/filewritestream.h"
 #include "rapidjson/filereadstream.h"
 #include "rapidjson/reader.h"
@@ -21,16 +21,11 @@ using namespace rapidjson;
 
 
 
-
-
-class JsonReadData {
+class JsonReadData : public BaseReaderHandler<UTF8<>, JsonReadData> {
   public:
-    JsonReadData(const string &input) : json(input), buffer(), writer(buffer), my_count(0), my_errors(0) { path.resize(1); };
+    JsonReadData(const string &input) : json(input), my_count(0), my_errors(0) { path.resize(1); };
     ~JsonReadData() { };
     const string &json;
-    StringBuffer buffer;
-    PrettyWriter<StringBuffer> writer;
-
     stack<bool> inArray;
 
     class Objekt {
@@ -56,9 +51,9 @@ class JsonReadData {
 
   MemberBase *getMem()
   {
+    TRACE(PARAM(lastKey));
     if (not objekte.empty() and not lastKey.empty() and objekte.top().obj and objekte.top().inProgress)
     {
-      cerr << "GET MEM " << lastKey << endl;
       MemberBase *m = 0;
       if (objekte.top().vec)
       {
@@ -76,7 +71,8 @@ class JsonReadData {
       if (not m)
         m = objekte.top().obj->getMemInfo(lastKey);
       if (m)
-        cerr << "FOUNF " << lastKey << " " << m->name() << endl;
+        cerr << "FOUND " << lastKey << " " << m->name() << endl;
+      else
       {
         string p;
         for (auto &i:path)
@@ -90,7 +86,7 @@ class JsonReadData {
   };
 
   bool Null() {
-    cout << "Null()" << endl;
+    TRACE("");
     MemberBase *mem = getMem();
     if (mem and mem->nullAllowed())
     {
@@ -99,7 +95,7 @@ class JsonReadData {
     }
     return true; }
   bool Bool(bool b) {
-    cout << "Bool(" << boolalpha << b << ")" << endl;
+    TRACE(PARAM(b));
     MemberBase *mem = getMem();
     Member<bool> *mbool = dynamic_cast<Member<bool> *>(mem);
     if (mbool)
@@ -109,7 +105,7 @@ class JsonReadData {
     }
   return true; }
   bool Int(int i) {
-    cout << "Int(" << i << ")" << endl;
+    TRACE(PARAM(i));
     MemberBase *mem = getMem();
     Member<int> *mint = dynamic_cast<Member<int> *>(mem);
     Member<double> *mdouble = dynamic_cast<Member<double> *>(mem);
@@ -122,7 +118,7 @@ class JsonReadData {
     }
   return true; }
   bool Uint(unsigned u) {
-    cout << "Uint(" << u << ")" << endl;
+    TRACE(PARAM(u));
     MemberBase *mem = getMem();
     Member<int> *mint = dynamic_cast<Member<int> *>(mem);
     Member<double> *mdouble = dynamic_cast<Member<double> *>(mem);
@@ -137,26 +133,29 @@ class JsonReadData {
     }
   return true; }
   bool Int64(int64_t i) {
+    TRACE(PARAM(i));
     cout << "Int64(" << i << ")" << endl;
   return true; }
   bool Uint64(uint64_t u) {
+    TRACE(PARAM(u));
     cout << "Uint64(" << u << ")" << endl;
   return true; }
   bool Double(double d) {
+    TRACE(PARAM(d));
     cout << "Double(" << d << ")" << endl;
   return true; }
   bool RawNumber(const char* str, SizeType length, bool copy) {
+    TRACE(PARAM(str) << PARAM(length) << PARAM(copy));
     cout << "Number(" << str << ", " << length << ", " << boolalpha << copy << ")" << endl;
     return true;
   }
   bool String(const char* str, SizeType length, bool copy) {
-    cout << "String(" << str << ", " << length << ", " << boolalpha << copy << ")" << endl;
+    TRACE(PARAM(str) << PARAM(length) << PARAM(copy));
     MemberBase *mem = getMem();
     Member<int> *mint = dynamic_cast<Member<int> *>(mem);
     Member<double> *mdouble = dynamic_cast<Member<double> *>(mem);
     Member<bool> *mbool = dynamic_cast<Member<bool> *>(mem);
     Member<string> *mstring = dynamic_cast<Member<string> *>(mem);
-    cerr << "KJKKJKJ" << endl;
     if (mstring)
     {
       mstring->operator()(string(str, length));
@@ -165,7 +164,7 @@ class JsonReadData {
     return true;
   }
   bool StartObject() {
-    cout << "StartObject(" << ")" << endl;
+    TRACE(PARAM(lastKey));
     if (objekte.empty())
       throw runtime_error("JsonRead: Fatal: keine Objekt");
 
@@ -209,13 +208,13 @@ class JsonReadData {
     path.resize(path.size()+1);
     return true; }
   bool Key(const char* str, SizeType length, bool copy) {
+    TRACE(PARAM(str) << PARAM(length) << PARAM(copy));
     lastKey = string(str, length);
-    cout << "Key(" << str << ", " << length << ", " << boolalpha << copy << ")" << endl;
     path[path.size()-1] = lastKey;
     return true;
   }
   bool EndObject(SizeType memberCount) {
-    cout << "EndObject(" << memberCount << ")" << endl;
+    TRACE(PARAM(memberCount));
     if (not objekte.empty() and objekte.top().inProgress)
       objekte.pop();
     path.resize(path.size()-1);
@@ -224,7 +223,7 @@ class JsonReadData {
       //throw runtime_error("Objektstack underflow");
     return true; }
   bool StartArray() {
-    cout << "StartArray()" << endl;
+    TRACE("");
     if (not objekte.empty() and not lastKey.empty() and objekte.top().obj and objekte.top().inProgress)
     {
       MemBaseVector *v = objekte.top().obj->getVecInfo(lastKey);
@@ -236,7 +235,7 @@ class JsonReadData {
     }
     return true; }
   bool EndArray(SizeType elementCount) {
-    cout << "EndArray(" << elementCount << ")" << endl;
+    TRACE(PARAM(elementCount));
     if (not objekte.empty())
       objekte.top().vec = 0;
     return true; }
@@ -251,24 +250,27 @@ class JsonReadData {
 
 void JsonRead::parse()
 {
+  TRACE("");
   StringStream s(data->json.c_str());
   Reader reader;
   reader.Parse(s, *data);
-  cerr << "PARSE FERTIG" << endl;
 }
 
-JsonRead::JsonRead(const string &input) //: os(stdout, writeBuffer, sizeof(writeBuffer), writer(os)
+JsonRead::JsonRead(const string &input)
 {
+  TRACE("");
   data = new JsonReadData(input);
 }
 
 JsonRead::~JsonRead()
 {
+  TRACE("");
   delete data;
 }
 
 void JsonRead::fill(ObjectBase &obj)
 {
+  TRACE("");
   data->objekte.push(JsonReadData::Objekt(&obj, "", true));
   parse();
 }

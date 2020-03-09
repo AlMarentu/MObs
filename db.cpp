@@ -1,5 +1,10 @@
 #include <iostream>
 
+//#define NDEBUG
+#include "logging.h"
+
+
+
 #include "objgen.h"
 #include "objpool.h"
 
@@ -46,6 +51,7 @@ class KeyString : virtual public ObjTravConst {
     virtual void doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec) { };
     virtual void doMem(ObjTravConst &ot, const MemberBase &mem)
     {
+      TRACE("");
       if (mem.key() > 0)
       {
         keystr += ".";
@@ -62,14 +68,17 @@ class KeyString : virtual public ObjTravConst {
 
 FileDatabase::FileDatabase(string path) : base(path)
 {
+  TRACE(PARAM(path));
 }
 
 FileDatabase::~FileDatabase()
 {
+  TRACE("");
 }
 
 bool FileDatabase::load(ObjectBase &obj)
 {
+  TRACE(PARAM(obj.typName()));
   KeyString k;
   obj.traverse(k);
   stringstream fname;
@@ -80,6 +89,7 @@ bool FileDatabase::load(ObjectBase &obj)
     throw runtime_error(string("File open error ") + fname.str());
   ostringstream data;
   data << f.rdbuf();
+  cout << "DATA " << data.str() << endl;
   JsonRead j(data.str());
   j.fill(obj);
   return true;
@@ -87,12 +97,13 @@ bool FileDatabase::load(ObjectBase &obj)
 
 bool FileDatabase::load(list<ObjectBase> &result, string objType, string query)
 {
-  cerr << "FileDatabase::load " << objType << " query: " << query << endl;
+  TRACE(PARAM(objType) << PARAM(query));
   return true;
 }
 
 bool FileDatabase::save(const ObjectBase &obj)
 {
+  TRACE(PARAM(obj.typName()));
   KeyString k;
   obj.traverse(k);
   JsonOut j;
@@ -126,16 +137,16 @@ class Fahrzeug : virtual public NamedObject, virtual public ObjectBase
     MemVar(string, typ);
     MemVar(int, achsen);
 
-    void init() { achsen.nullAllowed(true); keylist << id; };
+    void init() { TRACE(""); achsen.nullAllowed(true); keylist << id; };
     // ist das nötig=?
-    string objName() const { return typName() + "." + std::to_string(id()); };
+    string objName() const { TRACE(""); return typName() + "." + std::to_string(id()); };
 };
 ObjRegister(Fahrzeug);
 
 int main(int argc, char* argv[])
 {
+  TRACE("");
   try {
-    cerr << "HHHH" << endl;
     shared_ptr<NamedObjPool> pool = make_shared<NamedObjPool>();
 
     NamedObjRef<Fahrzeug> f1(pool, "1");
@@ -143,6 +154,7 @@ int main(int argc, char* argv[])
     f1->id(1);
     f1->typ("Traktor");
     f1->achsen(2);
+    cout << "Fahrzeug[" << f1->id() << "] hat " << f1->achsen() << " Achsen und ist ein " << f1->typ() << endl;
 
     FileDatabase db("data");
     db.save(*f1);
@@ -154,7 +166,7 @@ int main(int argc, char* argv[])
       f2->id(2);
       db.load(*f2);
     }
-    cerr << "Fahrzeug[" << f2->id() << "] hat " << f2->achsen() << " Achsen und ist ein " << f2->typ() << endl;
+    cout << "Fahrzeug[" << f2->id() << "] hat " << f2->achsen() << " Achsen und ist ein " << f2->typ() << endl;
 
 
     list<ObjectBase> result;
