@@ -4,6 +4,7 @@
 #include<limits.h>
 #include<iostream>
 
+#define RAPIDJSON_PARSE_DEFAULT_FLAGS kParseValidateEncodingFlag | kParseNanAndInfFlag | kParseEscapedApostropheFlag
 #define RAPIDJSON_HAS_STDSTRING 1
 #include "rapidjson/filewritestream.h"
 #include "rapidjson/filereadstream.h"
@@ -110,11 +111,17 @@ class JsonReadData : public BaseReaderHandler<UTF8<>, JsonReadData> {
     Member<int> *mint = dynamic_cast<Member<int> *>(mem);
     Member<double> *mdouble = dynamic_cast<Member<double> *>(mem);
     Member<bool> *mbool = dynamic_cast<Member<bool> *>(mem);
+    Member<string> *mstring = dynamic_cast<Member<string> *>(mem);
     if (mint)
     {
       cerr << "MINT" << endl;
       mint->operator()(int(i));
       return true;
+    }
+    if (mstring)
+    {
+      cerr << "MSTRING" << endl;
+      mstring->operator()(to_string(i));
     }
   return true; }
   bool Uint(unsigned u) {
@@ -123,6 +130,7 @@ class JsonReadData : public BaseReaderHandler<UTF8<>, JsonReadData> {
     Member<int> *mint = dynamic_cast<Member<int> *>(mem);
     Member<double> *mdouble = dynamic_cast<Member<double> *>(mem);
     Member<bool> *mbool = dynamic_cast<Member<bool> *>(mem);
+    Member<string> *mstring = dynamic_cast<Member<string> *>(mem);
     if (mint)
     {
       cerr << "MINT" << endl;
@@ -130,6 +138,11 @@ class JsonReadData : public BaseReaderHandler<UTF8<>, JsonReadData> {
         throw runtime_error("INT_Overflow");
       mint->operator()(int(u));
       return true;
+    }
+    if (mstring)
+    {
+      cerr << "MSTRING" << endl;
+      mstring->operator()(to_string(u));
     }
   return true; }
   bool Int64(int64_t i) {
@@ -146,6 +159,7 @@ class JsonReadData : public BaseReaderHandler<UTF8<>, JsonReadData> {
   return true; }
   bool RawNumber(const char* str, SizeType length, bool copy) {
     TRACE(PARAM(str) << PARAM(length) << PARAM(copy));
+    throw runtime_error(u8"RapidJson keine String-Zahlen");
     cout << "Number(" << str << ", " << length << ", " << boolalpha << copy << ")" << endl;
     return true;
   }
@@ -156,17 +170,20 @@ class JsonReadData : public BaseReaderHandler<UTF8<>, JsonReadData> {
     Member<double> *mdouble = dynamic_cast<Member<double> *>(mem);
     Member<bool> *mbool = dynamic_cast<Member<bool> *>(mem);
     Member<string> *mstring = dynamic_cast<Member<string> *>(mem);
+    
     if (mstring)
     {
       mstring->operator()(string(str, length));
       return true;
     }
+    else if (mem)
+      throw runtime_error(u8"JSON: string statt Zahl in Variable " + mem->name());
     return true;
   }
   bool StartObject() {
     TRACE(PARAM(lastKey));
     if (objekte.empty())
-      throw runtime_error("JsonRead: Fatal: keine Objekt");
+      throw runtime_error(u8"JsonRead: Fatal: keine Objekt");
 
     if (not objekte.top().inProgress)
     {
@@ -208,7 +225,6 @@ class JsonReadData : public BaseReaderHandler<UTF8<>, JsonReadData> {
     path.resize(path.size()+1);
     return true; }
   bool Key(const char* str, SizeType length, bool copy) {
-    TRACE(PARAM(str) << PARAM(length) << PARAM(copy));
     lastKey = string(str, length);
     path[path.size()-1] = lastKey;
     return true;
@@ -217,10 +233,9 @@ class JsonReadData : public BaseReaderHandler<UTF8<>, JsonReadData> {
     TRACE(PARAM(memberCount));
     if (not objekte.empty() and objekte.top().inProgress)
       objekte.pop();
+    else
+      throw runtime_error(u8"Objektstack underflow");
     path.resize(path.size()-1);
-    if (objekte.empty())
-      cerr << "OBJ STACK EMPTY" << endl;
-      //throw runtime_error("Objektstack underflow");
     return true; }
   bool StartArray() {
     TRACE("");
@@ -253,7 +268,9 @@ void JsonRead::parse()
   TRACE("");
   StringStream s(data->json.c_str());
   Reader reader;
-  reader.Parse(s, *data);
+  ParseResult ok = reader.Parse(s, *data);
+  if (not ok)
+    throw runtime_error(string("Parsing failed ") + GetParseError_En(ok.Code()) + " at pos. " + to_string(ok.Offset()));
 }
 
 JsonRead::JsonRead(const string &input)

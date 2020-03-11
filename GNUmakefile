@@ -5,7 +5,7 @@ CXX     = clang++
 TARGETS		= mom hw db
 
 CPPFLAGS	= -I../rapidjson/include
-CXXFLAGS	= -std=c++11 -g
+CXXFLAGS	= -std=c++11 -g -Wall
 LDLIBS		= 
 LDFLAGS		= 
 

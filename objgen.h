@@ -136,8 +136,8 @@ class ObjectBase : public NullValue {
 template<typename T>
 class Member : virtual public MemberBase {
 public:
-  Member() : MemberBase("") { TRACE(""); };  // Konstruktor für Array
-  Member(std::string n, ObjectBase *o) : MemberBase(n) { TRACE(PARAM(n) << PARAM(this)); if (o) o->regMem(this); }; // Konst. f. Objekt
+  Member() : MemberBase(""), wert(T()) { TRACE(""); };  // Konstruktor für Array
+  Member(std::string n, ObjectBase *o) : MemberBase(n), wert(T()) { TRACE(PARAM(n) << PARAM(this)); if (o) o->regMem(this); }; // Konst. f. Objekt
   Member &operator=(const Member &other) = delete;
   ~Member() { TRACE(PARAM(m_name)); };
   T operator() () const { return wert; };

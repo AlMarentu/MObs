@@ -2,15 +2,18 @@
 #include "logging.h"
 
 namespace logging {
-  Trace::Trace (const char *f, std::stringstream &ostr) : fun(f)
+  Trace::Trace (const char *f, const std::string &str) : fun(f)
   {
-    std::cerr << "T B(" << ++lev << ") " << fun
-      << " with " << ostr.str() << std::endl;
+    if (traceOn)
+      std::cerr << "T B(" << ++lev << ") " << fun
+          << " with " << str << std::endl;
   }
 
   Trace::~Trace ()
   {
-    std::cerr << "T E(" << lev-- << ") " << fun << std::endl;
+    if (traceOn)
+      std::cerr << "T E(" << lev-- << ") " << fun << std::endl;
   }
   int Trace::lev = 0;
+  bool Trace::traceOn = false;
 }
