@@ -38,6 +38,7 @@ class FileDatabase : public DatabaseInterface
 
 #include "dumpjson.h"
 #include "readjson.h"
+#include "xmlout.h"
 #include <fstream>
 #include <sstream>
 
@@ -171,6 +172,13 @@ int main(int argc, char* argv[])
 
     list<ObjectBase> result;
     db.load(result, "Fahrzeug", "id = 2");
+    
+    XmlOut dx2;
+    dx2.startList("list");
+    f2->traverse(dx2);
+    f2->traverse(dx2);
+    cerr << dx2.getString() << endl;
+    
 
   }
   catch (exception &e)

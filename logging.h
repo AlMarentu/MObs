@@ -9,9 +9,9 @@ class Trace {
 public:
   Trace (const char *f, const std::string &str);
   ~Trace ();
+  static bool traceOn;
 private:
   static int lev;
-  static bool traceOn;
   const char *fun;
 };
 }

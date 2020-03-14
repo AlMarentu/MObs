@@ -16,20 +16,6 @@ using namespace std;
 using namespace rapidjson;
 
 
-class JsonDumpData;
-class JsonDump : virtual public ObjTravConst {
-  public:
-    JsonDump();
-    ~JsonDump();
-    virtual void doObjBeg(ObjTravConst &ot, const ObjectBase &obj);
-    virtual void doObjEnd(ObjTravConst &ot, const ObjectBase &obj);
-    virtual void doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec);
-    virtual void doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec);
-    virtual void doMem(ObjTravConst &ot, const MemberBase &mem);
-  private:
-    JsonDumpData *data;
-
-};
 
 class JsonOutData {
   public:
