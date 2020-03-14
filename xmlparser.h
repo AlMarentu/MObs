@@ -203,8 +203,8 @@ public:
       std::string element = getValue();
       if (element.empty())
         throw std::runtime_error("missing tag B");
-      StartTag(element);
       tags.push(element);
+      StartTag(element);
       for (;;)
       {
         if (peek() == '>')  // Ende eines Starttags
