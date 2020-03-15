@@ -148,6 +148,7 @@ public:
           saveValue();
           Cdata(&Xml[posS], posE-posS);
           clearValue();
+          lastKey = "";
           eat();
           eat();
         }
