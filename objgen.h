@@ -4,7 +4,7 @@
 #include <list>
 #include <map>
 #include <vector>
-#include <sstream>
+#include <stack>
 
 #include "logging.h"
 
@@ -194,6 +194,36 @@ class ObjTravConst {
     virtual void doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec) = 0;
     virtual void doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec) = 0;
     virtual void doMem(ObjTravConst &ot, const MemberBase &mem) = 0;
+};
+
+class ObjectInserter  {
+public:
+  
+  inline MemberBase *member() const { return memBase; };
+  inline const std::string &showName() const { return memName; };
+  void pushObject(ObjectBase &obj, const std::string &name = "<obj>");
+  bool enter(const std::string &element);
+  void exit(const std::string &element = "");
+  
+  
+  
+private:
+  class Objekt {
+  public:
+    Objekt(ObjectBase *o, const std::string &name) {
+      obj = o;
+      objName = name;
+    };
+    ~Objekt() {};
+    
+    std::string objName;
+    ObjectBase *obj = 0;
+  };
+  std::stack<Objekt> objekte;
+  std::stack<std::string> path;
+  
+  std::string memName;
+  MemberBase *memBase = 0;
 };
 
 template<class T>

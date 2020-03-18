@@ -1,4 +1,5 @@
 #include "readjson.h"
+#include "logging.h"
 
 #include<stack>
 #include<limits.h>

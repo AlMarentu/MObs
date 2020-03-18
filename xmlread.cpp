@@ -1,89 +1,100 @@
 #include "xmlread.h"
 #include "xmlparser.h"
+#include "logging.h"
+
 
 #include<stack>
-#include<limits.h>
-#include<iostream>
 
-
-using namespace std;
-
-class ObjectInserter  {
+#if 0
+class ObjectXXXInserter  {
 public:
-  ObjectInserter() { }
-  ~ObjectInserter() { }
   
   inline MemberBase *member() const { return memBase; };
-  string showpath() const {
-    string p;
-    for (auto &i:path)
-      p += i + "::";
-    return p;
+  inline const std::string &showName() const { return memName; };
+  void pushObject(ObjectBase &obj, const std::string &name = "<obj>") {
+    objekte.push(ObjectInserter::Objekt(&obj, name));
   }
-  void pushObject(ObjectBase &obj) {
-    objekte.push(ObjectInserter::Objekt(&obj, ""));
-  }
-  bool enter(const string &element) {
+  bool enter(const std::string &element) {
     TRACE(PARAM(element));
-    memBase = 0;
-    path.push_back(element);
+    path.push(element);
     
     if (objekte.empty())
-      throw runtime_error(u8"XmlRead: Fatal: keine Objekt");
+      throw std::runtime_error(u8"XmlRead: Fatal: keine Objekt");
     
-    cerr << "Sind im Object " << objekte.top().objName << endl;
-    ObjectBase *o = objekte.top().obj->getObjInfo(element);
-    if (o)
+    if (memBase)  // War bereits im Member -> als Dummy-Objekt tarnen
+      objekte.push(ObjectInserter::Objekt(nullptr, memName));
+    
+    memName = objekte.top().objName;
+    memBase = 0;
+//    LOG(LM_DEBUG, "Sind im Object " << memName);
+    if (objekte.top().obj)
     {
-      cerr << element << " ist ein Objekt" << endl;
-      objekte.push(ObjectInserter::Objekt(o, o->name()));
-      return true;
-    }
-    MemBaseVector *v = objekte.top().obj->getVecInfo(element);
-    if (v)
-    {
-      size_t s = v->size();
-      cerr << element << " ist ein Vector " << s << endl;
-      v->resize(s+1);
-      MemberBase *m = v->getMemInfo(s);
-      ObjectBase *o = v->getObjInfo(s);
+      ObjectBase *o = objekte.top().obj->getObjInfo(element);
       if (o)
       {
-        //          cerr << "Objekt" << endl;
-        objekte.push(ObjectInserter::Objekt(o, element));
+//        LOG(LM_INFO, element << " ist ein Objekt");
+        memName += "." + o->name();
+        objekte.push(ObjectInserter::Objekt(o, memName));
         return true;
       }
-      else if (m)
+      MemBaseVector *v = objekte.top().obj->getVecInfo(element);
+      if (v)
       {
-        //          cerr << "Member" << endl;
+        size_t s = v->size();
+//        LOG(LM_INFO, element << " ist ein Vector " << s);
+        memName += ".";
+        memName += v->name();
+        memName += "[";
+        memName += std::to_string(s);
+        memName += "]";
+        v->resize(s+1);
+        MemberBase *m = v->getMemInfo(s);
+        ObjectBase *o = v->getObjInfo(s);
+        if (o)
+        {
+          //          cerr << "Objekt" << endl;
+          objekte.push(ObjectInserter::Objekt(o, memName));
+          return true;
+        }
+        else if (m)
+        {
+          memName += m->name();
+          memBase = m;
+//          LOG(LM_INFO, "Member: " << memName)
+          return true;
+        }
+        objekte.push(ObjectInserter::Objekt(nullptr, memName));
+        
+        return false;
+      }
+      MemberBase *m = objekte.top().obj->getMemInfo(element);
+      if (m)
+      {
+        //        cerr << element << " ist ein Member" << endl;
+        memName += "." + m->name();
         memBase = m;
+//        LOG(LM_INFO, "Member: " << memName);
         return true;
       }
-      objekte.push(ObjectInserter::Objekt(nullptr, element));
-      
-      return false;
     }
-    MemberBase *m = objekte.top().obj->getMemInfo(element);
-    if (m)
-    {
-      //        cerr << element << " ist ein Member" << endl;
-      memBase = m;
-      return true;
-    }
-    cerr << element << " ist ein WeisNichtWas" << endl;
+    memName += ".";
+    memName += element;
+    objekte.push(ObjectInserter::Objekt(nullptr, memName));
+
+//    LOG(LM_INFO, memName << " ist ein WeisNichtWas");
     return false;
   }
-  void exit(const string &element = "") {
+  void exit(const std::string &element = "") {
     TRACE(PARAM(element));
     if (memBase)
       memBase = 0;
     else if (objekte.empty())
-      throw runtime_error(u8"Objektstack underflow");
+      throw std::runtime_error(u8"Objektstack underflow");
     else
       objekte.pop();
-    if (not element.empty() and path[path.size() -1] != element)
-      throw runtime_error(u8"exit Object expected " + path[path.size() -1] + " got " + element);
-    path.resize(path.size()-1);
+    if (not element.empty() and path.top() != element)
+      throw std::runtime_error(u8"exit Object expected " + path.top() + " got " + element);
+    path.pop();
   }
   
   
@@ -91,38 +102,37 @@ public:
 private:
   class Objekt {
   public:
-    Objekt(ObjectBase *o, const string &name) {
+    Objekt(ObjectBase *o, const std::string &name) {
       obj = o;
       objName = name;
-      cerr << "OBJ " << name << endl;
     };
     ~Objekt() {};
     
-    string objName;
+    std::string objName;
     ObjectBase *obj = 0;
   };
-  stack<Objekt> objekte;
-  vector<string> path;
+  std::stack<Objekt> objekte;
+  std::stack<std::string> path;
   
-
+  std::string memName;
   MemberBase *memBase = 0;
 };
-
+#endif
 
 
 
 class XmlReadData : public ObjectInserter, public XmlParser  {
 public:
-  XmlReadData(const string &input) : XmlParser(input) {  };
+  XmlReadData(const std::string &input) : XmlParser(input) {  };
   ~XmlReadData() { };
   
 // stack<bool> inArray;
   
-  string encoding;
+  std::string encoding;
     
-  void NullTag(const string &element) {
+  void NullTag(const std::string &element) {
     TRACE(PARAM(element));
-    cerr << "NULL " << element << endl;
+    LOG(LM_INFO, "NULL " << element);
 
     if (member() and member()->nullAllowed())
     {
@@ -130,48 +140,48 @@ public:
     }
     EndTag(element);
   };
-  void Attribut(const string &element, const string &attribut, const string &value) {
+  void Attribut(const std::string &element, const std::string &attribut, const std::string &value) {
     TRACE(PARAM(element) << PARAM(attribut)<< PARAM(value));
-    cerr << "Attribut " << element << " " << attribut << " " << value << endl;
+    LOG(LM_INFO, "Attribut " << element << " " << attribut << " " << value);
 
   };
-  void Value(const string &value) {
+  void Value(const std::string &value) {
     TRACE(PARAM(value));
-    cerr << "Value " << value << endl;
+    LOG(LM_INFO, "Value " << showName() << " = " << value);
     if (not member())
-      cerr << "Variable fehlt " << showpath() << endl;
+      LOG(LM_INFO, "Variable fehlt " << showName())
     else
       member()->fromStr(value);
   };
   void Cdata(const char *val, size_t len) {
-    string value(val, len);
+    std::string value(val, len);
     TRACE(PARAM(value));
-    cerr << "Cdata " << value << " atadC" << endl;
+    LOG(LM_INFO, "Cdata " << value << " atadC");
     if (not member())
-      cerr << "Variable fehlt " << showpath() << endl;
+      LOG(LM_WARNING, "Variable fehlt " << showName())
     else
       member()->fromStr(value);
   };
-  void StartTag(const string &element) {
+  void StartTag(const std::string &element) {
     TRACE(PARAM(element));
-    cerr << "Start " << element << " " << tagPath().size() <<  endl;
+    LOG(LM_INFO, "Start " << element << " " << tagPath().size());
 
     if (tagPath().size() <= 1)
       return;
     if (not enter(element))
-      cerr << element << " wurde nicht gefunden" << endl;
+      LOG(LM_INFO, element << " wurde nicht gefunden");
 
 
   }
-  void EndTag(const string &element) {
+  void EndTag(const std::string &element) {
     TRACE(PARAM(element));
-    cerr << "Ende " << element << endl;
+    LOG(LM_INFO, "Ende " << element);
     if (tagPath().size() > 1)
       exit(element);
   }
-  void ProcessingInstruction(const string &element, const string &attribut, const string &value) {
+  void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::string &value) {
     TRACE(PARAM(element) << PARAM(attribut)<< PARAM(value));
-    cerr << "ProcInst " << element << " " << attribut << " " << value << endl;
+    LOG(LM_INFO, "ProcInst " << element << " " << attribut << " " << value);
     if (element == "xml" and attribut == "encoding")
       encoding = value;
   }
@@ -179,7 +189,7 @@ public:
   
   
   private:
-    string prefix;;
+    std::string prefix;;
   };
   
   
@@ -190,7 +200,7 @@ public:
     data->parse();
   }
   
-  XmlRead::XmlRead(const string &input)
+  XmlRead::XmlRead(const std::string &input)
   {
     TRACE("");
     data = new XmlReadData(input);
@@ -208,12 +218,12 @@ public:
     data->pushObject(obj);
     try {
       parse();
-    } catch (exception &e) {
-      cerr << "Exception " << e.what() << endl;
+    } catch (std::exception &e) {
+      LOG(LM_INFO, "Exception " << e.what());
       size_t pos;
-      const string &xml = data->info(pos);
-      cerr << xml.substr(pos) << endl;
-      throw runtime_error(string("Parsing failed ") + " at pos. " + to_string(pos));
+      const std::string &xml = data->info(pos);
+          LOG(LM_INFO, xml.substr(pos));
+      throw std::runtime_error(std::string("Parsing failed ") + " at pos. " + std::to_string(pos));
     }
   }
   
