@@ -1,5 +1,26 @@
-#ifndef OBJGEN_H
-#define OBJGEN_H
+// Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
+// für Datenspeicherung und Transport
+//
+// Copyright 2020 Matthias Lautner
+//
+// This is part of MObs
+//
+// MObs is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+#ifndef MOBS_OBJGEN_H
+#define MOBS_OBJGEN_H
 
 #include <list>
 #include <map>
@@ -198,26 +219,28 @@ class ObjTravConst {
 
 class ObjectInserter  {
 public:
-  
+  /// Zeiger auf die aktuelle MemberVariable oder nullptr, falls es keine Variable ist
   inline MemberBase *member() const { return memBase; };
+  /// Name der aktuellen MemberVariablen, oder leer, falls es keine Variable ist
   inline const std::string &showName() const { return memName; };
+  /// Name des aktuell referenzierten Objektes/Variable, leer, falls der das Objekt abgearbeitet ist
+  inline const std::string current() const { return path.empty() ? "" : path.top(); };
+  /// Push eines Objektes auf den Objektstack, zum weiteren Abarbeiten
+  /// @param obj Objekt-Referenz
   void pushObject(ObjectBase &obj, const std::string &name = "<obj>");
+  /// gehe eine Ebene tiefer in die Objektstruktur, Rückgabe true, wenn das Element existiert
+  /// @param element Name des Elementes
   bool enter(const std::string &element);
-  void exit(const std::string &element = "");
-  
-  
+  /// Verlassen einer Ebene in der Objektstruktur; Exception, bei Struktur-Fehler
+  /// @param element Name des Elementes oder leer, wenn der Name der Struktur nicht geprüft werden soll
+void leave(const std::string &element = "");
   
 private:
   class Objekt {
   public:
-    Objekt(ObjectBase *o, const std::string &name) {
-      obj = o;
-      objName = name;
-    };
-    ~Objekt() {};
-    
-    std::string objName;
+    Objekt(ObjectBase *o, const std::string &name) : obj(o), objName(name) { };
     ObjectBase *obj = 0;
+    std::string objName;
   };
   std::stack<Objekt> objekte;
   std::stack<std::string> path;

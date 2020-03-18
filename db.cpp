@@ -165,6 +165,8 @@ int main(int argc, char* argv[])
     {
       f2.create();
       f2->id(2);
+      logging::Trace::traceOn = true;
+
       db.load(*f2);
     }
     cout << "Fahrzeug[" << f2->id() << "] hat " << f2->achsen() << " Achsen und ist ein " << f2->typ() << endl;
