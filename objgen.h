@@ -26,6 +26,7 @@
 #include <map>
 #include <vector>
 #include <stack>
+#include <limits>
 
 #include "logging.h"
 
@@ -86,6 +87,7 @@ public:
   std::string name() const { return m_name; };
   virtual void strOut(std::ostream &str) const  = 0;
   virtual std::string toStr() const  = 0;
+  virtual bool is_specialized() const  = 0;
   virtual void fromStr(const std::string &s) = 0;
   void traverse(ObjTrav &trav);
   void traverse(ObjTravConst &trav) const;
@@ -165,6 +167,7 @@ public:
   void operator() (const T &t) { TRACE(PARAM(this)); wert = t; };
   virtual void strOut(std::ostream &str) const { str << wert; };
   virtual std::string toStr() const { std::stringstream s; s << wert; return s.str(); };
+  virtual bool is_specialized() const { return std::numeric_limits<T>::is_specialized; };
   virtual void fromStr(const std::string &sin) { std::stringstream s; s.str(sin); T t; s >> t; operator()(t);  };
   void doCopy(const Member<T> &other) { operator()(other()); };
 private:
