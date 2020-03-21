@@ -268,3 +268,81 @@ void ObjectInserter::leave(const std::string &element) {
 void ObjectInserter::pushObject(ObjectBase &obj, const std::string &name) {
    objekte.push(ObjectInserter::Objekt(&obj, name));
  }
+
+namespace mobs {
+string to_string(const ObjectBase &obj) {
+
+class ObjDump : virtual public ObjTravConst {
+public:
+  virtual void doObjBeg(ObjTravConst &ot, const ObjectBase &obj)
+  {
+    if (not fst)
+      res << ",";
+    fst = true;
+    if (not obj.name().empty())
+      res << obj.name() << ":";
+    if (obj.isNull())
+      res << "null";
+    else
+      res << "{";
+  };
+  virtual void doObjEnd(ObjTravConst &ot, const ObjectBase &obj)
+  {
+    if (not obj.isNull())
+      res << "}";
+    fst = false;
+  };
+  virtual void doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec)
+  {
+    if (not fst)
+      res << ",";
+    fst = false;
+    res << vec.name() << ":[";
+  };
+  virtual void doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec)
+  {
+    res << "]";
+    fst = false;
+  };
+  virtual void doMem(ObjTravConst &ot, const MemberBase &mem)
+  {
+    if (not fst)
+      res << ",";
+    fst = false;
+    res << boolalpha << mem.name() << ":";
+    if (mem.isNull())
+      res << "null";
+    else if (mem.is_chartype())
+    {
+      res << '"';
+      string s = mem.toStr();
+      if (s.length() > 1 and s[0] != 0)
+      {
+        size_t pos = 0;
+        size_t pos2 = 0;
+        while ((pos = s.find('"', pos2)) != string::npos)
+        {
+          res << s.substr(pos2, pos - pos2) << "\\\"";
+          pos2 = pos+1;
+        }
+        res << s.substr(pos2);
+      }
+      res << '"';
+
+    }
+    else
+      mem.strOut(res);
+
+  };
+  std::string result() const { return res.str(); };
+private:
+  bool fst = true;
+  stringstream res;
+};
+  
+  ObjDump od;
+  obj.traverse(od);
+  return od.result();
+}
+
+}

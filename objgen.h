@@ -29,6 +29,7 @@
 #include <limits>
 
 #include "logging.h"
+#include "objtypes.h"
 
 #define MemVar(typ, name) Member<typ> name = Member<typ>(#name, this)
 #define MemVector(typ, name) MemberVector<Member<typ> > name = MemberVector<Member<typ> >(#name, this)
@@ -54,7 +55,7 @@ public: \
   static RegMe##name regme; \
 }; \
 RegMe##name RegMe##name::regme; \
-} 
+}
 
 
 class ObjTrav;
@@ -88,7 +89,8 @@ public:
   virtual void strOut(std::ostream &str) const  = 0;
   virtual std::string toStr() const  = 0;
   virtual bool is_specialized() const  = 0;
-  virtual void fromStr(const std::string &s) = 0;
+  virtual bool is_chartype() const = 0;
+  virtual bool fromStr(const std::string &s) = 0;
   void traverse(ObjTrav &trav);
   void traverse(ObjTravConst &trav) const;
   void key(int k) { m_key = k; };
@@ -98,6 +100,9 @@ protected:
   std::string m_name;
   int m_key = 0;
 };
+
+
+
 
 class ObjectBase;
 
@@ -156,6 +161,24 @@ class ObjectBase : public NullValue {
 
 };
 
+// ist typename ein Character-Typ
+template <typename T>
+inline bool mobschar(T) { return not std::numeric_limits<T>::is_specialized; };
+template <> inline bool mobschar(char) { return true; };
+template <> inline bool mobschar(char16_t) { return true; };
+template <> inline bool mobschar(char32_t) { return true; };
+template <> inline bool mobschar(wchar_t) { return true; };
+template <> inline bool mobschar(unsigned char) { return true; };
+template <> inline bool mobschar(signed char) { return true; };
+
+
+//template <typename T>
+//inline T mobsempty(T&) { return T(); };
+//template <> inline char mobsempty(char&) { return ' '; };
+//template <> inline signed char mobsempty(signed char&) { return ' '; };
+//template <> inline unsigned char mobsempty(unsigned char&) { return ' '; };
+
+
 template<typename T>
 class Member : virtual public MemberBase {
 public:
@@ -163,12 +186,15 @@ public:
   Member(std::string n, ObjectBase *o) : MemberBase(n), wert(T()) { TRACE(PARAM(n) << PARAM(this)); if (o) o->regMem(this); }; // Konst. f. Objekt
   Member &operator=(const Member &other) = delete;
   ~Member() { TRACE(PARAM(m_name)); };
-  T operator() () const { return wert; };
-  void operator() (const T &t) { TRACE(PARAM(this)); wert = t; };
-  virtual void strOut(std::ostream &str) const { str << wert; };
-  virtual std::string toStr() const { std::stringstream s; s << wert; return s.str(); };
+  inline T operator() () const { return wert; };
+  inline void operator() (const T &t) { TRACE(PARAM(this)); wert = t; };
+  virtual void strOut(std::ostream &str) const { str << mobs::to_string(wert); };
+//  virtual std::string toStr() const { std::stringstream s; s << wert; return s.str(); };
+  virtual std::string toStr() const { return mobs::to_string(wert); };
+//  virtual std::wstring toWStr2() const { return mobs::to_wstring(wert); };
   virtual bool is_specialized() const { return std::numeric_limits<T>::is_specialized; };
-  virtual void fromStr(const std::string &sin) { std::stringstream s; s.str(sin); T t; s >> t; operator()(t);  };
+  virtual bool is_chartype() const { return mobschar(wert); };
+  virtual bool fromStr(const std::string &sin) { return mobs::string2x(sin, wert); };
   void doCopy(const Member<T> &other) { operator()(other()); };
 private:
   T wert;
@@ -306,5 +332,10 @@ void MemberVector<T>::doCopy(const MemBaseVector &other)
     throw std::runtime_error("MemberVector::doCopy invalid");
   doCopy(*t);
 };
+
+namespace mobs {
+  std::string to_string(const ObjectBase &obj);
+  //std::wstring to_wstring(const ObjectBase &obj);
+}
 
 #endif
