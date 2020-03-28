@@ -21,6 +21,9 @@
 
 #include "objgen.h"
 
+
+namespace mobs {
+
 class JsonOutData;
 class JsonOut : virtual public ObjTravConst {
   public:
@@ -53,3 +56,5 @@ class JsonDump : virtual public ObjTravConst {
     JsonDumpData *data;
 
 };
+
+}

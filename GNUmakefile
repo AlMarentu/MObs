@@ -34,3 +34,6 @@ tests: mobs.a googletest/testObjgen.o
 	$(CXX) $(LDFLAGS) $(LDLIBS) -lgtest_main  -lgtest -o $@ $^
 # -lpthread
 
+doc: 
+	doxygen doxygen.conf
+

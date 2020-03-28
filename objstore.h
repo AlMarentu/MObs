@@ -25,6 +25,7 @@
 #include <iostream>
 #include <string>
 
+namespace mobs {
 
 class NOObjInterface()
 {
@@ -34,4 +35,4 @@ class NOObjInterface()
   bool load(ObjectBase &obj);
 };
 
-
+}

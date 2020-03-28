@@ -31,9 +31,9 @@
 #include "logging.h"
 #include "objtypes.h"
 
-#define MemVar(typ, name) Member<typ> name = Member<typ>(#name, this)
-#define MemVector(typ, name) MemberVector<Member<typ> > name = MemberVector<Member<typ> >(#name, this)
-#define ObjVector(typ, name) MemberVector<typ> name = MemberVector<typ>(#name, this)
+#define MemVar(typ, name) mobs::Member<typ> name = mobs::Member<typ>(#name, this)
+#define MemVector(typ, name) mobs::MemberVector<mobs::Member<typ> > name = mobs::MemberVector<mobs::Member<typ> >(#name, this)
+#define ObjVector(typ, name) mobs::MemberVector<typ> name = mobs::MemberVector<typ>(#name, this)
 #define ObjVar(typ, name) typ name = typ(#name, this)
 #define ObjInit(objname) \
   objname() { TRACE(""); keylist.reset(); init(); }; \
@@ -51,12 +51,13 @@
 namespace  { \
 class RegMe##name { \
 public: \
-  RegMe##name() { ObjectBase::regObject(#name, name::createMe); }; \
+  RegMe##name() { mobs::ObjectBase::regObject(#name, name::createMe); }; \
   static RegMe##name regme; \
 }; \
 RegMe##name RegMe##name::regme; \
 }
 
+namespace mobs {
 
 class ObjTrav;
 class ObjTravConst;
@@ -87,6 +88,7 @@ public:
   virtual ~MemberBase() {};
   std::string name() const { return m_name; };
   virtual void strOut(std::ostream &str) const  = 0;
+  virtual void clear() = 0;
   virtual std::string toStr() const  = 0;
   virtual bool is_specialized() const  = 0;
   virtual bool is_chartype() const = 0;
@@ -189,6 +191,7 @@ public:
   inline T operator() () const { return wert; };
   inline void operator() (const T &t) { TRACE(PARAM(this)); wert = t; };
   virtual void strOut(std::ostream &str) const { str << mobs::to_string(wert); };
+  virtual void clear()  { wert = T(); };
 //  virtual std::string toStr() const { std::stringstream s; s << wert; return s.str(); };
   virtual std::string toStr() const { return mobs::to_string(wert); };
 //  virtual std::wstring toWStr2() const { return mobs::to_wstring(wert); };
@@ -333,9 +336,9 @@ void MemberVector<T>::doCopy(const MemBaseVector &other)
   doCopy(*t);
 };
 
-namespace mobs {
   std::string to_string(const ObjectBase &obj);
   //std::wstring to_wstring(const ObjectBase &obj);
+  void string2Obj(const std::string &str, ObjectBase &obj);
 }
 
 #endif

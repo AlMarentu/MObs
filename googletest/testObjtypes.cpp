@@ -1,20 +1,31 @@
+// Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
+// für Datenspeicherung und Transport
 //
-//  testObjgen.cpp
-//  mobs
+// Copyright 2020 Matthias Lautner
 //
-//  Created by Matthias Lautner on 19.03.20.
-//  Copyright © 2020 Matthias Lautner. All rights reserved.
+// This is part of MObs https://github.com/AlMarentu/MObs.git
 //
+// MObs is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 
 #include "objtypes.h"
 #include "objtypes.h"
+
 
 #include <stdio.h>
 #include <sstream>
 #include <gtest/gtest.h>
-
-using namespace std;
-using namespace mobs;
 
 
 namespace {
@@ -43,104 +54,104 @@ TEST(objtypeTest, to_string) {
 TEST(objtypeTest, string2x) {
 
   char32_t c32;
-  ASSERT_TRUE(string2x(u8"a", c32));
+  ASSERT_TRUE(mobs::string2x(u8"a", c32));
   EXPECT_EQ(U'a', c32);
-  EXPECT_FALSE(string2x(u8"ab", c32));
-  ASSERT_TRUE(string2x(u8"", c32));
+  EXPECT_FALSE(mobs::string2x(u8"ab", c32));
+  ASSERT_TRUE(mobs::string2x(u8"", c32));
   EXPECT_EQ(U'\U00000000', c32);
 
   char c;
-  ASSERT_FALSE(string2x(u8"\u2018", c));
-  ASSERT_TRUE(string2x(u8"a", c));
+  ASSERT_FALSE(mobs::string2x(u8"\u2018", c));
+  ASSERT_TRUE(mobs::string2x(u8"a", c));
   EXPECT_EQ('a', c);
-  ASSERT_TRUE(string2x(u8"ö", c));
+  ASSERT_TRUE(mobs::string2x(u8"ö", c));
   EXPECT_EQ(char(246), c);
 
   wchar_t w;
-  ASSERT_TRUE(string2x(u8"ü", w));
+  ASSERT_TRUE(mobs::string2x(u8"ü", w));
   EXPECT_EQ(wchar_t(252), w);
 
-  ASSERT_TRUE(string2x(u8"\u2018", w));
+  ASSERT_TRUE(mobs::string2x(u8"\u2018", w));
   EXPECT_EQ(L'\u2018', w);
   
   int i;
-  ASSERT_TRUE(string2x(u8"12345", i));
+  ASSERT_TRUE(mobs::string2x(u8"12345", i));
   EXPECT_EQ(12345, i);
-  ASSERT_TRUE(string2x(u8"-998", i));
+  ASSERT_TRUE(mobs::string2x(u8"-998", i));
   EXPECT_EQ(-998, i);
   EXPECT_EQ(-998, i);
-  ASSERT_TRUE(string2x(u8" 30000", i));
+  ASSERT_TRUE(mobs::string2x(u8" 30000", i));
   EXPECT_EQ(30000, i);
-  ASSERT_TRUE(string2x(u8"+99", i));
+  ASSERT_TRUE(mobs::string2x(u8"+99", i));
   EXPECT_EQ(99, i);
 
-  EXPECT_FALSE(string2x(u8"998 ", i));
-  EXPECT_FALSE(string2x(u8"- 998", i));
-  EXPECT_FALSE(string2x(u8"+ 998", i));
-  EXPECT_FALSE(string2x(u8"9a98", i));
-  EXPECT_FALSE(string2x(u8"3.14", i));
-  EXPECT_FALSE(string2x(u8"30000000000", i));
-  EXPECT_FALSE(string2x(u8"", i));
+  EXPECT_FALSE(mobs::string2x(u8"998 ", i));
+  EXPECT_FALSE(mobs::string2x(u8"- 998", i));
+  EXPECT_FALSE(mobs::string2x(u8"+ 998", i));
+  EXPECT_FALSE(mobs::string2x(u8"9a98", i));
+  EXPECT_FALSE(mobs::string2x(u8"3.14", i));
+  EXPECT_FALSE(mobs::string2x(u8"30000000000", i));
+  EXPECT_FALSE(mobs::string2x(u8"", i));
   
   unsigned short int usi;
-  ASSERT_TRUE(string2x(u8"12345", usi));
+  ASSERT_TRUE(mobs::string2x(u8"12345", usi));
   EXPECT_EQ(12345, usi);
-  EXPECT_FALSE(string2x(u8"-998 ", usi));
+  EXPECT_FALSE(mobs::string2x(u8"-998 ", usi));
   
   float f;
-  ASSERT_TRUE(string2x(u8"12.345", f));
+  ASSERT_TRUE(mobs::string2x(u8"12.345", f));
   EXPECT_FLOAT_EQ(12.345, f);
-  EXPECT_FALSE(string2x(u8"9,98", f));
+  EXPECT_FALSE(mobs::string2x(u8"9,98", f));
 
   double d;
-  ASSERT_TRUE(string2x(u8"-12.345", d));
+  ASSERT_TRUE(mobs::string2x(u8"-12.345", d));
   EXPECT_DOUBLE_EQ(-12.345, d);
-  EXPECT_FALSE(string2x(u8"9,98", d));
+  EXPECT_FALSE(mobs::string2x(u8"9,98", d));
   
   bool b;
-  ASSERT_TRUE(string2x(u8"true", b));
+  ASSERT_TRUE(mobs::string2x(u8"true", b));
   EXPECT_TRUE(b);
-  ASSERT_TRUE(string2x(u8"false", b));
+  ASSERT_TRUE(mobs::string2x(u8"false", b));
   EXPECT_FALSE(b);
 
-  EXPECT_FALSE(string2x(u8"1", b));
+  EXPECT_FALSE(mobs::string2x(u8"1", b));
 
   unsigned char uc;
-  ASSERT_FALSE(string2x(u8"\u2018", uc));
-  ASSERT_TRUE(string2x(u8"a", uc));
+  ASSERT_FALSE(mobs::string2x(u8"\u2018", uc));
+  ASSERT_TRUE(mobs::string2x(u8"a", uc));
   EXPECT_EQ('a', uc);
-  ASSERT_TRUE(string2x(u8"ö", uc));
+  ASSERT_TRUE(mobs::string2x(u8"ö", uc));
   EXPECT_EQ((unsigned char)(246), uc);
 
   signed char sc;
-  ASSERT_FALSE(string2x(u8"\u2018", sc));
-  ASSERT_TRUE(string2x(u8"a", sc));
+  ASSERT_FALSE(mobs::string2x(u8"\u2018", sc));
+  ASSERT_TRUE(mobs::string2x(u8"a", sc));
   EXPECT_EQ('a', sc);
-  ASSERT_TRUE(string2x(u8"ö", sc));
+  ASSERT_TRUE(mobs::string2x(u8"ö", sc));
   EXPECT_EQ((signed char)(246), sc);
 
-  string s;
-  ASSERT_TRUE(string2x(u8" Hallo ä0ß \u2020 +", s));
+  std::string s;
+  ASSERT_TRUE(mobs::string2x(u8" Hallo ä0ß \u2020 +", s));
   EXPECT_EQ(u8" Hallo ä0ß \u2020 +", s);
-  ASSERT_TRUE(string2x(u8"", s));
+  ASSERT_TRUE(mobs::string2x(u8"", s));
   EXPECT_EQ(u8"", s);
 
-  u32string s32;
-  ASSERT_TRUE(string2x(u8" Hallo ä0ß \u2020 +", s32));
+  std::u32string s32;
+  ASSERT_TRUE(mobs::string2x(u8" Hallo ä0ß \u2020 +", s32));
   EXPECT_EQ(U" Hallo ä0ß \U00002020 +", s32);
-  ASSERT_TRUE(string2x(u8"", s32));
+  ASSERT_TRUE(mobs::string2x(u8"", s32));
   EXPECT_EQ(U"", s32);
 
-  u16string s16;
-  ASSERT_TRUE(string2x(u8" Hallo ä0ß \u2020 +", s16));
+  std::u16string s16;
+  ASSERT_TRUE(mobs::string2x(u8" Hallo ä0ß \u2020 +", s16));
   EXPECT_EQ(u" Hallo ä0ß \u2020 +", s16);
-  ASSERT_TRUE(string2x(u8"", s16));
+  ASSERT_TRUE(mobs::string2x(u8"", s16));
   EXPECT_EQ(u"", s16);
 
-  wstring ws;
-  ASSERT_TRUE(string2x(u8" Hallo ä0ß \u2020 +", ws));
+  std::wstring ws;
+  ASSERT_TRUE(mobs::string2x(u8" Hallo ä0ß \u2020 +", ws));
   EXPECT_EQ(L" Hallo ä0ß \u2020 +", ws);
-  ASSERT_TRUE(string2x(u8"", ws));
+  ASSERT_TRUE(mobs::string2x(u8"", ws));
   EXPECT_EQ(L"", ws);
 
 

@@ -3,7 +3,7 @@
 //
 // Copyright 2020 Matthias Lautner
 //
-// This is part of MObs
+// This is part of MObs https://github.com/AlMarentu/MObs.git
 //
 // MObs is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
@@ -30,6 +30,7 @@
 
 using namespace std;
 
+namespace mobs {
 
 
 class XmlOutData {
@@ -172,4 +173,6 @@ void XmlOut::doMem(ObjTravConst &ot, const MemberBase &mem)
       }
     data->buffer << u8"</" << data->prefix << name << u8">\n";
   }
+}
+
 }

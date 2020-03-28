@@ -21,6 +21,8 @@
 
 #include "objgen.h"
 
+namespace mobs {
+
 class XmlOutData;
 class XmlOut : virtual public ObjTravConst {
   public:
@@ -39,3 +41,6 @@ class XmlOut : virtual public ObjTravConst {
     XmlOutData *data;
 
 };
+
+}
+

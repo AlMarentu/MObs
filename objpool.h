@@ -26,6 +26,8 @@
 #include <string>
 #include <memory>
 
+namespace mobs {
+
 
 class NamedObject
 {
@@ -99,5 +101,6 @@ class NamedObjRef
 
 };
 
+}
 
 #endif

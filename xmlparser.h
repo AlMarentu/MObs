@@ -22,9 +22,13 @@
 #ifndef MOBS_XMLPARSER_H
 #define MOBS_XMLPARSER_H
 
+#include "logging.h"
+
 #include<stack>
 #include<exception>
 #include<iostream>
+
+namespace mobs {
 
 /*! \class XmlParser
     \brief Einfacher XML-Parser.
@@ -394,6 +398,6 @@ public:
   std::string lastKey;
   
 };
-  
+}
   
 #endif

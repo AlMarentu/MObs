@@ -3,7 +3,7 @@
 //
 // Copyright 2020 Matthias Lautner
 //
-// This is part of MObs
+// This is part of MObs https://github.com/AlMarentu/MObs.git
 //
 // MObs is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
@@ -35,6 +35,7 @@
 using namespace std;
 using namespace rapidjson;
 
+namespace mobs {
 
 
 class JsonOutData {
@@ -218,4 +219,6 @@ void JsonDump::doMem(ObjTravConst &ot, const MemberBase &mem)
     else
       data->writer.String(mem.toStr());
   }
+}
+
 }

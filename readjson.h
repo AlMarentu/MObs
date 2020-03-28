@@ -21,6 +21,8 @@
 
 #include "objgen.h"
 
+namespace mobs {
+
 class JsonReadData;
 class JsonRead {
   public:
@@ -33,3 +35,4 @@ class JsonRead {
 
 };
 
+}

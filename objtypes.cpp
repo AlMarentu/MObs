@@ -3,7 +3,7 @@
 //
 // Copyright 2020 Matthias Lautner
 //
-// This is part of MObs
+// This is part of MObs https://github.com/AlMarentu/MObs.git
 //
 // MObs is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
@@ -104,6 +104,7 @@ string to_string(const ObjectBase &obj) {
 #endif
 
 template<>
+/// \private
 bool string2x(const std::string &str, char32_t &t) {
   std::u32string s = mobs::to_u32string(str);
   if (s.length() > 1)
@@ -113,6 +114,7 @@ bool string2x(const std::string &str, char32_t &t) {
 };
 
 template<>
+/// \private
 bool string2x(const std::string &str, char &t) {
   char32_t c;
   if (not string2x(str, c))
@@ -124,6 +126,7 @@ bool string2x(const std::string &str, char &t) {
 };
 
 template<>
+/// \private
 bool string2x(const std::string &str, signed char &t) {
   char32_t c;
   if (not string2x(str, c))
@@ -135,6 +138,7 @@ bool string2x(const std::string &str, signed char &t) {
 };
 
 template<>
+/// \private
 bool string2x(const std::string &str, unsigned char &t) {
   char32_t c;
   if (not string2x(str, c))
@@ -146,6 +150,7 @@ bool string2x(const std::string &str, unsigned char &t) {
 };
 
 template<>
+/// \private
 bool string2x(const std::string &str, char16_t &t) {
   char32_t c;
   if (not string2x(str, c))
@@ -157,6 +162,7 @@ bool string2x(const std::string &str, char16_t &t) {
 };
 
 template<>
+/// \private
 bool string2x(const std::string &str, wchar_t &t) {
   char32_t c;
   if (not string2x(str, c))
@@ -168,6 +174,7 @@ bool string2x(const std::string &str, wchar_t &t) {
 };
 
 template<>
+/// \private
 bool string2x(const std::string &str, bool &t) {
   if (str == "true")
     t = true;

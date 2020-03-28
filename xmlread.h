@@ -21,6 +21,8 @@
 
 #include "objgen.h"
 
+namespace mobs {
+
 class XmlReadData;
 class XmlRead {
   public:
@@ -33,3 +35,4 @@ class XmlRead {
 
 };
 
+}

@@ -3,7 +3,7 @@
 //
 // Copyright 2020 Matthias Lautner
 //
-// This is part of MObs
+// This is part of MObs https://github.com/AlMarentu/MObs.git
 //
 // MObs is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
@@ -22,7 +22,24 @@
 #include <iostream>
 #include "logging.h"
 
+/*! \def PARAM(x)
+ \brief Hilfs-Makro für TRACE, stellt Parameternamen vor Inhalt.
+ */
+
+/*! \def TRACE(x)
+\brief Makro für Tracing
+ */
+
+/*! \def LOG(level, stream Inhalt
+\brief Erzeugt eine Logmeldung aud stderr
+ */
+
 namespace logging {
+
+/// \brief Logmeldung ausgeben, interne Funktion, bitte Makro LOG() verwenden
+/// \see LOG(l, x)
+/// @param l Log-Level
+/// @param message Inhalt der Log-Meldung
 void logMessage(loglevel l, const std::string &message)
   {
     char c = ' ';
@@ -38,6 +55,7 @@ void logMessage(loglevel l, const std::string &message)
   }
 
 
+  
   Trace::Trace (const char *f, const std::string &str) : fun(f)
   {
     if (traceOn)
@@ -45,6 +63,7 @@ void logMessage(loglevel l, const std::string &message)
           << " with " << str << std::endl;
   }
 
+  /// Destruktor
   Trace::~Trace ()
   {
     if (traceOn)

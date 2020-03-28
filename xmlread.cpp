@@ -3,7 +3,7 @@
 //
 // Copyright 2020 Matthias Lautner
 //
-// This is part of MObs
+// This is part of MObs https://github.com/AlMarentu/MObs.git
 //
 // MObs is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
@@ -27,6 +27,7 @@
 #include<stack>
 
 
+namespace mobs {
 
 class XmlReadData : public ObjectInserter, public XmlParser  {
 public:
@@ -130,4 +131,4 @@ public:
     }
   }
   
-  
+}
