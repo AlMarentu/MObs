@@ -195,6 +195,23 @@ void ObjectBase::doCopy(const ObjectBase &other)
 }
 
 /////////////////////////////////////////////////
+/// ObjectBae::clear
+/////////////////////////////////////////////////
+
+void ObjectBase::clear()
+{
+  for (auto const &m:mlist)
+  {
+    if (m.mem)
+      m.mem->clear();
+    if (m.vec)
+      m.vec->resize(0);
+    if (m.obj)
+      m.obj->clear();
+  }
+}
+
+/////////////////////////////////////////////////
 /// Object Inserter
 /////////////////////////////////////////////////
 
@@ -293,13 +310,10 @@ void ObjectInserter::pushObject(ObjectBase &obj, const std::string &name) {
 /// to_string
 /////////////////////////////////////////////////
 
-
-
-string to_string(const ObjectBase &obj) {
-
+namespace  {
 class ObjDump : virtual public ObjTravConst {
 public:
-  ObjDump() { inArray.push(false); };
+  ObjDump(bool quote) : quoteKeys(quote ? "\"":"") { inArray.push(false); };
   virtual void doObjBeg(ObjTravConst &ot, const ObjectBase &obj)
   {
     inArray.push(false);
@@ -307,7 +321,7 @@ public:
       res << ",";
     fst = true;
     if (not obj.name().empty())
-      res << obj.name() << ":";
+      res << quoteKeys << obj.name() << quoteKeys << ":";
     if (obj.isNull())
       res << "null";
     else
@@ -326,7 +340,7 @@ public:
     if (not fst)
       res << ",";
     fst = true;
-    res << vec.name() << ":[";
+    res << quoteKeys << vec.name() << quoteKeys << ":[";
   };
   virtual void doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec)
   {
@@ -340,7 +354,7 @@ public:
       res << ",";
     fst = false;
     if (not inArray.empty() and not inArray.top())
-      res << boolalpha << mem.name() << ":";
+      res << boolalpha << quoteKeys << mem.name() << quoteKeys << ":";
     if (mem.isNull())
       res << "null";
     else if (mem.is_chartype())
@@ -367,12 +381,26 @@ public:
   };
   std::string result() const { return res.str(); };
 private:
+  std::string quoteKeys;
   bool fst = true;
   stringstream res;
   stack<bool> inArray;
 };
+
+}
+
+
+string to_string(const ObjectBase &obj)
+{
+  ObjDump od(false);
   
-  ObjDump od;
+  obj.traverse(od);
+  return od.result();
+}
+
+string to_json(const ObjectBase &obj)
+{
+  ObjDump od(true);
   
   obj.traverse(od);
   return od.result();

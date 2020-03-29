@@ -81,18 +81,19 @@ void parse(string s) { JParser p(s); p.parse(); };
 TEST(parserTest, jsonStruct1) {
   
   EXPECT_NO_THROW(parse(u8"{}"));
-  EXPECT_NO_THROW(parse(u8""));  // Obacht
   EXPECT_NO_THROW(parse(u8"[{}]"));
   EXPECT_NO_THROW(parse(u8"{ \"a\" : 1 }"));
-  EXPECT_ANY_THROW(parse(u8"\"a\":1"));// { fehlt  JParser p5();
-  EXPECT_ANY_THROW(parse(u8"{[]}"));
   EXPECT_NO_THROW(parse(u8"{a:[]}"));
   EXPECT_NO_THROW(parse(u8"[]"));
+
+  EXPECT_ANY_THROW(parse(u8""));
+  EXPECT_ANY_THROW(parse(u8"\"a\":1"));
+  EXPECT_ANY_THROW(parse(u8"{[]}"));
   EXPECT_ANY_THROW(parse(u8"{a:b,[]}"));
   EXPECT_ANY_THROW(parse(u8"{a:b:c}"));
   EXPECT_ANY_THROW(parse(u8"{a,b}"));
   EXPECT_ANY_THROW(parse(u8"{a:[a:b]}"));
-  EXPECT_NO_THROW(parse(u8"{a:[a,b,]}")); // TODO ???
+  EXPECT_ANY_THROW(parse(u8"{a:[a,b,]}"));
 
 }
 

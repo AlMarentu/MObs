@@ -8,6 +8,8 @@
 #include "objgen.h"
 #include "objpool.h"
 
+using namespace mobs;
+
 class DatabaseInterface
 {
   public:
@@ -36,8 +38,6 @@ class FileDatabase : public DatabaseInterface
 
 ////////////////
 
-#include "dumpjson.h"
-#include "readjson.h"
 #include "xmlout.h"
 #include <fstream>
 #include <sstream>
@@ -91,8 +91,8 @@ bool FileDatabase::load(ObjectBase &obj)
   ostringstream data;
   data << f.rdbuf();
   cout << "DATA " << data.str() << endl;
-  JsonRead j(data.str());
-  j.fill(obj);
+  string2Obj(data.str(), obj);
+
   return true;
 }
 
@@ -107,14 +107,12 @@ bool FileDatabase::save(const ObjectBase &obj)
   TRACE(PARAM(obj.typName()));
   KeyString k;
   obj.traverse(k);
-  JsonOut j;
-  obj.traverse(j);
   stringstream fname;
   fname << base << "/" << obj.typName() << k.key();
   fstream f(fname.str(), f.trunc | f.out);
   if (not f.is_open())
     throw runtime_error(string("File open error ") + fname.str());
-  f << j.getString() << endl;
+  f << to_json(obj) << endl;
   f.close();
   if (f.fail())
     throw runtime_error(string("File write error ") + fname.str());
@@ -165,7 +163,7 @@ int main(int argc, char* argv[])
     {
       f2.create();
       f2->id(2);
-      logging::Trace::traceOn = true;
+//      logging::Trace::traceOn = true;
 
       db.load(*f2);
     }

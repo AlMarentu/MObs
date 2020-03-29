@@ -3,7 +3,7 @@
 //
 // Copyright 2020 Matthias Lautner
 //
-// This is part of MObs
+// This is part of MObs https://github.com/AlMarentu/MObs.git
 //
 // MObs is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
@@ -18,16 +18,21 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+/** \file xmlread.h
+\brief optionale Klasse um Objekte aus einen XML-String auszulesen */
 
 #include "objgen.h"
 
 namespace mobs {
 
 class XmlReadData;
+/// KLasse um Objekte aus XML einzulesen
 class XmlRead {
   public:
+  /// Konstruktor mit XML initialisieren
     XmlRead(const std::string &input);
     ~XmlRead();
+  /// Objekt aus Daten füllen
     void fill(ObjectBase &obj);
   private:
     XmlReadData *data;

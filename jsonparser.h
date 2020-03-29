@@ -3,7 +3,7 @@
 //
 // Copyright 2020 Matthias Lautner
 //
-// This is part of MObs
+// This is part of MObs https://github.com/AlMarentu/MObs.git
 //
 // MObs is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
@@ -18,6 +18,8 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+/** \file jsonparser.h
+\brief EInfacher JSON-Parser */
 
 #ifndef MOBS_JSONPARSER_H
 #define MOBS_JSONPARSER_H
@@ -31,8 +33,7 @@ namespace mobs {
 
 /*! \class JsonParser
     \brief Einfacher JSON-Parser.
-    Virtuelle Basisklasse mit Callback-Funktionen. 
-    Im Fehlerfall werden exceptions geworfen.
+    Virtuelle Basisklasse mit Callback-Funktionen.
 \code
 concept JsonParser {
     JsonParser(const std::string &input);
@@ -47,8 +48,7 @@ concept JsonParser {
     void EndArray();
     void StartObject();
     void EndObject();
- 
-};
+ };
 \endcode
 */
 
@@ -58,30 +58,52 @@ concept JsonParser {
 /// Einfacher JSON-Parser - Basisklasse
 class JsonParser  {
 public:
+  /*! Generiere Parser-Objekt
+   @param input JSON Text zum Parsen
+   */
   JsonParser(const std::string &input) : buffer(input) {
     pos1 = pos2 = 0;
   };
   virtual ~JsonParser() { };
   
-  /// Liefert JSON-Puffer und aktuelle Position für detaillierte Fehlermeldung
-  /// @param pos Position des Fehlers im Json-Buffer
+  /** \brief Liefert JSON-Puffer und aktuelle Position für detaillierte Fehlermeldung
+   @param pos Position des Fehlers im Json-Buffer
+   @return Buffer des zu parsenden Textes
+   */
   const std::string &info(size_t &pos) const {
     pos = pos1;
     return buffer;
   };
 
+  /** \brief Callback funktion für gelesenes Key-Element
+   @param value Name des Schlüssels
+  */
   virtual void Key(const std::string &value) = 0;
+  /** \brief Call backfunktion für gelesenes Wert-Elementt
+   @param value Name des Wertes
+   @param charType true, wenn Wert in Quotes eingeschlossen war
+  */
   virtual void Value(const std::string &value, bool charType) = 0;
+  /** \brief Call backfunktion für Start eines Arrays
+  */
   virtual void StartArray() = 0;
+  /** \brief Call backfunktion für Ende eines Arrays
+  */
   virtual void EndArray() = 0;
+  /** \brief Call backfunktion für Start eines Objektes
+  */
   virtual void StartObject() = 0;
+  /** \brief Call backfunktion für Ende eiines Objektes
+   */
   virtual void EndObject() = 0;
-  /// Starte den Parser
+  /// \brief Starte den Parser
+  /// \throw runtime_error     Im Fehlerfall werden exceptions geworfen.
   void parse() {
     TRACE("");
     std::string element;
     bool expectKey = true;
-    char expectDelimiter = ' ';
+    bool expectEnd = false;
+    char expectDelimiter = ' '; // ' '..Key-Elemet
     for (;pos1 < buffer.length();)
     {
       switch (peek())
@@ -99,6 +121,7 @@ public:
           tags.push('[');
           StartArray();
           expectKey = false;
+          expectEnd = true;
           expectDelimiter = ' ';
           break;
         case '{':
@@ -108,24 +131,31 @@ public:
           tags.push('{');
           StartObject();
           expectKey = true;
+          expectEnd = true;
           expectDelimiter = ' ';
           break;
         case ']':
           eat();
           if (tags.empty() or tags.top() != '[')
             throw std::runtime_error(u8"unexpectet ']'");
+          if (not expectEnd)
+            throw std::runtime_error(u8"missing element");
           tags.pop();
           EndArray();
           expectKey = (tags.empty() or tags.top() == '{');
           expectDelimiter = ',';
+          expectEnd = true;
           break;
         case '}':
           eat();
           if (tags.empty() or tags.top() != '{' or expectDelimiter == ':')
             throw std::runtime_error(u8"unexpectet '}'");
+          if (not expectEnd)
+            throw std::runtime_error(u8"missing element");
           tags.pop();
           EndObject();
           expectKey = (tags.empty() or tags.top() == '{');
+          expectEnd = true;
           expectDelimiter = ',';
           break;
         case '"':
@@ -149,11 +179,13 @@ public:
           {
             Key(element);
             expectKey = false;
+            expectEnd = false;
             expectDelimiter = ':';
           }
           else
           {
             Value(element, true);
+            expectEnd = true;
             expectDelimiter = ',';
           }
           break;
@@ -161,6 +193,7 @@ public:
           if (expectDelimiter != ',')
             throw std::runtime_error(u8"unexpected ','");
           expectKey = (tags.empty() or tags.top() == '{');
+          expectEnd = false;
           expectDelimiter = ' ';
           eat();
           break;
@@ -168,6 +201,7 @@ public:
           if (expectDelimiter != ':')
             throw std::runtime_error(u8"unexpected ':'");
           expectKey = false;
+          expectEnd = false;
           expectDelimiter = ' ';
           eat();
           break;
@@ -199,11 +233,13 @@ public:
           if (expectKey)
           {
             Key(element);
+            expectEnd = false;
             expectDelimiter = ':';
           }
           else
           {
             Value(element, false);
+            expectEnd = true;
             expectDelimiter = ',';
           }
           break;
@@ -214,6 +250,10 @@ public:
     }
     if (not tags.empty())
       throw std::runtime_error(u8"unexpected EOF: missing " + std::string((tags.top() == '[' ? "]":"}")));
+    if (not expectDelimiter)
+      throw std::runtime_error(u8"unexpected EOF: missing " + std::string((tags.top() == '[' ? "]":"}")));
+    if (not expectEnd)
+      throw std::runtime_error(u8"missing element");
   };
   
   private:

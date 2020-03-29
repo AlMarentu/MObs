@@ -175,4 +175,13 @@ void XmlOut::doMem(ObjTravConst &ot, const MemberBase &mem)
   }
 }
 
+std::string to_xml(const ObjectBase &obj)
+{
+  XmlOut xd(true);
+  
+  obj.traverse(xd);
+  return xd.getString();
+}
+
+
 }

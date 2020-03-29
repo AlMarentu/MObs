@@ -299,6 +299,8 @@ TEST(objgenTest, Vectors) {
   info.adresse.setNull(false);
 //  cerr << mobs::to_string(info) << endl;
   EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", mobs::to_string(info));
+// dito mit to_json
+  EXPECT_EQ(R"({"kundennr":44,"firma":false,"name":"Peter","vorname":"","adresse":{"strasse":"","plz":"","ort":""},"kontakte":[{"art":0,"number":""},{"art":0,"number":""},{"art":0,"number":""},{"art":0,"number":""},{"art":2,"number":"+40 0000 1111 222"}],"hobbies":["","Piano"]})", mobs::to_json(info));
 
 }
 

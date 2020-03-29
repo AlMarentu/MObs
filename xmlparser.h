@@ -3,7 +3,7 @@
 //
 // Copyright 2020 Matthias Lautner
 //
-// This is part of MObs
+// This is part of MObs https://github.com/AlMarentu/MObs.git
 //
 // MObs is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
@@ -18,6 +18,9 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+/** \file xmlparser.h
+\brief EInfacher XML-Parser */
+
 
 #ifndef MOBS_XMLPARSER_H
 #define MOBS_XMLPARSER_H
@@ -31,32 +34,28 @@
 namespace mobs {
 
 /*! \class XmlParser
-    \brief Einfacher XML-Parser.
-    Virtuelle Basisklasse mit Callback-Funktionen. Die Tags werden nativ geparst,
-    es erfolgt keine Zeichenumwandlung (&lt; usw.); Die werde werden implace zurückgeliefert
-    Im Fehlerfall werden exceptions geworfen.
-\code
-concept XmlParser {
-    XmlParser(const std::string &input);
+ \brief Einfacher XML-Parser.
+ Virtuelle Basisklasse mit Callback-Funktionen. Die Tags werden nativ geparst,
+ es erfolgt keine Zeichenumwandlung (\&lt; usw.); Die werde werden implace zurückgeliefert
+ Im Fehlerfall werden exceptions geworfen.
+ \code
+ concept XmlParser {
+ XmlParser(const std::string &input);
  
-    // Starte Parser
-    void parse();
-
-
-    // Callback Funktionen
-    void NullTag(const std::string &element);
-    void Attribut(const std::string &element, const std::string &attribut, const std::string &value);
-    void Value(const std::string &value);
-    // TODO bei C++17 besser std::string_view, spart bis c++11 unnötiges umkopieren
-    void Value(const char *value, size_t len);
-    void Cdata(const char *value, size_t len);
-    void StartTag(const std::string &element);
-    void EndTag(const std::string &element);
-    void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::string &value);
+ // Starte Parser
+ void parse();
  
-};
-\endcode
-*/
+ // Callback Funktionen
+ void NullTag(const std::string &element);
+ void Attribut(const std::string &element, const std::string &attribut, const std::string &value);
+ void Value(const std::string &value);
+ void Cdata(const char *value, size_t len);
+ void StartTag(const std::string &element);
+ void EndTag(const std::string &element);
+ void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::string &value);
+ };
+ \endcode
+ */
 
 
 
@@ -64,32 +63,57 @@ concept XmlParser {
 /// Einfacher XML-Parser - Basisklasse
 class XmlParser  {
 public:
+  /*! Konstruktor der XML-Parser Basisklasse
+   @param input XML-Text der geparst werden soll   */
   XmlParser(const std::string &input) : Xml(input) {
     pos1 = pos2 = posS = posE = 0;
   };
   virtual ~XmlParser() { };
   
-  /// Liefert XML-Puffer und aktuelle Position für detaillierte Fehlermeldung
-  /// @param pos Position des Fehlers im Xml-Buffer
+  /*! \brief Liefert XML-Puffer und aktuelle Position für detaillierte Fehlermeldung
+   @param pos Position des Fehlers im Xml-Buffer
+   @return zu parsender Text-Buffer
+   */
   const std::string &info(size_t &pos) const {
     pos = pos1;
     return Xml;
   };
+  /** \brief zugriff auf den Stack der Element-Struktur
+   */
   const std::stack<std::string> &tagPath() const { return tags; };
-
-  /// Ein Tag ohne Inhalt, impliziert EndTag(..)
+  
+  /** \brief Callback-Function: Ein Tag ohne Inhalt, impliziert EndTag(..)
+   @param element Name des Elementes
+   */
   virtual void NullTag(const std::string &element) = 0;
-  /// Ein Atributwert einses Tags
+  /** \brief Callback-Function: Ein Atributwert einses Tags
+   @param element Name des Elementes
+   @param attribut Name des Attributes
+   @param value Wert des Attributes
+   */
   virtual void Attribut(const std::string &element, const std::string &attribut, const std::string &value) = 0;
-  /// Ein Inhalt eines Tags
+  /** \brief Callback-Function: Ein Inhalt eines Tags
+   @param value Inhalt des Tags
+   */
   virtual void Value(const std::string &value) = 0;
-  /// Ein CDATA-Elemet
+  /** \brief Callback-Function: Ein CDATA-Elemet
+   @param value Inhalt des Tags
+   @param len Länge des Tags
+   */
   virtual void Cdata(const char *value, size_t len) = 0;  // TODO bei C++17 besser std::string_view
-  /// Ein Start-Tag
+  /** \brief Callback-Function: Ein Start-Tag
+   @param element Name des Elementes
+   */
   virtual void StartTag(const std::string &element) = 0;
-  /// Ein Ende-Tag , jedoch nicht bei NullTag(..)
+  /** \brief Callback-Function: Ein Ende-Tag , jedoch nicht bei NullTag(..)
+   @param element Name des Elementes
+   */
   virtual void EndTag(const std::string &element) = 0;
-  /// Eine Verarbeitungsanweisung z.B, "xml", "encoding", "UTF-8"
+  /** \brief Callback-Function: Eine Verarbeitungsanweisung z.B, "xml", "encoding", "UTF-8"
+   @param element Name des Tags
+   @param attribut Name der Verarbeitungsanweisung
+   @param value Inhalz der Verarbeitungsanweisung
+   */
   virtual void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::string &value) = 0;
   
   /// Starte den Parser
@@ -131,7 +155,7 @@ public:
     {
       saveValue();
       eat('<');
-
+      
       if (peek() == '/')
       {
         // Parse End-Tag
@@ -272,8 +296,8 @@ public:
       throw std::runtime_error(u8" expected tag at EOF: " + tags.top());
   };
   
-  private:
-
+private:
+  
   void parse2LT() {
     pos2 = Xml.find('<', pos1);
     //cerr << "PLT " << pos2 << endl;
@@ -304,14 +328,14 @@ public:
       throw std::runtime_error("Syntax");
   };
   std::string getValue() {
-      if (pos2 == std::string::npos)
-        throw std::runtime_error(u8"unexpected EOF");
+    if (pos2 == std::string::npos)
+      throw std::runtime_error(u8"unexpected EOF");
     size_t p = pos1;
     pos1 = pos2;
     return decode(p, pos2);
   };
   void clearValue() { posS = posE; }; // der Zwischenraum fand Verwendung
-  /// Verwaltet den Zischenraum zwischen den <..Tags..>
+                                      /// Verwaltet den Zischenraum zwischen den <..Tags..>
   void saveValue() {
     // wenn nicht verwendet, darf es nur white space sein
     if (posS != posE)
@@ -324,7 +348,7 @@ public:
         throw std::runtime_error(u8"unexpected char");
       }
     }
-
+    
     if (pos2 == std::string::npos)
       throw std::runtime_error(u8"unexpected EOF");
     posS = pos1;
@@ -361,7 +385,7 @@ public:
         if (pos < posE and pos < posS + 16) // Token &xxxx; gefunden
         {
           std::string tok = std::string(&Xml[posS], pos-posS);
-//          std::cerr << "TOK " << tok << std::endl;
+          //          std::cerr << "TOK " << tok << std::endl;
           char c = '\0';
           if (tok == "lt")
             c = '<';
@@ -399,5 +423,5 @@ public:
   
 };
 }
-  
+
 #endif

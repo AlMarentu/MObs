@@ -133,6 +133,7 @@ void JsonOut::doMem(ObjTravConst &ot, const MemberBase &mem)
   }
 }
 
+
 class JsonDumpData {
   public:
     JsonDumpData() : buf((char *)::operator new[](65536)), os(stdout, buf, 65536), writer(os) {};

@@ -3,7 +3,7 @@
 //
 // Copyright 2020 Matthias Lautner
 //
-// This is part of MObs
+// This is part of MObs https://github.com/AlMarentu/MObs.git
 //
 // MObs is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
@@ -18,16 +18,22 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+/** \file readjson.h
+\brief optionale Klasse um Objekte aus einen JSON-String auszulesen, verwendet rapidjson */
+
 
 #include "objgen.h"
 
 namespace mobs {
 
 class JsonReadData;
+/// JSON-Parser für Objekte (verwendet rapidjson)
 class JsonRead {
   public:
+  /// Pareser mit JASO-String initialisieren
     JsonRead(const std::string &input);
     ~JsonRead();
+  /// Objekt extrahieren
     void fill(ObjectBase &obj);
   private:
     JsonReadData *data;

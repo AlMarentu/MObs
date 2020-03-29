@@ -3,7 +3,7 @@
 //
 // Copyright 2020 Matthias Lautner
 //
-// This is part of MObs
+// This is part of MObs https://github.com/AlMarentu/MObs.git
 //
 // MObs is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
@@ -18,12 +18,15 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+/** \file xmlout.h
+\brief optionale Klasse um Objekte in einen XML-String umzuwandeln */
 
 #include "objgen.h"
 
 namespace mobs {
 
 class XmlOutData;
+/// KLasse zum Erzeugen von XML aud Objekten
 class XmlOut : virtual public ObjTravConst {
   public:
     XmlOut(bool indent = true);
@@ -41,6 +44,9 @@ class XmlOut : virtual public ObjTravConst {
     XmlOutData *data;
 
 };
+
+/// Ausgabe eines Objektes im  XML-Format ohne whitespace
+std::string to_xml(const ObjectBase &obj);
 
 }
 
