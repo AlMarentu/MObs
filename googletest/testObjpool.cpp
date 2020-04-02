@@ -32,6 +32,18 @@ using namespace std;
 
 namespace {
 
+class Berlin : virtual public mobs::NamedObject
+{
+public:
+  int a;
+};
+
+class Tokio : virtual public mobs::NamedObject
+{
+public:
+  int a;
+};
+
 class Fahrzeug : virtual public mobs::NamedObject, virtual public mobs::ObjectBase
 {
   public:
@@ -44,6 +56,40 @@ class Fahrzeug : virtual public mobs::NamedObject, virtual public mobs::ObjectBa
 //    string objName() const { return typName() + "." + std::to_string(id()); };
 };
 ObjRegister(Fahrzeug);
+
+TEST(objpoolTest, simple) {
+
+  // Einen Pool erzeugen
+  shared_ptr<mobs::NamedObjPool> pool = make_shared<mobs::NamedObjPool>();
+
+  {
+    mobs::NamedObjRef<Berlin> ref1(pool, "B.1");
+    mobs::NamedObjRef<Tokio > ref2(pool, "T.2");
+    ref1 = new Berlin;
+    ref2 = new Tokio;
+    ref1->a = 42;
+    ref2->a = 666;
+  }
+  // retrueve Objects via Name
+  {
+    mobs::NamedObjRef<Berlin> r1(pool, "B.1");
+    mobs::NamedObjRef<Tokio > r2(pool, "T.2");
+    ASSERT_TRUE(r1.exists());
+    ASSERT_TRUE(r2.exists());
+    EXPECT_EQ(42, r1->a);
+    EXPECT_EQ(666, r2->a);
+  }
+  {
+    mobs::NamedObjRef<Berlin> xx(pool, "T.2");
+    mobs::NamedObjRef<Tokio > yy(pool, "T.4");
+    // wrong object
+    ASSERT_FALSE(xx.exists());
+    // unknown id
+    ASSERT_FALSE(yy.exists());
+  }
+  pool->garbageCollect();
+  
+}
 
 TEST(objpoolTest, create) {
   

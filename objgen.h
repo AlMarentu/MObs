@@ -83,7 +83,7 @@
  \arg Füllen über eine sequentiellen Pfad
  \see ObjTravConst
  \see ObjTrav
- \see ObjectInserter
+ \see ObjectNavigator
  
   Es existieren Klassen, um solche Objekt von und nach XML oder JSON zu wandeln
  
@@ -305,6 +305,16 @@ public:
   static ObjectBase *createObj(std::string n);
   /// Setze Inhalt auf leer, d.h. alle Vektoren sowie Unterobjekte und Varieblen werden gelöscht,
   void clear();
+  /// Setzt eine Variable mit dem angegebene Inhalt
+  /// @param path Pfad der Variable z.B.: kontakt[3].number
+  /// @param value Inhalt, der geschrieben werden soll
+  /// \return true, wenn der Vorgang erfolgreich war
+  bool setVariable(const std::string &path, const std::string &value);
+  /// liest eine Variable relativ zum angegebenen Pfad
+  /// @param path Pfad der Variable z.B.: kontakt[3].number
+  /// @param opt. Zeiger auf bool-Variable, die Anzeigt, ob das Element gefunden wurde
+  /// \return Inhalt der variable als string in UTF-8, oder leer, wenn nicht gefunden
+  std::string getVariable(const std::string &path, bool *found = nullptr);
   /// \brief Kopiere ein Objekt aus einem bereits vorhandenen.
   /// @param other zu Kopierendes Objekt
   /// \throw runtime_error Sind die Strukturen nicht identisch, wird eine Exception erzeugt
@@ -493,7 +503,7 @@ public:
 };
 
 /// Basisiklasse zum sequentiellen Einfügen von Daten in ein Objekt
-class ObjectInserter  {
+class ObjectNavigator  {
 public:
   /// Zeiger auf die aktuelle MemberVariable oder nullptr, falls es keine Variable ist
   inline MemberBase *member() const { return memBase; };
@@ -507,16 +517,25 @@ public:
   void pushObject(ObjectBase &obj, const std::string &name = "<obj>");
   /** \brief Suche ein Element in der aktuellen Objektstruktur
    @param element Name des Elementes
+   @param index optonal: Index bei Vectoren; ansosnten wir der Vector um ein Element erweitert
    @return liefert false, wenn das Element nicht existiert
   
    Ist das Element  eine Variable, so Kann über \c member darauf zugegriffen werden. Bei Objekten wird in die neue Objektebene gesprungen. Im Falle von Arrays wird ein neues Element angehängt.
       Sind entsprechnde Objekte nicht vorhanden, wird trotzdem die Struktur verfolgt und bei Rückkehr in die entsprechende Eben die Bearbeitung wieder aufgenommen.
    */
-  bool enter(const std::string &element);
+  bool enter(const std::string &element, std::size_t index = SIZE_MAX);
   /// Verlassen einer Ebene in der Objektstruktur
   /// @param element Name des Elementes oder leer, wenn der Name der Struktur nicht geprüft werden soll
   /// \throw std::runtime_error bei Strukturfehler
   void leave(const std::string &element = "");
+  /// Sucht einen direkten Pfad zu einer Elemntvariablen nach C-Syntax
+  ///
+  /// Sucht nach Variablen irelativ zu dem mit \ pushObj abgelegten Objektes:
+  /// z.B.:  "kontakte[2].number"
+  ///  find darf nur einmalig aufgerufen werden
+  /// @param path Variablenname
+  /// \return liefert \c false bei Syntax-Fehler
+  bool find(const std::string &path);
   
 private:
   class Objekt {

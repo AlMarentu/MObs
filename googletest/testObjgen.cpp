@@ -207,6 +207,20 @@ TEST(objgenTest, objDump) {
 //  cerr << to_string(dt) << endl << leer << endl;
 }
 
+TEST(objgenTest, inserter) {
+  Person person;
+  mobs::ObjectNavigator oi;
+  oi.pushObject(person);
+  EXPECT_TRUE(oi.find("kundennr"));
+  EXPECT_TRUE(oi.find("adresse"));
+  EXPECT_TRUE(oi.find("hobbies[4]"));
+  EXPECT_TRUE(oi.find("kontakte[2].number"));
+  EXPECT_FALSE(oi.find("kontakte[].number"));
+  EXPECT_FALSE(oi.find("kontakte[2]number"));
+  EXPECT_FALSE(oi.find("kontakte."));
+  EXPECT_FALSE(oi.find(""));
+}
+
 TEST(objgenTest, setVars) {
   DataTypes dt;
   dt.Bool(true);
@@ -323,6 +337,23 @@ TEST(objgenTest, Pointer) {
   EXPECT_EQ(&ip->kontakte[1].art, dynamic_cast<mobs::Member<int> *>(ip->kontakte[1].getMemInfo("art")));
 //  cerr << typeid(&ip->kontakte[0].number).name() << endl;
 //  cerr << typeid(ip->kontakte[0].getMemInfo("number")).name() << endl;
+}
+
+TEST(objgenTest, getSetVar) {
+  Person p;
+  mobs::ObjectBase *op = &p;
+  EXPECT_TRUE(op->setVariable("kontakte[3].number", "00-00-00"));
+  EXPECT_EQ("00-00-00", p.kontakte[3].number());
+  EXPECT_TRUE(op->setVariable("kontakte[1].number", "---"));
+  EXPECT_EQ("---", p.kontakte[1].number());
+  EXPECT_EQ("00-00-00", op->getVariable("kontakte[3].number"));
+  bool r = false;
+  EXPECT_EQ("---", op->getVariable("kontakte[1].number", &r));
+  EXPECT_TRUE(r);
+  EXPECT_EQ("", op->getVariable("kontakte[1].bee", &r));
+  EXPECT_FALSE(r);
+//  std::cerr << to_string(p) << std::endl;
+  
 }
 
 }

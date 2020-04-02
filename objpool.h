@@ -20,7 +20,7 @@
 
 
 /** \file objpool.h
-\brief Klassen für Object-Pool - minimale in memory Datenbank oder Objekt-Cache  */
+\brief Klassen für Object-Pool - benamte Objekte minimale in memory Datenbank oder Objekt-Cache  */
 
 #ifndef MOBS_OBJPOOL_H
 #define MOBS_OBJPOOL_H
@@ -30,7 +30,7 @@
 
 namespace mobs {
 
-/// Basisklasse um  Klassen vom Basistyp ObjectBase zu erweitern
+/// Basisklasse um  beliebige Objekte als "named object" zu verwalten
 class NamedObject
 {
   public:

@@ -19,9 +19,6 @@ mobs.a: objgen.o logging.o objpool.o dumpjson.o readjson.o xmlout.o xmlread.o
 	$(AR) -rc $@ $^
 
 # Achtung linkage: objgen.o immer zuerst
-mom: mobs.a momtest.o
-	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $^
-
 hw: mobs.a hw.o
 	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $^
 

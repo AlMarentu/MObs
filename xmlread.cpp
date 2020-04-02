@@ -29,7 +29,7 @@
 
 namespace mobs {
 
-class XmlReadData : public ObjectInserter, public XmlParser  {
+class XmlReadData : public ObjectNavigator, public XmlParser  {
 public:
   XmlReadData(const std::string &input) : XmlParser(input) {  };
   ~XmlReadData() { };

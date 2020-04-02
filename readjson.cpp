@@ -38,7 +38,7 @@ using namespace rapidjson;
 namespace mobs {
 
 
-class JsonReadData : public ObjectInserter, public BaseReaderHandler<UTF8<>, JsonReadData>  {
+class JsonReadData : public ObjectNavigator, public BaseReaderHandler<UTF8<>, JsonReadData>  {
 public:
   JsonReadData(const string &input) : json(input), my_count(0), my_errors(0) { };
   ~JsonReadData() { };

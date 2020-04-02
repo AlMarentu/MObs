@@ -211,51 +211,119 @@ void ObjectBase::clear()
   }
 }
 
+
+
+/////////////////////////////////////////////////
+/// ObjectBase::get/set/Variable
+/////////////////////////////////////////////////
+
+bool ObjectBase::setVariable(const std::string &path, const std::string &value) {
+  ObjectNavigator on;
+  on.pushObject(*this);
+  if (not on.find(path))
+    return false;
+  MemberBase *m = on.member();
+  if (not m)
+    return false;
+  
+  return m->fromStr(value);
+}
+
+std::string ObjectBase::getVariable(const std::string &path, bool *found) {
+  ObjectNavigator on;
+  on.pushObject(*this);
+  if (found)
+    *found = false;
+  
+  if (not on.find(path))
+    return std::string();
+  MemberBase *m = on.member();
+  if (not m)
+    return std::string();
+  
+  if (found)
+    *found = true;
+  
+  return m->toStr();
+}
+
 /////////////////////////////////////////////////
 /// Object Inserter
 /////////////////////////////////////////////////
 
-  
-bool ObjectInserter::enter(const std::string &element) {
-  TRACE(PARAM(element));
+bool ObjectNavigator::find(const std::string &path) {
+  TRACE(PARAM(path));
+  for (size_t pos = 0; pos < path.length();)
+  {
+    size_t pos2 = path.find_first_of(".[", pos);
+    if (pos2 == std::string::npos)
+    {
+      enter(path.substr(pos));
+      return true;
+    }
+    string element = path.substr(pos, pos2-pos);
+    size_t index = SIZE_MAX;
+    if (path[pos2] == '[')
+    {
+      pos = pos2 +1;
+      pos2 = path.find(']', pos);
+      if (pos2 == std::string::npos)
+        break;
+      string i = path.substr(pos, pos2-pos);
+      if (not mobs::string2x(i, index))
+        break;
+//      std::cerr << "XX " << element << " " << index << " " << i << std::endl;
+      pos2++;
+    }
+    enter(element, index);
+    if (pos2 == path.length())
+      return true;
+    if (path[pos2] != '.')
+      break;
+    pos = pos2 +1;
+  }
+  return false;
+}
+
+bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
+  TRACE(PARAM(element) << PARAM(index))
   path.push(element);
   
   if (objekte.empty())
     throw std::runtime_error(u8"XmlRead: Fatal: keine Objekt");
   
   if (memBase)  // War bereits im Member -> als Dummy-Objekt tarnen
-    objekte.push(ObjectInserter::Objekt(nullptr, memName));
+    objekte.push(ObjectNavigator::Objekt(nullptr, memName));
   
   memName = objekte.top().objName;
   memBase = 0;
   //    LOG(LM_DEBUG, "Sind im Object " << memName);
   if (objekte.top().obj)
   {
-    ObjectBase *o = objekte.top().obj->getObjInfo(element);
-    if (o)
-    {
-      //        LOG(LM_INFO, element << " ist ein Objekt");
-      memName += "." + o->name();
-      objekte.push(ObjectInserter::Objekt(o, memName));
-      return true;
-    }
     MemBaseVector *v = objekte.top().obj->getVecInfo(element);
     if (v)
     {
       size_t s = v->size();
-      //        LOG(LM_INFO, element << " ist ein Vector " << s);
+      if (index != SIZE_MAX and index < s)
+        s = index;
+      else
+      {
+        if (index != SIZE_MAX)
+          s = index;
+        v->resize(s+1);
+      }
+//              LOG(LM_INFO, element << " ist ein Vector " << s);
       memName += ".";
       memName += v->name();
       memName += "[";
       memName += std::to_string(s);
       memName += "]";
-      v->resize(s+1);
       MemberBase *m = v->getMemInfo(s);
       ObjectBase *o = v->getObjInfo(s);
       if (o)
       {
         //          cerr << "Objekt" << endl;
-        objekte.push(ObjectInserter::Objekt(o, memName));
+        objekte.push(ObjectNavigator::Objekt(o, memName));
         return true;
       }
       else if (m)
@@ -265,29 +333,40 @@ bool ObjectInserter::enter(const std::string &element) {
         //          LOG(LM_INFO, "Member: " << memName)
         return true;
       }
-      objekte.push(ObjectInserter::Objekt(nullptr, memName));
+      objekte.push(ObjectNavigator::Objekt(nullptr, memName));
       
       return false;
     }
-    MemberBase *m = objekte.top().obj->getMemInfo(element);
-    if (m)
+    if (index == SIZE_MAX)
     {
-      //        cerr << element << " ist ein Member" << endl;
-      memName += "." + m->name();
-      memBase = m;
-      //        LOG(LM_INFO, "Member: " << memName);
-      return true;
+      ObjectBase *o = objekte.top().obj->getObjInfo(element);
+      if (o)
+      {
+        //        LOG(LM_INFO, element << " ist ein Objekt");
+        memName += "." + o->name();
+        objekte.push(ObjectNavigator::Objekt(o, memName));
+        return true;
+      }
+      MemberBase *m = objekte.top().obj->getMemInfo(element);
+      if (m)
+      {
+        //        cerr << element << " ist ein Member" << endl;
+        memName += "." + m->name();
+        memBase = m;
+        //        LOG(LM_INFO, "Member: " << memName);
+        return true;
+      }
     }
   }
   memName += ".";
   memName += element;
-  objekte.push(ObjectInserter::Objekt(nullptr, memName));
+  objekte.push(ObjectNavigator::Objekt(nullptr, memName));
   
   //    LOG(LM_INFO, memName << " ist ein WeisNichtWas");
   return false;
 }
 
-void ObjectInserter::leave(const std::string &element) {
+void ObjectNavigator::leave(const std::string &element) {
   TRACE(PARAM(element));
   if (memBase)  // letzte Ebene war ein MemberVariable
     memBase = 0;
@@ -300,10 +379,9 @@ void ObjectInserter::leave(const std::string &element) {
   path.pop();
 }
 
-void ObjectInserter::pushObject(ObjectBase &obj, const std::string &name) {
-   objekte.push(ObjectInserter::Objekt(&obj, name));
+void ObjectNavigator::pushObject(ObjectBase &obj, const std::string &name) {
+   objekte.push(ObjectNavigator::Objekt(&obj, name));
 }
-
 
 
 /////////////////////////////////////////////////
@@ -414,7 +492,7 @@ string to_json(const ObjectBase &obj)
 
 void string2Obj(const std::string &str, ObjectBase &obj)
 {
-  class JsonReadData : public ObjectInserter, public JsonParser  {
+  class JsonReadData : public ObjectNavigator, public JsonParser  {
   public:
     JsonReadData(const string &input) : JsonParser(input) { }
     
