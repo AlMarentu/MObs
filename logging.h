@@ -40,6 +40,7 @@ typedef enum {
 /// Interne Klasse für Tracing, bitte Makro TRACE verwenden
 class Trace {
 public:
+  /// \private
   Trace (const char *f, const std::string &str);
   ~Trace ();
   static bool traceOn; ///< schaltet Tracing zur Laufzeit ein und aus

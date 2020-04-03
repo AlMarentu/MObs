@@ -131,7 +131,8 @@
  */
 #define ObjInit(objname) \
 objname() { TRACE(""); keylist.reset(); init(); }; \
-objname(std::string name, ObjectBase *t) { TRACE(PARAM(name) << PARAM(this)); if (t) t->regObj(this); m_varNam = name; }; \
+objname(mobs::MemBaseVector *m, mobs::ObjectBase *o) : ObjectBase(m, o) { TRACE(""); keylist.reset(); init(); }; \
+objname(std::string name, ObjectBase *t) : ObjectBase(name, t) { TRACE(PARAM(name) << PARAM(this)); if (t) t->regObj(this); }; \
 objname &operator=(const objname &other) { TRACE(""); \
 if (this != &other) { \
 doCopy(other); \
@@ -165,7 +166,9 @@ class ObjTravConst;
 class KeyList {
 public:
   KeyList() {};
+  /// \private
   int add() { return ++cnt; };
+  /// \private
   void reset() { cnt = 0; };
 private:
   int cnt = 0;
@@ -187,16 +190,21 @@ private:
   bool m_nullAllowed = false;
 };
 
+class ObjectBase;
+class MemBaseVector;
+
 /// Basisklasse für Membervariablen
 class MemberBase : public NullValue {
 protected:
   /// \private
-  MemberBase(std::string n) : m_name(n) {};
+  MemberBase(std::string n, ObjectBase *obj = nullptr) : m_name(n), m_parent(obj) {}
+  /// \private
+  MemberBase(mobs::MemBaseVector *m, mobs::ObjectBase *o) : m_name(""), m_parent(o), m_parVec(m) {}
 public:
-  virtual ~MemberBase() {};
+  virtual ~MemberBase() {}
   /// Abfrage des Namen der Membervariablen
-  std::string name() const { return m_name; };
-  virtual void strOut(std::ostream &str) const  = 0;
+  std::string name() const { return m_name; }
+//  virtual void strOut(std::ostream &str) const  = 0;
   /// Setze Inhalt auf leer
   virtual void clear() = 0;
   /// Ausgabe des Ihnhalts als \c std::string in UTF-8
@@ -212,22 +220,25 @@ public:
   /// Starte Traversierung  const
   void traverse(ObjTravConst &trav) const;
   /// private
-  void key(int k) { m_key = k; };
+  void key(int k) { m_key = k; }
   /// \brief Abfrage ob Memvervariable ein Key-Element ist
   /// @return Position im Schlüssel oder \c 0 wenn kein Schlüsselelement
-  int key() const { return m_key; };
-  
+  int key() const { return m_key; }
+  /// Zeiger auf Vater-Objekt
+  ObjectBase *parent() { return m_parent; }
+  /// Objekt wurde beschrieben
+  void activate();
+
 protected:
   /// \private
   int m_key = 0;
 private:
   std::string m_name;
+  ObjectBase *m_parent = nullptr;
+  MemBaseVector *m_parVec = nullptr;
 };
 
 
-
-
-class ObjectBase;
 
 /// \brief Basisklasse für Vectoren auf Membervariablen oder Objekten innerhalb von von \c ObjectBase angeleiteten Klasse; Bitte als Makro MemVector oder ObjVector verwenden
 /// \see MemVector
@@ -235,8 +246,8 @@ class ObjectBase;
 class MemBaseVector : public NullValue {
 public:
   /// \private
-  MemBaseVector(std::string n) : m_name(n) { TRACE(PARAM(n)); };
-  virtual ~MemBaseVector() { TRACE(""); };
+  MemBaseVector(std::string n, ObjectBase *obj) : m_name(n), m_parent(obj) { TRACE(PARAM(n)); }
+  virtual ~MemBaseVector() { TRACE(""); }
   /// Starte Traversierung nicht const
   virtual void traverse(ObjTrav &trav) = 0;
   /// Starte Traversierung  const
@@ -246,7 +257,7 @@ public:
   /// Vergrößert/verkleinert die Elemtzahl des Vektors
   virtual void resize(size_t s) = 0;
   /// liefert den Namen der Vektor variablen
-  std::string name() const { return m_name; };
+  std::string name() const { return m_name; }
   /// \private
   virtual void doCopy(const MemBaseVector &other) = 0;
   /// liefert einen Zeiger auf das entsprechende Element, falls es eine \c MemVar ist
@@ -254,16 +265,27 @@ public:
   /// liefert einen Zeiger auf das entsprechende Element, falls es eine \c MemObj ist
   virtual ObjectBase *getObjInfo(size_t i) = 0;
   /// Setze Inhalt auf leer; äquivalent zu \c resize(0)
-  void clear() { resize(0); };
+  void clear() { resize(0); }
+  /// Objekt wurde beschrieben
+  void activate();
+  /// Zeiger auf Vater-Objekt
+  ObjectBase *parent() { return m_parent; }
+
 protected:
   /// \private
   std::string m_name;
+private:
+  ObjectBase *m_parent = nullptr;
 };
 
 /// Basisklasse für Objekte
 class ObjectBase : public NullValue {
 public:
-  ObjectBase() {};
+  ObjectBase() {}
+  /// \private
+  ObjectBase(std::string n, ObjectBase *obj) : m_varNam(n), m_parent(obj) {} // Konstructor for ObjVar
+  /// \private
+  ObjectBase(MemBaseVector *m, ObjectBase *o) : m_varNam(""), m_parent(o), m_parVec(m) {} // Konstructor for Vector
   virtual ~ObjectBase() {};
   /// \private
   void regMem(MemberBase *mem);
@@ -277,11 +299,13 @@ public:
   /// Starte Traversierung  const
   void traverse(ObjTravConst &trav) const;
   /// liefert den Typnamen des Objektes
-  virtual std::string typName() const { return ""; };
+  virtual std::string typName() const { return ""; }
   /// Callback-Funktion die einmalig im Constructor aufgerufen wird
   virtual void init() {};
   /// liefert den Namen Membervariablen
   std::string name() const { return m_varNam; };
+  /// Objekt wurde beschrieben
+  void activate();
   /// liefert ???
   MemberBase &get(std::string name);
   /// Suche eine Membervariable
@@ -312,22 +336,27 @@ public:
   bool setVariable(const std::string &path, const std::string &value);
   /// liest eine Variable relativ zum angegebenen Pfad
   /// @param path Pfad der Variable z.B.: kontakt[3].number
-  /// @param opt. Zeiger auf bool-Variable, die Anzeigt, ob das Element gefunden wurde
+  /// @param found opt. Zeiger auf bool-Variable, die Anzeigt, ob das Element gefunden wurde
   /// \return Inhalt der variable als string in UTF-8, oder leer, wenn nicht gefunden
   std::string getVariable(const std::string &path, bool *found = nullptr);
   /// \brief Kopiere ein Objekt aus einem bereits vorhandenen.
   /// @param other zu Kopierendes Objekt
   /// \throw runtime_error Sind die Strukturen nicht identisch, wird eine Exception erzeugt
   void doCopy(const ObjectBase &other);
+  /// Zeiger auf Vater-Objekt
+  ObjectBase *parent() { return m_parent; }
 
-  
 protected:
-  std::string m_varNam;
   KeyList keylist; ///< Liste von Key-Elementen die innerhab \c init() gesetzt werden können \see KeyList
+
 private:
+  std::string m_varNam;
+  ObjectBase *m_parent = nullptr;
+  MemBaseVector *m_parVec = nullptr;
+
   class MlistInfo {
   public:
-    MlistInfo(MemberBase *m, ObjectBase *o, MemBaseVector *v) : mem(m), obj(o), vec(v) {};
+    MlistInfo(MemberBase *m, ObjectBase *o, MemBaseVector *v) : mem(m), obj(o), vec(v) {}
     MemberBase *mem = 0;
     ObjectBase *obj = 0;
     MemBaseVector *vec = 0;
@@ -340,7 +369,7 @@ private:
 // ist typename ein Character-Typ
 template <typename T>
 /// \brief prüft, ob der Typ T aus Text besteht - also zB. in JSON in Hochkommata steht
-inline bool mobschar(T) { return not std::numeric_limits<T>::is_specialized; };
+inline bool mobschar(T) { return not std::numeric_limits<T>::is_specialized; }
 /// \private
 template <> inline bool mobschar(char) { return true; };
 /// \private
@@ -407,30 +436,32 @@ template<typename T>
  */
 class Member : virtual public MemberBase {
 public:
-  Member() : MemberBase(""), wert(T()) { TRACE(""); };  // Konstruktor für Array
+  Member() : MemberBase(""), wert(T()) { TRACE(""); }  // Konstruktor für Array
   /// \private
-  Member(std::string n, ObjectBase *o) : MemberBase(n), wert(T()) { TRACE(PARAM(n) << PARAM(this)); if (o) o->regMem(this); }; // Konstruktor f. Objekt nur intern
+  Member(std::string n, ObjectBase *o) : MemberBase(n, o), wert(T()) { TRACE(PARAM(n) << PARAM(this)); if (o) o->regMem(this); } // Konstruktor f. Objekt nur intern
+  /// \private
+  Member(MemBaseVector *m, ObjectBase *o) : MemberBase(m, o) {} // Konstruktor f. Objekt nur intern
   Member &operator=(const Member &other) = delete;
-  ~Member() { TRACE(PARAM(name())); };
+  ~Member() { TRACE(PARAM(name())); }
   /// Zugriff auf Inhalt
-  inline T operator() () const { return wert; };
+  inline T operator() () const { return wert; }
   /// Zuweisung eines Wertes
-  inline void operator() (const T &t) { TRACE(PARAM(this)); wert = t; };
+  inline void operator() (const T &t) { TRACE(PARAM(this)); wert = t; activate(); }
   
-  virtual void strOut(std::ostream &str) const { str << mobs::to_string(wert); };
+//  virtual void strOut(std::ostream &str) const { str << mobs::to_string(wert); }
   /// Setze Inhalt auf leer
   virtual void clear()  { wert = T(); };
-  //  virtual std::string toStr() const { std::stringstream s; s << wert; return s.str(); };
+  //  virtual std::string toStr() const { std::stringstream s; s << wert; return s.str(); }
   virtual std::string toStr() const { return mobs::to_string(wert); };
-  //  virtual std::wstring toWStr2() const { return mobs::to_wstring(wert); };
+  //  virtual std::wstring toWStr2() const { return mobs::to_wstring(wert); }
   /// Abfrage, ob der Inhalt textbasiert ist (zb. in JSON in Hochkommata gestzt wird)
-  virtual bool is_specialized() const { return std::numeric_limits<T>::is_specialized; };
+  virtual bool is_specialized() const { return std::numeric_limits<T>::is_specialized; }
   /// Abfrage, ob der Inhalt textbasiert ist (zb. in JSON in Hochkommata gestzt wird)
-  virtual bool is_chartype() const { return mobschar(wert); };
+  virtual bool is_chartype() const { return mobschar(wert); }
   /// Einlesen der Variable aus einnem \c std::string im Format UTF-8
-  virtual bool fromStr(const std::string &sin) { return mobs::string2x(sin, wert); };
+  virtual bool fromStr(const std::string &sin) { if (mobs::string2x(sin, wert)) { activate(); return true; } return false; }
   /// \private
-  void doCopy(const Member<T> &other) { operator()(other()); };
+  void doCopy(const Member<T> &other) { operator()(other()); }
 private:
   T wert;
 };
@@ -452,16 +483,16 @@ template<class T>
 class MemberVector : virtual public MemBaseVector {
 public:
   /// \private
-  MemberVector(std::string n, ObjectBase *o) : MemBaseVector(n) { TRACE(PARAM(n) << PARAM(this)); o->regArray(this); };
+  MemberVector(std::string n, ObjectBase *o) : MemBaseVector(n, o) { TRACE(PARAM(n) << PARAM(this)); o->regArray(this); }
   ~MemberVector() { TRACE(PARAM(m_name)); resize(0); };   // heap Aufräumen
   /// Zugriff auf das entsprechende Vector-Element
-  T &operator[] (size_t t) { if (t >= size()) resize(t+1); return *werte[t]; };
-  virtual size_t size() const { return werte.size(); };
+  T &operator[] (size_t t) { if (t >= size()) resize(t+1); return *werte[t]; }
+  virtual size_t size() const { return werte.size(); }
   virtual void resize(size_t s);
   virtual void traverse(ObjTrav &trav);
   virtual void traverse(ObjTravConst &trav) const;
-  virtual MemberBase *getMemInfo(size_t i) { if (i >= size()) return 0; return dynamic_cast<MemberBase *>(werte[i]); };
-  virtual ObjectBase *getObjInfo(size_t i) { if (i >= size()) return 0; return dynamic_cast<ObjectBase *>(werte[i]); };
+  virtual MemberBase *getMemInfo(size_t i) { if (i >= size()) return 0; return dynamic_cast<MemberBase *>(werte[i]); }
+  virtual ObjectBase *getObjInfo(size_t i) { if (i >= size()) return 0; return dynamic_cast<ObjectBase *>(werte[i]); }
 protected:
   /// \private
   void doCopy(const MemberVector<T> &other);
@@ -510,7 +541,7 @@ public:
   /// Name der aktuellen MemberVariablen, oder leer, falls es keine Variable ist
   inline const std::string &showName() const { return memName; };
   /// Name des aktuell referenzierten Objektes/Variable, leer, falls der das Objekt abgearbeitet ist
-  inline const std::string current() const { return path.empty() ? "" : path.top(); };
+  inline const std::string current() const { return path.empty() ? "" : path.top(); }
   /// lege ein Objekt auf den Stapel, um die aktuellen Member zu füllen
   /// @param obj Objekt, muss von ObjecBase abgeleitet sein
   /// @param name Name des Objektes, muss nicht angegeben werden
@@ -566,7 +597,7 @@ void MemberVector<T>::resize(size_t s)
   {
     werte.resize(s);
     for (size_t i = old; i < s; i++)
-      werte[i] = new T;
+      werte[i] = new T(this, parent());
   }
 }
 

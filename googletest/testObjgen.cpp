@@ -292,10 +292,9 @@ TEST(objgenTest, setnull) {
   EXPECT_EQ(R"({kundennr:2,firma:false,name:"Das war ein ßäöü <>\"' ss \"#  ö",vorname:"",adresse:null,kontakte:[],hobbies:[]})", mobs::to_string(info));
   info.name(u8"John");
   info.adresse.ort(u8"Berlin");
-  // TODO null wird nicht aufgehoben wenn ein Unterelement gesetzt wird todo?
-  EXPECT_TRUE(info.adresse.isNull());
-  EXPECT_EQ(R"({kundennr:2,firma:false,name:"John",vorname:"",adresse:null,kontakte:[],hobbies:[]})", mobs::to_string(info));
-  // TODO hier ist noch eine Inkostenz: adresse immernoch null, aber adresse.ort gesetzt
+  // null wird aufgehoben wenn ein Unterelement gesetzt wird - rekursiv
+  EXPECT_FALSE(info.adresse.isNull());
+  EXPECT_EQ(R"({kundennr:2,firma:false,name:"John",vorname:"",adresse:{strasse:"",plz:"",ort:"Berlin"},kontakte:[],hobbies:[]})", mobs::to_string(info));
   EXPECT_EQ(u8"Berlin", info.adresse.ort());
 }
 

@@ -40,9 +40,38 @@ void MemberBase::traverse(ObjTravConst &trav) const
   trav.doMem(trav, *this);
 }
 
+void MemberBase::activate()
+{
+//  LOG(LM_INFO, "ACTIVATE MemberBase " << m_name);
+  setNull(false);
+  if (m_parVec)
+    m_parVec->activate();
+  else if (m_parent)
+    m_parent->activate();
+}
+
+
+
+void MemBaseVector::activate()
+{
+//  LOG(LM_INFO, "ACTIVATE MemberBaseVector " << m_name);
+  setNull(false);
+  if (parent()) parent()->activate();
+}
+
 /////////////////////////////////////////////////
 /// ObjectBase
 /////////////////////////////////////////////////
+
+void ObjectBase::activate()
+{
+//  LOG(LM_INFO, "ACTIVATE ObjectBase " << typName() << "::" << name());
+  setNull(false);
+  if (m_parVec)
+    m_parVec->activate();
+  else if (m_parent)
+    m_parent->activate();
+}
 
 void ObjectBase::regMem(MemberBase *mem)
 {
