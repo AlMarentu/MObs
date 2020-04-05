@@ -2,7 +2,7 @@
 
 CXX     = clang++
 
-TARGETS		= mom hw db tests
+TARGETS		= db tests
 
 CPPFLAGS	= -I/usr/local/include -I.
 CXXFLAGS	= -std=c++11 -g -Wall
@@ -19,8 +19,6 @@ mobs.a: objgen.o logging.o objpool.o dumpjson.o readjson.o xmlout.o xmlread.o
 	$(AR) -rc $@ $^
 
 # Achtung linkage: objgen.o immer zuerst
-hw: mobs.a hw.o
-	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $^
 
 db: mobs.a db.o 
 	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $^
