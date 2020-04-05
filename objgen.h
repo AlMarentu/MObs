@@ -131,14 +131,10 @@
  */
 #define ObjInit(objname) \
 objname() { TRACE(""); keylist.reset(); init(); }; \
+objname(const objname &that) { TRACE(""); doCopy(that); }; \
 objname(mobs::MemBaseVector *m, mobs::ObjectBase *o) : ObjectBase(m, o) { TRACE(""); keylist.reset(); init(); }; \
 objname(std::string name, ObjectBase *t) : ObjectBase(name, t) { TRACE(PARAM(name) << PARAM(this)); if (t) t->regObj(this); }; \
-objname &operator=(const objname &other) { TRACE(""); \
-if (this != &other) { \
-doCopy(other); \
-} \
-return *this; \
-}; \
+objname &operator=(const objname &rhs) { TRACE(""); if (this != &rhs) { doCopy(rhs); } return *this; }; \
 static ObjectBase *createMe() { return new objname; } ; \
 virtual std::string typName() const { return #objname; };
 
@@ -285,6 +281,7 @@ public:
   /// \private
   ObjectBase(std::string n, ObjectBase *obj) : m_varNam(n), m_parent(obj) {} // Konstructor for ObjVar
   /// \private
+  ObjectBase &operator=(const ObjectBase &rhs) { doCopy(rhs); return *this; }
   ObjectBase(MemBaseVector *m, ObjectBase *o) : m_varNam(""), m_parent(o), m_parVec(m) {} // Konstructor for Vector
   virtual ~ObjectBase() {};
   /// \private

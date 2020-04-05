@@ -26,7 +26,9 @@
 #define MOBS_OBJPOOL_H
 
 #include <string>
+#include <list>
 #include <memory>
+#include <utility>
 
 namespace mobs {
 
@@ -56,8 +58,10 @@ public:
   void assign(std::string objName, std::shared_ptr<NamedObject> obj);
   /// \private
   bool lookup(std::string objName, std::weak_ptr<NamedObject> &ptr);
-  /// garbage aufräumen
-  void garbageCollect();
+  /// \private
+  void search(std::string searchName, std::list<std::pair<std::string, std::weak_ptr<NamedObject>>> &result);
+  /// Entfernt  Objekte die nicht in Verwendung sind \c shared_ptr<T>
+  void clearUnlocked();
 private:
   NOPData *data;
 };
@@ -96,7 +100,7 @@ template <class T>
  \endcode
  
  \todo Suchen einer liste<NameObjRef> aus dem Pool, über eine regexp
- \todo Anpassungen um die Zugriffe threadsafe zu gestalten
+ \todo Anpassungen um die Zugriffe thread safe zu gestalten
 
  */
 class NamedObjRef
@@ -108,6 +112,8 @@ public:
     NamedObjRef(std::shared_ptr<NamedObjPool> nOPool, std::string objName) : pool(nOPool), name(objName) {
       pool->lookup(name, ptr);
     };
+  /// \private
+    NamedObjRef(const std::shared_ptr<NamedObjPool> &nOPool, const std::string &objName, std::weak_ptr<NamedObject> &p) : pool(nOPool), name(objName), ptr(p) {};
     ~NamedObjRef() {};
   /// Zuweisung eines Objektes per C-Pointer
       T *operator=(T *t) {
@@ -162,11 +168,35 @@ public:
         throw std::runtime_error(std::string("NamedObject ") + name + " nullptr access");
       return *t;
     };
+  /// Pool abfragen
+  std::shared_ptr<NamedObjPool> getPool() const { return pool; }
+  /// Objektname abfragen
+  std::string getName() const { return name; }
+  
   private:
     std::shared_ptr<NamedObjPool> pool;
     std::string name;
     mutable std::weak_ptr<NamedObject> ptr;
 
+};
+
+template <class T>
+/// Liste von \c NamedObjRef
+class NamedObjList : public std::list<NamedObjRef<T>> {
+public:
+  NamedObjList() : std::list<NamedObjRef<T>>() {}
+  
+  /// Sucht nach Objekten, die einen gleichen Teil zu Beginn des Objektnamens haben
+  /// @param pool Zeiger auf Pool aus dem gesucht weden soll
+  /// @param searchName Suchmuster
+  /// \throws runtime_error falls Methode nicht implementiert (unordered pool)
+  void serchBeginsWith(std::shared_ptr<NamedObjPool> pool, std::string searchName) {
+    std::list<std::pair<std::string, std::weak_ptr<NamedObject>>> result;
+    pool->search(searchName, result);
+    this->clear();
+    for (auto &i:result)
+      this->emplace(this->end(), pool, i.first, i.second);
+  }
 };
 
 }

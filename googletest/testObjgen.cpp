@@ -199,7 +199,6 @@ TEST(objgenTest, emptyVars) {
   EXPECT_EQ(U"", dt.U32string());
 }
 
-
 TEST(objgenTest, objDump) {
   DataTypes dt;
   string leer = R"({Bool:false,Char:"",Char16_t:"",Char32_t:"",Wchar_t:"",SignedChar:"",ShortInt:0,Int:0,LongInt:0,LongLongInt:0,UnsignedChar:"",UnsignedShortInt:0,UnsignedInt:0,UnsignedLongLong:0,UnsignedLongLongInt:0,Float:0,Double:0,LongDouble:0,String:"",Wstring:"",U16string:"",U32string:""})";
@@ -354,6 +353,45 @@ TEST(objgenTest, getSetVar) {
 //  std::cerr << to_string(p) << std::endl;
   
 }
+
+TEST(objgenTest, copy) {
+  
+  string inhalt = R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})";
+  
+  Person info;
+
+  ASSERT_NO_THROW(string2Obj(inhalt, info));
+  EXPECT_EQ(inhalt, mobs::to_string(info));
+
+  Person info2;
+  info2 = info;
+
+  EXPECT_EQ(inhalt, mobs::to_string(info2));
+
+  Person info3(info);
+  EXPECT_EQ(inhalt, mobs::to_string(info3));
+
+  
+}
+
+
+
+
+
+
+
+
+#if 0
+TEST(objgenTest, compare) {
+  Person p;
+  p.name("ABC");
+  p.vorname("ABC");
+  EXPECT_TRUE(p.name() == p.vorname());
+  EXPECT_TRUE(p.name == p.vorname);
+  
+}
+#endif
+
 
 }
 

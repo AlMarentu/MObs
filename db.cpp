@@ -99,7 +99,8 @@ bool FileDatabase::load(ObjectBase &obj)
 bool FileDatabase::load(list<ObjectBase> &result, string objType, string query)
 {
   TRACE(PARAM(objType) << PARAM(query));
-  return true;
+  // TODO
+  return false;
 }
 
 bool FileDatabase::save(const ObjectBase &obj)
@@ -159,7 +160,7 @@ int main(int argc, char* argv[])
     db.save(*f1);
 
     NamedObjRef<Fahrzeug> f2(pool, "2");
-    if (f2.lock() == nullptr)
+    if (not f2.exists())
     {
       f2.create();
       f2->id(2);

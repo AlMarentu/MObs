@@ -483,7 +483,7 @@ public:
 
     }
     else
-      mem.strOut(res);
+      res << mem.toStr();
 
   };
   std::string result() const { return res.str(); };

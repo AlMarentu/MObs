@@ -70,7 +70,7 @@ TEST(objpoolTest, simple) {
     ref1->a = 42;
     ref2->a = 666;
   }
-  // retrueve Objects via Name
+  // retreive Objects via Name
   {
     mobs::NamedObjRef<Berlin> r1(pool, "B.1");
     mobs::NamedObjRef<Tokio > r2(pool, "T.2");
@@ -87,10 +87,45 @@ TEST(objpoolTest, simple) {
     // unknown id
     ASSERT_FALSE(yy.exists());
   }
-  pool->garbageCollect();
+  pool->clearUnlocked();
   
 }
 
+TEST(objpoolTest, garbage) {
+
+// Einen Pool erzeugen
+shared_ptr<mobs::NamedObjPool> pool = make_shared<mobs::NamedObjPool>();
+
+  {
+    mobs::NamedObjRef<Berlin> ref1(pool, "B.1");
+    mobs::NamedObjRef<Tokio > ref2(pool, "T.2");
+    ref1 = new Berlin;
+    ref2 = new Tokio;
+    ref1->a = 42;
+    ref2->a = 666;
+    
+    EXPECT_TRUE(ref1.exists());
+    EXPECT_TRUE(ref2.exists());
+  }
+  mobs::NamedObjRef<Berlin> rb(pool, "B.1");
+  
+  mobs::NamedObjRef<Berlin> ref1(pool, "B.1");
+  mobs::NamedObjRef<Tokio > ref2(pool, "T.2");
+
+  shared_ptr<Berlin> berlin = rb.lock();
+
+  EXPECT_TRUE(ref1.exists());
+  EXPECT_TRUE(ref2.exists());
+
+  ASSERT_NO_THROW(pool->clearUnlocked());
+  
+
+  EXPECT_TRUE(ref1.exists());
+  EXPECT_FALSE(ref2.exists());
+
+}
+
+  
 TEST(objpoolTest, create) {
   
   // Einen Pool erzeugen
@@ -137,6 +172,30 @@ TEST(objpoolTest, reuse) {
   
 }
 
+TEST(objpoolTest, list) {
+  // Einen Pool erzeugen
+  shared_ptr<mobs::NamedObjPool> pool = make_shared<mobs::NamedObjPool>();
+  
+  for (int i = 1; i < 4; i++)
+  {
+     mobs::NamedObjRef<Berlin> ref1(pool, u8"B." + to_string(i));
+     mobs::NamedObjRef<Tokio > ref2(pool, u8"T." + to_string(i));
+     ref1 = new Berlin;
+     ref2 = new Tokio;
+     ref1->a = i;
+     ref2->a = i + 100;
+   }
+  mobs::NamedObjList<Berlin> l;
+  ASSERT_NO_THROW(l.serchBeginsWith(pool, "B."));
+  EXPECT_EQ(3, l.size());
+  int i = 1;
+  for (auto p:l)
+  {
+    EXPECT_EQ(i++, p->a);
+  }
+
+
+}
 
 
 
