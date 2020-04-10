@@ -104,18 +104,21 @@
 #include "logging.h"
 #include "objtypes.h"
 
+/// Makro für Typ-Deklaration zu \c MemVar
 #define MemVarType(typ) mobs::Member<typ, mobs::StrConv<typ>>
 /*! \brief Deklarations-Makro für eine  Membervarieable
 @param typ Basistyp
 @param name Name
 */
 #define MemVar(typ, name) MemVarType(typ) name = MemVarType(typ) (#name, this)
+/// Makro für Typ-Deklaration zu \c MemEnumVar
 #define MemEnumVarTyp(typ) mobs::Member<typ, mobs::StrIntConv<typ>>
 /*! \brief Deklarations-Makro für eine  Membervarieable des Typs \c enum
 @param typ Basistyp
 @param name Name
 */
 #define MemEnumVar(typ, name) MemEnumVarTyp(typ) name = MemEnumVarTyp(typ) (#name, this)
+/// Makro für Typ-Deklaration zu \c MemMobsEnumVar
 #define MemMobsEnumVarType(typ) mobs::Member<enum typ, mobs::Str##typ##Conv>
 /*! \brief Deklarations-Makro für eine  Membervarieable eines mit \c MOBS_ENUM_DEF erzeugten enums
 @param typ Name des enums (ohne Tiken \c enum
@@ -123,7 +126,14 @@
 */
 #define MemMobsEnumVar(typ, name) MemMobsEnumVarType(typ) name = MemMobsEnumVarType(typ) (#name, this)
 
+/// Makro für Typ-Deklaration zu \c MemMobsVar
 #define MemMobsVarType(typ, converter) mobs::Member<typ, converter>
+/*! \brief Deklarations-Makro für eine  Membervarieable eines mit \c MOBS_ENUM_DEF erzeugten enums
+@param typ Name des enums (ohne Tiken \c enum
+@param name Name
+@param converter Konvertier-Klasse von und nach \c std::string
+\see  ConvToStrHint
+*/
 #define MemMobsVar(typ, name, converter) MemMobsVarType(typ, converter) name = MemMobsVarType(typ, converter) (#name, this)
 
 
@@ -139,7 +149,7 @@
  @param typ Basistyp
  @param name Name
  */
-#define MemVarVector(typ, name) MemVector( MeVarType(typ), name)
+#define MemVarVector(typ, name) MemVector( MemVarType(typ), name)
 //#define MemVarVector(typ, name) mobs::MemberVector< MemVarType(typ) > name = mobs::MemberVector< MemVarType(typ) >(#name, this)
 
 
@@ -305,6 +315,7 @@ public:
   ObjectBase(std::string n, ObjectBase *obj) : m_varNam(n), m_parent(obj) {} // Konstructor for ObjVar
   /// \private
   ObjectBase &operator=(const ObjectBase &rhs) { doCopy(rhs); return *this; }
+  /// \private
   ObjectBase(MemBaseVector *m, ObjectBase *o) : m_varNam(""), m_parent(o), m_parVec(m) {} // Konstructor for Vector
   virtual ~ObjectBase() {};
   /// \private
@@ -357,6 +368,7 @@ public:
   /// liest eine Variable relativ zum angegebenen Pfad
   /// @param path Pfad der Variable z.B.: kontakt[3].number
   /// @param found opt. Zeiger auf bool-Variable, die Anzeigt, ob das Element gefunden wurde
+  /// @param compact opt. Angabe, ob ausgabe \e kompakt erfolgen soll (bei enum als \c int statt als Text
   /// \return Inhalt der variable als string in UTF-8, oder leer, wenn nicht gefunden
   std::string getVariable(const std::string &path, bool *found = nullptr, bool compact = false);
   /// \brief Kopiere ein Objekt aus einem bereits vorhandenen.
@@ -394,7 +406,7 @@ private:
 //template <> inline unsigned char mobsempty(unsigned char&) { return ' '; };
 
 
-template<typename T, class C>
+template<typename T, class C> 
 /** \brief Klasse für Member-Variable zum angegeben Basistyp
  
  Diese Klasse wird normalerweise innerhalb einen Objektes  das von der Basisklasse  \c ObjectType abgeleitet verwendet.
@@ -439,7 +451,7 @@ template<typename T, class C>
  */
 class Member : virtual public MemberBase, public C {
 public:
-  Member() : MemberBase(""), wert(T()) { TRACE(""); }  // Konstruktor für Array
+  Member() : MemberBase("") { TRACE(""); clear(); }  // Konstruktor für Array
   /// \private
   Member(std::string n, ObjectBase *o) : MemberBase(n, o), wert(T()) { TRACE(PARAM(n) << PARAM(this)); if (o) o->regMem(this); } // Konstruktor f. Objekt nur intern
   /// \private
@@ -453,9 +465,8 @@ public:
   
 //  virtual void strOut(std::ostream &str) const { str << mobs::to_string(wert); }
   /// Setze Inhalt auf leer
-  virtual void clear()  { wert = T(); };
+  virtual void clear()  { wert = this->c_empty(); };
   //  virtual std::string toStr() const { std::stringstream s; s << wert; return s.str(); }
-//  virtual std::string toStr() const { return mobs::to_string(wert); };
   virtual std::string toStr(const ConvToStrHint &cth) const { return this->c_to_string(wert, cth); };
   //  virtual std::wstring toWStr2() const { return mobs::to_wstring(wert); }
   /// Abfrage, ob der Inhalt textbasiert ist (zb. in JSON in Hochkommata gestzt wird)
@@ -464,7 +475,6 @@ public:
   virtual bool is_chartype(const ConvToStrHint &cth) const { return this->c_is_chartype(cth); }
   /// Einlesen der Variable aus einnem \c std::string im Format UTF-8
   virtual bool fromStr(const std::string &sin, const ConvFromStrHint &cfh) { if (this->c_string2x(sin, wert, cfh)) { activate(); return true; } return false; }
-//  virtual bool fromStr(const std::string &sin) { if (mobs::string2x(sin, wert)) { activate(); return true; } return false; }
   /// \private
   void doCopy(const Member<T, C> &other) { operator()(other()); }
 private:
@@ -479,6 +489,46 @@ KeyList & operator<<(KeyList &k, Member<T, C> &m)
   m.key(k.add());
   return k;
 };
+
+template<typename T>
+/// \private
+class MemberVectorIterator
+{
+public:
+  using iterator_category = std::random_access_iterator_tag;
+  using value_type = T;
+  using difference_type = std::ptrdiff_t;
+  using pointer = T*;
+  using reference = T&;
+  
+  MemberVectorIterator() { }
+  MemberVectorIterator(typename std::vector<T *>::iterator it) { m_iter = it; }
+  MemberVectorIterator(const MemberVectorIterator<T>& rawIterator) = default;
+  ~MemberVectorIterator() { }
+  
+  MemberVectorIterator<T>& operator=(const MemberVectorIterator<T>& rawIterator) = default;
+  //    MemberVectorIterator<T>&                  operator=(T* ptr){m_ptr = ptr;return (*this);}
+  
+  operator bool() const { return m_iter; }
+  bool operator==(const MemberVectorIterator<T>& rawIterator)const{ return (m_iter == rawIterator.m_iter); }
+  bool operator!=(const MemberVectorIterator<T>& rawIterator)const{ return (m_iter != rawIterator.m_iter); }
+  MemberVectorIterator<T>& operator+=(const difference_type& movement) { m_iter += movement;return *this; }
+  MemberVectorIterator<T>& operator-=(const difference_type& movement) { m_iter -= movement;return *this; }
+  MemberVectorIterator<T>& operator++() { ++m_iter; return *this; }
+  MemberVectorIterator<T>& operator--() { --m_iter; return *this; }
+  MemberVectorIterator<T> operator++(int) { auto temp(*this); ++m_iter; return temp; }
+  MemberVectorIterator<T> operator--(int) { auto temp(*this); --m_iter; return temp; }
+  MemberVectorIterator<T> operator+(const difference_type& movement) { auto oldIdx = m_iter; m_iter+=movement; auto temp(*this); m_iter = oldIdx; return temp; }
+  MemberVectorIterator<T> operator-(const difference_type& movement) { auto oldIdx = m_iter; m_iter-=movement; auto temp(*this); m_iter = oldIdx; return temp; }
+  difference_type operator-(const MemberVectorIterator<T>& rawIterator) { return std::distance(rawIterator.m_ite,this->m_iter); }
+  
+  T &operator*(){return **m_iter;}
+  const T &operator*()const{return **m_iter;}
+  T *operator->(){return *m_iter;}
+protected:
+  typename std::vector<T *>::iterator m_iter;
+};
+
 
 template<class T>
 /// \brief Klasse für Vectoren auf Membervariablen oder Objekten innerhalb von von \c ObjectBase angeleiteten Klasse; Bitte als Makro MemVarVector oder MemVector verwenden
@@ -498,6 +548,33 @@ public:
   virtual void traverse(ObjTravConst &trav) const;
   virtual MemberBase *getMemInfo(size_t i) { if (i >= size()) return 0; return dynamic_cast<MemberBase *>(werte[i]); }
   virtual ObjectBase *getObjInfo(size_t i) { if (i >= size()) return 0; return dynamic_cast<ObjectBase *>(werte[i]); }
+ 
+  /// Typ-Deklaration iterator auf Vector
+  typedef MemberVectorIterator<T> iterator;
+  /// Typ-Deklaration iterator auf Vector
+  typedef MemberVectorIterator<const T> const_iterator;
+  /// Typ-Deklaration iterator auf Vector
+  typedef MemberVectorIterator<T> reverse_iterator;
+  /// Typ-Deklaration iterator auf Vector
+  typedef MemberVectorIterator<const T> const_reverse_iterator;
+
+  /// Start-Iterator
+  iterator begin() noexcept { return werte.begin(); }
+  /// Ende-Iterator
+  iterator end() noexcept { return werte.end(); }
+  /// Start-Iterator
+  reverse_iterator rbegin() { return werte.rbegin(); }
+  /// Ende-Iterator
+  reverse_iterator rend() { return werte.rend(); }
+  /// Start-Iterator
+  const_iterator cbegin() noexcept { return werte.cbegin(); }
+  /// Ende-Iterator
+  const_iterator cend() noexcept { return werte.cend(); }
+  /// Start-Iterator
+  const_reverse_iterator crbegin() { return werte.crbegin(); }
+  /// Ende-Iterator
+  const_reverse_iterator crend() { return werte.crend(); }
+
 protected:
   /// \private
   void doCopy(const MemberVector<T> &other);

@@ -33,10 +33,20 @@
 /** \file objtypes.h
  \brief Definitionen von Konvertierungsroutinen von und nach std::string */
 
+/**
+ \brief Deklaration einses \c enum
+ 
+ Im Beispiel wird ein enum direction {Dleft, Dright, Dup, Ddown};
+ deklariert. Zusätzlich wird eine Konvertierungsklasse \c StrdirectionConv sowie 2 Hilfs-Arrays erzeugt.
+ \code
+ MOBS_ENUM_DEF(direction, Dleft, Dright, Dup, Ddown)
+ MOBS_ENUM_VAL(direction, "left", "right", "up", "down")
+ \endcode
+*/
 #define MOBS_ENUM_DEF(typ, ... ) \
 enum typ { __VA_ARGS__ }; \
 namespace mobs { const std::vector<enum typ> mobsinternal_elements_##typ = { __VA_ARGS__ }; }
-
+/// Deklaration der Ausgabewerte zu einem \c MOBS_ENUM_DEF
 #define MOBS_ENUM_VAL(typ, ... ) \
 namespace mobs { \
 const std::vector<std::string> mobsinternal_text_##typ = { __VA_ARGS__ }; \
@@ -44,11 +54,12 @@ std::string typ##_to_string(enum typ x) { size_t p = 0; for (auto const i:mobsin
 bool string_to_##typ(std::string s, enum typ &x) { size_t p = 0; for (auto const &i:mobsinternal_text_##typ) { if (i==s) { x = mobsinternal_elements_##typ.at(p); return true; } p++;} return false; };  \
 class Str##typ##Conv { \
 public: \
-static inline bool c_string2x(const std::string &str, typ &t, const ::mobs::ConvFromStrHint &cfh) { if (cfh.acceptExtented()) { if (string_to_##typ(str, t)) return true; } \
+  static inline bool c_string2x(const std::string &str, typ &t, const ::mobs::ConvFromStrHint &cfh) { if (cfh.acceptExtented()) { if (string_to_##typ(str, t)) return true; } \
                                                     if (not cfh.acceptCompact()) return false; int i; if (not ::mobs::string2x(str, i)) return false; t = typ(i); return true; } \
   static inline std::string c_to_string(typ t, const ::mobs::ConvToStrHint &cth) { return cth.compact() ? ::mobs::to_string(int(t)) : typ##_to_string(t); } \
   static inline bool c_is_chartype(const ::mobs::ConvToStrHint &cth) { return not cth.compact(); } \
   static inline bool c_is_specialized() { return false; } \
+  static inline typ c_empty() { return mobsinternal_elements_##typ.front(); } \
 }; }
 
 
@@ -218,45 +229,68 @@ template <> inline bool mobschar(unsigned char) { return true; };
 /// \private
 template <> inline bool mobschar(signed char) { return true; };
 
+/// Hilfsklasse für Konvertierungsklasse
 class ConvToStrHint {
 public:
+  /// Konstructor
+  /// @param print_compact führ bei einigen Typen zur vereinfachten Ausgabe
   ConvToStrHint(bool print_compact) : comp(print_compact) {}
   virtual ~ConvToStrHint() {}
+  /// \private
   virtual bool compact() const { return comp; }
   
-protected:
+private:
   ConvToStrHint();
   bool comp;
 };
 
+/// Hilfsklasse für Konvertierungsklasse - Basisklasse
 class ConvFromStrHint {
 public:
   virtual ~ConvFromStrHint() {}
+  /// darf ein kompakter Wert als Eingabe fungieren
   virtual bool acceptCompact() const = 0;
+  /// darf ein nicht-kompakter Wert als Eingabe fungieren
   virtual bool acceptExtented() const = 0;
 
+  /// Standard Konvertierungshinweis, kompake und erweiterte Eingaben sind erlaubt
   static const ConvFromStrHint &convFromStrHintDflt;
+  /// Konvertierungshinweis, der nur erweiterte Eingabe zulässt
   static const ConvFromStrHint &convFromStrHintExplizit;
 
 };
 
 template <typename T>
+/// Standard Konvertierungs-Klasse für Serialisierung von und nach std::string
 class StrConv {
 public:
+  /// liest eine Variable aus einem \c std::string
   static inline bool c_string2x(const std::string &str, T &t, const ConvFromStrHint &) { return mobs::string2x(str, t); }
+  /// Wandelt eine Variable in einen \c std::string um
   static inline std::string c_to_string(T t, const ConvToStrHint &) { return to_string(t); };
+  /// Angabe, ob die Ausgabe als Text erfolgt (quoting, escaping nötig)
   static inline bool c_is_chartype(const ConvToStrHint &) { return mobschar(T()); }
+  /// zeigt an, ob spezialisierter Typ vorliegt (\c \<limits>)
   static inline bool c_is_specialized() { return std::numeric_limits<T>::is_specialized; }
+  /// liefert eine \e leere Variable
+  static inline T c_empty() { return T(); }
 
 };
 
 template <typename T>
+/// Konvertiertungs-Klasse für enums mit Ein-/Ausgabe als \c int
 class StrIntConv {
 public:
+  /// \private
   static inline bool c_string2x(const std::string &str, T &t, const ConvFromStrHint &) { int i; if (not mobs::string2x(str, i)) return false; t = T(i); return true; }
+  /// \private
   static inline std::string c_to_string(T t, const ConvToStrHint &) { return to_string(int(t)); }
+  /// \private
   static inline bool c_is_chartype(const ConvToStrHint &) { return false; }
+  /// \private
   static inline bool c_is_specialized() { return std::numeric_limits<T>::is_specialized; }
+  /// \private
+  static inline T c_empty() { return T(0); }
 };
 
 

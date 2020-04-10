@@ -29,6 +29,7 @@
 
 namespace logging {
 
+/// Log-Lebel, bitte Makros verwenden
 typedef enum {
   lm_trace = 1,
   lm_debug = 2,

@@ -331,7 +331,19 @@ TEST(objgenTest, Vectors) {
   EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", mobs::to_string(info,true));
 // dito mit to_json
   EXPECT_EQ(R"({"kundennr":44,"firma":false,"name":"Peter","vorname":"","adresse":{"strasse":"","plz":"","ort":""},"kontakte":[{"art":"fax","number":""},{"art":"fax","number":""},{"art":"fax","number":""},{"art":"fax","number":""},{"art":"mobil","number":"+40 0000 1111 222"}],"hobbies":["","Piano"]})", mobs::to_json(info));
+}
+  
+TEST(objgenTest, iterator) {
+  Person info;
+  info.kontakte[4].number("+40 0000 1111 222");
 
+  mobs::MemberVector<Kontakt>::iterator it= info.kontakte.begin();
+  it += 4;
+  EXPECT_EQ(u8"+40 0000 1111 222", it->number());
+  int i = 0;
+  for(auto a:info.kontakte)
+    i++;
+  EXPECT_EQ(5, i);
 }
 
 TEST(objgenTest, Pointer) {

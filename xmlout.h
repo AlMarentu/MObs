@@ -28,20 +28,29 @@ namespace mobs {
 class XmlOutData;
 /// KLasse zum Erzeugen von XML aud Objekten
 class XmlOut : virtual public ObjTravConst {
-  public:
-    XmlOut(bool indent = true);
-    ~XmlOut();
-    virtual void doObjBeg(ObjTravConst &ot, const ObjectBase &obj);
-    virtual void doObjEnd(ObjTravConst &ot, const ObjectBase &obj);
-    virtual void doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec);
-    virtual void doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec);
-    virtual void doMem(ObjTravConst &ot, const MemberBase &mem);
-
-    std::string getString();
-    void clear();
-    void startList(std::string name);
-  private:
-    XmlOutData *data;
+public:
+  /// Konstruktor
+  /// @param indent erzeugt Einrückungen, wenn \c true
+  XmlOut(bool indent = true);
+  ~XmlOut();
+  /// \private
+  virtual void doObjBeg(ObjTravConst &ot, const ObjectBase &obj);
+  /// \private
+  virtual void doObjEnd(ObjTravConst &ot, const ObjectBase &obj);
+  /// \private
+  virtual void doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec);
+  /// \private
+  virtual void doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec);
+  /// \private
+  virtual void doMem(ObjTravConst &ot, const MemberBase &mem);
+  /// liefert Ergebnis-XML
+  std::string getString();
+  /// löscht Buffer
+  void clear();
+  /// Angabe eines Start-Tokens falls mehrere Objekte einer Liste gelesen werden
+  void startList(std::string name);
+private:
+  XmlOutData *data;
 
 };
 
