@@ -18,6 +18,8 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#if 1 // USERAPIJSON
+
 #include "readjson.h"
 #include "logging.h"
 
@@ -36,7 +38,6 @@ using namespace std;
 using namespace rapidjson;
 
 namespace mobs {
-
 
 class JsonReadData : public ObjectNavigator, public BaseReaderHandler<UTF8<>, JsonReadData>  {
 public:
@@ -57,7 +58,7 @@ public:
     TRACE(PARAM(b));
     if (enter(lastKey) and member())
     {
-      Member<bool> *mbool = dynamic_cast<Member<bool> *>(member());
+      auto mbool = dynamic_cast<MemVarType(bool) *>(member());
       if (mbool)
         mbool->operator()(b);
     }
@@ -68,10 +69,10 @@ public:
     TRACE(PARAM(i));
     if (enter(lastKey) and member())
     {
-      Member<int> *mint = dynamic_cast<Member<int> *>(member());
-      Member<double> *mdouble = dynamic_cast<Member<double> *>(member());
-      Member<bool> *mbool = dynamic_cast<Member<bool> *>(member());
-      Member<string> *mstring = dynamic_cast<Member<string> *>(member());
+      auto mint = dynamic_cast<MemVarType(int) *>(member());
+      auto mdouble = dynamic_cast<MemVarType(double) *>(member());
+      auto mbool = dynamic_cast<MemVarType(bool) *>(member());
+      auto mstring = dynamic_cast<MemVarType(string) *>(member());
       if (mint)
       {
         cerr << "MINT" << endl;
@@ -92,10 +93,10 @@ public:
     TRACE(PARAM(u));
     if (enter(lastKey) and member())
     {
-      Member<int> *mint = dynamic_cast<Member<int> *>(member());
-      Member<double> *mdouble = dynamic_cast<Member<double> *>(member());
-      Member<bool> *mbool = dynamic_cast<Member<bool> *>(member());
-      Member<string> *mstring = dynamic_cast<Member<string> *>(member());
+      auto mint = dynamic_cast<MemVarType(int) *>(member());
+      auto mdouble = dynamic_cast<MemVarType(double) *>(member());
+      auto mbool = dynamic_cast<MemVarType(bool) *>(member());
+      auto mstring = dynamic_cast<MemVarType(string) *>(member());
       if (mint)
       {
         cerr << "MINT" << endl;
@@ -148,10 +149,10 @@ public:
     TRACE(PARAM(str) << PARAM(length) << PARAM(copy));
     if (enter(lastKey) and member())
     {
-      Member<int> *mint = dynamic_cast<Member<int> *>(member());
-      Member<double> *mdouble = dynamic_cast<Member<double> *>(member());
-      Member<bool> *mbool = dynamic_cast<Member<bool> *>(member());
-      Member<string> *mstring = dynamic_cast<Member<string> *>(member());
+//      auto mint = dynamic_cast<MemVarType(int) *>(member());
+//      auto mdouble = dynamic_cast<MemVarType(double) *>(member());
+//      auto mbool = dynamic_cast<MemVarType(bool) *>(member());
+      auto mstring = dynamic_cast<MemVarType(string) *>(member());
       
       if (mstring)
         mstring->operator()(string(str, length));
@@ -232,3 +233,5 @@ void JsonRead::fill(ObjectBase &obj)
 }
 
 }
+
+#endif

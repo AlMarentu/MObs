@@ -240,5 +240,24 @@ std::string to_string(long double t) {
 }
 
 
+class ConvFromStrHintDefault : virtual public ConvFromStrHint {
+public:
+  ConvFromStrHintDefault() {}
+  virtual ~ConvFromStrHintDefault() {}
+  virtual bool acceptCompact() const { return true; }
+  virtual bool acceptExtented() const { return true; }
+};
+
+class ConvFromStrHintExplizit : virtual public ConvFromStrHint {
+public:
+  ConvFromStrHintExplizit() {}
+  virtual ~ConvFromStrHintExplizit() {}
+  virtual bool acceptCompact() const { return false; }
+  virtual bool acceptExtented() const { return true; }
+};
+
+const ConvFromStrHint &ConvFromStrHint::convFromStrHintDflt = ConvFromStrHintDefault();
+const ConvFromStrHint &ConvFromStrHint::convFromStrHintExplizit = ConvFromStrHintExplizit();
+
 
 }

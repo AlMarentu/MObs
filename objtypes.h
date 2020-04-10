@@ -26,9 +26,31 @@
 #include <iostream>
 #include <sstream>
 #include <codecvt>
+#include <vector>
+#include <limits>
+
 
 /** \file objtypes.h
  \brief Definitionen von Konvertierungsroutinen von und nach std::string */
+
+#define MOBS_ENUM_DEF(typ, ... ) \
+enum typ { __VA_ARGS__ }; \
+namespace mobs { const std::vector<enum typ> mobsinternal_elements_##typ = { __VA_ARGS__ }; }
+
+#define MOBS_ENUM_VAL(typ, ... ) \
+namespace mobs { \
+const std::vector<std::string> mobsinternal_text_##typ = { __VA_ARGS__ }; \
+std::string typ##_to_string(enum typ x) { size_t p = 0; for (auto const i:mobsinternal_elements_##typ) { if (i==x) { return mobsinternal_text_##typ.at(p); } p++;} throw std::runtime_error(#typ "to_string fails"); }; \
+bool string_to_##typ(std::string s, enum typ &x) { size_t p = 0; for (auto const &i:mobsinternal_text_##typ) { if (i==s) { x = mobsinternal_elements_##typ.at(p); return true; } p++;} return false; };  \
+class Str##typ##Conv { \
+public: \
+static inline bool c_string2x(const std::string &str, typ &t, const ::mobs::ConvFromStrHint &cfh) { if (cfh.acceptExtented()) { if (string_to_##typ(str, t)) return true; } \
+                                                    if (not cfh.acceptCompact()) return false; int i; if (not ::mobs::string2x(str, i)) return false; t = typ(i); return true; } \
+  static inline std::string c_to_string(typ t, const ::mobs::ConvToStrHint &cth) { return cth.compact() ? ::mobs::to_string(int(t)) : typ##_to_string(t); } \
+  static inline bool c_is_chartype(const ::mobs::ConvToStrHint &cth) { return not cth.compact(); } \
+  static inline bool c_is_specialized() { return false; } \
+}; }
+
 
 namespace mobs {
 
@@ -44,7 +66,7 @@ return c.from_bytes(val); };
 inline std::wstring to_wstring(std::string val) { std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> c; return c.from_bytes(val); };
 
 //template <typename T>
-//inline std::string to_string(T t) { return std::to_string(t); };
+//std::string to_string(T t) { std::stringstream s; s << t; return s.str(); };
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
@@ -178,6 +200,65 @@ template <> bool string2x(const std::string &str, char32_t &t);
 template <> bool string2x(const std::string &str, wchar_t &t);
 /// \private
 template <> bool string2x(const std::string &str, bool &t);
+
+// ist typename ein Character-Typ
+template <typename T>
+/// \brief prüft, ob der Typ T aus Text besteht - also zB. in JSON in Hochkommata steht
+inline bool mobschar(T) { return not std::numeric_limits<T>::is_specialized; }
+/// \private
+template <> inline bool mobschar(char) { return true; };
+/// \private
+template <> inline bool mobschar(char16_t) { return true; };
+/// \private
+template <> inline bool mobschar(char32_t) { return true; };
+/// \private
+template <> inline bool mobschar(wchar_t) { return true; };
+/// \private
+template <> inline bool mobschar(unsigned char) { return true; };
+/// \private
+template <> inline bool mobschar(signed char) { return true; };
+
+class ConvToStrHint {
+public:
+  ConvToStrHint(bool print_compact) : comp(print_compact) {}
+  virtual ~ConvToStrHint() {}
+  virtual bool compact() const { return comp; }
+  
+protected:
+  ConvToStrHint();
+  bool comp;
+};
+
+class ConvFromStrHint {
+public:
+  virtual ~ConvFromStrHint() {}
+  virtual bool acceptCompact() const = 0;
+  virtual bool acceptExtented() const = 0;
+
+  static const ConvFromStrHint &convFromStrHintDflt;
+  static const ConvFromStrHint &convFromStrHintExplizit;
+
+};
+
+template <typename T>
+class StrConv {
+public:
+  static inline bool c_string2x(const std::string &str, T &t, const ConvFromStrHint &) { return mobs::string2x(str, t); }
+  static inline std::string c_to_string(T t, const ConvToStrHint &) { return to_string(t); };
+  static inline bool c_is_chartype(const ConvToStrHint &) { return mobschar(T()); }
+  static inline bool c_is_specialized() { return std::numeric_limits<T>::is_specialized; }
+
+};
+
+template <typename T>
+class StrIntConv {
+public:
+  static inline bool c_string2x(const std::string &str, T &t, const ConvFromStrHint &) { int i; if (not mobs::string2x(str, i)) return false; t = T(i); return true; }
+  static inline std::string c_to_string(T t, const ConvToStrHint &) { return to_string(int(t)); }
+  static inline bool c_is_chartype(const ConvToStrHint &) { return false; }
+  static inline bool c_is_specialized() { return std::numeric_limits<T>::is_specialized; }
+};
+
 
 }
 

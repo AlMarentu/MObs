@@ -56,7 +56,7 @@ class KeyString : virtual public ObjTravConst {
       if (mem.key() > 0)
       {
         keystr += ".";
-        keystr += mem.toStr();
+        keystr += mem.toStr(false);
         //cerr << "  Mem " << mem.name() << " = ";
         //mem.strOut(cerr);
         //cerr << endl;

@@ -125,7 +125,7 @@ public:
     eat('<');
     if (peek() == '?')
     {
-      // Parse priimäre Verarbeitungsanweisung
+      // Parse primäre Verarbeitungsanweisung
       eat();
       parse2GT();
       if (getValue() != "xml")
@@ -315,11 +315,11 @@ private:
       throw std::runtime_error("Syntax");
   };
   void parse2Com() {
-    pos2 = Xml.find(u8"--!>", pos1);
+    pos2 = Xml.find(u8"-->", pos1);
     //cerr << "P-- " << pos2 << " " << pos1 << endl;
     if (pos2 == std::string::npos)
       throw std::runtime_error("Syntax");
-    pos1 = pos2 + 3;
+    pos1 = pos2 + 2;
   };
   void parse2CD() {
     pos2 = Xml.find(u8"]]>", pos1);

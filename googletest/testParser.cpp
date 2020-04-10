@@ -20,6 +20,8 @@
 
 
 #include "jsonparser.h"
+#include "jsonparser.h"
+#include "xmlparser.h"
 #include "xmlparser.h"
 
 #include <stdio.h>
@@ -41,6 +43,19 @@ public:
   virtual void StartObject() { LOG(LM_INFO, "START OBJECT"); };
   virtual void EndObject() { LOG(LM_INFO, "END OBJECT"); };
 };
+
+class XParser: public mobs::XmlParser {
+public:
+  XParser(const string &i) : mobs::XmlParser(i) {}
+  virtual void NullTag(const std::string &element) { LOG(LM_INFO, "NULL"); }
+  virtual void Attribut(const std::string &element, const std::string &attribut, const std::string &value) { LOG(LM_INFO, "ATTRIBUT " << element); }
+  virtual void Value(const std::string &value) { LOG(LM_INFO, "VALUE"); }
+  virtual void Cdata(const char *value, size_t len) { LOG(LM_INFO, "CDATA"); }
+  virtual void StartTag(const std::string &element) { LOG(LM_INFO, "START " << element); }
+  virtual void EndTag(const std::string &element) { LOG(LM_INFO, "END " << element); }
+  virtual void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::string &value) { LOG(LM_INFO, "PI" << element); }
+};
+
 
 TEST(parserTest, jsonTypes) {
   string inhalt = R"({Bool:true,Char:"a",Char16_t:"b",Char32_t:"c",Wchar_t:"d",SignedChar:"e",ShortInt:42,Int:-9876543,LongInt:-45454545,LongLongInt:-34343434343434,UnsignedChar:"f",UnsignedShortInt:999,UnsignedInt:88888,UnsignedLongLong:109876543,UnsignedLongLongInt:1234567890,Float:-21.3,Double:1e-05,LongDouble:123.456,String:"Anton",Wstring:"Berti",U16string:"Conni",U32string:"Det"})";
@@ -97,8 +112,38 @@ TEST(parserTest, jsonStruct1) {
 
 }
 
+void xparse(string s) { XParser p(s); p.parse(); };
 
+// aus https://de.wikipedia.org/wiki/Extensible_Markup_Language
+const string x1 = R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<verzeichnis>
+     <titel>Wikipedia Städteverzeichnis</titel>
+     <eintrag>
+          <stichwort>Genf</stichwort>
+          <eintragstext>Genf ist der Sitz von ...</eintragstext>
+     </eintrag>
+     <eintrag>
+          <stichwort>Köln</stichwort>
+          <eintragstext>Köln ist eine Stadt, die ...</eintragstext>
+     </eintrag>
+</verzeichnis>
+                    )";
+                    
+TEST(parserTest, xmlStruct1) {
+  EXPECT_NO_THROW(xparse(x1));
+  EXPECT_NO_THROW(xparse(u8"<abc/>"));
+  EXPECT_NO_THROW(xparse(u8"<abc a=\"xx\" bcd=\"9999\"/>"));
+  EXPECT_NO_THROW(xparse(u8"<abc f=\"\">xx</abc>"));
+  EXPECT_NO_THROW(xparse(u8"<abc>   <cde/> </abc>"));
+  EXPECT_NO_THROW(xparse(u8"<abc>   <!-- sdfsdf -->  <cde/>  </abc>"));
+  EXPECT_NO_THROW(xparse(u8"<abc>  <cde/> </abc> <!-- sdfs<< df --> "));
+  
+  EXPECT_ANY_THROW(xparse(u8"<abc  />"));
+  EXPECT_ANY_THROW(xparse(u8"<abc>   <cde/> </abce>"));
+  EXPECT_ANY_THROW(xparse(u8"<abc a =\"xx\" bcd=\"9999\"/>"));
+  EXPECT_ANY_THROW(xparse(u8"<abc a=xx bcd=\"9999\"/>"));
 
+}
 
 }
 

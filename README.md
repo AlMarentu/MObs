@@ -6,11 +6,11 @@ Lizenz: LGPL
 
 ## MObs Objektdefinition
 
- Alle Objekte sind Klassen die von public mobs::ObjectBase abgeleitet sind.
+ Alle MObs-Objekte sind Klassen die von public mobs::ObjectBase abgeleitet sind.
 
 Die Konstruktoren und nötigen Hilfsfunktionen weden über das Makro ObjInit(<class name>) ; erzeugt.
 
-Die Zugriffshethoden für eingache Variablen erzeugt das Makro MemVar8<type>, <variable name>);
+Die Zugriffshethoden für einfache Variablen erzeugt das Makro MemVar<type>, <variable name>);
 
 ~~~~~~~~~~cpp
 #include "objgen.h"
@@ -29,7 +29,7 @@ Der Zugriff auf die Variablen erfolgd dann über
 ~~~~~~~~~~cpp
 Fahrzeug f;
 f.fahrzeugTyp("PKW");
-std::cout << f.fahrzeugtyp();
+std::cout << f.fahrzeugTyp();
 ~~~~~~~~~~
 
 Als Basistypen für Variablen sid folgende erlaubt:
@@ -56,13 +56,13 @@ Als Basistypen für Variablen sid folgende erlaubt:
 * std::u16string
 * std::u32string
 
-Zusätzlich können auch weitere Objekte als Member verwendet werden sowie Vektoren von diesen Elementen.
+Zusätzlich können auch wieder MObs-Objekte als Member verwendet werden sowie Vektoren von diesen Elementen.
 
 Dazu stehen die Makros
 * MemVar für Basisitypen
 * ObjVar für Objekte
-* MemVector für Vector von Basisitypen
-* ObjVector für Vectoren von Objekt-Klassen
+* MemVarVector für Vector von Basisitypen
+* MemVector für Vectoren von Objekt-Klassen
 zur Verfügung
 ~~~~~~~~~~cpp
 class Kontakt : virtual public mobs::ObjectBase {
@@ -94,8 +94,8 @@ class Person : virtual public mobs::ObjectBase {
   MemVar(std::string, name);
   MemVar(std::string, vorname);
   ObjVar(Adresse, adresse);
-  ObjVector(Kontakt, kontakte);
-  MemVector(std::string, hobbies);
+  MemVector(Kontakt, kontakte);
+  MemVarVector(std::string, hobbies);
 };
 ~~~~~~~~~~
 Der Zugriff auf die Elemente dieser Klassen erfolgt über get- und set-Methoden:
@@ -110,7 +110,10 @@ std::cout << p.adresse.ort() << " " << p.hobbies[2]();
 DIe Vectoren werden bei Zugriffen automatisch vergrößert, so dass eine Überprüfung entfallen kann.
 
 ## Features
-#### Traversierung
+### Serialisierung
+Funktionen für Im- und Export in JSON und XML sind vorhanden
+
+### Traversierung
 Über einen Operator kann ein Objekt rekursiv durchlaufen werden
 Über Callback-Functions könen Aktionen bei
 * Betreten eines Objektes
@@ -124,14 +127,13 @@ ausgelöste werden.
 * im JSON-Format auszugeben (to_string bzw. to_json)
 * Im XML-Format auszugeben (to_xml)
 
-#### Dynamische Navigation innerhalb eines Objektes
+### Dynamische Navigation innerhalb eines Objektes
 Über den ObjectNavaigator könne Objekte-Teile gezielt angesprochen werden.
 
 Hier kann auf Elemente auch über textuele Anweisungen zgegriffen werden:
 ~~~~~~~~~~cpp
 obj.setVariable("p.hobbies[2]", "Tauchen");
 ~~~~~~~~~~
-ebenso können ganze Objekte aus XML oder JSON importiert werden
 
 
 ### Null-Values
@@ -147,6 +149,14 @@ Darüber lassen sich
 * On-Demand Datenbakkzugriffe
 * in-Memory Datenbanken
 usw. realiesieren
+
+## Installation
+Zum Übersetzen wird ein c++11 Compiler inkl. STL benötigt.
+Einige optionale Module benötigen rapidjson
+
+Das Makefile ist rudimentär und eine Installationsroutine fehlen noch. 
+
+Dies folgt in einer späteren Version
 
 ## Module
 * objgen.h  Deklaration um die Zielklassen zu generieren

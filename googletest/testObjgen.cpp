@@ -18,33 +18,49 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#include "datetime.h"
 
 #include "objgen.h"
 #include "objgen.h"
 #include "jsonparser.h"
 
+
 #include <stdio.h>
 #include <sstream>
 #include <gtest/gtest.h>
 
+
+
 using namespace std;
+
+//enum device { fax, sms, mobil, privat, arbeit };
+//namespace mobs {std::string to_string(enum device t);}
+
+
+MOBS_ENUM_DEF(device, fax, sms, mobil, privat, arbeit )
+MOBS_ENUM_VAL(device, "fax", "sms", "mobil", "privat", "arbeit" )
 
 
 namespace {
 
 
 
-
 class Kontakt : virtual public mobs::ObjectBase {
 public:
   ObjInit(Kontakt);
-  enum device { fax, sms, mobil, privat, arbeit };
-  
+//  enum device { fax, sms, mobil, privat, arbeit };
+
   /// Art des Kontaktes Fax/Mobil/SMS
-  MemVar(int, art);
+//  MemEnumVar(enum device, art);
+  MemMobsEnumVar(device, art);
+private:
+   const std::vector<enum device> intern_elements_art = { fax, sms, mobil, privat, arbeit };
+//  static std::string sss = "hhhh";
+public:
   /// Nummer
   MemVar(string, number);
 };
+
 //ObjRegister(Kontakt); unnötig,da kein Basis-Objekt
 
 //Kontakt::device Kontakt::device(unsigned int i) { return static_cast<Kontakt::device>(i); };
@@ -80,8 +96,8 @@ class Person : virtual public mobs::ObjectBase {
   MemVar(std::string, name);
   MemVar(std::string, vorname);
   ObjVar(Adresse, adresse);
-  ObjVector(Kontakt, kontakte);
-  MemVector(std::string, hobbies);
+  MemVector(Kontakt, kontakte);
+  MemVector(MemVarType(std::string), hobbies);
 
   virtual void init() { adresse.nullAllowed(true); name.nullAllowed(true); vorname.setNull(true); };
 };
@@ -99,8 +115,8 @@ ObjRegister(Person);
 //  ObjVar(Adresse, bums);
 //
 //  MemVar(string, mom);
-//  MemVector(string, susi);
-//  MemVector(string, friederich);
+//  MemVarVector(string, susi);
+//  MemVarVector(string, friederich);
 //
 //  virtual string objName() const { return typName() + "." + mom() + "." + mobs::to_string(otto()); };
 //  virtual void init() { otto.nullAllowed(true); pims.nullAllowed(true); pims.setNull(true);
@@ -149,28 +165,29 @@ public:
 
 TEST(objgenTest, chartype) {
   DataTypes dt;
+  auto cth = mobs::ConvToStrHint(false);
 //  methode charrtyp
-  EXPECT_FALSE(dt.Bool.is_chartype());
-  EXPECT_TRUE(dt.Char.is_chartype());
-  EXPECT_TRUE(dt.Char16_t.is_chartype());
-  EXPECT_TRUE(dt.Char32_t.is_chartype());
-  EXPECT_TRUE(dt.Wchar_t.is_chartype());
-  EXPECT_TRUE(dt.SignedChar.is_chartype());
-  EXPECT_FALSE(dt.ShortInt.is_chartype());
-  EXPECT_FALSE(dt.Int.is_chartype());
-  EXPECT_FALSE(dt.LongInt.is_chartype());
-  EXPECT_TRUE(dt.UnsignedChar.is_chartype());
-  EXPECT_FALSE(dt.UnsignedShortInt.is_chartype());
-  EXPECT_FALSE(dt.UnsignedInt.is_chartype());
-  EXPECT_FALSE(dt.UnsignedLongLong.is_chartype());
-  EXPECT_FALSE(dt.UnsignedLongLongInt.is_chartype());
-  EXPECT_FALSE(dt.Float.is_chartype());
-  EXPECT_FALSE(dt.Double.is_chartype());
-  EXPECT_FALSE(dt.LongDouble.is_chartype());
-  EXPECT_TRUE(dt.String.is_chartype());
-  EXPECT_TRUE(dt.Wstring.is_chartype());
-  EXPECT_TRUE(dt.U16string.is_chartype());
-  EXPECT_TRUE(dt.U32string.is_chartype());
+  EXPECT_FALSE(dt.Bool.is_chartype(cth));
+  EXPECT_TRUE(dt.Char.is_chartype(cth));
+  EXPECT_TRUE(dt.Char16_t.is_chartype(cth));
+  EXPECT_TRUE(dt.Char32_t.is_chartype(cth));
+  EXPECT_TRUE(dt.Wchar_t.is_chartype(cth));
+  EXPECT_TRUE(dt.SignedChar.is_chartype(cth));
+  EXPECT_FALSE(dt.ShortInt.is_chartype(cth));
+  EXPECT_FALSE(dt.Int.is_chartype(cth));
+  EXPECT_FALSE(dt.LongInt.is_chartype(cth));
+  EXPECT_TRUE(dt.UnsignedChar.is_chartype(cth));
+  EXPECT_FALSE(dt.UnsignedShortInt.is_chartype(cth));
+  EXPECT_FALSE(dt.UnsignedInt.is_chartype(cth));
+  EXPECT_FALSE(dt.UnsignedLongLong.is_chartype(cth));
+  EXPECT_FALSE(dt.UnsignedLongLongInt.is_chartype(cth));
+  EXPECT_FALSE(dt.Float.is_chartype(cth));
+  EXPECT_FALSE(dt.Double.is_chartype(cth));
+  EXPECT_FALSE(dt.LongDouble.is_chartype(cth));
+  EXPECT_TRUE(dt.String.is_chartype(cth));
+  EXPECT_TRUE(dt.Wstring.is_chartype(cth));
+  EXPECT_TRUE(dt.U16string.is_chartype(cth));
+  EXPECT_TRUE(dt.U32string.is_chartype(cth));
 }
 
 TEST(objgenTest, emptyVars) {
@@ -302,17 +319,18 @@ TEST(objgenTest, Vectors) {
   info.adresse.setNull(true);
   info.kundennr(44);
   info.name(u8"Peter");
-  info.kontakte[4].art(Kontakt::mobil);
+  info.kontakte[4].art(mobil);
   info.kontakte[4].number("+40 0000 1111 222");
   info.hobbies[1]("Piano");
 
   EXPECT_EQ("Adresse", info.adresse.typName());
-  EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:null,kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", mobs::to_string(info));
+  EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:null,kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", mobs::to_string(info, true));
+  EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:null,kontakte:[{art:"fax",number:""},{art:"fax",number:""},{art:"fax",number:""},{art:"fax",number:""},{art:"mobil",number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", mobs::to_string(info));
   info.adresse.setNull(false);
 //  cerr << mobs::to_string(info) << endl;
-  EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", mobs::to_string(info));
+  EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", mobs::to_string(info,true));
 // dito mit to_json
-  EXPECT_EQ(R"({"kundennr":44,"firma":false,"name":"Peter","vorname":"","adresse":{"strasse":"","plz":"","ort":""},"kontakte":[{"art":0,"number":""},{"art":0,"number":""},{"art":0,"number":""},{"art":0,"number":""},{"art":2,"number":"+40 0000 1111 222"}],"hobbies":["","Piano"]})", mobs::to_json(info));
+  EXPECT_EQ(R"({"kundennr":44,"firma":false,"name":"Peter","vorname":"","adresse":{"strasse":"","plz":"","ort":""},"kontakte":[{"art":"fax","number":""},{"art":"fax","number":""},{"art":"fax","number":""},{"art":"fax","number":""},{"art":"mobil","number":"+40 0000 1111 222"}],"hobbies":["","Piano"]})", mobs::to_json(info));
 
 }
 
@@ -324,15 +342,15 @@ TEST(objgenTest, Pointer) {
   EXPECT_EQ("Person", ip->typName());
   ASSERT_NO_THROW(mobs::string2Obj( R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", *ip));
   // Gegenprobe
-  EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", mobs::to_string(*ip));
+  EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", mobs::to_string(*ip, true));
 
   // Test ob Objekte nativ zurückgegeben werden und keine Kopien
   EXPECT_EQ(&ip->kontakte, ip->getVecInfo("kontakte"));
   EXPECT_EQ(&ip->kontakte[3], dynamic_cast<Kontakt *>(ip->kontakte.getObjInfo(3)));
   EXPECT_EQ(static_cast<mobs::ObjectBase *>(&ip->kontakte[3]), ip->kontakte.getObjInfo(3));
   EXPECT_EQ(ip, dynamic_cast<mobs::ObjectBase *>(ip));
-  EXPECT_EQ(&ip->kontakte[0].number, dynamic_cast<mobs::Member<string> *>(ip->kontakte[0].getMemInfo("number")));
-  EXPECT_EQ(&ip->kontakte[1].art, dynamic_cast<mobs::Member<int> *>(ip->kontakte[1].getMemInfo("art")));
+  EXPECT_EQ(&ip->kontakte[0].number, (dynamic_cast<MemVarType(string) *>(ip->kontakte[0].getMemInfo("number"))));
+  EXPECT_EQ(&ip->kontakte[1].art, (dynamic_cast<MemMobsEnumVarType(device) *>(ip->kontakte[1].getMemInfo("art"))));
 //  cerr << typeid(&ip->kontakte[0].number).name() << endl;
 //  cerr << typeid(ip->kontakte[0].getMemInfo("number")).name() << endl;
 }
@@ -361,22 +379,39 @@ TEST(objgenTest, copy) {
   Person info;
 
   ASSERT_NO_THROW(string2Obj(inhalt, info));
-  EXPECT_EQ(inhalt, mobs::to_string(info));
+  EXPECT_EQ(inhalt, mobs::to_string(info, true));
 
   Person info2;
   info2 = info;
 
-  EXPECT_EQ(inhalt, mobs::to_string(info2));
+  EXPECT_EQ(inhalt, mobs::to_string(info2, true));
 
   Person info3(info);
-  EXPECT_EQ(inhalt, mobs::to_string(info3));
+  EXPECT_EQ(inhalt, mobs::to_string(info3, true));
 
   
 }
 
 
+class TimeStamp : virtual public mobs::ObjectBase {
+public:
+  ObjInit(TimeStamp);
+  
+  MemVar(time_t, time);
+  MemVar(mobs::DateTime, dtime);
+  MemVar(std::string, name);
+};
+ObjRegister(TimeStamp);
 
 
+TEST(objgenTest, time_t) {
+  TimeStamp t;
+  t.time(time(0));
+  t.dtime(mobs::DateTime("2019-12-24T14:01:00+01:00"));
+  t.name(u8"me");
+  std::cerr << to_string(t) << std::endl;
+  
+}
 
 
 

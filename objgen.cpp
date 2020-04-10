@@ -189,9 +189,17 @@ void ObjectBase::traverse(ObjTrav &trav)
 /////////////////////////////////////////////////
 /// ObjectBae::doCopy
 /////////////////////////////////////////////////
+class ConvFromStrHintDoCopy : virtual public ConvFromStrHint {
+public:
+  ConvFromStrHintDoCopy() {}
+  virtual ~ConvFromStrHintDoCopy() {}
+  virtual bool acceptCompact() const { return true; }
+  virtual bool acceptExtented() const { return false; }
+};
 
 void ObjectBase::doCopy(const ObjectBase &other)
 {
+  ConvFromStrHintDoCopy cfh;
   if (typName() != other.typName())
     throw runtime_error(u8"ObjectBase::doCopy: invalid Type");
   auto src = other.mlist.begin();
@@ -203,7 +211,7 @@ void ObjectBase::doCopy(const ObjectBase &other)
     {
       if (not src->mem)
         throw runtime_error(u8"ObjectBase::doCopy: invalid Element (Member)");
-      m.mem->fromStr(src->mem->toStr());
+      m.mem->fromStr(src->mem->toStr(ConvToStrHint(true)), cfh);
     }
     if (m.vec)
     {
@@ -255,10 +263,10 @@ bool ObjectBase::setVariable(const std::string &path, const std::string &value) 
   if (not m)
     return false;
   
-  return m->fromStr(value);
+  return m->fromStr(value, ConvFromStrHint::convFromStrHintDflt);
 }
 
-std::string ObjectBase::getVariable(const std::string &path, bool *found) {
+std::string ObjectBase::getVariable(const std::string &path, bool *found, bool compact) {
   ObjectNavigator on;
   on.pushObject(*this);
   if (found)
@@ -273,7 +281,7 @@ std::string ObjectBase::getVariable(const std::string &path, bool *found) {
   if (found)
     *found = true;
   
-  return m->toStr();
+  return m->toStr(ConvToStrHint(compact));
 }
 
 /////////////////////////////////////////////////
@@ -420,7 +428,7 @@ void ObjectNavigator::pushObject(ObjectBase &obj, const std::string &name) {
 namespace  {
 class ObjDump : virtual public ObjTravConst {
 public:
-  ObjDump(bool quote) : quoteKeys(quote ? "\"":"") { inArray.push(false); };
+  ObjDump(bool quote, bool compact = false) : quoteKeys(quote ? "\"":""), cth(compact) { inArray.push(false); };
   virtual void doObjBeg(ObjTravConst &ot, const ObjectBase &obj)
   {
     inArray.push(false);
@@ -464,10 +472,10 @@ public:
       res << boolalpha << quoteKeys << mem.name() << quoteKeys << ":";
     if (mem.isNull())
       res << "null";
-    else if (mem.is_chartype())
+    else if (mem.is_chartype(cth))
     {
       res << '"';
-      string s = mem.toStr();
+      string s = mem.toStr(cth);
       if (s.length() != 1 or s[0] != 0)
       {
         size_t pos = 0;
@@ -483,7 +491,7 @@ public:
 
     }
     else
-      res << mem.toStr();
+      res << mem.toStr(cth);
 
   };
   std::string result() const { return res.str(); };
@@ -492,14 +500,15 @@ private:
   bool fst = true;
   stringstream res;
   stack<bool> inArray;
+  ConvToStrHint cth;
 };
 
 }
 
 
-string to_string(const ObjectBase &obj)
+string to_string(const ObjectBase &obj, bool compact)
 {
-  ObjDump od(false);
+  ObjDump od(false, compact);
   
   obj.traverse(od);
   return od.result();
@@ -519,11 +528,11 @@ string to_json(const ObjectBase &obj)
 /// string2Obj
 /////////////////////////////////////////////////
 
-void string2Obj(const std::string &str, ObjectBase &obj)
+void string2Obj(const std::string &str, ObjectBase &obj, const ConvFromStrHint &cfh)
 {
   class JsonReadData : public ObjectNavigator, public JsonParser  {
   public:
-    JsonReadData(const string &input) : JsonParser(input) { }
+    JsonReadData(const string &input, const ConvFromStrHint &c) : JsonParser(input), cfh(c) { }
     
     void Value(const string &val, bool charType) {
       TRACE(PARAM(val));
@@ -543,7 +552,7 @@ void string2Obj(const std::string &str, ObjectBase &obj)
             member()->clear();
           }
         }
-        else if (not member()->fromStr(val))
+        else if (not member()->fromStr(val, cfh))
           throw runtime_error(u8"JSON: invalid type in variable " + member()->name());
       }
       leave();
@@ -573,9 +582,10 @@ void string2Obj(const std::string &str, ObjectBase &obj)
     int level = 0;
     string lastKey;
     string prefix;
+    const ConvFromStrHint &cfh;
   };
   
-  JsonReadData jd(str);
+  JsonReadData jd(str, cfh);
   jd.pushObject(obj);
   jd.parse();
 }

@@ -62,8 +62,8 @@
    MemVar(std::string,    name);      // std::string name
    MemVar(std::string,    vorname);
    ObjVar(Adresse,        adresse);   // Adresse adresse;
-   ObjVector(Kontakt,     kontakte);  // vector<Kontakt> kontakte;
-   MemVector(std::string, hobbies);   // vector<std::string> hobbies
+   MemVector(Kontakt,     kontakte);  // vector<Kontakt> kontakte;
+   MemVarVector(std::string, hobbies);   // vector<std::string> hobbies
  };
  \endcode
  
@@ -100,26 +100,49 @@
 #include <map>
 #include <vector>
 #include <stack>
-#include <limits>
 
 #include "logging.h"
 #include "objtypes.h"
 
+#define MemVarType(typ) mobs::Member<typ, mobs::StrConv<typ>>
 /*! \brief Deklarations-Makro für eine  Membervarieable
- @param typ Basistyp
- @param name Name
- */
-#define MemVar(typ, name) mobs::Member<typ> name = mobs::Member<typ>(#name, this)
-/*! \brief Deklarations-Makro für eines Vector von Membervarieablen
- @param typ Basistyp
- @param name Name
- */
-#define MemVector(typ, name) mobs::MemberVector<mobs::Member<typ> > name = mobs::MemberVector<mobs::Member<typ> >(#name, this)
+@param typ Basistyp
+@param name Name
+*/
+#define MemVar(typ, name) MemVarType(typ) name = MemVarType(typ) (#name, this)
+#define MemEnumVarTyp(typ) mobs::Member<typ, mobs::StrIntConv<typ>>
+/*! \brief Deklarations-Makro für eine  Membervarieable des Typs \c enum
+@param typ Basistyp
+@param name Name
+*/
+#define MemEnumVar(typ, name) MemEnumVarTyp(typ) name = MemEnumVarTyp(typ) (#name, this)
+#define MemMobsEnumVarType(typ) mobs::Member<enum typ, mobs::Str##typ##Conv>
+/*! \brief Deklarations-Makro für eine  Membervarieable eines mit \c MOBS_ENUM_DEF erzeugten enums
+@param typ Name des enums (ohne Tiken \c enum
+@param name Name
+*/
+#define MemMobsEnumVar(typ, name) MemMobsEnumVarType(typ) name = MemMobsEnumVarType(typ) (#name, this)
+
+#define MemMobsVarType(typ, converter) mobs::Member<typ, converter>
+#define MemMobsVar(typ, name, converter) MemMobsVarType(typ, converter) name = MemMobsVarType(typ, converter) (#name, this)
+
+
+
+// vector
 /*! \brief Deklarations-Makro für eines Vector von Objektvaliebalen
  @param typ Objekttyp
  @param name Name
  */
-#define ObjVector(typ, name) mobs::MemberVector<typ> name = mobs::MemberVector<typ>(#name, this)
+#define MemVector(typ, name) mobs::MemberVector<typ> name = mobs::MemberVector<typ>(#name, this)
+/*! \brief Deklarations-Makro für eines Vector von Membervarieablen
+  identisch mit \c MemVector(MeVarType(typ), \c name)
+ @param typ Basistyp
+ @param name Name
+ */
+#define MemVarVector(typ, name) MemVector( MeVarType(typ), name)
+//#define MemVarVector(typ, name) mobs::MemberVector< MemVarType(typ) > name = mobs::MemberVector< MemVarType(typ) >(#name, this)
+
+
 /*! \brief Deklarations-Makro für eine Objekt als Membervariable
  @param typ Objekttyp
  @param name Name
@@ -204,13 +227,13 @@ public:
   /// Setze Inhalt auf leer
   virtual void clear() = 0;
   /// Ausgabe des Ihnhalts als \c std::string in UTF-8
-  virtual std::string toStr() const  = 0;
+  virtual std::string toStr(const ConvToStrHint &) const  = 0;
   /// Abfrage ob der Basistyp vom typ \c  std::is_specialized  ist; \see \<limits>
   virtual bool is_specialized() const  = 0;
   /// Abfrage, ob der Inhalt textbasiert ist (zb. in JSON in Hochkommata gestzt wird)
-  virtual bool is_chartype() const = 0;
+  virtual bool is_chartype(const ConvToStrHint &) const = 0;
   /// Einlesen der Variable aus einnem \c std::string im Format UTF-8
-  virtual bool fromStr(const std::string &s) = 0;
+  virtual bool fromStr(const std::string &s, const ConvFromStrHint &) = 0;
   /// Starte Traversierung nicht const
   void traverse(ObjTrav &trav);
   /// Starte Traversierung  const
@@ -236,9 +259,9 @@ private:
 
 
 
-/// \brief Basisklasse für Vectoren auf Membervariablen oder Objekten innerhalb von von \c ObjectBase angeleiteten Klasse; Bitte als Makro MemVector oder ObjVector verwenden
-/// \see MemVector
-/// \see ObjVector
+/// \brief Basisklasse für Vectoren auf Membervariablen oder Objekten innerhalb von von \c ObjectBase angeleiteten Klasse; Bitte als Makro MemVarVector oder MemVector verwenden
+/// \see MemVarVector
+/// \see MemVector
 class MemBaseVector : public NullValue {
 public:
   /// \private
@@ -335,7 +358,7 @@ public:
   /// @param path Pfad der Variable z.B.: kontakt[3].number
   /// @param found opt. Zeiger auf bool-Variable, die Anzeigt, ob das Element gefunden wurde
   /// \return Inhalt der variable als string in UTF-8, oder leer, wenn nicht gefunden
-  std::string getVariable(const std::string &path, bool *found = nullptr);
+  std::string getVariable(const std::string &path, bool *found = nullptr, bool compact = false);
   /// \brief Kopiere ein Objekt aus einem bereits vorhandenen.
   /// @param other zu Kopierendes Objekt
   /// \throw runtime_error Sind die Strukturen nicht identisch, wird eine Exception erzeugt
@@ -363,23 +386,6 @@ private:
   
 };
 
-// ist typename ein Character-Typ
-template <typename T>
-/// \brief prüft, ob der Typ T aus Text besteht - also zB. in JSON in Hochkommata steht
-inline bool mobschar(T) { return not std::numeric_limits<T>::is_specialized; }
-/// \private
-template <> inline bool mobschar(char) { return true; };
-/// \private
-template <> inline bool mobschar(char16_t) { return true; };
-/// \private
-template <> inline bool mobschar(char32_t) { return true; };
-/// \private
-template <> inline bool mobschar(wchar_t) { return true; };
-/// \private
-template <> inline bool mobschar(unsigned char) { return true; };
-/// \private
-template <> inline bool mobschar(signed char) { return true; };
-
 
 //template <typename T>
 //inline T mobsempty(T&) { return T(); };
@@ -388,7 +394,7 @@ template <> inline bool mobschar(signed char) { return true; };
 //template <> inline unsigned char mobsempty(unsigned char&) { return ' '; };
 
 
-template<typename T>
+template<typename T, class C>
 /** \brief Klasse für Member-Variable zum angegeben Basistyp
  
  Diese Klasse wird normalerweise innerhalb einen Objektes  das von der Basisklasse  \c ObjectType abgeleitet verwendet.
@@ -431,7 +437,7 @@ template<typename T>
  \arg std::u32string
 
  */
-class Member : virtual public MemberBase {
+class Member : virtual public MemberBase, public C {
 public:
   Member() : MemberBase(""), wert(T()) { TRACE(""); }  // Konstruktor für Array
   /// \private
@@ -449,23 +455,25 @@ public:
   /// Setze Inhalt auf leer
   virtual void clear()  { wert = T(); };
   //  virtual std::string toStr() const { std::stringstream s; s << wert; return s.str(); }
-  virtual std::string toStr() const { return mobs::to_string(wert); };
+//  virtual std::string toStr() const { return mobs::to_string(wert); };
+  virtual std::string toStr(const ConvToStrHint &cth) const { return this->c_to_string(wert, cth); };
   //  virtual std::wstring toWStr2() const { return mobs::to_wstring(wert); }
   /// Abfrage, ob der Inhalt textbasiert ist (zb. in JSON in Hochkommata gestzt wird)
-  virtual bool is_specialized() const { return std::numeric_limits<T>::is_specialized; }
+  virtual bool is_specialized() const { return this->c_is_specialized(); }
   /// Abfrage, ob der Inhalt textbasiert ist (zb. in JSON in Hochkommata gestzt wird)
-  virtual bool is_chartype() const { return mobschar(wert); }
+  virtual bool is_chartype(const ConvToStrHint &cth) const { return this->c_is_chartype(cth); }
   /// Einlesen der Variable aus einnem \c std::string im Format UTF-8
-  virtual bool fromStr(const std::string &sin) { if (mobs::string2x(sin, wert)) { activate(); return true; } return false; }
+  virtual bool fromStr(const std::string &sin, const ConvFromStrHint &cfh) { if (this->c_string2x(sin, wert, cfh)) { activate(); return true; } return false; }
+//  virtual bool fromStr(const std::string &sin) { if (mobs::string2x(sin, wert)) { activate(); return true; } return false; }
   /// \private
-  void doCopy(const Member<T> &other) { operator()(other()); }
+  void doCopy(const Member<T, C> &other) { operator()(other()); }
 private:
   T wert;
 };
-
-template<typename T>
+ 
+template<typename T, class C>
 /// Klasse zur Beschreibung von Membervariablen als Key-Element für einen Datenbank
-KeyList & operator<<(KeyList &k, Member<T> &m)
+KeyList & operator<<(KeyList &k, Member<T, C> &m)
 { 
   TRACE(PARAM(m.name()) << PARAM(m.key()));
   m.key(k.add());
@@ -473,9 +481,9 @@ KeyList & operator<<(KeyList &k, Member<T> &m)
 };
 
 template<class T>
-/// \brief Klasse für Vectoren auf Membervariablen oder Objekten innerhalb von von \c ObjectBase angeleiteten Klasse; Bitte als Makro MemVector oder ObjVector verwenden
-/// \see MemVector
-/// \see ObjVector
+/// \brief Klasse für Vectoren auf Membervariablen oder Objekten innerhalb von von \c ObjectBase angeleiteten Klasse; Bitte als Makro MemVarVector oder MemVector verwenden
+/// \see MemVarVector
+/// \see MemVector
 /// \tparam T entweder eine von \c MemberBase oder eine von \c ObjectBase abgeleitete Klasse
 class MemberVector : virtual public MemBaseVector {
 public:
@@ -634,12 +642,13 @@ void MemberVector<T>::doCopy(const MemBaseVector &other)
   doCopy(*t);
 };
 
+
 /// Ausgabe eines Objektes im kompakten JSON-Format, Keys unquoted
-std::string to_string(const ObjectBase &obj);
+std::string to_string(const ObjectBase &obj, bool compact = false);
 /// Ausgabe eines Objektes im  JSON-Format ohne whitespace
 std::string to_json(const ObjectBase &obj);
 //std::wstring to_wstring(const ObjectBase &obj);
-void string2Obj(const std::string &str, ObjectBase &obj);
+void string2Obj(const std::string &str, ObjectBase &obj, const ConvFromStrHint &cfh = ConvFromStrHint::convFromStrHintDflt);
 }
 
 #endif

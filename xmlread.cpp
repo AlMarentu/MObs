@@ -57,7 +57,7 @@ public:
     if (not member())
       LOG(LM_INFO, "Variable fehlt " << showName())
     else
-      member()->fromStr(value);
+      member()->fromStr(value, cfh);
   };
   void Cdata(const char *val, size_t len) {
     std::string value(val, len);
@@ -66,7 +66,7 @@ public:
     if (not member())
       LOG(LM_WARNING, "Variable fehlt " << showName())
     else
-      member()->fromStr(value);
+      member()->fromStr(value, cfh);
   };
   void StartTag(const std::string &element) {
     TRACE(PARAM(element));
@@ -93,7 +93,8 @@ public:
   }
 
   private:
-    std::string prefix;;
+    std::string prefix;
+    const ConvFromStrHint &cfh = ConvFromStrHint::convFromStrHintDflt;
   };
   
   

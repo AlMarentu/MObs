@@ -45,6 +45,7 @@ class JsonOutData {
     StringBuffer buffer;
     PrettyWriter<StringBuffer> writer;
     stack<bool> inArray;
+    ConvToStrHint cth = ConvToStrHint(false);
 };
 
 JsonOut::JsonOut() //: os(stdout, writeBuffer, sizeof(writeBuffer), writer(os)
@@ -119,9 +120,9 @@ void JsonOut::doMem(ObjTravConst &ot, const MemberBase &mem)
     data->writer.Null();
   else
   {
-    const Member<int> *mint = dynamic_cast<const Member<int> *>(&mem);
-    const Member<double> *mdouble = dynamic_cast<const Member<double> *>(&mem);
-    const Member<bool> *mbool = dynamic_cast<const Member<bool> *>(&mem);
+    const Member<int, StrConv<int>> *mint = dynamic_cast<const Member<int, StrConv<int>> *>(&mem);
+    const Member<double, StrConv<double>> *mdouble = dynamic_cast<const Member<double, StrConv<double>> *>(&mem);
+    const Member<bool, StrConv<bool>> *mbool = dynamic_cast<const Member<bool, StrConv<bool>> *>(&mem);
     if (mbool)
       data->writer.Bool((*mbool)());
     else if (mint)
@@ -129,7 +130,7 @@ void JsonOut::doMem(ObjTravConst &ot, const MemberBase &mem)
     else if (mdouble)
       data->writer.Double((*mdouble)());
     else
-      data->writer.String(mem.toStr());
+      data->writer.String(mem.toStr(data->cth));
   }
 }
 
@@ -142,6 +143,7 @@ class JsonDumpData {
     FileWriteStream os;
     PrettyWriter<FileWriteStream> writer;
     stack<bool> inArray;
+    ConvToStrHint cth = ConvToStrHint(false);
 };
 
 JsonDump::JsonDump() //: os(stdout, writeBuffer, sizeof(writeBuffer), writer(os)
@@ -208,9 +210,9 @@ void JsonDump::doMem(ObjTravConst &ot, const MemberBase &mem)
     data->writer.Null();
   else
   {
-    const Member<int> *mint = dynamic_cast<const Member<int> *>(&mem);
-    const Member<double> *mdouble = dynamic_cast<const Member<double> *>(&mem);
-    const Member<bool> *mbool = dynamic_cast<const Member<bool> *>(&mem);
+    auto mint = dynamic_cast<const MemVarType(int) *>(&mem);
+    auto mdouble = dynamic_cast<const MemVarType(double) *>(&mem);
+    auto mbool = dynamic_cast<const MemVarType(bool) *>(&mem);
     if (mbool)
       data->writer.Bool((*mbool)());
     else if (mint)
@@ -218,7 +220,7 @@ void JsonDump::doMem(ObjTravConst &ot, const MemberBase &mem)
     else if (mdouble)
       data->writer.Double((*mdouble)());
     else
-      data->writer.String(mem.toStr());
+      data->writer.String(mem.toStr(data->cth));
   }
 }
 

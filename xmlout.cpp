@@ -35,13 +35,14 @@ namespace mobs {
 
 class XmlOutData {
 public:
-  XmlOutData() { };
+  XmlOutData() : cth(false) { };
   ~XmlOutData() {};
   stringstream buffer;
   int level = 0;
   bool doIndent = true;
   string prefix;
   stack<string> elements;
+  mobs::ConvToStrHint cth;
   void indent()
   {
     if (doIndent)
@@ -163,7 +164,7 @@ void XmlOut::doMem(ObjTravConst &ot, const MemberBase &mem)
   else
   {
     data->buffer << '>';
-    const string &value = mem.toStr();
+    const string &value = mem.toStr(data->cth);
     for (const auto c:value)
       switch (c)
       {

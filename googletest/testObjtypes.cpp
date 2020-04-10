@@ -157,5 +157,54 @@ TEST(objtypeTest, string2x) {
 
 }
 
+MOBS_ENUM_DEF(direction, Dleft, Dright, Dup, Ddown)
+MOBS_ENUM_VAL(direction, "left", "right", "up", "down")
+
+mobs::StrdirectionConv c;
+
+TEST(objtypeTest, mobsenum) {
+  EXPECT_EQ("left", mobs::direction_to_string(Dleft));
+  EXPECT_EQ("up", mobs::direction_to_string(Dup));
+  enum direction d;
+  ASSERT_TRUE(mobs::string_to_direction("right", d));
+  EXPECT_EQ(Dright, d);
+  ASSERT_TRUE(mobs::string_to_direction("down", d));
+  EXPECT_EQ(Ddown, d);
+  EXPECT_FALSE(mobs::string_to_direction("middle", d));
+}
+
+TEST(objtypeTest, mobsconv) {
+  ::mobs::ConvToStrHint cthf = ::mobs::ConvToStrHint(false);
+  ::mobs::ConvToStrHint ctht = ::mobs::ConvToStrHint(true);
+  EXPECT_EQ("left", c.c_to_string(Dleft,cthf));
+  EXPECT_EQ("up", c.c_to_string(Dup, cthf));
+  EXPECT_EQ(std::to_string(int(Dleft)), c.c_to_string(Dleft,ctht));
+  EXPECT_EQ(std::to_string(int(Dup)), c.c_to_string(Dup, ctht));
+  enum direction d;
+
+  ASSERT_TRUE(c.c_string2x("right", d, ::mobs::ConvFromStrHint::convFromStrHintDflt));
+  EXPECT_EQ(Dright, d);
+  ASSERT_TRUE(c.c_string2x("down", d, ::mobs::ConvFromStrHint::convFromStrHintDflt));
+  EXPECT_EQ(Ddown, d);
+  EXPECT_FALSE(c.c_string2x("middle", d, ::mobs::ConvFromStrHint::convFromStrHintDflt));
+}
+
+
+MOBS_ENUM_DEF(direction2, D2left, D2right, D2up, D2down, D2void)
+MOBS_ENUM_VAL(direction2, "left", "right", "up", "down")
+
+TEST(objtypeTest, mobsenum2) {
+  EXPECT_ANY_THROW(mobs::direction2_to_string(D2void));
+}
+
+MOBS_ENUM_DEF(direction3, D3left, D3right, D3up, D3down)
+MOBS_ENUM_VAL(direction3, "left", "right", "up", "down", "void")
+
+TEST(objtypeTest, mobsenum3) {
+  enum direction3 d;
+  EXPECT_ANY_THROW(mobs::string_to_direction3("void", d));
+  EXPECT_FALSE(mobs::string_to_direction3("middle", d));
+}
+
 }
 
