@@ -20,15 +20,33 @@
 
 #include "objgen.h"
 #include "jsonparser.h"
-//#include <iostream>
+#include "xmlout.h"
+#include <map>
 
 using namespace std;
 
 namespace mobs {
 
+
+enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confToken, const std::string &s) {
+  confToken.push_back(s);
+  return MemVarCfg(confToken.size() + base -1);
+}
+
 /////////////////////////////////////////////////
 /// MemberBase
 /////////////////////////////////////////////////
+
+void MemberBase::doConfig(MemVarCfg c)
+{
+  switch(c) {
+    case Unset: break;
+    case InitialNull: nullAllowed(true); break;
+    case Key1 ... Key5: m_key = c - Key1 + 1; break;
+    case AltNameBase ... AltNameBaseEnd: m_altName = c - AltNameBase; break;
+    case VectorNull: break;
+  }
+}
 
 void MemberBase::traverse(ObjTrav &trav)
 {
@@ -59,6 +77,18 @@ void MemBaseVector::activate()
   if (parent()) parent()->activate();
 }
 
+void MemBaseVector::doConfig(MemVarCfg c)
+{
+  switch(c) {
+    case Unset: break;
+    case VectorNull: nullAllowed(true); break;
+    case Key1 ... Key5: break;
+    case AltNameBase ... AltNameBaseEnd: m_altName = c - AltNameBase; break;
+    case InitialNull: m_c.push_back(c); break;
+  }
+  
+}
+
 /////////////////////////////////////////////////
 /// ObjectBase
 /////////////////////////////////////////////////
@@ -71,6 +101,17 @@ void ObjectBase::activate()
     m_parVec->activate();
   else if (m_parent)
     m_parent->activate();
+}
+
+void ObjectBase::doConfig(MemVarCfg c)
+{
+  switch(c) {
+    case Unset: break;
+    case InitialNull: nullAllowed(true); break;
+    case Key1 ... Key5: m_key = c - Key1 + 1; break;
+    case AltNameBase ... AltNameBaseEnd: m_altName = c - AltNameBase; break;
+    case VectorNull: break;
+  }
 }
 
 void ObjectBase::regMem(MemberBase *mem)
@@ -144,6 +185,7 @@ MemberBase &ObjectBase::get(string name)
   throw runtime_error(u8"ObjectBase::get: element not found");
 }
 
+
 void ObjectBase::traverse(ObjTravConst &trav) const
 {
   trav.doObjBeg(trav, *this);
@@ -186,6 +228,60 @@ void ObjectBase::traverse(ObjTrav &trav)
   trav.doObjEnd(trav, *this);
 }
 
+void ObjectBase::getKey(std::list<std::string> &key, const ConvToStrHint &cth) const
+{
+  // Element-Liste nach Key-Nummer sortieren
+  multimap<int, const MlistInfo *> tmp;
+  for (auto const &m:mlist)
+  {
+    if (m.mem and m.mem->key() > 0)
+      tmp.insert(make_pair(m.mem->key(), &m));
+    if (m.obj and m.obj->key() > 0)
+      tmp.insert(make_pair(m.obj->key(), &m));
+  }
+  // Key-Elemente an Liste hängen
+  for (auto const &i:tmp)
+  {
+    auto &m = *i.second;
+    if (m.mem)
+    {
+      if (isNull() or m.mem->isNull())
+        key.push_back("");
+      else
+        key.push_back(m.mem->toStr(cth));
+    }
+    if (m.obj)
+    {
+      list<string> keyTmp;
+      m.obj->getKey(keyTmp, cth);
+      if (isNull())
+        for (auto i:keyTmp)
+          key.push_back("");
+      else
+        key.splice(key.end(), keyTmp);
+    }
+  }
+}
+
+std::string ObjectBase::keyStr() const
+{
+  ConvToStrHint cth(false);
+  list<string> key;
+  getKey(key, cth);
+  stringstream s;
+  bool f = true;
+  for (auto const &k:key)
+  {
+    // TODO Quoten
+    if (f)
+      f = false;
+    else
+      s << '.';
+    s << k;
+  }
+  return s.str();
+}
+
 /////////////////////////////////////////////////
 /// ObjectBae::doCopy
 /////////////////////////////////////////////////
@@ -195,6 +291,7 @@ public:
   virtual ~ConvFromStrHintDoCopy() {}
   virtual bool acceptCompact() const { return true; }
   virtual bool acceptExtented() const { return false; }
+  virtual bool useAltNames() const { return false; }
 };
 
 void ObjectBase::doCopy(const ObjectBase &other)
@@ -242,10 +339,14 @@ void ObjectBase::clear()
     if (m.mem)
       m.mem->clear();
     if (m.vec)
-      m.vec->resize(0);
+      m.vec->clear();
     if (m.obj)
       m.obj->clear();
   }
+  if (nullAllowed())
+    setNull(true);
+  else
+    activate();
 }
 
 
@@ -266,9 +367,9 @@ bool ObjectBase::setVariable(const std::string &path, const std::string &value) 
   return m->fromStr(value, ConvFromStrHint::convFromStrHintDflt);
 }
 
-std::string ObjectBase::getVariable(const std::string &path, bool *found, bool compact) {
+std::string ObjectBase::getVariable(const std::string &path, bool *found, bool compact) const {
   ObjectNavigator on;
-  on.pushObject(*this);
+  on.pushObject(*const_cast<ObjectBase *>(this));
   if (found)
     *found = false;
   
@@ -428,7 +529,7 @@ void ObjectNavigator::pushObject(ObjectBase &obj, const std::string &name) {
 namespace  {
 class ObjDump : virtual public ObjTravConst {
 public:
-  ObjDump(bool quote, bool compact = false) : quoteKeys(quote ? "\"":""), cth(compact) { inArray.push(false); };
+  ObjDump(const ConvObjToString &c) : quoteKeys(c.withQuotes() ? "\"":""), cth(c) { inArray.push(false); };
   virtual void doObjBeg(ObjTravConst &ot, const ObjectBase &obj)
   {
     inArray.push(false);
@@ -436,7 +537,10 @@ public:
       res << ",";
     fst = true;
     if (not obj.name().empty())
-      res << quoteKeys << obj.name() << quoteKeys << ":";
+    {
+      size_t n = obj.parent() and cth.useAltNames() ? obj.cAltName() : SIZE_T_MAX;
+      res << quoteKeys << (n == SIZE_T_MAX ? obj.name() : obj.parent()->getConf(n)) << quoteKeys << ":";
+    }
     if (obj.isNull())
       res << "null";
     else
@@ -451,25 +555,32 @@ public:
   };
   virtual void doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec)
   {
+    size_t n = vec.parent() and cth.useAltNames() ? vec.cAltName() : SIZE_T_MAX;
     inArray.push(true);
     if (not fst)
       res << ",";
     fst = true;
-    res << quoteKeys << vec.name() << quoteKeys << ":[";
+    res << quoteKeys << (n == SIZE_T_MAX ? vec.name() : vec.parent()->getConf(n)) << quoteKeys << ":";
+    if (vec.isNull())
+      res << "null";
+    else
+      res << "[";
   };
   virtual void doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec)
   {
-    res << "]";
+    if (not vec.isNull())
+      res << "]";
     fst = false;
     inArray.pop();
   };
   virtual void doMem(ObjTravConst &ot, const MemberBase &mem)
   {
+    size_t n = mem.parent() and cth.useAltNames() ? mem.cAltName() : SIZE_T_MAX;
     if (not fst)
       res << ",";
     fst = false;
     if (not inArray.empty() and not inArray.top())
-      res << boolalpha << quoteKeys << mem.name() << quoteKeys << ":";
+      res << boolalpha << quoteKeys << (n == SIZE_T_MAX ? mem.name() : mem.parent()->getConf(n)) << quoteKeys << ":";
     if (mem.isNull())
       res << "null";
     else if (mem.is_chartype(cth))
@@ -500,27 +611,30 @@ private:
   bool fst = true;
   stringstream res;
   stack<bool> inArray;
-  ConvToStrHint cth;
+  ConvObjToString cth;
 };
 
 }
 
-
-string to_string(const ObjectBase &obj, bool compact)
+std::string ObjectBase::to_string(ConvObjToString cth) const
 {
-  ObjDump od(false, compact);
-  
-  obj.traverse(od);
-  return od.result();
+  if (cth.toJson())
+  {
+    ObjDump od(cth);
+    traverse(od);
+    return od.result();
+  }
+  else if (cth.toXml())
+  {
+    XmlOut xd(cth);
+    traverse(xd);
+    return xd.getString();
+  }
+  else
+    return "";
 }
 
-string to_json(const ObjectBase &obj)
-{
-  ObjDump od(true);
-  
-  obj.traverse(od);
-  return od.result();
-}
+
 
 
 

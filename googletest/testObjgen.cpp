@@ -18,12 +18,10 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#include "datetime.h"
-
 #include "objgen.h"
 #include "objgen.h"
 #include "jsonparser.h"
-
+#include "xmlout.h"
 
 #include <stdio.h>
 #include <sstream>
@@ -53,10 +51,6 @@ public:
   /// Art des Kontaktes Fax/Mobil/SMS
 //  MemEnumVar(enum device, art);
   MemMobsEnumVar(device, art);
-private:
-   const std::vector<enum device> intern_elements_art = { fax, sms, mobil, privat, arbeit };
-//  static std::string sss = "hhhh";
-public:
   /// Nummer
   MemVar(string, number);
 };
@@ -95,11 +89,11 @@ class Person : virtual public mobs::ObjectBase {
   MemVar(bool, firma);
   MemVar(std::string, name);
   MemVar(std::string, vorname);
-  ObjVar(Adresse, adresse);
+  ObjVar(Adresse, adresse, USENULL);
   MemVector(Kontakt, kontakte);
   MemVector(MemVarType(std::string), hobbies);
 
-  virtual void init() { adresse.nullAllowed(true); name.nullAllowed(true); vorname.setNull(true); };
+  virtual void init() { vorname.setNull(true); };
 };
 ObjRegister(Person);
 
@@ -312,6 +306,8 @@ TEST(objgenTest, setnull) {
   EXPECT_FALSE(info.adresse.isNull());
   EXPECT_EQ(R"({kundennr:2,firma:false,name:"John",vorname:"",adresse:{strasse:"",plz:"",ort:"Berlin"},kontakte:[],hobbies:[]})", mobs::to_string(info));
   EXPECT_EQ(u8"Berlin", info.adresse.ort());
+  
+  
 }
 
 TEST(objgenTest, Vectors) {
@@ -324,13 +320,13 @@ TEST(objgenTest, Vectors) {
   info.hobbies[1]("Piano");
 
   EXPECT_EQ("Adresse", info.adresse.typName());
-  EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:null,kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", mobs::to_string(info, true));
+  EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:null,kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", info.to_string(mobs::ConvObjToString().exportCompact()));
   EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:null,kontakte:[{art:"fax",number:""},{art:"fax",number:""},{art:"fax",number:""},{art:"fax",number:""},{art:"mobil",number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", mobs::to_string(info));
   info.adresse.setNull(false);
 //  cerr << mobs::to_string(info) << endl;
-  EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", mobs::to_string(info,true));
+  EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", info.to_string(mobs::ConvObjToString().exportCompact()));
 // dito mit to_json
-  EXPECT_EQ(R"({"kundennr":44,"firma":false,"name":"Peter","vorname":"","adresse":{"strasse":"","plz":"","ort":""},"kontakte":[{"art":"fax","number":""},{"art":"fax","number":""},{"art":"fax","number":""},{"art":"fax","number":""},{"art":"mobil","number":"+40 0000 1111 222"}],"hobbies":["","Piano"]})", mobs::to_json(info));
+  EXPECT_EQ(R"({"kundennr":44,"firma":false,"name":"Peter","vorname":"","adresse":{"strasse":"","plz":"","ort":""},"kontakte":[{"art":"fax","number":""},{"art":"fax","number":""},{"art":"fax","number":""},{"art":"fax","number":""},{"art":"mobil","number":"+40 0000 1111 222"}],"hobbies":["","Piano"]})", info.to_string(mobs::ConvObjToString().exportJson()));
 }
   
 TEST(objgenTest, iterator) {
@@ -354,7 +350,7 @@ TEST(objgenTest, Pointer) {
   EXPECT_EQ("Person", ip->typName());
   ASSERT_NO_THROW(mobs::string2Obj( R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", *ip));
   // Gegenprobe
-  EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", mobs::to_string(*ip, true));
+  EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", ip->to_string(mobs::ConvObjToString().exportCompact()));
 
   // Test ob Objekte nativ zurückgegeben werden und keine Kopien
   EXPECT_EQ(&ip->kontakte, ip->getVecInfo("kontakte"));
@@ -391,42 +387,177 @@ TEST(objgenTest, copy) {
   Person info;
 
   ASSERT_NO_THROW(string2Obj(inhalt, info));
-  EXPECT_EQ(inhalt, mobs::to_string(info, true));
+  EXPECT_EQ(inhalt, info.to_string(mobs::ConvObjToString().exportCompact()));
 
   Person info2;
   info2 = info;
 
-  EXPECT_EQ(inhalt, mobs::to_string(info2, true));
+  EXPECT_EQ(inhalt, info2.to_string(mobs::ConvObjToString().exportCompact()));
 
   Person info3(info);
-  EXPECT_EQ(inhalt, mobs::to_string(info3, true));
+  EXPECT_EQ(inhalt, info3.to_string(mobs::ConvObjToString().exportCompact()));
 
   
 }
 
 
-class TimeStamp : virtual public mobs::ObjectBase {
-public:
-  ObjInit(TimeStamp);
-  
-  MemVar(time_t, time);
-  MemVar(mobs::DateTime, dtime);
-  MemVar(std::string, name);
+
+
+class RechPos : virtual public mobs::ObjectBase {
+  public:
+  ObjInit(RechPos);
+
+  MemVar(std::string, artikel);
+  MemVar(unsigned int, anzahl);
+  MemVar(float, einzelpreis);
 };
-ObjRegister(TimeStamp);
 
+class Rechnung : virtual public mobs::ObjectBase {
+  public:
+  ObjInit(Rechnung);
+  MemVar(int, id, USENULL);
 
-TEST(objgenTest, time_t) {
-  TimeStamp t;
-  t.time(time(0));
-  t.dtime(mobs::DateTime("2019-12-24T14:01:00+01:00"));
-  t.name(u8"me");
-  std::cerr << to_string(t) << std::endl;
+  ObjVar(Person, kunde, USENULL);
+  MemVector(RechPos, position, USENULL USEVECNULL);
+
+};
+ObjRegister(Rechnung);
+
+TEST(objgenTest, usenull) {
+  Rechnung rech;
+  EXPECT_FALSE(rech.nullAllowed());
+  EXPECT_TRUE(rech.id.nullAllowed());
+  EXPECT_TRUE(rech.kunde.nullAllowed());
+  EXPECT_TRUE(rech.position.nullAllowed());
+  EXPECT_TRUE(rech.id.isNull());
+  EXPECT_TRUE(rech.kunde.isNull());
+  EXPECT_TRUE(rech.position.isNull());
+  EXPECT_EQ("{id:null,kunde:null,position:null}", to_string(rech));
+  rech.position.setNull(false);
+  EXPECT_EQ("{id:null,kunde:null,position:[]}", to_string(rech));
+
+  rech.position[3].anzahl(1);
+  EXPECT_EQ("{id:null,kunde:null,position:[null,null,null,{artikel:\"\",anzahl:1,einzelpreis:0}]}", to_string(rech));
   
+  string xml =
+  R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<root>
+  <id/>
+  <kunde/>
+  <position/>
+  <position/>
+  <position/>
+  <position>
+    <artikel></artikel>
+    <anzahl>1</anzahl>
+    <einzelpreis>0</einzelpreis>
+  </position>
+</root>
+)";
+  // TODO korrekt? oder muss um Array ein <array> Tag?
+  EXPECT_EQ(xml, rech.to_string(mobs::ConvObjToString().exportXml().doIndent()));
+
+  
+
 }
 
 
 
+class Obj0 : virtual public mobs::ObjectBase {
+public:
+  ObjInit(Obj0);
+
+  MemVar(int, aa, KEYELEMENT2);
+  MemVar(int, bb);
+  MemVar(int, cc, KEYELEMENT1);
+  MemVar(int, dd, KEYELEMENT1);
+  MemVar(int, ee);
+};
+
+class Obj1 : virtual public mobs::ObjectBase {
+  public:
+  ObjInit(Obj1);
+  MemVar(int, id, KEYELEMENT1);
+  MemVar(int, xx);
+  MemVar(int, yy, USENULL KEYELEMENT3);
+  MemVar(int, zz);
+
+  ObjVar(Obj0, oo, USENULL KEYELEMENT2);
+};
+
+TEST(objgenTest, keys) {
+  Obj1 o;
+  EXPECT_EQ(2, o.oo.key());
+  EXPECT_EQ(3, o.yy.key());
+  EXPECT_EQ(1, o.id.key());
+  EXPECT_EQ("0....", o.keyStr());
+  o.oo.bb(7);
+  EXPECT_EQ("0.0.0.0.", o.keyStr());
+  o.oo.cc(211);
+  o.oo.dd(212);
+  o.oo.aa(220);
+  o.id(1);
+  o.yy(3);
+  EXPECT_EQ("1.211.212.220.3", o.keyStr());
+  EXPECT_EQ("1.211.212.220.3", o.keyStr());
+  // TODO test mit qouted string
+}
+
+
+
+
+class ObjX : virtual public mobs::ObjectBase {
+public:
+ObjInit(ObjX);
+  MemVar(int, id, KEYELEMENT1 ALTNAME(grimoald));
+  MemVar(int, a, ALTNAME(pippin));
+  MemVar(int, b, ALTNAME(karl));
+  MemVar(int, c);
+  ObjVar(Obj0, o, USENULL ALTNAME(karlmann));
+  MemVector(MemVarType(std::string), d, ALTNAME(ludwig));
+
+};
+
+TEST(objgenTest, conftoken) {
+  ObjX o;
+  EXPECT_EQ("grimoald", o.getConf(0));
+  EXPECT_EQ("", o.getConf(99));
+  EXPECT_EQ(0, o.id.cAltName());
+  EXPECT_EQ(1, o.a.cAltName());
+  EXPECT_EQ(2, o.b.cAltName());
+  EXPECT_EQ(SIZE_T_MAX, o.c.cAltName());
+  EXPECT_EQ("grimoald", o.getConf(o.id.cAltName()));
+  EXPECT_EQ("pippin", o.getConf(o.a.cAltName()));
+  EXPECT_EQ("", o.getConf(o.c.cAltName()));
+  EXPECT_EQ("karlmann", o.getConf(o.o.cAltName()));
+  EXPECT_EQ("ludwig", o.getConf(o.d.cAltName()));
+  
+  mobs::ConvToStrHint cth1(false, false);
+  EXPECT_EQ("{id:0,a:0,b:0,c:0,o:null,d:[]}", o.to_string(mobs::ConvObjToString()));
+  mobs::ConvToStrHint cth2(false, true);
+  EXPECT_EQ("{grimoald:0,pippin:0,karl:0,c:0,karlmann:null,ludwig:[]}", o.to_string(mobs::ConvObjToString().exportAltNames()));
+
+  string xml = R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<root>
+  <grimoald>0</grimoald>
+  <pippin>0</pippin>
+  <karl>0</karl>
+  <c>0</c>
+  <karlmann>
+    <aa>0</aa>
+    <bb>0</bb>
+    <cc>0</cc>
+    <dd>0</dd>
+    <ee>0</ee>
+  </karlmann>
+  <ludwig></ludwig>
+</root>
+)";
+  o.d[0]("");
+  o.o.setNull(false);
+  EXPECT_EQ(xml, o.to_string(mobs::ConvObjToString().exportXml().exportAltNames().doIndent()));
+
+}
 
 #if 0
 TEST(objgenTest, compare) {

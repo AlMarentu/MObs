@@ -44,6 +44,7 @@ class FileDatabase : public DatabaseInterface
 
 using namespace std;
 
+#if 0
 class KeyString : virtual public ObjTravConst {
   public:
     virtual void doObjBeg(ObjTravConst &ot, const ObjectBase &obj) { };
@@ -66,6 +67,7 @@ class KeyString : virtual public ObjTravConst {
   protected:
     string keystr;
 };
+#endif
 
 FileDatabase::FileDatabase(string path) : base(path)
 {
@@ -80,11 +82,15 @@ FileDatabase::~FileDatabase()
 bool FileDatabase::load(ObjectBase &obj)
 {
   TRACE(PARAM(obj.typName()));
-  KeyString k;
-  obj.traverse(k);
+  ConvToStrHint cth(false);
+  list<string> key;
+  obj.getKey(key, cth);
+
   stringstream fname;
-  fname << base << "/" << obj.typName() << k.key();
-  cerr << "FileDatabase::load " << obj.typName() << " name: " << k.key() << endl;
+  fname << base << "/" << obj.typName();
+  for (auto &k:key)
+    fname << '.' << k;
+  cerr << "FileDatabase::load " << obj.typName() << " name: " << obj.keyStr() << endl;
   ifstream f(fname.str());
   if (not f.is_open())
     throw runtime_error(string("File open error ") + fname.str());
@@ -106,19 +112,18 @@ bool FileDatabase::load(list<ObjectBase> &result, string objType, string query)
 bool FileDatabase::save(const ObjectBase &obj)
 {
   TRACE(PARAM(obj.typName()));
-  KeyString k;
-  obj.traverse(k);
+  
   stringstream fname;
-  fname << base << "/" << obj.typName() << k.key();
+  fname << base << "/" << obj.typName() << "." << obj.keyStr();
   fstream f(fname.str(), f.trunc | f.out);
   if (not f.is_open())
     throw runtime_error(string("File open error ") + fname.str());
-  f << to_json(obj) << endl;
+  f << obj.to_string(ConvObjToString().exportJson()) << endl;
   f.close();
   if (f.fail())
     throw runtime_error(string("File write error ") + fname.str());
 
-  cerr << "FileDatabase::save " << obj.typName() << " name: " << k.key() << endl;
+  cerr << "FileDatabase::save " << obj.typName() << " name: " << obj.keyStr() << endl;
   return true;
 }
 
@@ -133,11 +138,11 @@ class Fahrzeug : virtual public NamedObject, virtual public ObjectBase
   public:
     ObjInit(Fahrzeug);
 
-    MemVar(int, id);
+    MemVar(int, id, KEYELEMENT1);
     MemVar(string, typ);
-    MemVar(int, achsen);
+    MemVar(int, achsen, USENULL);
 
-    void init() { TRACE(""); achsen.nullAllowed(true); keylist << id; };
+    void init() { TRACE(""); };
     // ist das nötig=?
     string objName() const { TRACE(""); return typName() + "." + std::to_string(id()); };
 };
@@ -174,7 +179,8 @@ int main(int argc, char* argv[])
     list<ObjectBase> result;
     db.load(result, "Fahrzeug", "id = 2");
     
-    XmlOut dx2;
+    ConvObjToString cth;
+    XmlOut dx2(ConvObjToString().doIndent());
     dx2.startList("list");
     f2->traverse(dx2);
     f2->traverse(dx2);

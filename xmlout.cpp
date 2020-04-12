@@ -35,17 +35,16 @@ namespace mobs {
 
 class XmlOutData {
 public:
-  XmlOutData() : cth(false) { };
+  XmlOutData(const ConvObjToString &c) : cth(c) { };
   ~XmlOutData() {};
   stringstream buffer;
   int level = 0;
-  bool doIndent = true;
   string prefix;
   stack<string> elements;
-  mobs::ConvToStrHint cth;
+  const ConvObjToString cth;
   void indent()
   {
-    if (doIndent)
+    if (cth.withIndentation())
     {
       string s;
       s.resize(level * 2, ' ');
@@ -54,10 +53,9 @@ public:
   };
 };
 
-XmlOut::XmlOut(bool indent)
+XmlOut::XmlOut(ConvObjToString cth)
 {
-  data = new XmlOutData;
-  data->doIndent = indent;
+  data = new XmlOutData(cth);
 }
 
 XmlOut::~XmlOut()
@@ -107,7 +105,10 @@ void XmlOut::doObjBeg(ObjTravConst &ot, const ObjectBase &obj)
   if (not data->elements.empty())
     name = data->elements.top();
   if (name.empty())
-    name = obj.name();
+  {
+    size_t n = (obj.parent() and data->cth.useAltNames()) ? obj.cAltName() : SIZE_T_MAX;
+    name = (n == SIZE_T_MAX) ? obj.name() : obj.parent()->getConf(n);
+  }
   if (name.empty())
     name = u8"entry";
 
@@ -133,7 +134,10 @@ void XmlOut::doObjEnd(ObjTravConst &ot, const ObjectBase &obj)
     if (not data->elements.empty())
       name = data->elements.top();
     if (name.empty())
-      name = obj.name();
+    {
+      size_t n = (obj.parent() and data->cth.useAltNames()) ? obj.cAltName() : SIZE_T_MAX;
+      name = (n == SIZE_T_MAX) ? obj.name() : obj.parent()->getConf(n);
+    }
     
     data->indent();
     data->buffer << u8"</" << data->prefix << name << u8">\n";
@@ -142,7 +146,8 @@ void XmlOut::doObjEnd(ObjTravConst &ot, const ObjectBase &obj)
 
 void XmlOut::doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec)
 {
-  data->elements.push(vec.name());
+  size_t n = (vec.parent() and data->cth.useAltNames()) ? vec.cAltName() : SIZE_T_MAX;
+  data->elements.push((n == SIZE_T_MAX) ? vec.name() : vec.parent()->getConf(n));
 }
 
 void XmlOut::doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec)
@@ -156,7 +161,10 @@ void XmlOut::doMem(ObjTravConst &ot, const MemberBase &mem)
   if (not data->elements.empty())
     name = data->elements.top();
   if (name.empty())
-    name = mem.name();
+  {
+    size_t n = (mem.parent() and data->cth.useAltNames()) ? mem.cAltName() : SIZE_T_MAX;
+    name = (n == SIZE_T_MAX) ? mem.name() : mem.parent()->getConf(n);
+  }
   data->indent();
   data->buffer << '<' << data->prefix << name;
   if (mem.isNull())
@@ -174,14 +182,6 @@ void XmlOut::doMem(ObjTravConst &ot, const MemberBase &mem)
       }
     data->buffer << u8"</" << data->prefix << name << u8">\n";
   }
-}
-
-std::string to_xml(const ObjectBase &obj)
-{
-  XmlOut xd(true);
-  
-  obj.traverse(xd);
-  return xd.getString();
 }
 
 

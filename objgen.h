@@ -104,27 +104,29 @@
 #include "logging.h"
 #include "objtypes.h"
 
+namespace mobs {
+
 /// Makro für Typ-Deklaration zu \c MemVar
 #define MemVarType(typ) mobs::Member<typ, mobs::StrConv<typ>>
 /*! \brief Deklarations-Makro für eine  Membervarieable
 @param typ Basistyp
 @param name Name
 */
-#define MemVar(typ, name) MemVarType(typ) name = MemVarType(typ) (#name, this)
+#define MemVar(typ, name, ...) MemVarType(typ) name = MemVarType(typ) (#name, this __VA_ARGS__)
 /// Makro für Typ-Deklaration zu \c MemEnumVar
 #define MemEnumVarTyp(typ) mobs::Member<typ, mobs::StrIntConv<typ>>
 /*! \brief Deklarations-Makro für eine  Membervarieable des Typs \c enum
 @param typ Basistyp
 @param name Name
 */
-#define MemEnumVar(typ, name) MemEnumVarTyp(typ) name = MemEnumVarTyp(typ) (#name, this)
+#define MemEnumVar(typ, name, ...) MemEnumVarTyp(typ) name = MemEnumVarTyp(typ) (#name, this)
 /// Makro für Typ-Deklaration zu \c MemMobsEnumVar
 #define MemMobsEnumVarType(typ) mobs::Member<enum typ, mobs::Str##typ##Conv>
 /*! \brief Deklarations-Makro für eine  Membervarieable eines mit \c MOBS_ENUM_DEF erzeugten enums
 @param typ Name des enums (ohne Tiken \c enum
 @param name Name
 */
-#define MemMobsEnumVar(typ, name) MemMobsEnumVarType(typ) name = MemMobsEnumVarType(typ) (#name, this)
+#define MemMobsEnumVar(typ, name, ...) MemMobsEnumVarType(typ) name = MemMobsEnumVarType(typ) (#name, this __VA_ARGS__)
 
 /// Makro für Typ-Deklaration zu \c MemMobsVar
 #define MemMobsVarType(typ, converter) mobs::Member<typ, converter>
@@ -134,7 +136,22 @@
 @param converter Konvertier-Klasse von und nach \c std::string
 \see  ConvToStrHint
 */
-#define MemMobsVar(typ, name, converter) MemMobsVarType(typ, converter) name = MemMobsVarType(typ, converter) (#name, this)
+#define MemMobsVar(typ, name, converter, ...) MemMobsVarType(typ, converter) name = MemMobsVarType(typ, converter) (#name, this __VA_ARGS__)
+
+/// \private
+enum MemVarCfg { Unset, InitialNull, VectorNull, Key1, Key2, Key3, Key4, Key5, AltNameBase = 100, AltNameBaseEnd = 299 };
+/// \private
+enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confToken, const std::string &s);
+
+#define USENULL ,mobs::InitialNull ///< Element wir mit\c null vorinitialisiert
+#define USEVECNULL ,mobs::VectorNull ///< Bei Vectoren wird der Vector selbst mit \c null vorinitialisiert
+#define KEYELEMENT1 ,mobs::Key1 ///<  Keyelement der Priorität 1 (erstes Element)
+#define KEYELEMENT2 ,mobs::Key2 ///< Keyelement der Priorität 2
+#define KEYELEMENT3 ,mobs::Key3 ///< Keyelement der Priorität 3
+#define KEYELEMENT4 ,mobs::Key4 ///< Keyelement der Priorität 4
+#define KEYELEMENT5 ,mobs::Key5 ///< Keyelement der Priorität 5
+#define ALTNAME(name) ,::mobs::mobsToken(::mobs::AltNameBase,m_confToken,#name) ///< Definition eines Alternativen Namens für die Ein-/Ausgsbe
+
 
 
 
@@ -143,13 +160,13 @@
  @param typ Objekttyp
  @param name Name
  */
-#define MemVector(typ, name) mobs::MemberVector<typ> name = mobs::MemberVector<typ>(#name, this)
+#define MemVector(typ, name, ...) mobs::MemberVector<typ> name = mobs::MemberVector<typ>(#name, this __VA_ARGS__)
 /*! \brief Deklarations-Makro für eines Vector von Membervarieablen
   identisch mit \c MemVector(MeVarType(typ), \c name)
  @param typ Basistyp
  @param name Name
  */
-#define MemVarVector(typ, name) MemVector( MemVarType(typ), name)
+#define MemVarVector(typ, name, ...) MemVector( MemVarType(typ), name, __VA_ARGS__)
 //#define MemVarVector(typ, name) mobs::MemberVector< MemVarType(typ) > name = mobs::MemberVector< MemVarType(typ) >(#name, this)
 
 
@@ -157,16 +174,16 @@
  @param typ Objekttyp
  @param name Name
  */
-#define ObjVar(typ, name) typ name = typ(#name, this)
+#define ObjVar(typ, name, ...) typ name = typ(#name, this __VA_ARGS__)
 
 /*! \brief Makro für Definitionen im Objekt das von ObjecBase ist
  @param objname Name der Klasse (muss von ObjecBase abgeleitet sein)
  */
 #define ObjInit(objname) \
-objname() { TRACE(""); keylist.reset(); init(); }; \
+objname() { TRACE(""); doInit(); init(); }; \
 objname(const objname &that) { TRACE(""); doCopy(that); }; \
-objname(mobs::MemBaseVector *m, mobs::ObjectBase *o) : ObjectBase(m, o) { TRACE(""); keylist.reset(); init(); }; \
-objname(std::string name, ObjectBase *t) : ObjectBase(name, t) { TRACE(PARAM(name) << PARAM(this)); if (t) t->regObj(this); }; \
+objname(mobs::MemBaseVector *m, mobs::ObjectBase *o, mobs::MemVarCfg c1 = mobs::Unset, mobs::MemVarCfg c2 = mobs::Unset, mobs::MemVarCfg c3 = mobs::Unset) : ObjectBase(m, o, c1, c2, c3) { TRACE(""); doInit(); init(); }; \
+objname(std::string name, ObjectBase *t, mobs::MemVarCfg c1 = mobs::Unset, mobs::MemVarCfg c2 = mobs::Unset, mobs::MemVarCfg c3 = mobs::Unset) : ObjectBase(name, t, c1, c2, c3) { TRACE(PARAM(name) << PARAM(this)); if (t) t->regObj(this); doInit(); init(); }; \
 objname &operator=(const objname &rhs) { TRACE(""); if (this != &rhs) { doCopy(rhs); } return *this; }; \
 static ObjectBase *createMe() { return new objname; } ; \
 virtual std::string typName() const { return #objname; };
@@ -185,23 +202,9 @@ static RegMe##name regme; \
 RegMe##name RegMe##name::regme; \
 }
 
-namespace mobs {
 
 class ObjTrav;
 class ObjTravConst;
-
-/// \brief Interne Klasse zur Verwaltung der Schlüsselelenten bei Datenbankobjekten
-/// \see KeyList
-class KeyList {
-public:
-  KeyList() {};
-  /// \private
-  int add() { return ++cnt; };
-  /// \private
-  void reset() { cnt = 0; };
-private:
-  int cnt = 0;
-};
 
 /// Interne Klasse zur Behandlung von \c NULL \c -Werten
 class NullValue {
@@ -222,17 +225,21 @@ private:
 class ObjectBase;
 class MemBaseVector;
 
+// ------------------ MemberBase ------------------
+
 /// Basisklasse für Membervariablen
 class MemberBase : public NullValue {
 protected:
   /// \private
-  MemberBase(std::string n, ObjectBase *obj = nullptr) : m_name(n), m_parent(obj) {}
+  MemberBase(std::string n, ObjectBase *obj, MemVarCfg c1 = Unset, MemVarCfg c2 = Unset, MemVarCfg c3 = Unset) : m_name(n), m_parent(obj) { doConfig(c1); doConfig(c2); doConfig(c3); }
   /// \private
-  MemberBase(mobs::MemBaseVector *m, mobs::ObjectBase *o) : m_name(""), m_parent(o), m_parVec(m) {}
+  MemberBase(mobs::MemBaseVector *m, mobs::ObjectBase *o, MemVarCfg c1 = Unset, MemVarCfg c2 = Unset, MemVarCfg c3 = Unset) : m_name(""), m_parent(o), m_parVec(m) { doConfig(c1); doConfig(c2); doConfig(c3); }
 public:
   virtual ~MemberBase() {}
   /// Abfrage des Namen der Membervariablen
   std::string name() const { return m_name; }
+  /// Config-Token alternativer Name oder \c SIZE_T_MAX
+  size_t cAltName() const { return m_altName; };
 //  virtual void strOut(std::ostream &str) const  = 0;
   /// Setze Inhalt auf leer
   virtual void clear() = 0;
@@ -254,19 +261,24 @@ public:
   /// @return Position im Schlüssel oder \c 0 wenn kein Schlüsselelement
   int key() const { return m_key; }
   /// Zeiger auf Vater-Objekt
-  ObjectBase *parent() { return m_parent; }
+  ObjectBase *parent() const { return m_parent; }
   /// Objekt wurde beschrieben
   void activate();
 
 protected:
   /// \private
   int m_key = 0;
+  /// \private
+  size_t m_altName = SIZE_T_MAX;
+  
 private:
+  void doConfig(MemVarCfg c);
   std::string m_name;
   ObjectBase *m_parent = nullptr;
   MemBaseVector *m_parVec = nullptr;
 };
 
+// ------------------ VectorBase ------------------
 
 
 /// \brief Basisklasse für Vectoren auf Membervariablen oder Objekten innerhalb von von \c ObjectBase angeleiteten Klasse; Bitte als Makro MemVarVector oder MemVector verwenden
@@ -275,7 +287,8 @@ private:
 class MemBaseVector : public NullValue {
 public:
   /// \private
-  MemBaseVector(std::string n, ObjectBase *obj) : m_name(n), m_parent(obj) { TRACE(PARAM(n)); }
+  MemBaseVector(std::string n, ObjectBase *obj, MemVarCfg c1 = Unset, MemVarCfg c2 = Unset, MemVarCfg c3 = Unset, MemVarCfg c4 = Unset) : m_name(n), m_parent(obj)
+  { TRACE(PARAM(n)); doConfig(c1); doConfig(c2); doConfig(c3); doConfig(c4); if (nullAllowed()) setNull(true); m_c.resize(3, Unset); }
   virtual ~MemBaseVector() { TRACE(""); }
   /// Starte Traversierung nicht const
   virtual void traverse(ObjTrav &trav) = 0;
@@ -286,7 +299,9 @@ public:
   /// Vergrößert/verkleinert die Elemtzahl des Vektors
   virtual void resize(size_t s) = 0;
   /// liefert den Namen der Vektor variablen
-  std::string name() const { return m_name; }
+  inline std::string name() const { return m_name; }
+  /// Config-Token alternativer Name oder \c SIZE_T_MAX
+  size_t cAltName() const { return m_altName; };
   /// \private
   virtual void doCopy(const MemBaseVector &other) = 0;
   /// liefert einen Zeiger auf das entsprechende Element, falls es eine \c MemVar ist
@@ -298,26 +313,48 @@ public:
   /// Objekt wurde beschrieben
   void activate();
   /// Zeiger auf Vater-Objekt
-  ObjectBase *parent() { return m_parent; }
+  inline ObjectBase *parent() const { return m_parent; }
 
 protected:
   /// \private
   std::string m_name;
+  /// \private
+  std::vector<MemVarCfg> m_c;
+  /// \private
+  size_t m_altName = SIZE_T_MAX;
+
+
 private:
+  void doConfig(MemVarCfg c);
   ObjectBase *m_parent = nullptr;
 };
+
+#if 0
+/// Hilfsklasse für Json-Ausgabe
+class ConvToJsonHint : virtual public ConvToStrHint {
+public:
+  virtual ~ConvToJsonHint() {}
+  /// \private
+  virtual bool compact() const { return comp; }
+  
+  bool comp;
+};
+#endif
+
+// ------------------ ObjectBase ------------------
+
 
 /// Basisklasse für Objekte
 class ObjectBase : public NullValue {
 public:
-  ObjectBase() {}
+  ObjectBase() { }
   /// \private
-  ObjectBase(std::string n, ObjectBase *obj) : m_varNam(n), m_parent(obj) {} // Konstructor for ObjVar
+  ObjectBase(std::string n, ObjectBase *obj, MemVarCfg c1 = Unset, MemVarCfg c2 = Unset, MemVarCfg c3 = Unset) : m_varNam(n), m_parent(obj) { doConfig(c1); doConfig(c2); doConfig(c3); } // Konstructor for ObjVar
+  /// \private
+  ObjectBase(MemBaseVector *m, ObjectBase *o, MemVarCfg c1 = Unset, MemVarCfg c2 = Unset, MemVarCfg c3 = Unset) : m_varNam(""), m_parent(o), m_parVec(m) { doConfig(c1); doConfig(c2); doConfig(c3); } // Konstructor for Vector
+  virtual ~ObjectBase() {};
   /// \private
   ObjectBase &operator=(const ObjectBase &rhs) { doCopy(rhs); return *this; }
-  /// \private
-  ObjectBase(MemBaseVector *m, ObjectBase *o) : m_varNam(""), m_parent(o), m_parVec(m) {} // Konstructor for Vector
-  virtual ~ObjectBase() {};
   /// \private
   void regMem(MemberBase *mem);
   /// \private
@@ -335,8 +372,15 @@ public:
   virtual void init() {};
   /// liefert den Namen Membervariablen
   std::string name() const { return m_varNam; };
+  /// Config-Token alternativer Name oder \c SIZE_T_MAX
+  size_t cAltName() const { return m_altName; };
   /// Objekt wurde beschrieben
   void activate();
+  /// private
+  void key(int k) { m_key = k; }
+  /// \brief Abfrage ob Unteröbjekt ein Key-Element enthält
+  /// @return Position im Schlüssel oder \c 0 wenn kein Schlüsselelement
+  int key() const { return m_key; }
   /// liefert ???
   MemberBase &get(std::string name);
   /// Suche eine Membervariable
@@ -370,21 +414,40 @@ public:
   /// @param found opt. Zeiger auf bool-Variable, die Anzeigt, ob das Element gefunden wurde
   /// @param compact opt. Angabe, ob ausgabe \e kompakt erfolgen soll (bei enum als \c int statt als Text
   /// \return Inhalt der variable als string in UTF-8, oder leer, wenn nicht gefunden
-  std::string getVariable(const std::string &path, bool *found = nullptr, bool compact = false);
+  std::string getVariable(const std::string &path, bool *found = nullptr, bool compact = false) const;
+  
+  /// Erzeuge eine Liste der Key-Elementze
+  /// @param key Rückgabe der Liste
+  /// @param cth Konvertierungs-Hinweis
+  void getKey(std::list<std::string> &key, const ConvToStrHint &cth) const;
+  /// liefert einen \c std::string aus den Key-Elementen
+  std::string keyStr() const;
   /// \brief Kopiere ein Objekt aus einem bereits vorhandenen.
   /// @param other zu Kopierendes Objekt
   /// \throw runtime_error Sind die Strukturen nicht identisch, wird eine Exception erzeugt
   void doCopy(const ObjectBase &other);
   /// Zeiger auf Vater-Objekt
-  ObjectBase *parent() { return m_parent; }
+  ObjectBase *parent() const { return m_parent; }
+  /// Config-Token lesen
+  const std::string &getConf(std::size_t i) const { static std::string x; if (i < m_confToken.size()) return m_confToken[i]; return x; }
+  /// Ausgabe als \c std::string (Json)
+  std::string to_string(ConvObjToString cft = ConvObjToString()) const;
+
 
 protected:
-  KeyList keylist; ///< Liste von Key-Elementen die innerhab \c init() gesetzt werden können \see KeyList
+  /// \private
+  void doInit() { if (nullAllowed()) setNull(true); } // Initialisierung am Ende des Konstruktors
+  /// \private
+  std::vector<std::string> m_confToken; // Liste der Konfigurationstokens
 
 private:
   std::string m_varNam;
   ObjectBase *m_parent = nullptr;
   MemBaseVector *m_parVec = nullptr;
+  int m_key = 0;
+  size_t m_altName = SIZE_T_MAX;
+
+  void doConfig(MemVarCfg c);
 
   class MlistInfo {
   public:
@@ -405,6 +468,7 @@ private:
 //template <> inline signed char mobsempty(signed char&) { return ' '; };
 //template <> inline unsigned char mobsempty(unsigned char&) { return ' '; };
 
+// ------------------ Member ------------------
 
 template<typename T, class C> 
 /** \brief Klasse für Member-Variable zum angegeben Basistyp
@@ -451,11 +515,12 @@ template<typename T, class C>
  */
 class Member : virtual public MemberBase, public C {
 public:
-  Member() : MemberBase("") { TRACE(""); clear(); }  // Konstruktor für Array
   /// \private
-  Member(std::string n, ObjectBase *o) : MemberBase(n, o), wert(T()) { TRACE(PARAM(n) << PARAM(this)); if (o) o->regMem(this); } // Konstruktor f. Objekt nur intern
+  Member(MemVarCfg c1 = Unset, MemVarCfg c2 = Unset, MemVarCfg c3 = Unset) : MemberBase("", nullptr) { TRACE(""); clear(); }  // Konstruktor für Array oder Solo
   /// \private
-  Member(MemBaseVector *m, ObjectBase *o) : MemberBase(m, o) {} // Konstruktor f. Objekt nur intern
+  Member(std::string n, ObjectBase *o, MemVarCfg c1 = Unset, MemVarCfg c2 = Unset, MemVarCfg c3 = Unset) : MemberBase(n, o, c1, c2, c3), wert(T()) { TRACE(PARAM(n) << PARAM(this)); if (o) o->regMem(this); clear(); } // Konstruktor innerhalb  Objekt nur intern
+  /// \private
+  Member(MemBaseVector *m, ObjectBase *o, MemVarCfg c1 = Unset, MemVarCfg c2 = Unset, MemVarCfg c3 = Unset) : MemberBase(m, o, c1, c2, c3) {} // Konstruktor f. Objekt nur intern
   Member &operator=(const Member &other) = delete;
   ~Member() { TRACE(PARAM(name())); }
   /// Zugriff auf Inhalt
@@ -465,7 +530,7 @@ public:
   
 //  virtual void strOut(std::ostream &str) const { str << mobs::to_string(wert); }
   /// Setze Inhalt auf leer
-  virtual void clear()  { wert = this->c_empty(); };
+  virtual void clear()  { wert = this->c_empty(); if (nullAllowed()) setNull(true); else activate(); };
   //  virtual std::string toStr() const { std::stringstream s; s << wert; return s.str(); }
   virtual std::string toStr(const ConvToStrHint &cth) const { return this->c_to_string(wert, cth); };
   //  virtual std::wstring toWStr2() const { return mobs::to_wstring(wert); }
@@ -481,14 +546,8 @@ private:
   T wert;
 };
  
-template<typename T, class C>
-/// Klasse zur Beschreibung von Membervariablen als Key-Element für einen Datenbank
-KeyList & operator<<(KeyList &k, Member<T, C> &m)
-{ 
-  TRACE(PARAM(m.name()) << PARAM(m.key()));
-  m.key(k.add());
-  return k;
-};
+
+// ------------------ Iterator ------------------
 
 template<typename T>
 /// \private
@@ -529,6 +588,7 @@ protected:
   typename std::vector<T *>::iterator m_iter;
 };
 
+// ------------------ MemberVector ------------------
 
 template<class T>
 /// \brief Klasse für Vectoren auf Membervariablen oder Objekten innerhalb von von \c ObjectBase angeleiteten Klasse; Bitte als Makro MemVarVector oder MemVector verwenden
@@ -538,7 +598,7 @@ template<class T>
 class MemberVector : virtual public MemBaseVector {
 public:
   /// \private
-  MemberVector(std::string n, ObjectBase *o) : MemBaseVector(n, o) { TRACE(PARAM(n) << PARAM(this)); o->regArray(this); }
+  MemberVector(std::string n, ObjectBase *o, MemVarCfg c1 = Unset, MemVarCfg c2 = Unset, MemVarCfg c3 = Unset, MemVarCfg c4 = Unset) : MemBaseVector(n, o, c1, c2, c3, c4) { TRACE(PARAM(n)); o->regArray(this); }
   ~MemberVector() { TRACE(PARAM(m_name)); resize(0); };   // heap Aufräumen
   /// Zugriff auf das entsprechende Vector-Element
   T &operator[] (size_t t) { if (t >= size()) resize(t+1); return *werte[t]; }
@@ -584,6 +644,29 @@ private:
   // Vector von Heap-Elementen verwenden, da sonst Probleme beim Reorg
   std::vector<T *> werte;
 };
+
+template<class T>
+void MemberVector<T>::resize(size_t s)
+{
+  TRACE(PARAM(s));
+  size_t old = size();
+  if (old > s)
+  {
+    for (size_t i = s; i < old; i++)
+      delete werte[i];
+    werte.resize(s);
+  }
+  else if (old < s)
+  {
+    werte.resize(s);
+    for (size_t i = old; i < s; i++)
+      werte[i] = new T(this, parent(), m_c[0], m_c[1], m_c[2]);
+  }
+}
+
+
+// ------------------ Navigation / Ausgabe ------------------
+
 
 /// Basisklasse zum rekursiven Durchlauf über eine Objektstruktur
 class ObjTrav {
@@ -665,25 +748,6 @@ private:
 };
 
 template<class T>
-void MemberVector<T>::resize(size_t s)
-{
-  TRACE(PARAM(s));
-  size_t old = size();
-  if (old > s)
-  {
-    for (size_t i = s; i < old; i++)
-      delete werte[i];
-    werte.resize(s);
-  }
-  else if (old < s)
-  {
-    werte.resize(s);
-    for (size_t i = old; i < s; i++)
-      werte[i] = new T(this, parent());
-  }
-}
-
-template<class T>
 void MemberVector<T>::traverse(ObjTrav &trav)
 {
   trav.doArrayBeg(trav, *this);
@@ -721,10 +785,9 @@ void MemberVector<T>::doCopy(const MemBaseVector &other)
 
 
 /// Ausgabe eines Objektes im kompakten JSON-Format, Keys unquoted
-std::string to_string(const ObjectBase &obj, bool compact = false);
-/// Ausgabe eines Objektes im  JSON-Format ohne whitespace
-std::string to_json(const ObjectBase &obj);
+inline std::string to_string(const ObjectBase &obj) { return obj.to_string(); };
 //std::wstring to_wstring(const ObjectBase &obj);
+
 void string2Obj(const std::string &str, ObjectBase &obj, const ConvFromStrHint &cfh = ConvFromStrHint::convFromStrHintDflt);
 }
 

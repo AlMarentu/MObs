@@ -30,8 +30,8 @@ class XmlOutData;
 class XmlOut : virtual public ObjTravConst {
 public:
   /// Konstruktor
-  /// @param indent erzeugt Einrückungen, wenn \c true
-  XmlOut(bool indent = true);
+  /// @param cth Konvertierungs-Hinweis
+  XmlOut(ConvObjToString cth);
   ~XmlOut();
   /// \private
   virtual void doObjBeg(ObjTravConst &ot, const ObjectBase &obj);
@@ -54,8 +54,6 @@ private:
 
 };
 
-/// Ausgabe eines Objektes im  XML-Format ohne whitespace
-std::string to_xml(const ObjectBase &obj);
 
 }
 

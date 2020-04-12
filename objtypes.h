@@ -232,16 +232,22 @@ template <> inline bool mobschar(signed char) { return true; };
 /// Hilfsklasse für Konvertierungsklasse
 class ConvToStrHint {
 public:
+  ConvToStrHint() = delete;
   /// Konstructor
-  /// @param print_compact führ bei einigen Typen zur vereinfachten Ausgabe
-  ConvToStrHint(bool print_compact) : comp(print_compact) {}
+  /// @param print_compact führt bei einigen Typen zur vereinfachten Ausgabe
+  /// @param altNames verwende alternative Namen wenn VOrhanden
+  ConvToStrHint(bool print_compact, bool altNames = false) : comp(print_compact), altnam(altNames) {}
   virtual ~ConvToStrHint() {}
   /// \private
   virtual bool compact() const { return comp; }
-  
-private:
-  ConvToStrHint();
+  /// \private
+  virtual bool useAltNames() const { return altnam; }
+
+protected:
+  /// \private
   bool comp;
+  /// \private
+  bool altnam;
 };
 
 /// Hilfsklasse für Konvertierungsklasse - Basisklasse
@@ -252,11 +258,46 @@ public:
   virtual bool acceptCompact() const = 0;
   /// darf ein nicht-kompakter Wert als Eingabe fungieren
   virtual bool acceptExtented() const = 0;
+  /// Verwende alternative Namen
+  virtual bool useAltNames() const = 0;
 
   /// Standard Konvertierungshinweis, kompake und erweiterte Eingaben sind erlaubt
   static const ConvFromStrHint &convFromStrHintDflt;
   /// Konvertierungshinweis, der nur erweiterte Eingabe zulässt
   static const ConvFromStrHint &convFromStrHintExplizit;
+
+};
+
+/// Ausgabeformat für \c to_string() Methode von Objekten
+class ConvObjToString : virtual public ConvToStrHint {
+public:
+  ConvObjToString() : ConvToStrHint(false) {}
+  /// \private
+  bool toXml() const { return xml; }
+  /// \private
+  bool toJson() const { return not xml; }
+  /// \private
+  bool withQuotes() const { return quotes; }
+  /// \private
+  bool withIndentation() const { return indent; }
+  /// Ausgabe als XML-Datei
+  ConvObjToString exportXml() const { ConvObjToString c(*this); c.xml = true; return c; }
+  /// Ausgabe als JSON
+  ConvObjToString exportJson() const { ConvObjToString c(*this); c.xml = false; c.quotes = true; return c; }
+  /// Verwende alternative Namen
+  ConvObjToString exportAltNames() const { ConvObjToString c(*this); c.altnam = true; return c; }
+  /// Export mit Einrückungen (derzeit nicht bei JSON)
+  ConvObjToString doIndent() const { ConvObjToString c(*this); c.indent = true; return c; }
+  /// Export ohne Einrückumgen
+  ConvObjToString noIndent() const { ConvObjToString c(*this); c.indent = false; return c; }
+  /// Verwende native von enums und Zeiten
+  ConvObjToString exportCompact() const { ConvObjToString c(*this); c.comp = true; return c; }
+  /// Ausgabe im Klartext von enums und Uhrzeit
+  ConvObjToString exportExtendet() const { ConvObjToString c(*this); c.comp = false; return c; }
+private:
+  bool xml = false;
+  bool quotes = false;
+  bool indent = false;
 
 };
 
@@ -272,7 +313,8 @@ public:
   static inline bool c_is_chartype(const ConvToStrHint &) { return mobschar(T()); }
   /// zeigt an, ob spezialisierter Typ vorliegt (\c \<limits>)
   static inline bool c_is_specialized() { return std::numeric_limits<T>::is_specialized; }
-  /// liefert eine \e leere Variable
+  /// liefert eine \e leere Variable die zum löschen oder Initialisieren einer Membervarieblen verwendet wird
+  /// \see clear()
   static inline T c_empty() { return T(); }
 
 };
