@@ -175,6 +175,44 @@ MemBaseVector *ObjectBase::getVecInfo(const string &name)
   return 0;
 }
 
+size_t ObjectBase::findConfToken(const std::string &name)
+{
+  auto i = find(m_confToken.begin(), m_confToken.end(), name);
+  if (i == m_confToken.end())
+    return SIZE_T_MAX;
+  return distance(m_confToken.begin(), i);
+}
+
+MemberBase *ObjectBase::getMemInfo(const size_t ctok)
+{
+  for (auto i:mlist)
+  {
+    if (i.mem and ctok == i.mem->cAltName())
+      return i.mem;
+  }
+  return 0;
+}
+
+ObjectBase *ObjectBase::getObjInfo(const size_t ctok)
+{
+  for (auto i:mlist)
+  {
+    if (i.obj and ctok == i.obj->cAltName())
+      return i.obj;
+  }
+  return 0;
+}
+
+MemBaseVector *ObjectBase::getVecInfo(const size_t ctok)
+{
+  for (auto i:mlist)
+  {
+    if (i.vec and ctok == i.vec->cAltName())
+      return i.vec;
+  }
+  return 0;
+}
+
 MemberBase &ObjectBase::get(string name)
 {
   for (auto m:mlist)
@@ -291,7 +329,6 @@ public:
   virtual ~ConvFromStrHintDoCopy() {}
   virtual bool acceptCompact() const { return true; }
   virtual bool acceptExtented() const { return false; }
-  virtual bool useAltNames() const { return false; }
 };
 
 void ObjectBase::doCopy(const ObjectBase &other)
@@ -435,10 +472,22 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
   
   memName = objekte.top().objName;
   memBase = 0;
+  size_t altNamtok = SIZE_T_MAX;
   //    LOG(LM_DEBUG, "Sind im Object " << memName);
   if (objekte.top().obj)
   {
-    MemBaseVector *v = objekte.top().obj->getVecInfo(element);
+    if (cfs.acceptAltNames())
+      altNamtok = objekte.top().obj->findConfToken(element);
+//    LOG(LM_INFO, "ALT " << altNamtok << " " << boolalpha << cfs.acceptAltNames());
+    MemBaseVector *v = nullptr;
+    if (altNamtok != SIZE_T_MAX)
+      v = objekte.top().obj->getVecInfo(altNamtok);
+    if (v == nullptr)
+    {
+      v = objekte.top().obj->getVecInfo(element);
+      if (v and not cfs.acceptOriNames() and v->cAltName() != SIZE_T_MAX)
+        v = nullptr;
+    }
     if (v)
     {
       size_t s = v->size();
@@ -477,7 +526,15 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
     }
     if (index == SIZE_MAX)
     {
-      ObjectBase *o = objekte.top().obj->getObjInfo(element);
+      ObjectBase *o = nullptr;
+      if (altNamtok != SIZE_T_MAX)
+        o = objekte.top().obj->getObjInfo(altNamtok);
+      if (o == nullptr)
+      {
+        o = objekte.top().obj->getObjInfo(element);
+        if (o and not cfs.acceptOriNames() and o->cAltName() != SIZE_T_MAX)
+          o = nullptr;
+      }
       if (o)
       {
         //        LOG(LM_INFO, element << " ist ein Objekt");
@@ -485,7 +542,15 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
         objekte.push(ObjectNavigator::Objekt(o, memName));
         return true;
       }
-      MemberBase *m = objekte.top().obj->getMemInfo(element);
+      MemberBase *m = nullptr;
+      if (altNamtok != SIZE_T_MAX)
+        m = objekte.top().obj->getMemInfo(altNamtok);
+      if (m == nullptr)
+      {
+        m = objekte.top().obj->getMemInfo(element);
+        if (m and not cfs.acceptOriNames() and m->cAltName() != SIZE_T_MAX)
+          m = nullptr;
+      }
       if (m)
       {
         //        cerr << element << " ist ein Member" << endl;
@@ -642,11 +707,11 @@ std::string ObjectBase::to_string(ConvObjToString cth) const
 /// string2Obj
 /////////////////////////////////////////////////
 
-void string2Obj(const std::string &str, ObjectBase &obj, const ConvFromStrHint &cfh)
+void string2Obj(const std::string &str, ObjectBase &obj, ConvObjFromStr cfh)
 {
   class JsonReadData : public ObjectNavigator, public JsonParser  {
   public:
-    JsonReadData(const string &input, const ConvFromStrHint &c) : JsonParser(input), cfh(c) { }
+    JsonReadData(const string &input, const ConvObjFromStr &c) : JsonParser(input) { cfs = c; }
     
     void Value(const string &val, bool charType) {
       TRACE(PARAM(val));
@@ -666,7 +731,7 @@ void string2Obj(const std::string &str, ObjectBase &obj, const ConvFromStrHint &
             member()->clear();
           }
         }
-        else if (not member()->fromStr(val, cfh))
+        else if (not member()->fromStr(val, cfs))
           throw runtime_error(u8"JSON: invalid type in variable " + member()->name());
       }
       leave();
@@ -696,7 +761,6 @@ void string2Obj(const std::string &str, ObjectBase &obj, const ConvFromStrHint &
     int level = 0;
     string lastKey;
     string prefix;
-    const ConvFromStrHint &cfh;
   };
   
   JsonReadData jd(str, cfh);

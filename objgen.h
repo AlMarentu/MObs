@@ -395,7 +395,7 @@ public:
   /// @param name Name der zu suchenden Variable
   /// @return Zeiger auf Objekt \c MemBaseVector oder \c nullptr
   MemBaseVector *getVecInfo(const std::string &name);
-  
+
   /// \private
   static void regObject(std::string n, ObjectBase *fun());
   /// \brief Erzeuge ein neues Objekt
@@ -433,6 +433,15 @@ public:
   /// Ausgabe als \c std::string (Json)
   std::string to_string(ConvObjToString cft = ConvObjToString()) const;
 
+  /// \private
+  size_t findConfToken(const std::string &name);
+  /// \private
+  MemberBase *getMemInfo(const size_t ctok);
+  /// \private
+  ObjectBase *getObjInfo(const size_t ctok);
+  /// \private
+  MemBaseVector *getVecInfo(const size_t ctok);
+
 
 protected:
   /// \private
@@ -441,6 +450,7 @@ protected:
   std::vector<std::string> m_confToken; // Liste der Konfigurationstokens
 
 private:
+
   std::string m_varNam;
   ObjectBase *m_parent = nullptr;
   MemBaseVector *m_parVec = nullptr;
@@ -733,6 +743,9 @@ public:
   /// \return liefert \c false bei Syntax-Fehler
   bool find(const std::string &path);
   
+  /// Import-Konfiguration
+  ConvObjFromStr cfs;
+
 private:
   class Objekt {
   public:
@@ -788,7 +801,7 @@ void MemberVector<T>::doCopy(const MemBaseVector &other)
 inline std::string to_string(const ObjectBase &obj) { return obj.to_string(); };
 //std::wstring to_wstring(const ObjectBase &obj);
 
-void string2Obj(const std::string &str, ObjectBase &obj, const ConvFromStrHint &cfh = ConvFromStrHint::convFromStrHintDflt);
+void string2Obj(const std::string &str, ObjectBase &obj, ConvObjFromStr cfs = ConvObjFromStr());
 }
 
 #endif

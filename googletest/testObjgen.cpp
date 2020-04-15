@@ -557,6 +557,19 @@ TEST(objgenTest, conftoken) {
   o.o.setNull(false);
   EXPECT_EQ(xml, o.to_string(mobs::ConvObjToString().exportXml().exportAltNames().doIndent()));
 
+  ObjX o2;
+
+  EXPECT_NO_THROW(mobs::string2Obj("{grimoald:12,pippin:17,karl:22,c:33,karlmann:{aa:1,bb:2,cc:3,dd:4,ee:6},ludwig:[\"a\"]}", o2, mobs::ConvObjFromStr().useAlternativeNames()));
+  EXPECT_EQ("{id:12,a:17,b:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},d:[\"a\"]}", o2.to_string(mobs::ConvObjToString()));
+
+  o2.clear();
+  EXPECT_NO_THROW(mobs::string2Obj("{grimoald:12,a:17,karl:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},ludwig:[\"a\"]}", o2, mobs::ConvObjFromStr().useAutoNames()));
+  EXPECT_EQ("{id:12,a:17,b:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},d:[\"a\"]}", o2.to_string(mobs::ConvObjToString()));
+
+  o2.clear();
+  EXPECT_NO_THROW(mobs::string2Obj("{grimoald:12,a:17,karl:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},ludwig:[\"a\"]}", o2, mobs::ConvObjFromStr().useAlternativeNames()));
+  EXPECT_EQ("{id:12,a:0,b:22,c:33,o:null,d:[\"a\"]}", o2.to_string(mobs::ConvObjToString()));
+
 }
 
 #if 0
@@ -567,6 +580,8 @@ TEST(objgenTest, compare) {
   EXPECT_TRUE(p.name() == p.vorname());
   EXPECT_TRUE(p.name == p.vorname);
   
+  
+
 }
 #endif
 

@@ -254,12 +254,10 @@ protected:
 class ConvFromStrHint {
 public:
   virtual ~ConvFromStrHint() {}
-  /// darf ein kompakter Wert als Eingabe fungieren
-  virtual bool acceptCompact() const = 0;
   /// darf ein nicht-kompakter Wert als Eingabe fungieren
   virtual bool acceptExtented() const = 0;
-  /// Verwende alternative Namen
-  virtual bool useAltNames() const = 0;
+  /// darf ein kompakter Wert als Eingabe fungieren
+  virtual bool acceptCompact() const = 0;
 
   /// Standard Konvertierungshinweis, kompake und erweiterte Eingaben sind erlaubt
   static const ConvFromStrHint &convFromStrHintDflt;
@@ -299,6 +297,31 @@ private:
   bool quotes = false;
   bool indent = false;
 
+};
+
+class ConvObjFromStr : virtual public ConvFromStrHint {
+public:
+  virtual ~ConvObjFromStr() {}
+  /// darf ein kompakter Wert als Eingabe fungieren
+  virtual bool acceptCompact() const { return compact; }
+  /// darf ein nicht-kompakter Wert als Eingabe fungieren
+  virtual bool acceptExtented() const { return extented; };
+  /// Verwende alternative Namen
+  virtual bool acceptAltNames() const { return altNam; };
+  /// Verwende original Namen
+  virtual bool acceptOriNames() const { return oriNam; };
+
+  ConvObjFromStr useCompactValues() const { ConvObjFromStr c(*this); c.compact = true; c.extented = false; return c; }
+  ConvObjFromStr useExtentedValues() const { ConvObjFromStr c(*this); c.compact = false; c.extented = true; return c; }
+  ConvObjFromStr useAutoValues() const { ConvObjFromStr c(*this); c.compact = true; c.extented = true; return c; }
+  ConvObjFromStr useOriginalNames() const { ConvObjFromStr c(*this); c.oriNam = true; c.altNam = false; return c; }
+  ConvObjFromStr useAlternativeNames() const { ConvObjFromStr c(*this); c.oriNam = false; c.altNam = true; return c; }
+  ConvObjFromStr useAutoNames() const {  ConvObjFromStr c(*this); c.oriNam = true; c.altNam = true; return c; }
+protected:
+  bool compact = true;
+  bool extented = true;
+  bool oriNam = true;
+  bool altNam = false;
 };
 
 template <typename T>
