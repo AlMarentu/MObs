@@ -95,6 +95,8 @@ string  XmlOut::getString()
 
 void XmlOut::doObjBeg(ObjTravConst &ot, const ObjectBase &obj)
 {
+  if (obj.isNull() and data->cth.omitNull())
+    return;
   if (data->elements.empty())
   {
     data->buffer << u8"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
@@ -125,6 +127,8 @@ void XmlOut::doObjBeg(ObjTravConst &ot, const ObjectBase &obj)
 
 void XmlOut::doObjEnd(ObjTravConst &ot, const ObjectBase &obj)
 { 
+  if (obj.isNull() and data->cth.omitNull())
+    return;
   data->level--;
   data->elements.pop();
 
@@ -157,6 +161,8 @@ void XmlOut::doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec)
 
 void XmlOut::doMem(ObjTravConst &ot, const MemberBase &mem)
 {
+  if (mem.isNull() and data->cth.omitNull())
+    return;
   string name;
   if (not data->elements.empty())
     name = data->elements.top();

@@ -394,6 +394,7 @@ void ObjectBase::clear()
 
 bool ObjectBase::setVariable(const std::string &path, const std::string &value) {
   ObjectNavigator on;
+  on.cfs = on.cfs.useDontShrink();
   on.pushObject(*this);
   if (not on.find(path))
     return false;
@@ -406,6 +407,7 @@ bool ObjectBase::setVariable(const std::string &path, const std::string &value) 
 
 std::string ObjectBase::getVariable(const std::string &path, bool *found, bool compact) const {
   ObjectNavigator on;
+  on.cfs = on.cfs.useDontShrink();
   on.pushObject(*const_cast<ObjectBase *>(this));
   if (found)
     *found = false;
@@ -437,13 +439,16 @@ bool ObjectNavigator::find(const std::string &path) {
       return true;
     }
     string element = path.substr(pos, pos2-pos);
-    size_t index = SIZE_MAX;
+    size_t index = SIZE_T_MAX; // Vector selbst
     if (path[pos2] == '[')
     {
       pos = pos2 +1;
       pos2 = path.find(']', pos);
       if (pos2 == std::string::npos)
+      {
+        index = INT_MAX;  // hinten anhängen
         break;
+      }
       string i = path.substr(pos, pos2-pos);
       if (not mobs::string2x(i, index))
         break;
@@ -460,8 +465,67 @@ bool ObjectNavigator::find(const std::string &path) {
   return false;
 }
 
+bool ObjectNavigator::setNull() {
+  TRACE("");
+  if (memVec)
+  {
+    switch (cfs.nullHandling()) {
+      case ConvObjFromStr::omit: break;
+      case ConvObjFromStr::force: memVec->forceNull(); break;
+      case ConvObjFromStr::clear: memVec->clear(); break;
+      case ConvObjFromStr::except:
+        if (not memVec->nullAllowed())
+          throw runtime_error(u8"writing null to member " + showName() + " w/o nullAllowed");
+        memVec->forceNull(); break;
+      case ConvObjFromStr::ignore:
+        if (not memVec->nullAllowed())
+          return false;
+        memVec->forceNull(); break;
+    }
+    return true;
+  }
+  if (member())
+  {
+    switch (cfs.nullHandling()) {
+      case ConvObjFromStr::omit: break;
+      case ConvObjFromStr::force: member()->forceNull(); break;
+      case ConvObjFromStr::clear: member()->clear(); break;
+      case ConvObjFromStr::except:
+        if (not member()->nullAllowed())
+          throw runtime_error(u8"writing null to member " + showName() + " w/o nullAllowed");
+        member()->forceNull(); break;
+      case ConvObjFromStr::ignore:
+        if (not member()->nullAllowed())
+          return false;
+        member()->forceNull(); break;
+    }
+    return true;
+  }
+  if (objekte.empty())
+    return false;
+  if (objekte.top().obj)
+  {
+    switch (cfs.nullHandling()) {
+      case ConvObjFromStr::omit: break;
+      case ConvObjFromStr::force: objekte.top().obj->forceNull(); break;
+      case ConvObjFromStr::clear: objekte.top().obj->clear(); break;
+      case ConvObjFromStr::except:
+        if (not objekte.top().obj->nullAllowed())
+          throw runtime_error(u8"writing null to member " + showName() + " w/o nullAllowed");
+        objekte.top().obj->forceNull(); break;
+      case ConvObjFromStr::ignore:
+        if (not objekte.top().obj->nullAllowed())
+          return false;
+        objekte.top().obj->forceNull(); break;
+    }
+    return true;
+  }
+  return false;
+}
+  
 bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
   TRACE(PARAM(element) << PARAM(index))
+//  LOG(LM_INFO, "enter " << element << " " << index)
   path.push(element);
   
   if (objekte.empty())
@@ -470,8 +534,9 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
   if (memBase)  // War bereits im Member -> als Dummy-Objekt tarnen
     objekte.push(ObjectNavigator::Objekt(nullptr, memName));
   
+  memVec = nullptr;
   memName = objekte.top().objName;
-  memBase = 0;
+  memBase = nullptr;
   size_t altNamtok = SIZE_T_MAX;
   //    LOG(LM_DEBUG, "Sind im Object " << memName);
   if (objekte.top().obj)
@@ -491,11 +556,19 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
     if (v)
     {
       size_t s = v->size();
-      if (index != SIZE_MAX and index < s)
-        s = index;
-      else
+      if (index == SIZE_T_MAX)  // Wenn mit index gearbeitet wird, ist bei SIZE_MAX der Vector selbst gemeint
       {
-        if (index != SIZE_MAX)
+        memVec = v;
+      }
+      if (index < INT_MAX and index < s)
+      {
+        s = index;
+        if (cfs.shrinkArray())
+          v->resize(s+1);
+      }
+      else if (index != SIZE_T_MAX)
+      {
+        if (index < INT_MAX)
           s = index;
         v->resize(s+1);
       }
@@ -503,8 +576,11 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
       memName += ".";
       memName += v->name();
       memName += "[";
-      memName += std::to_string(s);
+      if (index != SIZE_T_MAX)
+        memName += std::to_string(s);
       memName += "]";
+      if (index == SIZE_T_MAX)
+        return true;
       MemberBase *m = v->getMemInfo(s);
       ObjectBase *o = v->getObjInfo(s);
       if (o)
@@ -524,7 +600,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
       
       return false;
     }
-    if (index == SIZE_MAX)
+    if (index >= INT_MAX)
     {
       ObjectBase *o = nullptr;
       if (altNamtok != SIZE_T_MAX)
@@ -564,15 +640,14 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
   memName += ".";
   memName += element;
   objekte.push(ObjectNavigator::Objekt(nullptr, memName));
-  
-  //    LOG(LM_INFO, memName << " ist ein WeisNichtWas");
+//  LOG(LM_ERROR, u8"Element " << memName << " ist nicht vorhanden");
   return false;
 }
 
 void ObjectNavigator::leave(const std::string &element) {
   TRACE(PARAM(element));
   if (memBase)  // letzte Ebene war ein MemberVariable
-    memBase = 0;
+    memBase = nullptr;
   else if (objekte.empty() or path.empty())
     throw std::runtime_error(u8"Objektstack underflow");
   else
@@ -580,6 +655,7 @@ void ObjectNavigator::leave(const std::string &element) {
   if (not element.empty() and path.top() != element)
     throw std::runtime_error(u8"exit Object expected " + path.top() + " got " + element);
   path.pop();
+  memVec = nullptr;
 }
 
 void ObjectNavigator::pushObject(ObjectBase &obj, const std::string &name) {
@@ -597,6 +673,8 @@ public:
   ObjDump(const ConvObjToString &c) : quoteKeys(c.withQuotes() ? "\"":""), cth(c) { inArray.push(false); };
   virtual void doObjBeg(ObjTravConst &ot, const ObjectBase &obj)
   {
+    if (obj.isNull() and cth.omitNull())
+      return;
     inArray.push(false);
     if (not fst)
       res << ",";
@@ -613,6 +691,8 @@ public:
   };
   virtual void doObjEnd(ObjTravConst &ot, const ObjectBase &obj)
   {
+    if (obj.isNull() and cth.omitNull())
+      return;
     if (not obj.isNull())
       res << "}";
     fst = false;
@@ -620,6 +700,8 @@ public:
   };
   virtual void doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec)
   {
+    if (vec.isNull() and cth.omitNull())
+      return;
     size_t n = vec.parent() and cth.useAltNames() ? vec.cAltName() : SIZE_T_MAX;
     inArray.push(true);
     if (not fst)
@@ -635,11 +717,15 @@ public:
   {
     if (not vec.isNull())
       res << "]";
+    else if (cth.omitNull())
+      return;
     fst = false;
     inArray.pop();
   };
   virtual void doMem(ObjTravConst &ot, const MemberBase &mem)
   {
+    if (mem.isNull() and cth.omitNull())
+      return;
     size_t n = mem.parent() and cth.useAltNames() ? mem.cAltName() : SIZE_T_MAX;
     if (not fst)
       res << ",";
@@ -715,29 +801,23 @@ void string2Obj(const std::string &str, ObjectBase &obj, ConvObjFromStr cfh)
     
     void Value(const string &val, bool charType) {
       TRACE(PARAM(val));
-      if (enter(lastKey) and member())
+      if (enter(lastKey, currentIdx))
       {
-        if (not member())
-        {
-          LOG(LM_WARNING, "Variable fehlt " << showName());
-        }
-        else if (not charType and val == "null")
-        {
-          if (member()->nullAllowed())
-            member()->setNull(true);
-          else
-          {
-            LOG(LM_ERROR, u8"JSON: null not allowed  in variable " + member()->name());
-            member()->clear();
-          }
-        }
+        if (not charType and val == "null")
+          setNull();
+        else if (not member())
+          LOG(LM_WARNING, u8" unknom variable " + member()->name())
         else if (not member()->fromStr(val, cfs))
           throw runtime_error(u8"JSON: invalid type in variable " + member()->name());
       }
+      if (currentIdx != SIZE_T_MAX)
+        currentIdx++;
       leave();
     }
     void StartObject() {
       TRACE(PARAM(lastKey));
+      index.push(currentIdx);
+      currentIdx = SIZE_T_MAX;
       if (++level > 1)
         enter(lastKey);
     }
@@ -749,18 +829,26 @@ void string2Obj(const std::string &str, ObjectBase &obj, ConvObjFromStr cfh)
       lastKey = current();
       if (level-- > 1)
         leave();
+      if (index.empty())
+        throw runtime_error(u8"JSON: Structure invalid");
+      currentIdx = index.top();
+      index.pop();
     }
     void StartArray() {
       TRACE("");
+      currentIdx = 0;
     }
     void EndArray() {
       TRACE("");
+      currentIdx = SIZE_T_MAX;
     }
     
   private:
     int level = 0;
+    size_t currentIdx = SIZE_T_MAX;
     string lastKey;
     string prefix;
+    stack<size_t> index;
   };
   
   JsonReadData jd(str, cfh);

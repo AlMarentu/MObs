@@ -278,6 +278,8 @@ public:
   bool withQuotes() const { return quotes; }
   /// \private
   bool withIndentation() const { return indent; }
+  /// \private
+  bool omitNull() const { return onull; }
   /// Ausgabe als XML-Datei
   ConvObjToString exportXml() const { ConvObjToString c(*this); c.xml = true; return c; }
   /// Ausgabe als JSON
@@ -292,15 +294,21 @@ public:
   ConvObjToString exportCompact() const { ConvObjToString c(*this); c.comp = true; return c; }
   /// Ausgabe im Klartext von enums und Uhrzeit
   ConvObjToString exportExtendet() const { ConvObjToString c(*this); c.comp = false; return c; }
+  /// Ausgabe von null-Werten überspringen
+  ConvObjToString exportWoNull() const { ConvObjToString c(*this); c.onull = true; return c; }
 private:
   bool xml = false;
   bool quotes = false;
   bool indent = false;
+  bool onull = false;
 
 };
 
+/// Konfiguration für \c string2Obj
 class ConvObjFromStr : virtual public ConvFromStrHint {
 public:
+  /// Enums für Behandlung NULL-Werte
+  enum Nulls { ignore, omit, clear, force, except };
   virtual ~ConvObjFromStr() {}
   /// darf ein kompakter Wert als Eingabe fungieren
   virtual bool acceptCompact() const { return compact; }
@@ -310,18 +318,46 @@ public:
   virtual bool acceptAltNames() const { return altNam; };
   /// Verwende original Namen
   virtual bool acceptOriNames() const { return oriNam; };
+  /// setze Arraysize auf letztes Element
+  virtual bool shrinkArray() const { return shrink; };
+  /// Null-Werte behandeln
+  virtual enum Nulls nullHandling() const { return null; };
 
+  /// Werte in Kurzform akzeptieren (zB. Zahl anstatt enum-Text)
   ConvObjFromStr useCompactValues() const { ConvObjFromStr c(*this); c.compact = true; c.extented = false; return c; }
+  /// Werte in Langform akzeptieren (zB. enum-Text, Datum)
   ConvObjFromStr useExtentedValues() const { ConvObjFromStr c(*this); c.compact = false; c.extented = true; return c; }
+  /// Werte in beliebiger Form akzeptieren
   ConvObjFromStr useAutoValues() const { ConvObjFromStr c(*this); c.compact = true; c.extented = true; return c; }
+  /// Nur Original-Namen akzeptieren
   ConvObjFromStr useOriginalNames() const { ConvObjFromStr c(*this); c.oriNam = true; c.altNam = false; return c; }
+  /// Nur Alternativ-Namen akzeptieren
   ConvObjFromStr useAlternativeNames() const { ConvObjFromStr c(*this); c.oriNam = false; c.altNam = true; return c; }
+  /// Original oder Alternativ-Namen akzeptieren
   ConvObjFromStr useAutoNames() const {  ConvObjFromStr c(*this); c.oriNam = true; c.altNam = true; return c; }
+  /// Vektoren beim Schreiben entsprechens verkleinern
+  ConvObjFromStr useDontShrink() const {  ConvObjFromStr c(*this); c.shrink = false; return c; }
+  /// null-Elemente werden beim Einlesen abhängig von \c nullAlllowed  auf null gesetzt im anderen Fall wird statt den Fehler zu ignorieren, eine exceition geworen
+  ConvObjFromStr useExceptNull() const {  ConvObjFromStr c(*this); c.null = except; return c; }
+  /// null-Elemente werden beim Einlesen üblesen
+  ConvObjFromStr useOmitNull() const {  ConvObjFromStr c(*this); c.null = omit; return c; }
+  /// null-Elemente werden beim Einlesen anhand \c nullAlllowed behandelt
+  ConvObjFromStr useClearNull() const {  ConvObjFromStr c(*this); c.null = clear; return c; }
+  /// null-Elemente werden beim Einlesen unabhängig von \c nullAlllowed  auf null gesetzt
+  ConvObjFromStr useForceNull() const {  ConvObjFromStr c(*this); c.null = force; return c; }
 protected:
+  /// \private
   bool compact = true;
+  /// \private
   bool extented = true;
+  /// \private
   bool oriNam = true;
+  /// \private
   bool altNam = false;
+  /// \private
+  bool shrink = true;
+  /// \private
+  enum Nulls null = ignore;
 };
 
 template <typename T>

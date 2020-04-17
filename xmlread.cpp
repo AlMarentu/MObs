@@ -42,7 +42,7 @@ public:
 
     if (member() and member()->nullAllowed())
     {
-      member()->setNull(true);
+      member()->forceNull();
     }
     EndTag(element);
   };

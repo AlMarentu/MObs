@@ -93,7 +93,7 @@ class Person : virtual public mobs::ObjectBase {
   MemVector(Kontakt, kontakte);
   MemVector(MemVarType(std::string), hobbies);
 
-  virtual void init() { vorname.setNull(true); };
+  virtual void init() {  };
 };
 ObjRegister(Person);
 
@@ -291,7 +291,7 @@ TEST(objgenTest, setVars) {
 
 TEST(objgenTest, setnull) {
   Person info;
-  info.adresse.setNull(true);
+  info.adresse.forceNull();
   info.kundennr(2);
   info.name(u8"Das war ein ßäöü <>\"' ss \"#  ö");
 //  cerr << mobs::to_string(info) << endl;
@@ -312,7 +312,7 @@ TEST(objgenTest, setnull) {
 
 TEST(objgenTest, Vectors) {
   Person info;
-  info.adresse.setNull(true);
+  info.adresse.forceNull();
   info.kundennr(44);
   info.name(u8"Peter");
   info.kontakte[4].art(mobil);
@@ -322,7 +322,7 @@ TEST(objgenTest, Vectors) {
   EXPECT_EQ("Adresse", info.adresse.typName());
   EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:null,kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", info.to_string(mobs::ConvObjToString().exportCompact()));
   EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:null,kontakte:[{art:"fax",number:""},{art:"fax",number:""},{art:"fax",number:""},{art:"fax",number:""},{art:"mobil",number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", mobs::to_string(info));
-  info.adresse.setNull(false);
+  info.adresse.setEmpty();
 //  cerr << mobs::to_string(info) << endl;
   EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", info.to_string(mobs::ConvObjToString().exportCompact()));
 // dito mit to_json
@@ -433,7 +433,7 @@ TEST(objgenTest, usenull) {
   EXPECT_TRUE(rech.kunde.isNull());
   EXPECT_TRUE(rech.position.isNull());
   EXPECT_EQ("{id:null,kunde:null,position:null}", to_string(rech));
-  rech.position.setNull(false);
+  rech.position.setEmpty();
   EXPECT_EQ("{id:null,kunde:null,position:[]}", to_string(rech));
 
   rech.position[3].anzahl(1);
@@ -554,7 +554,7 @@ TEST(objgenTest, conftoken) {
 </root>
 )";
   o.d[0]("");
-  o.o.setNull(false);
+  o.o.setEmpty();
   EXPECT_EQ(xml, o.to_string(mobs::ConvObjToString().exportXml().exportAltNames().doIndent()));
 
   ObjX o2;
@@ -571,6 +571,43 @@ TEST(objgenTest, conftoken) {
   EXPECT_EQ("{id:12,a:0,b:22,c:33,o:null,d:[\"a\"]}", o2.to_string(mobs::ConvObjToString()));
 
 }
+
+TEST(objgenTest, readmulti) {
+  ObjX o;
+  EXPECT_NO_THROW(mobs::string2Obj("{grimoald:12,a:17,karl:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},ludwig:[\"a\"]}", o, mobs::ConvObjFromStr().useAlternativeNames()));
+  EXPECT_EQ("{id:12,a:0,b:22,c:33,o:null,d:[\"a\"]}", o.to_string(mobs::ConvObjToString()));
+  // mehrfaxhes Lesen führt zur selben  Inhalt
+  EXPECT_NO_THROW(mobs::string2Obj("{grimoald:12,a:17,karl:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},ludwig:[\"a\"]}", o, mobs::ConvObjFromStr().useAlternativeNames()));
+  EXPECT_EQ("{id:12,a:0,b:22,c:33,o:null,d:[\"a\"]}", o.to_string(mobs::ConvObjToString()));
+
+  EXPECT_NO_THROW(mobs::string2Obj("{grimoald:12,a:17,karl:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},ludwig:[\"b\",\"c\"]}", o, mobs::ConvObjFromStr().useAlternativeNames()));
+  EXPECT_EQ("{id:12,a:0,b:22,c:33,o:null,d:[\"b\",\"c\"]}", o.to_string(mobs::ConvObjToString()));
+
+  EXPECT_NO_THROW(mobs::string2Obj("{id:12,a:17,b:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},d:[\"x\"]}", o, mobs::ConvObjFromStr()));
+  EXPECT_EQ("{id:12,a:17,b:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},d:[\"x\"]}", o.to_string(mobs::ConvObjToString()));
+
+  EXPECT_NO_THROW(mobs::string2Obj("{id:12,a:17,b:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},d:[\"x\",\"c\"]}", o, mobs::ConvObjFromStr()));
+  EXPECT_NO_THROW(mobs::string2Obj("{id:12,a:17,b:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},d:[\"j\"]}", o, mobs::ConvObjFromStr().useDontShrink()));
+  EXPECT_EQ("{id:12,a:17,b:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},d:[\"j\",\"c\"]}", o.to_string(mobs::ConvObjToString()));
+
+  EXPECT_NO_THROW(mobs::string2Obj("{id:12,a:17,b:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},d:[\"x\",\"c\"]}", o, mobs::ConvObjFromStr()));
+  EXPECT_NO_THROW(mobs::string2Obj("{id:12,a:17,b:null,c:33,o:null,d:null}", o, mobs::ConvObjFromStr().useDontShrink().useForceNull()));
+  EXPECT_EQ("{id:12,a:17,b:null,c:33,o:null,d:null}", o.to_string(mobs::ConvObjToString()));
+
+  EXPECT_NO_THROW(mobs::string2Obj("{id:12,a:17,b:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},d:[\"x\",\"c\"]}", o, mobs::ConvObjFromStr()));
+  EXPECT_NO_THROW(mobs::string2Obj("{id:1,a:2,b:null,c:33,o:null,d:null}", o, mobs::ConvObjFromStr().useDontShrink().useOmitNull()));
+  EXPECT_EQ("{id:1,a:2,b:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},d:[\"x\",\"c\"]}", o.to_string(mobs::ConvObjToString()));
+
+  EXPECT_NO_THROW(mobs::string2Obj("{id:12,a:17,b:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},d:[\"x\",\"c\"]}", o, mobs::ConvObjFromStr()));
+  EXPECT_NO_THROW(mobs::string2Obj("{id:12,a:17,b:null,c:33,o:null,d:[null]}", o, mobs::ConvObjFromStr().useDontShrink().useForceNull()));
+  EXPECT_EQ("{id:12,a:17,b:null,c:33,o:null,d:[null,\"c\"]}", o.to_string(mobs::ConvObjToString()));
+
+  EXPECT_EQ("{id:12,a:17,c:33,d:[\"c\"]}", o.to_string(mobs::ConvObjToString().exportWoNull()));
+
+
+}
+
+
 
 #if 0
 TEST(objgenTest, compare) {

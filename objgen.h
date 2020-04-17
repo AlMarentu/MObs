@@ -210,13 +210,14 @@ class ObjTravConst;
 class NullValue {
 public:
   /// Abfrage, ob eine Variable den Wet \c NULL hat (nur möglich, wenn \c nullAllowed gesetzt ist.
-  bool isNull() const { return m_null and m_nullAllowed; };
-  /// Setzmethode für Membevasriable ist \c NULL
-  void setNull(bool n) { m_null = n; } ;
+  bool isNull() const { return m_null; };
   /// Abfrage ob \c NULL -Werte erlaubt sind
   void nullAllowed(bool on) { m_nullAllowed = on; };
   /// Abfrage ob für diese Variable Null-Werte erlaubt sind
   bool nullAllowed() const { return m_nullAllowed; };
+protected:
+  /// Setzmethode für Membevasriable ist \c NULL
+  void setNull(bool n) { m_null = n; } ;
 private:
   bool m_null = false;
   bool m_nullAllowed = false;
@@ -251,6 +252,10 @@ public:
   virtual bool is_chartype(const ConvToStrHint &) const = 0;
   /// Einlesen der Variable aus einnem \c std::string im Format UTF-8
   virtual bool fromStr(const std::string &s, const ConvFromStrHint &) = 0;
+  /// Setze Inhalt auf null
+  void forceNull() { clear(); setNull(true);}
+  /// Setze Inhalt auf leer,
+  void setEmpty() { clear(); setNull(false);}
   /// Starte Traversierung nicht const
   void traverse(ObjTrav &trav);
   /// Starte Traversierung  const
@@ -310,6 +315,10 @@ public:
   virtual ObjectBase *getObjInfo(size_t i) = 0;
   /// Setze Inhalt auf leer; äquivalent zu \c resize(0)
   void clear() { resize(0); }
+  /// Setze Inhalt auf null
+  void forceNull() { clear(); setNull(true);}
+  /// Setze Inhalt auf leer,
+  void setEmpty() { clear(); setNull(false);}
   /// Objekt wurde beschrieben
   void activate();
   /// Zeiger auf Vater-Objekt
@@ -404,6 +413,10 @@ public:
   static ObjectBase *createObj(std::string n);
   /// Setze Inhalt auf leer, d.h. alle Vektoren sowie Unterobjekte und Varieblen werden gelöscht,
   void clear();
+  /// Setze Inhalt auf null
+  void forceNull() { clear(); setNull(true);}
+  /// Setze Inhalt auf leer,
+  void setEmpty() { clear(); setNull(false);}
   /// Setzt eine Variable mit dem angegebene Inhalt
   /// @param path Pfad der Variable z.B.: kontakt[3].number
   /// @param value Inhalt, der geschrieben werden soll
@@ -728,8 +741,10 @@ public:
   
    Ist das Element  eine Variable, so Kann über \c member darauf zugegriffen werden. Bei Objekten wird in die neue Objektebene gesprungen. Im Falle von Arrays wird ein neues Element angehängt.
       Sind entsprechnde Objekte nicht vorhanden, wird trotzdem die Struktur verfolgt und bei Rückkehr in die entsprechende Eben die Bearbeitung wieder aufgenommen.
+    
+   Wird \c INT_MAX übergeben wird automatisch erweitert; bei \c SIZE_T_MAX  wird  der Vector selbst betrachtet -> memVec
    */
-  bool enter(const std::string &element, std::size_t index = SIZE_MAX);
+  bool enter(const std::string &element, std::size_t index = INT_MAX);
   /// Verlassen einer Ebene in der Objektstruktur
   /// @param element Name des Elementes oder leer, wenn der Name der Struktur nicht geprüft werden soll
   /// \throw std::runtime_error bei Strukturfehler
@@ -742,6 +757,8 @@ public:
   /// @param path Variablenname
   /// \return liefert \c false bei Syntax-Fehler
   bool find(const std::string &path);
+  /// setzte aktuelles Objekt im Pfad auf Null entsprechen der Einstellung \c ConvObjFromStr
+  bool setNull();
   
   /// Import-Konfiguration
   ConvObjFromStr cfs;
@@ -758,6 +775,7 @@ private:
   
   std::string memName;
   MemberBase *memBase = 0;
+  MemBaseVector *memVec = 0;
 };
 
 template<class T>
