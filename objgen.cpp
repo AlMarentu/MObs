@@ -19,7 +19,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "objgen.h"
-#include "jsonparser.h"
 #include "xmlout.h"
 #include <map>
 
@@ -27,7 +26,7 @@ using namespace std;
 
 namespace mobs {
 
-
+/// \private
 enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confToken, const std::string &s) {
   confToken.push_back(s);
   return MemVarCfg(confToken.size() + base -1);
@@ -145,7 +144,7 @@ ObjectBase *ObjectBase::createObj(string n)
   return (*it).second();
 }
 
-MemberBase *ObjectBase::getMemInfo(const string &name)
+MemberBase *ObjectBase::getMemInfo(const std::string &name)
 {
   for (auto i:mlist)
   {
@@ -155,7 +154,7 @@ MemberBase *ObjectBase::getMemInfo(const string &name)
   return 0;
 }
 
-ObjectBase *ObjectBase::getObjInfo(const string &name)
+ObjectBase *ObjectBase::getObjInfo(const std::string &name)
 {
   for (auto i:mlist)
   {
@@ -165,7 +164,7 @@ ObjectBase *ObjectBase::getObjInfo(const string &name)
   return 0;
 }
 
-MemBaseVector *ObjectBase::getVecInfo(const string &name)
+MemBaseVector *ObjectBase::getVecInfo(const std::string &name)
 {
   for (auto i:mlist)
   {
@@ -430,6 +429,7 @@ std::string ObjectBase::getVariable(const std::string &path, bool *found, bool c
 
 bool ObjectNavigator::find(const std::string &path) {
   TRACE(PARAM(path));
+  memName = "";
   for (size_t pos = 0; pos < path.length();)
   {
     size_t pos2 = path.find_first_of(".[", pos);
@@ -475,7 +475,7 @@ bool ObjectNavigator::setNull() {
       case ConvObjFromStr::clear: memVec->clear(); break;
       case ConvObjFromStr::except:
         if (not memVec->nullAllowed())
-          throw runtime_error(u8"writing null to member " + showName() + " w/o nullAllowed");
+          throw runtime_error(u8"ObjectNavigator: writing null to member " + showName() + " w/o nullAllowed");
         memVec->forceNull(); break;
       case ConvObjFromStr::ignore:
         if (not memVec->nullAllowed())
@@ -492,7 +492,7 @@ bool ObjectNavigator::setNull() {
       case ConvObjFromStr::clear: member()->clear(); break;
       case ConvObjFromStr::except:
         if (not member()->nullAllowed())
-          throw runtime_error(u8"writing null to member " + showName() + " w/o nullAllowed");
+          throw runtime_error(u8"ObjectNavigator: writing null to member " + showName() + " w/o nullAllowed");
         member()->forceNull(); break;
       case ConvObjFromStr::ignore:
         if (not member()->nullAllowed())
@@ -511,7 +511,7 @@ bool ObjectNavigator::setNull() {
       case ConvObjFromStr::clear: objekte.top().obj->clear(); break;
       case ConvObjFromStr::except:
         if (not objekte.top().obj->nullAllowed())
-          throw runtime_error(u8"writing null to member " + showName() + " w/o nullAllowed");
+          throw runtime_error(u8"ObjectNavigator: writing null to member " + showName() + " w/o nullAllowed");
         objekte.top().obj->forceNull(); break;
       case ConvObjFromStr::ignore:
         if (not objekte.top().obj->nullAllowed())
@@ -529,7 +529,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
   path.push(element);
   
   if (objekte.empty())
-    throw std::runtime_error(u8"XmlRead: Fatal: keine Objekt");
+    throw std::runtime_error(u8"ObjectNavigator: Fatal: no object");
   
   if (memBase)  // War bereits im Member -> als Dummy-Objekt tarnen
     objekte.push(ObjectNavigator::Objekt(nullptr, memName));
@@ -596,9 +596,10 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
         //          LOG(LM_INFO, "Member: " << memName)
         return true;
       }
-      objekte.push(ObjectNavigator::Objekt(nullptr, memName));
-      
-      return false;
+      // Vector-element ist weder von MemberBase noch von ObjectBase abgeleitet
+      throw runtime_error(u8"ObjectNavigator: structural corruption, vector without Elements in " + memName);
+//      objekte.push(ObjectNavigator::Objekt(nullptr, memName));
+//      return false;
     }
     if (index >= INT_MAX)
     {
@@ -640,7 +641,9 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
   memName += ".";
   memName += element;
   objekte.push(ObjectNavigator::Objekt(nullptr, memName));
-//  LOG(LM_ERROR, u8"Element " << memName << " ist nicht vorhanden");
+  if (cfs.exceptionIfUnknown())
+    throw runtime_error(u8"ObjectNavigator: Element " + memName + " not found");
+//  LOG(LM_DEBUG, u8"Element " + memName + " ist nicht vorhanden");
   return false;
 }
 
@@ -649,11 +652,11 @@ void ObjectNavigator::leave(const std::string &element) {
   if (memBase)  // letzte Ebene war ein MemberVariable
     memBase = nullptr;
   else if (objekte.empty() or path.empty())
-    throw std::runtime_error(u8"Objektstack underflow");
+    throw std::runtime_error(u8"ObjectNavigator: Objektstack underflow");
   else
     objekte.pop();
   if (not element.empty() and path.top() != element)
-    throw std::runtime_error(u8"exit Object expected " + path.top() + " got " + element);
+    throw std::runtime_error(u8"ObjectNavigator: exit Object expected " + path.top() + " got " + element);
   path.pop();
   memVec = nullptr;
 }
@@ -810,75 +813,6 @@ std::string ObjectBase::to_string(ConvObjToString cth) const
 }
 
 
-
-
-
-/////////////////////////////////////////////////
-/// string2Obj
-/////////////////////////////////////////////////
-
-void string2Obj(const std::string &str, ObjectBase &obj, ConvObjFromStr cfh)
-{
-  class JsonReadData : public ObjectNavigator, public JsonParser  {
-  public:
-    JsonReadData(const string &input, const ConvObjFromStr &c) : JsonParser(input) { cfs = c; }
-    
-    void Value(const string &val, bool charType) {
-      TRACE(PARAM(val));
-      if (enter(lastKey, currentIdx))
-      {
-        if (not charType and val == "null")
-          setNull();
-        else if (not member())
-          LOG(LM_WARNING, u8" unknom variable " + member()->name())
-        else if (not member()->fromStr(val, cfs))
-          throw runtime_error(u8"JSON: invalid type in variable " + member()->name());
-      }
-      if (currentIdx != SIZE_T_MAX)
-        currentIdx++;
-      leave();
-    }
-    void StartObject() {
-      TRACE(PARAM(lastKey));
-      index.push(currentIdx);
-      currentIdx = SIZE_T_MAX;
-      if (++level > 1)
-        enter(lastKey);
-    }
-    void Key(const string &key) {
-      lastKey = key;
-    }
-    void EndObject() {
-      TRACE("");
-      lastKey = current();
-      if (level-- > 1)
-        leave();
-      if (index.empty())
-        throw runtime_error(u8"JSON: Structure invalid");
-      currentIdx = index.top();
-      index.pop();
-    }
-    void StartArray() {
-      TRACE("");
-      currentIdx = 0;
-    }
-    void EndArray() {
-      TRACE("");
-      currentIdx = SIZE_T_MAX;
-    }
-    
-  private:
-    int level = 0;
-    size_t currentIdx = SIZE_T_MAX;
-    string lastKey;
-    string prefix;
-    stack<size_t> index;
-  };
-  
-  JsonReadData jd(str, cfh);
-  jd.pushObject(obj);
-  jd.parse();
-}
 
 /////////////////////////////////////////////////
 

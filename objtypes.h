@@ -310,6 +310,8 @@ public:
   /// Enums für Behandlung NULL-Werte
   enum Nulls { ignore, omit, clear, force, except };
   virtual ~ConvObjFromStr() {}
+  /// Eingabe ist im XML-Format
+  virtual bool acceptXml() const { return xml; }
   /// darf ein kompakter Wert als Eingabe fungieren
   virtual bool acceptCompact() const { return compact; }
   /// darf ein nicht-kompakter Wert als Eingabe fungieren
@@ -320,9 +322,12 @@ public:
   virtual bool acceptOriNames() const { return oriNam; };
   /// setze Arraysize auf letztes Element
   virtual bool shrinkArray() const { return shrink; };
+  /// werfe eine Exception bei unbekannter Variable
+  virtual bool exceptionIfUnknown() const { return exceptUnk; };
   /// Null-Werte behandeln
   virtual enum Nulls nullHandling() const { return null; };
-
+  /// Verwenden den XML-Parser
+  ConvObjFromStr useXml() const { ConvObjFromStr c(*this); c.xml = true; return c; }
   /// Werte in Kurzform akzeptieren (zB. Zahl anstatt enum-Text)
   ConvObjFromStr useCompactValues() const { ConvObjFromStr c(*this); c.compact = true; c.extented = false; return c; }
   /// Werte in Langform akzeptieren (zB. enum-Text, Datum)
@@ -337,7 +342,7 @@ public:
   ConvObjFromStr useAutoNames() const {  ConvObjFromStr c(*this); c.oriNam = true; c.altNam = true; return c; }
   /// Vektoren beim Schreiben entsprechens verkleinern
   ConvObjFromStr useDontShrink() const {  ConvObjFromStr c(*this); c.shrink = false; return c; }
-  /// null-Elemente werden beim Einlesen abhängig von \c nullAlllowed  auf null gesetzt im anderen Fall wird statt den Fehler zu ignorieren, eine exceition geworen
+  /// null-Elemente werden beim Einlesen abhängig von \c nullAlllowed  auf null gesetzt im anderen Fall wird statt den Fehler zu ignorieren, eine exception geworen
   ConvObjFromStr useExceptNull() const {  ConvObjFromStr c(*this); c.null = except; return c; }
   /// null-Elemente werden beim Einlesen üblesen
   ConvObjFromStr useOmitNull() const {  ConvObjFromStr c(*this); c.null = omit; return c; }
@@ -345,7 +350,11 @@ public:
   ConvObjFromStr useClearNull() const {  ConvObjFromStr c(*this); c.null = clear; return c; }
   /// null-Elemente werden beim Einlesen unabhängig von \c nullAlllowed  auf null gesetzt
   ConvObjFromStr useForceNull() const {  ConvObjFromStr c(*this); c.null = force; return c; }
+  /// wird versucht eine unbekannte Variable einzulesen, wird eine exception geworfen
+  ConvObjFromStr useExceptUnknown() const {  ConvObjFromStr c(*this); c.exceptUnk = true; return c; }
 protected:
+  /// \private
+  bool xml = false;
   /// \private
   bool compact = true;
   /// \private
@@ -356,6 +365,8 @@ protected:
   bool altNam = false;
   /// \private
   bool shrink = true;
+  /// \private
+  bool exceptUnk = false;
   /// \private
   enum Nulls null = ignore;
 };

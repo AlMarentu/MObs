@@ -818,7 +818,7 @@ void MemberVector<T>::doCopy(const MemBaseVector &other)
 /// Ausgabe eines Objektes im kompakten JSON-Format, Keys unquoted
 inline std::string to_string(const ObjectBase &obj) { return obj.to_string(); };
 //std::wstring to_wstring(const ObjectBase &obj);
-
+/// Einlesen der Daten eines std::string in ein Objekt. Das Objekt muss vorher gelöscht werden, ansonsten wird es überschrieben
 void string2Obj(const std::string &str, ObjectBase &obj, ConvObjFromStr cfs = ConvObjFromStr());
 }
 

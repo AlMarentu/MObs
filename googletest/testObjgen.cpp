@@ -597,6 +597,14 @@ TEST(objgenTest, conftoken) {
   EXPECT_NO_THROW(mobs::string2Obj("{grimoald:12,a:17,karl:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},ludwig:[\"a\"]}", o2, mobs::ConvObjFromStr().useAlternativeNames()));
   EXPECT_EQ("{id:12,a:0,b:22,c:33,o:null,d:[\"a\"]}", o2.to_string(mobs::ConvObjToString()));
 
+  // unknwon element
+  o2.clear();
+  EXPECT_NO_THROW(mobs::string2Obj("{id:12,a:17,b:22,c:33,XXX:7,d:[\"a\"]}", o2, mobs::ConvObjFromStr()));
+  EXPECT_EQ("{id:12,a:17,b:22,c:33,o:null,d:[\"a\"]}", o2.to_string(mobs::ConvObjToString()));
+  EXPECT_ANY_THROW(mobs::string2Obj("{id:12,a:17,b:22,c:33,XXX:7,d:[\"a\"]}", o2, mobs::ConvObjFromStr().useExceptUnknown()));
+  
+  EXPECT_ANY_THROW(mobs::string2Obj("{id", o2, mobs::ConvObjFromStr()));
+  EXPECT_ANY_THROW(mobs::string2Obj("{id:12,a:17,b:22,c:33,o:7,d:[\"a\"]}", o2, mobs::ConvObjFromStr()));
 }
 
 TEST(objgenTest, readmulti) {
@@ -634,7 +642,16 @@ TEST(objgenTest, readmulti) {
 
 }
 
+TEST(objgenTest, readxml) {
+  ObjX o, o2;
 
+  EXPECT_NO_THROW(mobs::string2Obj("{id:12,a:17,b:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},d:[\"x\"]}", o, mobs::ConvObjFromStr()));
+  string xml = o.to_string(mobs::ConvObjToString().exportXml().doIndent());
+  EXPECT_NO_THROW(mobs::string2Obj(xml, o2, mobs::ConvObjFromStr().useXml()));
+
+  EXPECT_EQ("{id:12,a:17,b:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},d:[\"x\"]}", o2.to_string(mobs::ConvObjToString()));
+
+}
 
 #if 0
 TEST(objgenTest, compare) {

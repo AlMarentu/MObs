@@ -74,6 +74,8 @@ Als Basistypen für Variablen sid folgende erlaubt:
 * std::u16string
 * std::u32string
 
+Die Klasse UxTime steht als Wrapper für den typ time_t zur Verfügung, um Zeitpunkte in den Objekten verwenden zu können
+
 Zusätzlich können auch wieder MObs-Objekte als Member verwendet werden sowie Vektoren von diesen Elementen.
 
 Dazu stehen die Makros
@@ -167,7 +169,7 @@ Zur Steuerung des Ausgabeformates können entsprechende Parameter angegeben werd
 b->to_string(mobs::ConvObjToString().exportXml().exportAltNames().doIndent())
 ~~~~~~~~~~
 Zur Verfügung stehen:
-*  exportXml()  Ausgabe als XML
+* exportXml()  Ausgabe als XML
 * exportJson() Ausgabe als JSON
 * exportAltNames() Verwende die alternativen Namen bei der Ausgabe
 * doIndent() Ausgabe mit Pretty-Printer
@@ -180,6 +182,8 @@ Um ein Objekt aus einem std::string einzulesen wird  string2Obj verwendet
 ~~~~~~~~~~cpp
 mobs::string2Obj("{id:12,a:17,b:null,c:33,o:null,d:[null]}", object, mobs::ConvObjFromStr().useDontShrink().useForceNull())
 ~~~~~~~~~~
+Im Fehlerfall wird ein std::runtime_error geworfen.
+
 Konfiguriert werden kann:
 * useCompactValues() Werte in Kurzform akzeptieren (zB. Zahl anstatt enum-Text)
 * useExtentedValues() Werte in Langform akzeptieren (zB. enum-Text, Datum)
@@ -188,6 +192,7 @@ Konfiguriert werden kann:
 * useAlternativeNames() Nur Alternativ-Namen akzeptieren
 * useAutoNames() Original oder Alternativ-Namen akzeptieren
 * useDontShrink() Vektoren beim Schreiben entsprechens verkleinern
+* exceptionIfUnknown() werfe eine Exception falls ein Element nicht gefunden wird; ansonsten werden zusätzliche Felder ignoriert
 * useExceptNull() null-Elemente werden beim Einlesen abhängig von "USENULL"  auf null gesetzt. Im Fehlerfall erfolgt eine Exception
 * useOmitNull() null-Elemente werden beim Einlesen überlesen
 * useClearNull() null-Elemente werden beim Einlesen abhängig von "USENULL"  auf null gesetzt. Ansonsten nur gelöscht.
@@ -227,9 +232,9 @@ Darüber lassen sich
 usw. realiesieren
 
 ## Installation
-Zum Übersetzen wird ein c++11 Compiler inkl. STL benötigt.
+Zum Übersetzen wird ein c++11 Compiler inkl. STL benötigt. Für die Test-Suite wird googletest benötigt
 Die Entwicklung efolgt mit clang version 11.0.3, sollte aber auch mit anderen Compilern funktionieren
-Einige optionale Module benötigen rapidjson (dumpjson und readjson) diese dienen nur als Beispiel und können auch ohne Funktionseinschränkung weggelassen werden
+Einige optionale Module benötigen rapidjson (dumpjson und readjson) diese dienen nur als Beispiel und können  ohne Funktionseinschränkung weggelassen werden
 
 Das Makefile ist rudimentär und eine Installationsroutine fehlen noch. 
 
