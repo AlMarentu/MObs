@@ -49,7 +49,7 @@ public:
     if (enter(lastKey) and member())
     {
       if (member()->nullAllowed())
-        member()->setNull(true);
+        member()->forceNull();
     }
     leave();
     return true;

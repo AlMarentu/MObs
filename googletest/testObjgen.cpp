@@ -91,7 +91,8 @@ class Person : virtual public mobs::ObjectBase {
   MemVar(std::string, vorname);
   ObjVar(Adresse, adresse, USENULL);
   MemVector(Kontakt, kontakte);
-  MemVector(MemVarType(std::string), hobbies);
+//  MemVector(MemVarType(std::string), hobbies);
+  MemVarVector(std::string, hobbies);
 
   virtual void init() {  };
 };
@@ -423,7 +424,7 @@ class Rechnung : virtual public mobs::ObjectBase {
 };
 ObjRegister(Rechnung);
 
-TEST(objgenTest, usenull) {
+TEST(objgenTest, usenullAndIndent) {
   Rechnung rech;
   EXPECT_FALSE(rech.nullAllowed());
   EXPECT_TRUE(rech.id.nullAllowed());
@@ -437,7 +438,10 @@ TEST(objgenTest, usenull) {
   EXPECT_EQ("{id:null,kunde:null,position:[]}", to_string(rech));
 
   rech.position[3].anzahl(1);
-  EXPECT_EQ("{id:null,kunde:null,position:[null,null,null,{artikel:\"\",anzahl:1,einzelpreis:0}]}", to_string(rech));
+  rech.position[2].anzahl(2);
+  rech.position[2].einzelpreis(3);
+  rech.position[2].artikel("nnn");
+  EXPECT_EQ("{id:null,kunde:null,position:[null,null,{artikel:\"nnn\",anzahl:2,einzelpreis:3},{artikel:\"\",anzahl:1,einzelpreis:0}]}", to_string(rech));
   
   string xml =
   R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -446,7 +450,11 @@ TEST(objgenTest, usenull) {
   <kunde/>
   <position/>
   <position/>
-  <position/>
+  <position>
+    <artikel>nnn</artikel>
+    <anzahl>2</anzahl>
+    <einzelpreis>3</einzelpreis>
+  </position>
   <position>
     <artikel></artikel>
     <anzahl>1</anzahl>
@@ -454,8 +462,27 @@ TEST(objgenTest, usenull) {
   </position>
 </root>
 )";
+    string json = R"({
+  "id":null,
+  "kunde":null,
+  "position":[
+  null,
+  null,
+  {
+    "artikel":"nnn",
+    "anzahl":2,
+    "einzelpreis":3
+  },{
+    "artikel":"",
+    "anzahl":1,
+    "einzelpreis":0
+  }]
+}
+)";
+
   // TODO korrekt? oder muss um Array ein <array> Tag?
   EXPECT_EQ(xml, rech.to_string(mobs::ConvObjToString().exportXml().doIndent()));
+  EXPECT_EQ(json, rech.to_string(mobs::ConvObjToString().exportJson().doIndent()));
 
   
 

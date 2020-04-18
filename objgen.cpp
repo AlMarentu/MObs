@@ -671,6 +671,15 @@ namespace  {
 class ObjDump : virtual public ObjTravConst {
 public:
   ObjDump(const ConvObjToString &c) : quoteKeys(c.withQuotes() ? "\"":""), cth(c) { inArray.push(false); };
+  void newline() {
+    if (needBreak and cth.withIndentation())
+    {
+      string s;
+      s.resize(level * 2, ' ');
+      res << '\n' << s;
+    }
+    needBreak = false;
+  };
   virtual void doObjBeg(ObjTravConst &ot, const ObjectBase &obj)
   {
     if (obj.isNull() and cth.omitNull())
@@ -678,6 +687,7 @@ public:
     inArray.push(false);
     if (not fst)
       res << ",";
+    newline();
     fst = true;
     if (not obj.name().empty())
     {
@@ -688,15 +698,23 @@ public:
       res << "null";
     else
       res << "{";
+    needBreak = true;
+    level++;
   };
   virtual void doObjEnd(ObjTravConst &ot, const ObjectBase &obj)
   {
     if (obj.isNull() and cth.omitNull())
       return;
+    level--;
     if (not obj.isNull())
+    {
+      newline();
       res << "}";
+    }
     fst = false;
     inArray.pop();
+    if (inArray.empty() or not inArray.top())
+      needBreak = true;
   };
   virtual void doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec)
   {
@@ -706,12 +724,14 @@ public:
     inArray.push(true);
     if (not fst)
       res << ",";
+    newline();
     fst = true;
     res << quoteKeys << (n == SIZE_T_MAX ? vec.name() : vec.parent()->getConf(n)) << quoteKeys << ":";
     if (vec.isNull())
       res << "null";
     else
       res << "[";
+    needBreak = true;
   };
   virtual void doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec)
   {
@@ -721,6 +741,7 @@ public:
       return;
     fst = false;
     inArray.pop();
+    needBreak = true;
   };
   virtual void doMem(ObjTravConst &ot, const MemberBase &mem)
   {
@@ -729,6 +750,7 @@ public:
     size_t n = mem.parent() and cth.useAltNames() ? mem.cAltName() : SIZE_T_MAX;
     if (not fst)
       res << ",";
+    newline();
     fst = false;
     if (not inArray.empty() and not inArray.top())
       res << boolalpha << quoteKeys << (n == SIZE_T_MAX ? mem.name() : mem.parent()->getConf(n)) << quoteKeys << ":";
@@ -754,12 +776,14 @@ public:
     }
     else
       res << mem.toStr(cth);
-
+    needBreak = true;
   };
-  std::string result() const { return res.str(); };
+  std::string result() { newline(); return res.str(); };
 private:
   std::string quoteKeys;
   bool fst = true;
+  bool needBreak = false;
+  int level = 0;
   stringstream res;
   stack<bool> inArray;
   ConvObjToString cth;

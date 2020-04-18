@@ -25,7 +25,18 @@
 #include <sstream>
 
 /** \file logging.h
-\brief Hilfsfunktionen und Makros für logging und tracing */
+\brief Hilfsfunktionen und Makros für logging und tracing
+ 
+ Kann leicht dur andere Tools esetzt werden. Es mussen die Makros
+ 
+ LOG(level, streamop)
+ TRACE(streamop)
+ PARAM(par)
+ 
+ sowie dei Log_level-Makros existieren.
+ 
+ 
+ */
 
 namespace logging {
 

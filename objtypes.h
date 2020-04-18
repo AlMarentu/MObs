@@ -286,11 +286,11 @@ public:
   ConvObjToString exportJson() const { ConvObjToString c(*this); c.xml = false; c.quotes = true; return c; }
   /// Verwende alternative Namen
   ConvObjToString exportAltNames() const { ConvObjToString c(*this); c.altnam = true; return c; }
-  /// Export mit Einrückungen (derzeit nicht bei JSON)
+  /// Export mit Einrückungen 
   ConvObjToString doIndent() const { ConvObjToString c(*this); c.indent = true; return c; }
-  /// Export ohne Einrückumgen
+  /// Export ohne Einrückungen
   ConvObjToString noIndent() const { ConvObjToString c(*this); c.indent = false; return c; }
-  /// Verwende native von enums und Zeiten
+  /// Verwende native Bezeichnmer von enums und Zeiten
   ConvObjToString exportCompact() const { ConvObjToString c(*this); c.comp = true; return c; }
   /// Ausgabe im Klartext von enums und Uhrzeit
   ConvObjToString exportExtendet() const { ConvObjToString c(*this); c.comp = false; return c; }
