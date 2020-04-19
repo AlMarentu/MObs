@@ -86,6 +86,7 @@ void string2Obj(const std::string &str, ObjectBase &obj, ConvObjFromStr cfh)
   };
   
   
+#if 0
   class XmlReadData : public ObjectNavigator, public XmlParser  {
   public:
     XmlReadData(const std::string &input, const ConvObjFromStr &c) : XmlParser(input) { cfs = c; };
@@ -131,20 +132,66 @@ void string2Obj(const std::string &str, ObjectBase &obj, ConvObjFromStr cfh)
     std::string prefix;
   };
     
+#else
+  class XmlReadData : public ObjectNavigator, public XmlParserW  {
+  public:
+    XmlReadData(const std::string &input, const ConvObjFromStr &c) : XmlParserW(str), str(to_wstring(input)) { cfs = c; };
+      
+    void NullTag(const std::string &element) {
+      TRACE(PARAM(element));
+      setNull();
+      if (tagPath().size() > 1)
+        leave();
+    };
+    void Attribut(const std::string &element, const std::string &attribut, const std::wstring &value) {
+//      TRACE(PARAM(element) << PARAM(attribut)<< PARAM(value));
+      LOG(LM_INFO, "string2Obj: ignoring attribute " << element << ":" << attribut << " = " << to_string(value));
+    };
+    void Value(const std::wstring &val) {
+//      TRACE(PARAM(val));
+      if (not member())
+        throw runtime_error(u8"string2Obj: " + showName() + " is no variable, can't assign");
+      else if (not member()->fromStr(val, cfs))
+        throw runtime_error(u8"string2Obj: invalid type in variable " + showName() + " can't assign");
+    };
+    void Cdata(const wchar_t *value, size_t len) { Value(std::wstring(value, len)); }
+
+    void StartTag(const std::string &element) {
+      TRACE(PARAM(element));
+      if (tagPath().size() <= 1)
+        return;
+      if (not enter(element))
+        LOG(LM_INFO, element << " wurde nicht gefunden");
+    }
+    void EndTag(const std::string &element) {
+      TRACE(PARAM(element));
+      if (tagPath().size() > 1)
+        leave(element);
+    }
+    void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) {
+//      TRACE(PARAM(element) << PARAM(attribut)<< PARAM(value));
+      if (element == "xml" and attribut == "encoding")
+        encoding = mobs::to_string(value);
+    }
+    
+    std::wistringstream str;
+    std::string encoding;
+    std::string prefix;
+  };
+#endif
+
 
   if (cfh.acceptXml()) {
     XmlReadData xd(str, cfh);
     xd.pushObject(obj);
-    xd.parse();
-    #if 0
-      catch (std::exception &e) {
-        LOG(LM_INFO, "Exception " << e.what());
-        size_t pos;
-        const std::string &xml = data->info(pos);
-        LOG(LM_INFO, xml.substr(pos));
-        throw std::runtime_error(std::string("Parsing failed ") + " at pos. " + std::to_string(pos));
-      }
-    #endif
+      xd.parse();
+//    catch (std::exception &e) {
+//      LOG(LM_INFO, "Exception " << e.what());
+//      size_t pos;
+//      std::string xml = data->info(pos);
+//      LOG(LM_INFO, xml.substr(pos));
+//      throw std::runtime_error(std::string("Parsing failed ") + " at pos. " + std::to_string(pos));
+//    }
   } else {
     JsonReadData jd(str, cfh);
     jd.pushObject(obj);

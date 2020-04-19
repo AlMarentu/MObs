@@ -56,6 +56,7 @@ class Str##typ##Conv { \
 public: \
   static inline bool c_string2x(const std::string &str, typ &t, const ::mobs::ConvFromStrHint &cfh) { if (cfh.acceptExtented()) { if (string_to_##typ(str, t)) return true; } \
                                                     if (not cfh.acceptCompact()) return false; int i; if (not ::mobs::string2x(str, i)) return false; t = typ(i); return true; } \
+  static inline bool c_wstring2x(const std::wstring &wstr, typ &t, const ::mobs::ConvFromStrHint &cfh) { return c_string2x(::mobs::to_string(wstr), t, cfh); } \
   static inline std::string c_to_string(typ t, const ::mobs::ConvToStrHint &cth) { return cth.compact() ? ::mobs::to_string(int(t)) : typ##_to_string(t); } \
   static inline bool c_is_chartype(const ::mobs::ConvToStrHint &cth) { return not cth.compact(); } \
   static inline bool c_is_specialized() { return false; } \
@@ -188,9 +189,9 @@ template <typename T>
 /// @param str Konvertierter Wert
 /// @param t Wert
 /// @return true, wenn fehlerfrei
-inline bool string2x(const std::string &str, T &t) {std::stringstream s; s.str(str); s >> t; return s.eof() and not s.bad() and not s.fail(); };
+inline bool string2x(const std::string &str, T &t) {std::stringstream s; s.str(str); s >> t; return s.eof() and not s.bad() and not s.fail(); }
 /// \private
-template <> inline bool string2x(const std::string &str, std::string &t) { t = str; return true; };
+template <> inline bool string2x(const std::string &str, std::string &t) { t = str; return true; }
 /// \private
 template <> bool string2x(const std::string &str, std::wstring &t);
 /// \private
@@ -211,6 +212,21 @@ template <> bool string2x(const std::string &str, char32_t &t);
 template <> bool string2x(const std::string &str, wchar_t &t);
 /// \private
 template <> bool string2x(const std::string &str, bool &t);
+
+template <typename T>
+/// \brief Konvertierung von std::wstring
+/// @param wstr Konvertierter Wert
+/// @param t Wert
+/// @return true, wenn fehlerfrei
+inline bool wstring2x(const std::wstring &wstr, T &t) {std::stringstream s; s.str(mobs::to_string(wstr)); s >> t; return s.eof() and not s.bad() and not s.fail(); }
+/// \private
+template <> inline bool wstring2x(const std::wstring &wstr, std::string &t) { t = to_string(wstr); return true; }
+/// \private
+template <> inline bool wstring2x(const std::wstring &wstr, std::wstring &t) { t = wstr; return true; }
+/// \private
+template <> bool wstring2x(const std::wstring &wstr, std::u32string &t);
+/// \private
+template <> bool wstring2x(const std::wstring &wstr, std::u16string &t);
 
 // ist typename ein Character-Typ
 template <typename T>
@@ -377,6 +393,8 @@ class StrConv {
 public:
   /// liest eine Variable aus einem \c std::string
   static inline bool c_string2x(const std::string &str, T &t, const ConvFromStrHint &) { return mobs::string2x(str, t); }
+  /// liest eine Variable aus einem \c std::wstring
+  static inline bool c_wstring2x(const std::wstring &wstr, T &t, const ConvFromStrHint &) { return mobs::string2x(mobs::to_string(wstr), t); }
   /// Wandelt eine Variable in einen \c std::string um
   static inline std::string c_to_string(T t, const ConvToStrHint &) { return to_string(t); };
   /// Angabe, ob die Ausgabe als Text erfolgt (quoting, escaping nötig)
@@ -395,6 +413,8 @@ class StrIntConv {
 public:
   /// \private
   static inline bool c_string2x(const std::string &str, T &t, const ConvFromStrHint &) { int i; if (not mobs::string2x(str, i)) return false; t = T(i); return true; }
+  /// \private
+  static inline bool c_wstring2x(const std::wstring &wstr, T &t, const ConvFromStrHint &) { int i; if (not mobs::wstring2x(wstr, i)) return false; t = T(i); return true; }
   /// \private
   static inline std::string c_to_string(T t, const ConvToStrHint &) { return to_string(int(t)); }
   /// \private

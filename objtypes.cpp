@@ -183,28 +183,41 @@ bool string2x(const std::string &str, bool &t) {
   else
     return false;
   return true;
-};
+}
 
 template<>
 bool string2x(const std::string &str, u32string &t) {
   std::wstring_convert<std::codecvt_utf8<char32_t>,char32_t> c;
   t = c.from_bytes(str);
   return true;
-};
+}
 
 template<>
 bool string2x(const std::string &str, u16string &t) {
   std::wstring_convert<std::codecvt_utf8<char16_t>,char16_t> c;
   t = c.from_bytes(str);
   return true;
-};
+}
 
 template<>
 bool string2x(const std::string &str, wstring &t) {
   std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> c;
   t = c.from_bytes(str);
   return true;
-};
+}
+
+
+template <>
+bool wstring2x(const std::wstring &wstr, std::u32string &t) {
+  std::copy(wstr.cbegin(), wstr.cend(), back_inserter(t));
+  return true;
+}
+
+template <>
+bool wstring2x(const std::wstring &wstr, std::u16string &t) {
+  std::copy(wstr.cbegin(), wstr.cend(), back_inserter(t));
+  return true;
+}
 
 
 std::string to_string(std::u32string t) {
@@ -221,6 +234,7 @@ std::string to_string(std::wstring t) {
   std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> c;
   return c.to_bytes(t);
 }
+
 std::string to_string(float t) {
   std::stringstream str;
   str << t;

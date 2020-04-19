@@ -248,7 +248,7 @@ Dies folgt in einer späteren Version
 * xmlout.h  Klasse um  XML zu generieren
 * objpool.h  Klassen für Named Objects 
 * logging.h Makros und Klassen für Logging und TRACING auf stderr 
-* datetime.h rudimentäre Klasse für Datum-Zeit auf basis von Unix-time_t
+* unixtime.h Wrapper Klasse für Datum-Zeit auf basis von Unix-time_t
 
 
 

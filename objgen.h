@@ -252,6 +252,8 @@ public:
   virtual bool is_chartype(const ConvToStrHint &) const = 0;
   /// Einlesen der Variable aus einnem \c std::string im Format UTF-8
   virtual bool fromStr(const std::string &s, const ConvFromStrHint &) = 0;
+  /// Einlesen der Variable aus einnem \c std::wstring
+  virtual bool fromStr(const std::wstring &s, const ConvFromStrHint &) = 0;
   /// Setze Inhalt auf null
   void forceNull() { clear(); setNull(true);}
   /// Setze Inhalt auf leer,
@@ -563,6 +565,8 @@ public:
   virtual bool is_chartype(const ConvToStrHint &cth) const { return this->c_is_chartype(cth); }
   /// Einlesen der Variable aus einnem \c std::string im Format UTF-8
   virtual bool fromStr(const std::string &sin, const ConvFromStrHint &cfh) { if (this->c_string2x(sin, wert, cfh)) { activate(); return true; } return false; }
+  /// Einlesen der Variable aus einnem \c std::wstring im Format UTF-8
+  virtual bool fromStr(const std::wstring &sin, const ConvFromStrHint &cfh) { if (this->c_wstring2x(sin, wert, cfh)) { activate(); return true; } return false; }
   /// \private
   void doCopy(const Member<T, C> &other) { operator()(other()); }
 private:

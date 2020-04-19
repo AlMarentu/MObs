@@ -26,6 +26,7 @@
 #define MOBS_XMLPARSER_H
 
 #include "logging.h"
+#include "objtypes.h"
 
 #include<stack>
 #include<exception>
@@ -422,6 +423,474 @@ private:
   std::string lastKey;
   
 };
+
+
+
+
+
+
+
+/*! \class XmlParserW
+\brief  XML-Parser  der mit wstream arbeitet.
+Virtuelle Basisklasse mit Callback-Funktionen. Die Tags werden nativ geparst,
+es erfolgt eine Zeichenumwandlung (\&lt; usw.);
+ 
+Als Eingabe kann entweder ein \c std::wifstream dienen oder ein \c std::wistringstream
+ 
+Bei einem \c wifstream wird anhand des BOM das Charset automatisch angepasst  (UTF-16 (LE) oder UTF-8)
+ 
+Im Fehlerfall werden exceptions geworfen.
+\code
+concept XmlParserW {
+XmlParserW(std::wistream &input);
+
+// Starte Parser
+void parse();
+
+// Callback Funktionen
+void NullTag(const std::string &element);
+void Attribut(const std::string &element, const std::string &attribut, const std::wstring &value);
+void Value(const std::wstring &value);
+void Cdata(const wchar_t *value, size_t len);
+void StartTag(const std::string &element);
+void EndTag(const std::string &element);
+void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value);
+};
+\endcode
+*/
+
+
+
+class XmlParserW  {
+public:
+  /*! Konstruktor der XML-Parser Basisklasse für std::wstring
+   
+     es kann z.B. ein \c std::wifstream dienen oder ein \c std::wistringstream übergeben werden
+   @param input XML-stream der geparst werden soll   */
+  XmlParserW(std::wistream &input) : istr(input) { };
+  virtual ~XmlParserW() { };
+  
+  /*! \brief Liefert XML-Puffer und aktuelle Position für detaillierte Fehlermeldung
+   @param pos Position des Fehlers im Xml-Buffer
+   @return zu parsender Text-Buffer
+   */
+  std::string info(size_t &pos) const {
+    pos = istr.tellg();
+    std::cerr << "CUR = " << curr << " " << pos << std::endl;
+    std::wstring w;
+    wchar_t c;
+    w += curr;
+    for (int i = 0; i < 50; i++) {
+      if ((c = istr.get()) <= 0)
+        break;
+      else
+        w += c;
+    }
+    std::cerr << mobs::to_string(w) << std::endl;
+    return to_string(w);
+  };
+  /** \brief zugriff auf den Stack der Element-Struktur
+   */
+  const std::stack<std::string> &tagPath() const { return tags; };
+  
+  /** \brief Callback-Function: Ein Tag ohne Inhalt, impliziert EndTag(..)
+   @param element Name des Elementes
+   */
+  virtual void NullTag(const std::string &element) = 0;
+  /** \brief Callback-Function: Ein Atributwert einses Tags
+   @param element Name des Elementes
+   @param attribut Name des Attributes
+   @param value Wert des Attributes
+   */
+  virtual void Attribut(const std::string &element, const std::string &attribut, const std::wstring &value) = 0;
+  /** \brief Callback-Function: Ein Inhalt eines Tags
+   @param value Inhalt des Tags
+   */
+  virtual void Value(const std::wstring &value) = 0;
+  /** \brief Callback-Function: Ein CDATA-Elemet
+   @param value Inhalt des Tags
+   @param len Länge des Tags
+   */
+  virtual void Cdata(const wchar_t *value, size_t len) = 0;  // TODO bei C++17 besser std::string_view
+  /** \brief Callback-Function: Ein Start-Tag
+   @param element Name des Elementes
+   */
+  virtual void StartTag(const std::string &element) = 0;
+  /** \brief Callback-Function: Ein Ende-Tag , jedoch nicht bei NullTag(..)
+   @param element Name des Elementes
+   */
+  virtual void EndTag(const std::string &element) = 0;
+  /** \brief Callback-Function: Eine Verarbeitungsanweisung z.B, "xml", "encoding", "UTF-8"
+   @param element Name des Tags
+   @param attribut Name der Verarbeitungsanweisung
+   @param value Inhalz der Verarbeitungsanweisung
+   */
+  virtual void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) = 0;
+  
+  /// Starte den Parser
+  void parse() {
+    TRACE("");
+    eat();  // erstes Zeichen einlesen
+    /// BOM bearbeiten
+    if (curr == 0xff)
+    {
+      std::locale lo;
+      if ((curr = istr.get()) == 0xfe)
+      {
+        lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::little_endian>);
+        istr.imbue(lo);
+      }
+      else
+        throw std::runtime_error(u8"Error in BOM");
+      eat();
+    }
+//    else if (curr == 0xfe)
+//    {
+//      std::locale lo;
+//      if ((curr = istr.get()) == 0xff)
+//        lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::big_endian>);
+//      else
+//        throw std::runtime_error(u8"Error in BOM");
+//      istr.imbue(lo);
+//    }
+    else if (curr == 0xef)
+    {
+      std::locale lo;
+      if ((curr = istr.get()) == 0xbb and (curr = istr.get()) == 0xbf)
+        lo = std::locale(istr.getloc(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
+      else
+        throw std::runtime_error(u8"Error in BOM");
+      istr.imbue(lo);
+      eat();
+    }
+
+    buffer.clear();
+    parse2LT();
+    if (curr != '<')
+      throw std::runtime_error(u8"Syntax Head");
+    // BOM überlesen
+    if (not buffer.empty() and buffer != L"\0xEF\0xBB\0xBF" and buffer != L"\ufeff")
+    {
+      for (auto c:buffer) std::cerr << '#' <<  int(c) << std::endl;
+      throw std::runtime_error("invalid begin of File");
+    }
+    buffer.clear();
+    // eigentliches Parsing
+    while (curr == '<')
+    {
+      saveValue();
+//      saved = buffer;
+      eat('<');
+      
+      if (peek() == '/')
+      {
+        // Parse End-Tag
+        eat();
+        parse2GT();
+        decode(buffer);
+        std::string element = to_string(buffer);
+        if (element.empty())
+          throw std::runtime_error("missing end tag");
+        if (lastKey == element)
+        {
+          decode(saved);
+          Value(saved);
+          clearValue();
+          lastKey = "";
+        }
+        EndTag(element);
+        if (tags.empty())
+          throw std::runtime_error(u8"unexpected closing tag " + element);
+        if (tags.top() != element)
+          throw std::runtime_error(u8"unmatching tag " + element + " expected " + tags.top());
+        tags.pop();
+        eat('>');
+        parse2LT();
+        continue;
+      }
+      else if (peek() == '!')
+      {
+        eat();
+        // Parse CDATA Element
+        if (peek() == '[')
+        {
+          eat('[');
+          eat('C');
+          eat('D');
+          eat('A');
+          eat('T');
+          eat('A');
+          eat('[');
+          parse2CD();
+          saveValue();
+          Cdata(&buffer[0], buffer.length());
+          clearValue();
+          lastKey = "";
+          eat();
+          eat();
+        }
+        else
+        {
+          // Parse Kommentar
+          eat('-');
+          eat('-');
+          parse2Com();
+        }
+        eat('>');
+        parse2LT();
+        continue;
+      }
+      else if (peek() == '?')
+      {
+        // Parse Verarbeitungsanweisung
+        eat();
+        parse2GT();
+        decode(buffer);
+        std::string element = to_string(buffer);
+        for (;;)
+        {
+          if (peek() == '?')
+          {
+            eat();
+            ProcessingInstruction(element, "", L"");
+            break;
+          }
+          eat(' ');
+          parse2GT();
+          decode(buffer);
+          std::string a = to_string(buffer);
+          std::wstring v;
+          if (peek() == '=')
+          {
+            eat('=');
+            char c = peek();
+            if (c == '"')
+              eat('"');
+            else
+              eat('\'');
+            parse2Char(c);
+            decode(buffer);
+            v = buffer;
+            eat(c);
+          }
+          ProcessingInstruction(element, a, v);
+        }
+        eat('>');
+        parse2LT();
+        continue;
+      }
+      // Parse Element-Beginn
+      parse2GT();
+      decode(buffer);
+      std::string element = to_string(buffer);
+      if (element.empty())
+        throw std::runtime_error("missing begin tag ");
+      tags.push(element);
+      StartTag(element);
+      for (;;)
+      {
+        if (peek() == '>')  // Ende eines Starttags
+        {
+          eat();
+          parse2LT();
+          break;
+        }
+        else if (peek() == '/') // Leertag
+        {
+          eat();
+          eat('>');
+          NullTag(element);
+          tags.pop();
+          parse2LT();
+          break;
+        }
+        eat(' ');
+        parse2GT();
+        decode(buffer);
+        std::string a = to_string(buffer);
+        eat('=');
+        wchar_t c = peek();
+        if (c == '"')
+          eat('"');
+        else
+          eat('\'');
+        parse2Char(c);
+        decode(buffer);
+        Attribut(element, a, buffer);
+        eat(c);
+      }
+      lastKey = element;
+    }
+    saveValue();
+//    std::cerr << "LAST BUFFER " <<  mobs::to_string(buffer) << "|" << curr << std::endl;
+//    for (auto i:buffer) std::cerr << "#" << int(i) << std::endl;
+    if (curr != -1)
+      throw std::runtime_error(u8"Syntax error");
+    // nur noch für check Whitespace bis eof
+    saveValue();
+    if (not tags.empty())
+      throw std::runtime_error(u8" expected tag at EOF: " + tags.top());
+  };
+  
+private:
+  void parse2LT() { parse2Char('<'); }
+  void parse2GT() {
+    buffer.clear();
+    if (curr <= 0)
+      return;
+    buffer += curr;
+    while ((curr = istr.get()) > 0) {
+      if (std::wstring(L"/ <>=\"'?!").find(curr) != std::wstring::npos )
+        break;
+//      std::cout << mobs::to_string(curr);
+      buffer += curr;
+    }
+    if (curr < 0)
+      throw std::runtime_error("Syntax");
+  };
+  void parse2Char(wchar_t c) {
+    buffer.clear();
+    if (curr == c or curr <= 0)
+      return;
+    buffer += curr;
+    while ((curr = istr.get()) > 0) {
+      if (curr == c)
+        break;
+//      std::cout << mobs::to_string(curr);
+      buffer += curr;
+    }
+  };
+  void parse2Com() {
+    for (;;) {
+      parse2Char('-');
+      if (peek() == '-') {
+        eat();
+        if (peek() == '-') {
+          for (;;) {
+            eat();
+            if (peek() == '>')
+              return;
+            if (peek() != '-')
+              break;
+          }
+        }
+      }
+      if (peek() < 0)
+        throw std::runtime_error("Syntax");
+    }
+  };
+  void parse2CD() {
+//    pos2 = Xml.find(L"]]>", pos1);
+    buffer.clear();
+    for (;;) {
+      std::wstring tmp = buffer;
+      parse2Char(']');
+      buffer = tmp + buffer;
+      if (peek() == ']') {
+        eat();
+        if (peek() == ']') {
+          for (;;) {
+            eat();
+            if (peek() == '>')
+              return;
+            if (peek() != ']')
+              break;
+          }
+        }
+      }
+      if (peek() < 0)
+        throw std::runtime_error("Syntax");
+    }
+  };
+  void clearValue() { saved.clear(); }; // der Zwischenraum fand Verwendung
+                                      /// Verwaltet den Zischenraum zwischen den <..Tags..>
+  void saveValue() {
+    // wenn nicht verwendet, darf es nur white space sein
+    if (not saved.empty())
+    {
+      size_t p = saved.find_first_not_of(L" \n\r\t");
+      if (p != std::wstring::npos)
+        throw std::runtime_error(u8"unexpected char");
+    }
+    saved = buffer;
+  };
+  void eat(wchar_t c) {
+    buffer += curr;
+    if (curr != c)
+      throw std::runtime_error(u8"Expected " + mobs::to_string(c) + " got " + mobs::to_string(curr));
+    curr = istr.get();
+//    pos1++;
+  };
+  void eat() {
+//    pos1++;
+    buffer += curr;
+    curr = istr.get();
+  };
+  wchar_t peek() {
+    if (curr < 0)
+      throw std::runtime_error(u8"unexpected EOF");
+    //cerr << "Peek " << Xml[pos1] << " " << pos1 << endl;
+    return curr;
+  };
+  /// Wandelt einen Teilstring aus Xml von der HTML-Notation in ASCII zurück
+  void decode(std::wstring &buf) {
+    std::wstring result;
+    for (;;) {
+      size_t posS = 0;
+      size_t posE = buf.length();
+      size_t pos = buf.find('&', posS);
+      if (pos < posE) // & gefunden
+      {
+        result += std::wstring(&buf[posS], pos-posS);
+        posS = pos +1;
+        pos = buf.find(';', posS);
+        if (pos < posE and pos < posS + 16) // Token &xxxx; gefunden
+        {
+          std::wstring tok = std::wstring(&buf[posS], pos-posS);
+          //          std::cerr << "TOK " << tok << std::endl;
+          char c = '\0';
+          if (tok == L"lt")
+            c = '<';
+          else if (tok == L"gt")
+            c = '>';
+          else if (tok == L"amp")
+            c = '&';
+          else if (tok == L"quot")
+            c = '"';
+          else if (tok == L"apos")
+            c = '\'';
+          if (c)
+          {
+            result += c;
+            posS = pos +1;
+            continue;
+          }
+        }
+        // wenn nichts passt dann einfach übernehmen
+        result += '&';
+      }
+      else
+      {
+        result += std::wstring(&buf[posS], posE-posS);
+        break;
+      }
+    }
+    buf = result;
+  }
+  std::wistream &istr;
+  std::wstring buffer;
+  std::wstring saved;
+  wchar_t curr = 0;
+//  size_t pos1, pos2;  // current / search pointer for parsing
+//  size_t posS, posE;  // start / end pointer for last text
+//  size_t done = 0;
+  std::stack<std::string> tags;
+  std::string lastKey;
+  
+};
+
+
+
 }
 
 #endif

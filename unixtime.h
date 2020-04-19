@@ -94,6 +94,8 @@ public:
   /// \private
   static inline bool c_string2x(const std::string &str, UxTime &t, const ConvFromStrHint &) { return mobs::string2x(str, t); }
   /// \private
+  static inline bool c_wstring2x(const std::wstring &wstr, UxTime &t, const ConvFromStrHint &) { return mobs::string2x(mobs::to_string(wstr), t); }
+  /// \private
   static inline std::string c_to_string(UxTime t, const ConvToStrHint &cth) { if (cth.compact()) return to_string(t.toUxTime()); return to_string(t); };
   /// \private
   static inline bool c_is_chartype(const ConvToStrHint &cth) { return not cth.compact(); }
