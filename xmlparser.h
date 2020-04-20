@@ -437,7 +437,8 @@ es erfolgt eine Zeichenumwandlung (\&lt; usw.);
  
 Als Eingabe kann entweder ein \c std::wifstream dienen oder ein \c std::wistringstream
  
-Bei einem \c wifstream wird anhand des BOM das Charset automatisch angepasst  (UTF-16 (LE) oder UTF-8)
+Bei einem \c wifstream wird anhand des BOM das Charset automatisch angepasst  (UTF-16 (LE) oder UTF-8).
+Ohne BOM wird nativ \c ISO-8859-1 angenommen.  Über  <?xml ... encoding="UTF-8"  kann auch auf \c UTF-8 umgeschaltet werden.
  
 Im Fehlerfall werden exceptions geworfen.
 \code
@@ -539,6 +540,7 @@ public:
       {
         lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::little_endian>);
         istr.imbue(lo);
+        encoding = u8"UTF-16 (LE)";
       }
       else
         throw std::runtime_error(u8"Error in BOM");
@@ -560,6 +562,7 @@ public:
         lo = std::locale(istr.getloc(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
       else
         throw std::runtime_error(u8"Error in BOM");
+      encoding = u8"UTF-8";
       istr.imbue(lo);
       eat();
     }
@@ -621,13 +624,11 @@ public:
           eat('T');
           eat('A');
           eat('[');
+          saveValue();  // nur whitespace prüfen
           parse2CD();
-          saveValue();
-          Cdata(&buffer[0], buffer.length());
+          Cdata(&buffer[0], buffer.length() -2);
           clearValue();
           lastKey = "";
-          eat();
-          eat();
         }
         else
         {
@@ -672,6 +673,23 @@ public:
             decode(buffer);
             v = buffer;
             eat(c);
+          }
+          if (element == u8"xml" and a == u8"encoding" and not v.empty())
+          {
+            if (encoding.empty())
+            {
+              encoding = mobs::to_string(v);
+              if (encoding == u8"UTF-8")
+              {
+                std::locale lo = std::locale(istr.getloc(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
+                istr.imbue(lo);
+              }
+              else if (encoding != u8"ISO-8859-1")
+                LOG(LM_WARNING, u8"encoding mismatch: " << encoding << " using ISO-8859-1");
+            }
+            else if (encoding != mobs::to_string(v))
+              LOG(LM_WARNING, u8"encoding mismatch: " << encoding << " " << mobs::to_string(v));
+
           }
           ProcessingInstruction(element, a, v);
         }
@@ -835,9 +853,9 @@ private:
   /// Wandelt einen Teilstring aus Xml von der HTML-Notation in ASCII zurück
   void decode(std::wstring &buf) {
     std::wstring result;
+    size_t posS = 0;
+    size_t posE = buf.length();
     for (;;) {
-      size_t posS = 0;
-      size_t posE = buf.length();
       size_t pos = buf.find('&', posS);
       if (pos < posE) // & gefunden
       {
@@ -848,7 +866,7 @@ private:
         {
           std::wstring tok = std::wstring(&buf[posS], pos-posS);
           //          std::cerr << "TOK " << tok << std::endl;
-          char c = '\0';
+          wchar_t c = '\0';
           if (tok == L"lt")
             c = '<';
           else if (tok == L"gt")
@@ -859,6 +877,12 @@ private:
             c = '"';
           else if (tok == L"apos")
             c = '\'';
+          else if (tok[0] == L'#') {
+            size_t p;
+            int i = std::stoi(mobs::to_string(tok.substr(tok[1] == 'x' ? 2:1)), &p, tok[1] == 'x' ? 16:10);
+            if (p == tok.length() - (tok[1] == 'x' ? 2:1))
+              c = i;
+          }
           if (c)
           {
             result += c;
@@ -881,9 +905,7 @@ private:
   std::wstring buffer;
   std::wstring saved;
   wchar_t curr = 0;
-//  size_t pos1, pos2;  // current / search pointer for parsing
-//  size_t posS, posE;  // start / end pointer for last text
-//  size_t done = 0;
+  std::string encoding;
   std::stack<std::string> tags;
   std::string lastKey;
   

@@ -50,7 +50,7 @@ public:
   virtual void NullTag(const std::string &element) { LOG(LM_INFO, "NULL"); }
   virtual void Attribut(const std::string &element, const std::string &attribut, const std::string &value) { LOG(LM_INFO, "ATTRIBUT " << element); }
   virtual void Value(const std::string &value) { LOG(LM_INFO, "VALUE"); }
-  virtual void Cdata(const char *value, size_t len) { LOG(LM_INFO, "CDATA"); }
+  virtual void Cdata(const char *value, size_t len) { LOG(LM_INFO, "CDATA >" << string(value, len) << "<"); }
   virtual void StartTag(const std::string &element) { LOG(LM_INFO, "START " << element); }
   virtual void EndTag(const std::string &element) { LOG(LM_INFO, "END " << element); }
   virtual void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::string &value) { LOG(LM_INFO, "PI" << element); }
@@ -61,8 +61,8 @@ public:
   XParserW(const wstring &i) : mobs::XmlParserW(str), str(i) { }
   virtual void NullTag(const std::string &element) { LOG(LM_INFO, "NULL"); }
   virtual void Attribut(const std::string &element, const std::string &attribut, const std::wstring &value) { LOG(LM_INFO, "ATTRIBUT " << element); }
-  virtual void Value(const std::wstring &value) { LOG(LM_INFO, "VALUE"); }
-  virtual void Cdata(const wchar_t *value, size_t len) { LOG(LM_INFO, "CDATA"); }
+  virtual void Value(const std::wstring &value) { LOG(LM_INFO, "VALUE >" << mobs::to_string(value) << "<"); }
+  virtual void Cdata(const wchar_t *value, size_t len) { LOG(LM_INFO, "CDATA >" << mobs::to_string(wstring(value, len)) << "<"); }
   virtual void StartTag(const std::string &element) { LOG(LM_INFO, "START " << element); }
   virtual void EndTag(const std::string &element) { LOG(LM_INFO, "END " << element); }
   virtual void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) { LOG(LM_INFO, "PI" << element); }
@@ -164,11 +164,14 @@ TEST(parserTest, xmlStructW1) {
   EXPECT_NO_THROW(xparse(mobs::to_wstring(x1)));
   EXPECT_NO_THROW(xparse(L"<abc/>"));
   EXPECT_NO_THROW(xparse(L"<abc a=\"xx\" bcd=\"9999\"/>"));
-  EXPECT_NO_THROW(xparse(L"<abc f=\"\">xx</abc>"));
+  EXPECT_NO_THROW(xparse(L"<abc f=\"\">xx&#188;&#x20;ö&lt;ä&gt;ü</abc>"));
   EXPECT_NO_THROW(xparse(L"<abc>   <cde/> </abc>"));
-  EXPECT_NO_THROW(xparse(L"<abc>   <!-- sdfsdf -->  <cde/>  </abc>"));
+  EXPECT_NO_THROW(xparse(L"<ggg>   <!-- sdfsdf --><cde/>  </ggg>"));
+  EXPECT_NO_THROW(xparse(L"<abc>   <![CDATA[J]]></abc>"));
   EXPECT_NO_THROW(xparse(L"<abc>  <cde/> </abc> <!-- sdfs<< df --> "));
   
+  EXPECT_ANY_THROW(xparse(L"<abc>  dd <![CDATA[J]]></abc>"));
+
   EXPECT_ANY_THROW(xparse(L"<abc  />"));
   EXPECT_ANY_THROW(xparse(L"<abc>   <cde/> </abce>"));
   EXPECT_ANY_THROW(xparse(L"<abc a =\"xx\" bcd=\"9999\"/>"));
