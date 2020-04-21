@@ -452,7 +452,7 @@ void parse();
 void NullTag(const std::string &element);
 void Attribut(const std::string &element, const std::string &attribut, const std::wstring &value);
 void Value(const std::wstring &value);
-void Cdata(const wchar_t *value, size_t len);
+void Cdata(const std::wstring &value);
 void StartTag(const std::string &element);
 void EndTag(const std::string &element);
 void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value);
@@ -508,11 +508,10 @@ public:
    @param value Inhalt des Tags
    */
   virtual void Value(const std::wstring &value) = 0;
-  /** \brief Callback-Function: Ein CDATA-Elemet
+  /** \brief Callback-Function: Ein CDATA-Elemet (optional) ansonsten wird auf \c Value abgebildet
    @param value Inhalt des Tags
-   @param len Länge des Tags
    */
-  virtual void Cdata(const wchar_t *value, size_t len) = 0;  // TODO bei C++17 besser std::string_view
+  virtual void Cdata(const std::wstring &value) { Value(value); };
   /** \brief Callback-Function: Ein Start-Tag
    @param element Name des Elementes
    */
@@ -626,7 +625,8 @@ public:
           eat('[');
           saveValue();  // nur whitespace prüfen
           parse2CD();
-          Cdata(&buffer[0], buffer.length() -2);
+          buffer.erase(buffer.length() -2, 2);
+          Cdata(buffer);
           clearValue();
           lastKey = "";
         }
@@ -880,7 +880,9 @@ private:
           else if (tok[0] == L'#') {
             size_t p;
             int i = std::stoi(mobs::to_string(tok.substr(tok[1] == 'x' ? 2:1)), &p, tok[1] == 'x' ? 16:10);
-            if (p == tok.length() - (tok[1] == 'x' ? 2:1))
+            if (p == tok.length() - (tok[1] == 'x' ? 2:1) and
+                (i == 9 or i == 10 or i == 13 or (i >= 32 and i <= 0xD7FF) or
+                (i >= 0xE000 and i <= 0xFFFD) or (i >= 0x10000 and i <= 0x10FFFF)))
               c = i;
           }
           if (c)

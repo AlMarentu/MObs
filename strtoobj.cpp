@@ -154,8 +154,6 @@ void string2Obj(const std::string &str, ObjectBase &obj, ConvObjFromStr cfh)
       else if (not member()->fromStr(val, cfs))
         throw runtime_error(u8"string2Obj: invalid type in variable " + showName() + " can't assign");
     };
-    void Cdata(const wchar_t *value, size_t len) { Value(std::wstring(value, len)); }
-
     void StartTag(const std::string &element) {
       TRACE(PARAM(element));
       if (tagPath().size() <= 1)

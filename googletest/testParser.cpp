@@ -62,7 +62,7 @@ public:
   virtual void NullTag(const std::string &element) { LOG(LM_INFO, "NULL"); }
   virtual void Attribut(const std::string &element, const std::string &attribut, const std::wstring &value) { LOG(LM_INFO, "ATTRIBUT " << element); }
   virtual void Value(const std::wstring &value) { LOG(LM_INFO, "VALUE >" << mobs::to_string(value) << "<"); }
-  virtual void Cdata(const wchar_t *value, size_t len) { LOG(LM_INFO, "CDATA >" << mobs::to_string(wstring(value, len)) << "<"); }
+  virtual void Cdata(const std::wstring &value) { LOG(LM_INFO, "CDATA >" << mobs::to_string(value) << "<"); }
   virtual void StartTag(const std::string &element) { LOG(LM_INFO, "START " << element); }
   virtual void EndTag(const std::string &element) { LOG(LM_INFO, "END " << element); }
   virtual void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) { LOG(LM_INFO, "PI" << element); }
