@@ -47,9 +47,9 @@ using namespace std;
 #if 0
 class KeyString : virtual public ObjTravConst {
   public:
-    virtual void doObjBeg(ObjTravConst &ot, const ObjectBase &obj) { };
+    virtual bool doObjBeg(ObjTravConst &ot, const ObjectBase &obj) { return true; };
     virtual void doObjEnd(ObjTravConst &ot, const ObjectBase &obj) { };
-    virtual void doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec) { };
+    virtual bool doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec) { return false; }; // Keine Arrays im Key
     virtual void doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec) { };
     virtual void doMem(ObjTravConst &ot, const MemberBase &mem)
     {
@@ -59,7 +59,6 @@ class KeyString : virtual public ObjTravConst {
         keystr += ".";
         keystr += mem.toStr(false);
         //cerr << "  Mem " << mem.name() << " = ";
-        //mem.strOut(cerr);
         //cerr << endl;
       }
     };

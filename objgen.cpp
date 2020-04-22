@@ -49,12 +49,12 @@ void MemberBase::doConfig(MemVarCfg c)
 
 void MemberBase::traverse(ObjTrav &trav)
 {
-  trav.doMem(trav, *this);
+  trav.doMem(*this);
 }
 
 void MemberBase::traverse(ObjTravConst &trav) const
 {
-  trav.doMem(trav, *this);
+  trav.doMem(*this);
 }
 
 void MemberBase::activate()
@@ -225,8 +225,7 @@ MemberBase &ObjectBase::get(string name)
 
 void ObjectBase::traverse(ObjTravConst &trav) const
 {
-  trav.doObjBeg(trav, *this);
-  if (not isNull())
+  if (trav.doObjBeg(*this))
   {
     for (auto const &m:mlist)
     {
@@ -240,14 +239,13 @@ void ObjectBase::traverse(ObjTravConst &trav) const
         m.obj->traverse(trav);
       }
     }
+    trav.doObjEnd(*this);
   }
-  trav.doObjEnd(trav, *this);
 }
 
 void ObjectBase::traverse(ObjTrav &trav)
 {
-  trav.doObjBeg(trav, *this);
-  if (not isNull())
+  if (trav.doObjBeg(*this))
   {
     for (auto const &m:mlist)
     {
@@ -261,8 +259,8 @@ void ObjectBase::traverse(ObjTrav &trav)
         m.obj->traverse(trav);
       }
     }
+    trav.doObjEnd(*this);
   }
-  trav.doObjEnd(trav, *this);
 }
 
 void ObjectBase::getKey(std::list<std::string> &key, const ConvToStrHint &cth) const
@@ -691,11 +689,10 @@ public:
     }
     needBreak = false;
   };
-  virtual void doObjBeg(ObjTravConst &ot, const ObjectBase &obj)
+  virtual bool doObjBeg(const ObjectBase &obj)
   {
     if (obj.isNull() and cth.omitNull())
-      return;
-    inArray.push(false);
+      return false;
     if (not fst)
       res << ",";
     newline();
@@ -706,55 +703,60 @@ public:
       res << quoteKeys << (n == SIZE_T_MAX ? obj.name() : obj.parent()->getConf(n)) << quoteKeys << ":";
     }
     if (obj.isNull())
+    {
       res << "null";
-    else
-      res << "{";
+      fst = false;
+//      if (inArray.empty() or not inArray.top())
+        needBreak = true;
+      return false;
+    }
+    inArray.push(false);
+    res << "{";
     needBreak = true;
     level++;
+    return true;
   };
-  virtual void doObjEnd(ObjTravConst &ot, const ObjectBase &obj)
+  virtual void doObjEnd(const ObjectBase &obj)
   {
     if (obj.isNull() and cth.omitNull())
       return;
     level--;
-    if (not obj.isNull())
-    {
-      newline();
-      res << "}";
-    }
+    newline();
+    res << "}";
     fst = false;
     inArray.pop();
     if (inArray.empty() or not inArray.top())
       needBreak = true;
   };
-  virtual void doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec)
+  virtual bool doArrayBeg(const MemBaseVector &vec)
   {
     if (vec.isNull() and cth.omitNull())
-      return;
+      return false;
     size_t n = vec.parent() and cth.useAltNames() ? vec.cAltName() : SIZE_T_MAX;
-    inArray.push(true);
     if (not fst)
       res << ",";
     newline();
     fst = true;
     res << quoteKeys << (n == SIZE_T_MAX ? vec.name() : vec.parent()->getConf(n)) << quoteKeys << ":";
-    if (vec.isNull())
-      res << "null";
-    else
-      res << "[";
     needBreak = true;
+    if (vec.isNull())
+    {
+      res << "null";
+      fst = false;
+      return false;
+    }
+    inArray.push(true);
+    res << "[";
+    return true;
   };
-  virtual void doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec)
+  virtual void doArrayEnd(const MemBaseVector &vec)
   {
-    if (not vec.isNull())
-      res << "]";
-    else if (cth.omitNull())
-      return;
+    res << "]";
     fst = false;
     inArray.pop();
     needBreak = true;
   };
-  virtual void doMem(ObjTravConst &ot, const MemberBase &mem)
+  virtual void doMem(const MemberBase &mem)
   {
     if (mem.isNull() and cth.omitNull())
       return;

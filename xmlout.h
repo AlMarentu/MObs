@@ -34,15 +34,15 @@ public:
   XmlOut(ConvObjToString cth);
   ~XmlOut();
   /// \private
-  virtual void doObjBeg(ObjTravConst &ot, const ObjectBase &obj);
+  virtual bool doObjBeg(const ObjectBase &obj);
   /// \private
-  virtual void doObjEnd(ObjTravConst &ot, const ObjectBase &obj);
+  virtual void doObjEnd(const ObjectBase &obj);
   /// \private
-  virtual void doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec);
+  virtual bool doArrayBeg(const MemBaseVector &vec);
   /// \private
-  virtual void doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec);
+  virtual void doArrayEnd(const MemBaseVector &vec);
   /// \private
-  virtual void doMem(ObjTravConst &ot, const MemberBase &mem);
+  virtual void doMem(const MemberBase &mem);
   /// liefert Ergebnis-XML
   std::string getString();
   /// löscht Buffer

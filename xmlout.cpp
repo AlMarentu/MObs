@@ -93,10 +93,10 @@ string  XmlOut::getString()
 
 
 
-void XmlOut::doObjBeg(ObjTravConst &ot, const ObjectBase &obj)
+bool XmlOut::doObjBeg(const ObjectBase &obj)
 {
   if (obj.isNull() and data->cth.omitNull())
-    return;
+    return true;
   if (data->elements.empty())
   {
     data->buffer << u8"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
@@ -116,50 +116,55 @@ void XmlOut::doObjBeg(ObjTravConst &ot, const ObjectBase &obj)
 
   data->indent();
   if (obj.isNull())
+  {
     data->buffer << '<' << data->prefix << name << u8"/>\n";
-  else
-    data->buffer << '<' << data->prefix << name << u8">\n";
+    return false;
+  }
+  
+  data->buffer << '<' << data->prefix << name << u8">\n";
   
   data->elements.push("");
   data->level++;
-
+  return true;
 }
 
-void XmlOut::doObjEnd(ObjTravConst &ot, const ObjectBase &obj)
+void XmlOut::doObjEnd(const ObjectBase &obj)
 { 
-  if (obj.isNull() and data->cth.omitNull())
-    return;
   data->level--;
   data->elements.pop();
-
-  if (not obj.isNull())
+  
+  string name;
+  if (not data->elements.empty())
+    name = data->elements.top();
+  if (name.empty())
   {
-    string name;
-    if (not data->elements.empty())
-      name = data->elements.top();
-    if (name.empty())
-    {
-      size_t n = (obj.parent() and data->cth.useAltNames()) ? obj.cAltName() : SIZE_T_MAX;
-      name = (n == SIZE_T_MAX) ? obj.name() : obj.parent()->getConf(n);
-    }
-    
-    data->indent();
-    data->buffer << u8"</" << data->prefix << name << u8">\n";
+    size_t n = (obj.parent() and data->cth.useAltNames()) ? obj.cAltName() : SIZE_T_MAX;
+    name = (n == SIZE_T_MAX) ? obj.name() : obj.parent()->getConf(n);
   }
+  
+  data->indent();
+  data->buffer << u8"</" << data->prefix << name << u8">\n";
 }
 
-void XmlOut::doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec)
+bool XmlOut::doArrayBeg(const MemBaseVector &vec)
 {
+  if (vec.isNull() and data->cth.omitNull())
+    return false;
+  if (vec.isNull()) 
+    return false;
+// TODO nei null etvl. data->buffer << '<' << data->prefix << (n == SIZE_T_MAX) ? vec.name() : vec.parent()->getConf(n) << u8"/>\n";
+
   size_t n = (vec.parent() and data->cth.useAltNames()) ? vec.cAltName() : SIZE_T_MAX;
   data->elements.push((n == SIZE_T_MAX) ? vec.name() : vec.parent()->getConf(n));
+  return true;
 }
 
-void XmlOut::doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec)
+void XmlOut::doArrayEnd(const MemBaseVector &vec)
 {
   data->elements.pop();
 }
 
-void XmlOut::doMem(ObjTravConst &ot, const MemberBase &mem)
+void XmlOut::doMem(const MemberBase &mem)
 {
   if (mem.isNull() and data->cth.omitNull())
     return;

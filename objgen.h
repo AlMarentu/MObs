@@ -698,30 +698,34 @@ void MemberVector<T>::resize(size_t s)
 class ObjTrav {
 public:
   /// Callbackfunktion, die bei Betreten eines Objektes aufgerufen wird
-  virtual void doObjBeg(ObjTrav &ot, ObjectBase &obj) = 0;
+  /// \return wenn false zurückgeliefert wird, das gesamte Objekt übersprungen
+  virtual bool doObjBeg(ObjectBase &obj) = 0;
   /// Callbackfunktion, die bei Verlassen eines Objektes aufgerufen wird
-  virtual void doObjEnd(ObjTrav &ot, ObjectBase &obj) = 0;
+  virtual void doObjEnd(ObjectBase &obj) = 0;
   /// Callbackfunktion, die bei Betreten eines Arrays aufgerufen wird
-  virtual void doArrayBeg(ObjTrav &ot, MemBaseVector &vec) = 0;
+  /// \return wenn false zurückgeliefert wird, der gesamte Vector übersprungen
+  virtual bool doArrayBeg(MemBaseVector &vec) = 0;
   /// Callbackfunktion, die bei Verlassen eines Arrays aufgerufen wird
-  virtual void doArrayEnd(ObjTrav &ot, MemBaseVector &vec) = 0;
+  virtual void doArrayEnd(MemBaseVector &vec) = 0;
   /// Callbackfunktion, die bei einer Varieblen aufgerufen wird
-  virtual void doMem(ObjTrav &ot, MemberBase &mem) = 0;
+  virtual void doMem(MemberBase &mem) = 0;
 };
 
 /// Basisklasse zum rekursiven Durchlauf über eine  \c const  Objektstruktur
 class ObjTravConst {
 public:
   /// Callbackfunktion, die bei Betreten eines Objektes aufgerufen wird
-  virtual void doObjBeg(ObjTravConst &ot, const ObjectBase &obj) = 0;
+  /// \return wenn false zurückgeliefert wird, das gesamte Objekt übersprungen
+  virtual bool doObjBeg(const ObjectBase &obj) = 0;
   /// Callbackfunktion, die bei Verlassen eines Objektes aufgerufen wird
-  virtual void doObjEnd(ObjTravConst &ot, const ObjectBase &obj) = 0;
+  virtual void doObjEnd(const ObjectBase &obj) = 0;
   /// Callbackfunktion, die bei Betreten eines Arrays aufgerufen wird
-  virtual void doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec) = 0;
+  /// \return wenn false zurückgeliefert wird, der gesamte Vector übersprungen
+  virtual bool doArrayBeg(const MemBaseVector &vec) = 0;
   /// Callbackfunktion, die bei Verlassen eines Arrays aufgerufen wird
-  virtual void doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec) = 0;
+  virtual void doArrayEnd(const MemBaseVector &vec) = 0;
   /// Callbackfunktion, die bei einer Varieblen aufgerufen wird
-  virtual void doMem(ObjTravConst &ot, const MemberBase &mem) = 0;
+  virtual void doMem(const MemberBase &mem) = 0;
 };
 
 /// Basisiklasse zum sequentiellen Einfügen von Daten in ein Objekt
@@ -784,19 +788,23 @@ private:
 template<class T>
 void MemberVector<T>::traverse(ObjTrav &trav)
 {
-  trav.doArrayBeg(trav, *this);
-  for (auto w:werte)
-    w->traverse(trav);
-  trav.doArrayEnd(trav, *this);
+  if (trav.doArrayBeg(*this))
+  {
+    for (auto w:werte)
+      w->traverse(trav);
+    trav.doArrayEnd(*this);
+  }
 };
 
 template<class T>
 void MemberVector<T>::traverse(ObjTravConst &trav) const
 {
-  trav.doArrayBeg(trav, *this);
-  for (auto w:werte)
-    w->traverse(trav);
-  trav.doArrayEnd(trav, *this);
+  if (trav.doArrayBeg(*this))
+  {
+    for (auto w:werte)
+      w->traverse(trav);
+    trav.doArrayEnd(*this);
+  }
 };
 
 template<class T>
