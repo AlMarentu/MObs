@@ -61,7 +61,7 @@
    MemVar(bool,           firma);     // bool firma;
    MemVar(std::string,    name);      // std::string name
    MemVar(std::string,    vorname);
-   ObjVar(Adresse,        adresse);   // Adresse adresse;
+   MemObj(Adresse,        adresse);   // Adresse adresse;
    MemVector(Kontakt,     kontakte);  // vector<Kontakt> kontakte;
    MemVarVector(std::string, hobbies);   // vector<std::string> hobbies
  };
@@ -174,7 +174,7 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
  @param typ Objekttyp
  @param name Name
  */
-#define ObjVar(typ, name, ...) typ name = typ(#name, this __VA_ARGS__)
+#define MemObj(typ, name, ...) typ name = typ(#name, this __VA_ARGS__)
 
 /*! \brief Makro für Definitionen im Objekt das von ObjecBase ist
  @param objname Name der Klasse (muss von ObjecBase abgeleitet sein)
@@ -360,7 +360,7 @@ class ObjectBase : public NullValue {
 public:
   ObjectBase() { }
   /// \private
-  ObjectBase(std::string n, ObjectBase *obj, MemVarCfg c1 = Unset, MemVarCfg c2 = Unset, MemVarCfg c3 = Unset) : m_varNam(n), m_parent(obj) { doConfig(c1); doConfig(c2); doConfig(c3); } // Konstructor for ObjVar
+  ObjectBase(std::string n, ObjectBase *obj, MemVarCfg c1 = Unset, MemVarCfg c2 = Unset, MemVarCfg c3 = Unset) : m_varNam(n), m_parent(obj) { doConfig(c1); doConfig(c2); doConfig(c3); } // Konstructor for MemObj
   /// \private
   ObjectBase(MemBaseVector *m, ObjectBase *o, MemVarCfg c1 = Unset, MemVarCfg c2 = Unset, MemVarCfg c3 = Unset) : m_varNam(""), m_parent(o), m_parVec(m) { doConfig(c1); doConfig(c2); doConfig(c3); } // Konstructor for Vector
   virtual ~ObjectBase() {};

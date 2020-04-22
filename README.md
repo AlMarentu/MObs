@@ -80,7 +80,7 @@ Zusätzlich können auch wieder MObs-Objekte als Member verwendet werden sowie V
 
 Dazu stehen die Makros
 * MemVar für Basisitypen
-* ObjVar für Objekte
+* MemObj für Objekte
 * MemVarVector für Vektor von Basisitypen
 * MemVector für Vektoren von Objekt-Klassen
 * MemMobsEnumVar, MOBS_ENUM_DEF und MOBS_ENUM_VAL für enum-definitionen
@@ -116,7 +116,7 @@ class Person : virtual public mobs::ObjectBase {
   MemVar(bool, firma);
   MemVar(std::string, name);
   MemVar(std::string, vorname);
-  ObjVar(Adresse, adresse);
+  MemObj(Adresse, adresse);
   MemVector(Kontakt, kontakte);
   MemVarVector(std::string, hobbies);
 };
@@ -145,7 +145,7 @@ class Obj1 : virtual public mobs::ObjectBase {
   MemVar(int, yy, USENULL KEYELEMENT3 ALTNAME(NewName));
   MemVar(int, zz);
 
-  ObjVar(Obj0, oo, USENULL KEYELEMENT2);
+  MemObj(Obj0, oo, USENULL KEYELEMENT2);
 };
 ~~~~~~~~~~
 

@@ -89,7 +89,7 @@ class Person : virtual public mobs::ObjectBase {
   MemVar(bool, firma);
   MemVar(std::string, name);
   MemVar(std::string, vorname);
-  ObjVar(Adresse, adresse, USENULL);
+  MemObj(Adresse, adresse, USENULL);
   MemVector(Kontakt, kontakte);
 //  MemVector(MemVarType(std::string), hobbies);
   MemVarVector(std::string, hobbies);
@@ -106,8 +106,8 @@ ObjRegister(Person);
 //  MemVar(int, otto);
 //  MemVar(int, peter);
 //  MemVar(bool, pool);
-//  ObjVar(Adresse, pims);
-//  ObjVar(Adresse, bums);
+//  MemObj(Adresse, pims);
+//  MemObj(Adresse, bums);
 //
 //  MemVar(string, mom);
 //  MemVarVector(string, susi);
@@ -418,7 +418,7 @@ class Rechnung : virtual public mobs::ObjectBase {
   ObjInit(Rechnung);
   MemVar(int, id, USENULL);
 
-  ObjVar(Person, kunde, USENULL);
+  MemObj(Person, kunde, USENULL);
   MemVector(RechPos, position, USENULL USEVECNULL);
 
 };
@@ -509,7 +509,7 @@ class Obj1 : virtual public mobs::ObjectBase {
   MemVar(int, yy, USENULL KEYELEMENT3);
   MemVar(int, zz);
 
-  ObjVar(Obj0, oo, USENULL KEYELEMENT2);
+  MemObj(Obj0, oo, USENULL KEYELEMENT2);
 };
 
 TEST(objgenTest, keys) {
@@ -540,7 +540,7 @@ ObjInit(ObjX);
   MemVar(int, a, ALTNAME(pippin));
   MemVar(int, b, ALTNAME(karl));
   MemVar(int, c);
-  ObjVar(Obj0, o, USENULL ALTNAME(karlmann));
+  MemObj(Obj0, o, USENULL ALTNAME(karlmann));
   MemVector(MemVarType(std::string), d, ALTNAME(ludwig));
 
 };
