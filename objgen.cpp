@@ -335,6 +335,11 @@ void ObjectBase::doCopy(const ObjectBase &other)
   ConvFromStrHintDoCopy cfh;
   if (typName() != other.typName())
     throw runtime_error(u8"ObjectBase::doCopy: invalid Type");
+  if (other.isNull())
+  {
+    forceNull();
+    return;
+  }
   auto src = other.mlist.begin();
   for (auto const &m:mlist)
   {
@@ -344,7 +349,10 @@ void ObjectBase::doCopy(const ObjectBase &other)
     {
       if (not src->mem)
         throw runtime_error(u8"ObjectBase::doCopy: invalid Element (Member)");
-      m.mem->fromStr(src->mem->toStr(ConvToStrHint(true)), cfh);
+      if (src->mem->isNull())
+        m.mem->forceNull();
+      else if (not m.mem->doCopy(src->mem))
+        m.mem->fromStr(src->mem->toStr(ConvToStrHint(true)), cfh); // Fallback auf String umkopieren
     }
     if (m.vec)
     {

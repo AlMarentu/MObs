@@ -254,6 +254,9 @@ public:
   virtual bool fromStr(const std::string &s, const ConvFromStrHint &) = 0;
   /// Einlesen der Variable aus einnem \c std::wstring
   virtual bool fromStr(const std::wstring &s, const ConvFromStrHint &) = 0;
+  /// natives Kopieren einer Member-Variable
+  /// \return true, wenn kopieren erfolgreich (Typ-Gleichheit beider Elemente)
+  virtual bool doCopy(const MemberBase *other) = 0;
   /// Setze Inhalt auf null
   void forceNull() { clear(); setNull(true);}
   /// Setze Inhalt auf leer,
@@ -383,7 +386,7 @@ public:
   virtual void init() {};
   /// liefert den Namen Membervariablen
   std::string name() const { return m_varNam; };
-  /// Config-Token alternativer Name oder \c SIZE_T_MAX
+  /// Config-Token-Id alternativer Name oder \c SIZE_T_MAX
   size_t cAltName() const { return m_altName; };
   /// Objekt wurde beschrieben
   void activate();
@@ -430,8 +433,7 @@ public:
   /// @param compact opt. Angabe, ob ausgabe \e kompakt erfolgen soll (bei enum als \c int statt als Text
   /// \return Inhalt der variable als string in UTF-8, oder leer, wenn nicht gefunden
   std::string getVariable(const std::string &path, bool *found = nullptr, bool compact = false) const;
-  
-  /// Erzeuge eine Liste der Key-Elementze
+  /// Erzeuge eine Liste der Key-Elemente
   /// @param key Rückgabe der Liste
   /// @param cth Konvertierungs-Hinweis
   void getKey(std::list<std::string> &key, const ConvToStrHint &cth) const;
@@ -487,11 +489,6 @@ private:
 };
 
 
-//template <typename T>
-//inline T mobsempty(T&) { return T(); };
-//template <> inline char mobsempty(char&) { return ' '; };
-//template <> inline signed char mobsempty(signed char&) { return ' '; };
-//template <> inline unsigned char mobsempty(unsigned char&) { return ' '; };
 
 // ------------------ Member ------------------
 
@@ -555,9 +552,9 @@ public:
   
 //  virtual void strOut(std::ostream &str) const { str << mobs::to_string(wert); }
   /// Setze Inhalt auf leer
-  virtual void clear()  { wert = this->c_empty(); if (nullAllowed()) setNull(true); else activate(); };
+  virtual void clear()  { wert = this->c_empty(); if (nullAllowed()) setNull(true); else activate(); }
   //  virtual std::string toStr() const { std::stringstream s; s << wert; return s.str(); }
-  virtual std::string toStr(const ConvToStrHint &cth) const { return this->c_to_string(wert, cth); };
+  virtual std::string toStr(const ConvToStrHint &cth) const { return this->c_to_string(wert, cth); }
   //  virtual std::wstring toWStr2() const { return mobs::to_wstring(wert); }
   /// Abfrage, ob der Inhalt textbasiert ist (zb. in JSON in Hochkommata gestzt wird)
   virtual bool is_specialized() const { return this->c_is_specialized(); }
@@ -567,8 +564,10 @@ public:
   virtual bool fromStr(const std::string &sin, const ConvFromStrHint &cfh) { if (this->c_string2x(sin, wert, cfh)) { activate(); return true; } return false; }
   /// Einlesen der Variable aus einnem \c std::wstring im Format UTF-8
   virtual bool fromStr(const std::wstring &sin, const ConvFromStrHint &cfh) { if (this->c_wstring2x(sin, wert, cfh)) { activate(); return true; } return false; }
+  /// Versuche ein Member nativ zu kopieren
+  virtual bool doCopy(const MemberBase *other) { auto t = dynamic_cast<const Member<T, C> *>(other); if (t) doCopy(*t); return t != nullptr; }
   /// \private
-  void doCopy(const Member<T, C> &other) { operator()(other()); }
+  void inline doCopy(const Member<T, C> &other) { if (other.isNull()) forceNull(); else operator()(other()); }
 private:
   T wert;
 };
