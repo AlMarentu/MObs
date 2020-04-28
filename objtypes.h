@@ -60,6 +60,7 @@ public: \
   static inline std::string c_to_string(typ t, const ::mobs::ConvToStrHint &cth) { return cth.compact() ? ::mobs::to_string(int(t)) : typ##_to_string(t); } \
   static inline bool c_is_chartype(const ::mobs::ConvToStrHint &cth) { return not cth.compact(); } \
   static inline bool c_is_specialized() { return false; } \
+  static inline uint64_t c_time_granularity() { return 0; } \
   static inline typ c_empty() { return mobsinternal_elements_##typ.front(); } \
 }; }
 
@@ -76,6 +77,10 @@ return c.from_bytes(val); };
 /// @param val Wert in utf8
 /// @return Wert als wstring
 inline std::wstring to_wstring(std::string val) { std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> c; return c.from_bytes(val); };
+
+/// String in Anführungszeichen setzen mit escaping
+/// @param s Wert in utf8
+std::string to_quote(const std::string &s);
 
 //template <typename T>
 //std::string to_string(T t) { std::stringstream s; s << t; return s.str(); };
@@ -387,6 +392,79 @@ protected:
   enum Nulls null = ignore;
 };
 
+///Template für Hilfsfunktion zum Konvertieren eines Datentyps in einen unsigned int
+/// @param t zu wandelnder Typ
+/// @param u Ergebnisrückgabe als Zahl
+/// @param max Rückgabe des maximalen Wertes zu diesem Typ
+/// \return true wenn Konvertierung möglich
+template<typename T> inline bool to_uint64(T t, uint64_t &u, uint64_t &max) { return false; }
+///Template für Hilfsfunktion zum Konvertieren eines Datentyps in einen signed int
+/// @param t zu wandelnder Typ
+/// @param i Ergebnisrückgabe als Zahl
+/// @param min Rückgabe des minimalen Wertes zu diesem Typ
+/// @param max Rückgabe des maximalen Wertes zu diesem Typ
+/// \return true wenn Konvertierung möglich
+template<typename T> inline bool to_int64(T t, int64_t &i, int64_t &min, uint64_t &max) { return false; }
+///Template für Hilfsfunktion zum Konvertieren eines Datentyps in einen double
+/// @param t zu wandelnder Typ
+/// @param d Ergebnisrückgabe als Zahl
+/// \return true wenn Konvertierung möglich
+template<typename T> inline bool to_double(T t, double &d) { return false; }
+///Template für Hilfsfunktion zum Konvertieren eines eines \c int in einen Typ t
+/// \return true wenn Konvertierung möglich
+template<typename T> inline bool from_number(int64_t, T &t) { return false; }
+///Template für Hilfsfunktion zum Konvertieren eines eines \c uint in einen Typ t
+/// \return true wenn Konvertierung möglich
+template<typename T> inline bool from_number(uint64_t, T &t) { return false; }
+///Template für Hilfsfunktion zum Konvertieren eines eines \c double in einen Typ t
+/// \return true wenn Konvertierung möglich
+template<typename T> inline bool from_number(double, T &t) { return false; }
+
+
+template<> bool to_int64(int t, int64_t &i, int64_t &min, uint64_t &max);
+template<> bool to_int64(short int t, int64_t &i, int64_t &min, uint64_t &max);
+template<> bool to_int64(long int t, int64_t &i, int64_t &min, uint64_t &max);
+template<> bool to_int64(long long int t, int64_t &i, int64_t &min, uint64_t &max);
+template<> bool to_uint64(unsigned int t, uint64_t &u, uint64_t &max);
+template<> bool to_uint64(unsigned short int t, uint64_t &u, uint64_t &max);
+template<> bool to_uint64(unsigned long int t, uint64_t &u, uint64_t &max);
+template<> bool to_uint64(unsigned long long int t, uint64_t &u, uint64_t &max);
+template<> bool to_uint64(bool t, uint64_t &u, uint64_t &max);
+template<> bool to_double(double t, double &d);
+template<> bool to_double(float t, double &d);
+//template<> bool to_double(long double t, double &d) { d = t; return true; }
+template<> bool from_number(int64_t, int &t);
+template<> bool from_number(int64_t, short int &t);
+template<> bool from_number(int64_t, long int &t);
+template<> bool from_number(int64_t, long long int &t);
+template<> bool from_number(uint64_t, unsigned int &t);
+template<> bool from_number(uint64_t, unsigned short int &t);
+template<> bool from_number(uint64_t, unsigned long int &t);
+template<> bool from_number(uint64_t, unsigned long long int &t);
+template<> bool from_number(uint64_t, bool &t);
+template<> bool from_number(double, float &t);
+template<> bool from_number(double, double &t);
+
+/// Infos zum aktuellen Wert, wenn dieser als Zahl darstellbar ist.
+///
+/// Der Inhalt ist unabhängig vo Zusatand \c isNull und hängt nur vom defierten Datentyp ab
+/// bei \c bool ist \c isUnsigned gestzt und max = 1
+class MobsMemberInfo {
+public:
+  bool isUnsigned = false; ///< hat Wert von typ \c signed, i64, min und max sind gesetzt
+  bool isSigned = false; ///< wht Wert vom Typ \c unsigned, u64 und max sind gesetzt
+  int64_t i64 = 0; ///< Inhalt des Wertes wenn signed (unabhängrig von \c isNull)
+  uint64_t u64 = 0; ///< Inhalt des Wertes wenn unsigned (unabhängrig von \c isNull)
+  int64_t min = 0; ///< Miniimalwert des Datentyps
+  uint64_t max = 0; ///< Maximalwert des Datentyps
+  uint64_t granularity = 0; ///< Körnung des Datentyps nur bei \c isTime
+  bool isEnum = false; ///<  Wert ist ein enum -> besser als Klartext darstellen \see acceptExtented
+  bool isTime = false; ///< Wert ist Millsekunde seit Unix-Epoche i64 ist gesetzt
+  bool is_spezialized = false; ///< is_spezialized aus std::numeric_limits
+  
+
+};
+
 template <typename T>
 /// Standard Konvertierungs-Klasse für Serialisierung von und nach std::string
 class StrConv {
@@ -404,6 +482,8 @@ public:
   /// liefert eine \e leere Variable die zum löschen oder Initialisieren einer Membervarieblen verwendet wird
   /// \see clear()
   static inline T c_empty() { return T(); }
+  /// Körnung des Datentyps wenn es ein Date-Typ ist, \c 0 sonst
+  static inline uint64_t c_time_granularity() { return 0; }
 
 };
 
@@ -422,7 +502,13 @@ public:
   /// \private
   static inline bool c_is_specialized() { return std::numeric_limits<T>::is_specialized; }
   /// \private
+  static inline uint64_t c_max() { return std::numeric_limits<unsigned short int>::max(); }
+  /// \private
+  static inline int64_t c_min() { return 0; }
+  /// \private
   static inline T c_empty() { return T(0); }
+  /// \private
+  static inline uint64_t c_time_granularity() { return 0; }
 };
 
 

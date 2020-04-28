@@ -107,10 +107,7 @@ bool XmlOut::doObjBeg(const ObjectBase &obj)
   if (not data->elements.empty())
     name = data->elements.top();
   if (name.empty())
-  {
-    size_t n = (obj.parent() and data->cth.useAltNames()) ? obj.cAltName() : SIZE_T_MAX;
-    name = (n == SIZE_T_MAX) ? obj.name() : obj.parent()->getConf(n);
-  }
+    name = obj.getName(data->cth);
   if (name.empty())
     name = u8"entry";
 
@@ -137,10 +134,7 @@ void XmlOut::doObjEnd(const ObjectBase &obj)
   if (not data->elements.empty())
     name = data->elements.top();
   if (name.empty())
-  {
-    size_t n = (obj.parent() and data->cth.useAltNames()) ? obj.cAltName() : SIZE_T_MAX;
-    name = (n == SIZE_T_MAX) ? obj.name() : obj.parent()->getConf(n);
-  }
+    name = obj.getName(data->cth);
   
   data->indent();
   data->buffer << u8"</" << data->prefix << name << u8">\n";
@@ -154,8 +148,7 @@ bool XmlOut::doArrayBeg(const MemBaseVector &vec)
     return false;
 // TODO nei null etvl. data->buffer << '<' << data->prefix << (n == SIZE_T_MAX) ? vec.name() : vec.parent()->getConf(n) << u8"/>\n";
 
-  size_t n = (vec.parent() and data->cth.useAltNames()) ? vec.cAltName() : SIZE_T_MAX;
-  data->elements.push((n == SIZE_T_MAX) ? vec.name() : vec.parent()->getConf(n));
+  data->elements.push(vec.getName(data->cth));
   return true;
 }
 
@@ -172,10 +165,7 @@ void XmlOut::doMem(const MemberBase &mem)
   if (not data->elements.empty())
     name = data->elements.top();
   if (name.empty())
-  {
-    size_t n = (mem.parent() and data->cth.useAltNames()) ? mem.cAltName() : SIZE_T_MAX;
-    name = (n == SIZE_T_MAX) ? mem.name() : mem.parent()->getConf(n);
-  }
+    name = mem.getName(data->cth);
   data->indent();
   data->buffer << '<' << data->prefix << name;
   if (mem.isNull())

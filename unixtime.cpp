@@ -160,6 +160,25 @@ template <> bool string2x(const std::string &str, UxTime &t)
   return true;
 }
 
+template<> bool to_int64(UxTime t, int64_t &i, int64_t &min, uint64_t &max)
+{
+  i = t.toUxTime() * 1000;
+  min = 0;
+  max = std::numeric_limits<time_t>::max();
+  return true;
+}
+
+template<> bool from_number(int64_t i, UxTime &t)
+{
+  i /= 1000;
+  if (i >= 0 or i < std::numeric_limits<time_t>::max())
+  {
+    t = UxTime(i);
+    return true;
+  }
+  return false;
+}
+
 
 
 }

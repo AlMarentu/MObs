@@ -81,6 +81,10 @@ inline double operator-(UxTime t1, UxTime t2) {return ::difftime(t1.toUxTime(), 
 
 /// \private
 template <> bool string2x(const std::string &str, UxTime &t);
+/// \private
+template<> bool to_int64(UxTime t, int64_t &i, int64_t &min, uint64_t &max);
+/// \private
+template<> bool from_number(int64_t, UxTime &t);
 
 /// Konvertier-Funktion \c UxTime nach \c std::string im Format ISO8601
 inline std::string to_string(UxTime t) {
@@ -101,6 +105,8 @@ public:
   static inline bool c_is_chartype(const ConvToStrHint &cth) { return not cth.compact(); }
   /// \private
   static inline bool c_is_specialized() { return false; }
+  /// \private
+  static inline uint64_t c_time_granularity() { return 1000; } // returning Seconds
   /// \private
   static inline UxTime c_empty() { return UxTime(); }
 };

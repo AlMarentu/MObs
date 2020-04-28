@@ -241,7 +241,9 @@ public:
   std::string name() const { return m_name; }
   /// Config-Token alternativer Name oder \c SIZE_T_MAX
   size_t cAltName() const { return m_altName; };
-//  virtual void strOut(std::ostream &str) const  = 0;
+  /// Abfrage des originalen oder des alternativen Namens der Membervariablen
+  std::string getName(const ConvToStrHint &) const;
+  //  virtual void strOut(std::ostream &str) const  = 0;
   /// Setze Inhalt auf leer
   virtual void clear() = 0;
   /// Ausgabe des Ihnhalts als \c std::string in UTF-8
@@ -250,10 +252,21 @@ public:
   virtual bool is_specialized() const  = 0;
   /// Abfrage, ob der Inhalt textbasiert ist (zb. in JSON in Hochkommata gestzt wird)
   virtual bool is_chartype(const ConvToStrHint &) const = 0;
-  /// Einlesen der Variable aus einnem \c std::string im Format UTF-8
+  /// Versuch, die  Variable aus einem \c std::string im Format UTF-8 einzulesen
   virtual bool fromStr(const std::string &s, const ConvFromStrHint &) = 0;
-  /// Einlesen der Variable aus einnem \c std::wstring
+  /// Versuch, die  Variable aus einem \c std::wstring einzulesen
   virtual bool fromStr(const std::wstring &s, const ConvFromStrHint &) = 0;
+  /// Versuch, die  Variable aus einem \c uint64_t einzulesen
+  virtual bool fromUInt64(uint64_t) = 0;
+  /// Versuch, die Variable aus einem \c int64_t einzulesen
+  virtual bool fromInt64(int64_t) = 0;
+  /// Versuch, die Variable aus einem \c double einzulesen
+  virtual bool fromDouble(double) = 0;
+  /// hole detaillierte Informatiom zu einer Membervariablem /see MobsMemberInfo
+  virtual void memInfo(MobsMemberInfo &i) const = 0;
+  /// lese den Inhalt einer Fließkommazahl; liefert true, wenn es eine Fließkommazahl ist
+  virtual bool toDouble(double &d) const = 0;
+
   /// natives Kopieren einer Member-Variable
   /// \return true, wenn kopieren erfolgreich (Typ-Gleichheit beider Elemente)
   virtual bool doCopy(const MemberBase *other) = 0;
@@ -312,6 +325,8 @@ public:
   inline std::string name() const { return m_name; }
   /// Config-Token alternativer Name oder \c SIZE_T_MAX
   size_t cAltName() const { return m_altName; };
+  /// Abfrage des originalen oder des alternativen Namens des Vektors
+  std::string getName(const ConvToStrHint &) const;
   /// \private
   virtual void doCopy(const MemBaseVector &other) = 0;
   /// liefert einen Zeiger auf das entsprechende Element, falls es eine \c MemVar ist
@@ -380,6 +395,8 @@ public:
   void traverse(ObjTrav &trav);
   /// Starte Traversierung  const
   void traverse(ObjTravConst &trav) const;
+  /// Starte Traversierung der Key-Elemente in exakter Reihenfolge
+  void traverseKey(ObjTravConst &trav) const;
   /// liefert den Typnamen des Objektes
   virtual std::string typName() const { return ""; }
   /// Callback-Funktion die einmalig im Constructor aufgerufen wird
@@ -388,6 +405,8 @@ public:
   std::string name() const { return m_varNam; };
   /// Config-Token-Id alternativer Name oder \c SIZE_T_MAX
   size_t cAltName() const { return m_altName; };
+  /// Abfrage des originalen oder des alternativen Namens des Objektes
+  std::string getName(const ConvToStrHint &) const;
   /// Objekt wurde beschrieben
   void activate();
   /// private
@@ -433,10 +452,6 @@ public:
   /// @param compact opt. Angabe, ob ausgabe \e kompakt erfolgen soll (bei enum als \c int statt als Text
   /// \return Inhalt der variable als string in UTF-8, oder leer, wenn nicht gefunden
   std::string getVariable(const std::string &path, bool *found = nullptr, bool compact = false) const;
-  /// Erzeuge eine Liste der Key-Elemente
-  /// @param key Rückgabe der Liste
-  /// @param cth Konvertierungs-Hinweis
-  void getKey(std::list<std::string> &key, const ConvToStrHint &cth) const;
   /// liefert einen \c std::string aus den Key-Elementen
   std::string keyStr() const;
   /// \brief Kopiere ein Objekt aus einem bereits vorhandenen.
@@ -449,6 +464,7 @@ public:
   const std::string &getConf(std::size_t i) const { static std::string x; if (i < m_confToken.size()) return m_confToken[i]; return x; }
   /// Ausgabe als \c std::string (Json)
   std::string to_string(ConvObjToString cft = ConvObjToString()) const;
+
 
   /// \private
   size_t findConfToken(const std::string &name);
@@ -564,6 +580,14 @@ public:
   virtual bool fromStr(const std::string &sin, const ConvFromStrHint &cfh) { if (this->c_string2x(sin, wert, cfh)) { activate(); return true; } return false; }
   /// Einlesen der Variable aus einnem \c std::wstring im Format UTF-8
   virtual bool fromStr(const std::wstring &sin, const ConvFromStrHint &cfh) { if (this->c_wstring2x(sin, wert, cfh)) { activate(); return true; } return false; }
+  virtual bool toDouble(double &d) const { return to_double(wert, d); }
+  virtual void memInfo(MobsMemberInfo &i) const;
+  /// Versuch, die  Variable aus einem \c uint64_t einzulesen
+  virtual bool fromUInt64(uint64_t u) { if (from_number(u, wert)) { activate(); return true; } return false; }
+  /// Versuch, die Variable aus einem \c int64_t einzulesen
+  virtual bool fromInt64(int64_t i) { if (from_number(i, wert)) { activate(); return true; } return false; }
+  /// Versuch, die Variable aus einem \c double einzulesen
+  virtual bool fromDouble(double d) { if (from_number(d, wert)) { activate(); return true; } return false; }
   /// Versuche ein Member nativ zu kopieren
   virtual bool doCopy(const MemberBase *other) { auto t = dynamic_cast<const Member<T, C> *>(other); if (t) doCopy(*t); return t != nullptr; }
   /// \private
@@ -690,6 +714,24 @@ void MemberVector<T>::resize(size_t s)
   }
 }
 
+template<typename T, class C>
+void Member<T, C>::memInfo(MobsMemberInfo &i) const
+{
+  i = MobsMemberInfo();
+  i.isSigned = to_int64(wert, i.i64, i.min, i.max);
+  i.isUnsigned = to_uint64(wert, i.u64, i.max);
+  i.is_spezialized = this->c_is_specialized();
+  i.isEnum = false;
+  i.isTime = false;
+  i.granularity = this->c_time_granularity();
+  if (i.granularity > 0) {
+    i.isTime = true;
+    i.isSigned = false;
+  }
+  else
+    i.granularity = 1;
+}
+
 
 // ------------------ Navigation / Ausgabe ------------------
 
@@ -709,6 +751,10 @@ public:
   virtual void doArrayEnd(MemBaseVector &vec) = 0;
   /// Callbackfunktion, die bei einer Varieblen aufgerufen wird
   virtual void doMem(MemberBase &mem) = 0;
+  /// Zeigt an, ob gerade ein Array durchlaufen wird
+  bool inArray() const { return arrayIndex != SIZE_MAX; }
+  /// Ist das Element Teil eines Vektors, wird die Index-Position angezeigt, ansonsten ist der Wert \c SIZE_MAX
+  size_t arrayIndex = SIZE_MAX;
 };
 
 /// Basisklasse zum rekursiven Durchlauf über eine  \c const  Objektstruktur
@@ -726,6 +772,14 @@ public:
   virtual void doArrayEnd(const MemBaseVector &vec) = 0;
   /// Callbackfunktion, die bei einer Varieblen aufgerufen wird
   virtual void doMem(const MemberBase &mem) = 0;
+  /// Zeigt an, ob gerade ein Array durchlaufen wird
+  bool inArray() const { return arrayIndex != SIZE_MAX; }
+  /// Zeigt an, dass bereits ein Vaterobjekt \c null ist
+  bool inNull = false;
+  /// ist true, wenn ein \c traversKey durchgeführt wird
+  bool keyMode = false;
+  /// Ist das Element Teil eines Vektors, wird die Index-Position angezeigt, ansonsten ist der Wert \c SIZE_MAX
+  size_t arrayIndex = SIZE_MAX;
 };
 
 /// Basisiklasse zum sequentiellen Einfügen von Daten in ein Objekt
@@ -790,8 +844,12 @@ void MemberVector<T>::traverse(ObjTrav &trav)
 {
   if (trav.doArrayBeg(*this))
   {
-    for (auto w:werte)
+    size_t i = 0;
+    for (auto w:werte) {
+      trav.arrayIndex = i++;
       w->traverse(trav);
+    }
+    trav.arrayIndex = SIZE_MAX;
     trav.doArrayEnd(*this);
   }
 };
@@ -799,10 +857,17 @@ void MemberVector<T>::traverse(ObjTrav &trav)
 template<class T>
 void MemberVector<T>::traverse(ObjTravConst &trav) const
 {
+  bool inNull = trav.inNull;
   if (trav.doArrayBeg(*this))
   {
-    for (auto w:werte)
+    size_t i = 0;
+    for (auto w:werte) {
+      trav.inNull = inNull or isNull();
+      trav.arrayIndex = i++;
       w->traverse(trav);
+    }
+    trav.inNull = inNull;
+    trav.arrayIndex = SIZE_MAX;
     trav.doArrayEnd(*this);
   }
 };

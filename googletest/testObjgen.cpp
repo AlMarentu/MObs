@@ -483,6 +483,7 @@ TEST(objgenTest, usenullAndIndent) {
   // TODO korrekt? oder muss um Array ein <array> Tag?
   EXPECT_EQ(xml, rech.to_string(mobs::ConvObjToString().exportXml().doIndent()));
   EXPECT_EQ(json, rech.to_string(mobs::ConvObjToString().exportJson().doIndent()));
+//  std::cerr << rech.to_string(mobs::ConvObjToString().exportJson().doIndent()) << std::endl;
 
   
 
@@ -500,6 +501,7 @@ public:
   MemVar(int, dd, KEYELEMENT1);
   MemVar(int, ee);
 };
+class Obj2;
 
 class Obj1 : virtual public mobs::ObjectBase {
   public:
@@ -508,30 +510,94 @@ class Obj1 : virtual public mobs::ObjectBase {
   MemVar(int, xx);
   MemVar(int, yy, USENULL KEYELEMENT3);
   MemVar(int, zz);
-
   MemObj(Obj0, oo, USENULL KEYELEMENT2);
+  // rekursive vorwärts Deklaration Compiliert nicht
+  // MemObj(Obj2, rr, USENULL KEYELEMENT2);
+
 };
+
+class Obj2 : virtual public mobs::ObjectBase {
+  public:
+  ObjInit(Obj2);
+  MemVar(int, id, KEYELEMENT1);
+  MemVar(int, xx);
+  MemVector(Obj2, rekursiv_vector, USEVECNULL);
+
+  // rekursive Definition Compiliert nicht
+  // MemObj(Obj2, oo, USENULL KEYELEMENT2);
+};
+
+class KeyDump : virtual public mobs::ObjTravConst {
+public:
+  KeyDump(const mobs::ConvObjToString &c) : quoteKeys(c.withQuotes() ? "\"":""), cth(c) { };
+  virtual bool doObjBeg(const mobs::ObjectBase &obj) {
+    if (not obj.name().empty())
+      objNames.push(obj.getName(cth) + ".");
+    return true;
+  };
+  virtual void doObjEnd(const mobs::ObjectBase &obj) {
+    if (not objNames.empty())
+      objNames.pop();
+  };
+  virtual bool doArrayBeg(const mobs::MemBaseVector &vec) { return false; }
+  virtual void doArrayEnd(const mobs::MemBaseVector &vec) { }
+  virtual void doMem(const mobs::MemberBase &mem) {
+    std::string name;
+    if (not objNames.empty())
+      name = objNames.top();
+    name += mem.getName(cth);
+    if (not fst)
+      res << ",";
+    fst = false;
+    
+    res << quoteKeys << name << quoteKeys << ":";
+    if (inNull or mem.isNull())
+      res << "null";
+    else if (mem.is_chartype(cth))
+      res << mobs::to_quote(mem.toStr(cth));
+    else
+      res << mem.toStr(cth);
+  };
+  std::string result() { return res.str(); };
+private:
+  std::string quoteKeys;
+  bool fst = true;
+  stringstream res;
+  stack<std::string> objNames;
+  mobs::ConvObjToString cth;
+};
+
+std::string showKey(const mobs::ObjectBase &obj) {
+  KeyDump kd(mobs::ConvObjToString().exportExtendet());
+  obj.traverseKey(kd);
+  return kd.result();
+}
+
+
+
 
 TEST(objgenTest, keys) {
   Obj1 o;
   EXPECT_EQ(2, o.oo.key());
   EXPECT_EQ(3, o.yy.key());
   EXPECT_EQ(1, o.id.key());
-  EXPECT_EQ("0....", o.keyStr());
+  EXPECT_EQ("0,,,,", o.keyStr());
   o.oo.bb(7);
-  EXPECT_EQ("0.0.0.0.", o.keyStr());
+  EXPECT_EQ("0,0,0,0,", o.keyStr());
   o.oo.cc(211);
   o.oo.dd(212);
   o.oo.aa(220);
   o.id(1);
   o.yy(3);
-  EXPECT_EQ("1.211.212.220.3", o.keyStr());
-  EXPECT_EQ("1.211.212.220.3", o.keyStr());
+  EXPECT_EQ("1,211,212,220,3", o.keyStr());
+  EXPECT_EQ("1,211,212,220,3", o.keyStr());
+  // traversKey
+  EXPECT_EQ("id:1,oo.cc:211,oo.dd:212,oo.aa:220,yy:3", showKey(o));
+  o.oo.forceNull();
+  EXPECT_EQ("id:1,oo.cc:null,oo.dd:null,oo.aa:null,yy:3", showKey(o));
+
   // TODO test mit qouted string
 }
-
-
-
 
 class ObjX : virtual public mobs::ObjectBase {
 public:
@@ -542,7 +608,6 @@ ObjInit(ObjX);
   MemVar(int, c);
   MemObj(Obj0, o, USENULL ALTNAME(karlmann));
   MemVector(MemVarType(std::string), d, ALTNAME(ludwig));
-
 };
 
 TEST(objgenTest, conftoken) {

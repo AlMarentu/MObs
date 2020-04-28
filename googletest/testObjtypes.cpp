@@ -51,6 +51,14 @@ TEST(objtypeTest, to_string) {
 
 }
 
+TEST(objtypeTest, to_quote) {
+  EXPECT_EQ(u8"\"\"", mobs::to_quote(""));
+  EXPECT_EQ(u8"\"a\"", mobs::to_quote("a"));
+  EXPECT_EQ(u8"\"\"", mobs::to_quote("\0"));
+  EXPECT_EQ(u8"\"abc\"", mobs::to_quote("abc"));
+  EXPECT_EQ(u8"\"ab\\\"cd\\\"ef\"", mobs::to_quote("ab\"cd\"ef"));
+}
+
 TEST(objtypeTest, string2x) {
 
   char32_t c32;

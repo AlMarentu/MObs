@@ -26,82 +26,23 @@ using namespace std;
 
 namespace mobs {
 
-#if 0
-string to_string(const ObjectBase &obj) {
-  
-  class ObjDump : virtual public ObjTravConst {
-  public:
-    virtual void doObjBeg(ObjTravConst &ot, const ObjectBase &obj)
-    {
-      if (not fst)
-        res << ",";
-      fst = true;
-      if (not obj.name().empty())
-        res << obj.name() << ":";
-      if (obj.isNull())
-        res << "null";
-      else
-        res << "{";
-    };
-    virtual void doObjEnd(ObjTravConst &ot, const ObjectBase &obj)
-    {
-      if (not obj.isNull())
-        res << "}";
-      fst = false;
-    };
-    virtual void doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec)
-    {
-      if (not fst)
-        res << ",";
-      fst = false;
-      res << vec.name() << ":[";
-    };
-    virtual void doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec)
-    {
-      res << "]";
-      fst = false;
-    };
-    virtual void doMem(ObjTravConst &ot, const MemberBase &mem)
-    {
-      if (not fst)
-        res << ",";
-      fst = false;
-      res << boolalpha << mem.name() << ":";
-      if (mem.isNull())
-        res << "null";
-      else if (mem.is_chartype())
-      {
-        res << '"';
-        string s = mem.toStr();
-        if (s.length() > 1 and s[0] != 0)
-        {
-          size_t pos = 0;
-          size_t pos2 = 0;
-          while ((pos = s.find('"', pos2)) != string::npos)
-          {
-            res << s.substr(pos2, pos - pos2) << "\\\"";
-            pos2 = pos+1;
-          }
-          res << s.substr(pos2);
-        }
-        res << '"';
 
-      }
-      else
-        mem.strOut(res);
-      
-    };
-    std::string result() const { return res.str(); };
-  private:
-    bool fst = true;
-    stringstream res;
-  };
-  
-  ObjDump od;
-  obj.traverse(od);
-  return od.result();
+std::string to_quote(const std::string &s) {
+  string result = "\"";
+  if (s.length() > 1 or s[0] != 0)
+  {
+    size_t pos = 0;
+    size_t pos2 = 0;
+    while ((pos = s.find('"', pos2)) != string::npos)
+    {
+      result += s.substr(pos2, pos - pos2) + "\\\"";
+      pos2 = pos+1;
+    }
+    result += s.substr(pos2);
+  }
+  result += '"';
+  return result;
 }
-#endif
 
 template<>
 /// \private
@@ -252,6 +193,102 @@ std::string to_string(long double t) {
   str << t;
   return str.str();
 }
+
+
+
+template<>
+bool to_int64(int t, int64_t &i, int64_t &min, uint64_t &max)
+{ i = t; min = std::numeric_limits<int>::min(); max = std::numeric_limits<int>::max(); return true; }
+template<>
+bool to_int64(short int t, int64_t &i, int64_t &min, uint64_t &max)
+{ i = t; min = std::numeric_limits<short int>::min(); max = std::numeric_limits<short int>::max(); return true; }
+template<>
+bool to_int64(long int t, int64_t &i, int64_t &min, uint64_t &max)
+{ i = t; min = std::numeric_limits<long int>::min(); max = std::numeric_limits<long int>::max(); return true; }
+template<>
+bool to_int64(long long int t, int64_t &i, int64_t &min, uint64_t &max)
+{ i = t; min = std::numeric_limits<long long int>::min(); max = std::numeric_limits<long long int>::max(); return true; }
+template<>
+bool to_uint64(unsigned int t, uint64_t &u, uint64_t &max)
+{ u = t; max = std::numeric_limits<unsigned int>::max(); return true; }
+template<>
+bool to_uint64(unsigned short int t, uint64_t &u, uint64_t &max)
+{ u = t; max = std::numeric_limits<unsigned short int>::max(); return true; }
+template<>
+bool to_uint64(unsigned long int t, uint64_t &u, uint64_t &max)
+{ u = t; max = std::numeric_limits<unsigned long int>::max(); return true; }
+template<>
+bool to_uint64(unsigned long long int t, uint64_t &u, uint64_t &max)
+{ u = t; max = std::numeric_limits<unsigned long long int>::max(); return true; }
+template<>
+bool to_uint64(bool t, uint64_t &u, uint64_t &max)
+{ u = t ? 1:0; max = 1; return true; }
+template<>
+bool to_double(double t, double &d) { d = t; return true; }
+template<>
+bool to_double(float t, double &d) { d = t; return true; }
+//template<>
+//bool to_double(long double t, double &d) { d = t; return true; }
+
+template<>
+bool from_number(int64_t i, int &t) {
+  if (i > std::numeric_limits<int>::max() or i < std::numeric_limits<int>::min()) return false;
+  t = ( int)i;
+  return true;
+}
+template<>
+bool from_number(int64_t i, short int &t) {
+  if (i > std::numeric_limits<short int>::max() or i < std::numeric_limits<short int>::min()) return false;
+  t = (short int)i;
+  return true;
+}
+template<>
+bool from_number(int64_t i, long int &t) {
+  if (i > std::numeric_limits<long int>::max() or i < std::numeric_limits<long int>::min()) return false;
+  t = (long int)i;
+  return true;
+}
+template<>
+bool from_number(int64_t i, long long int &t) {
+  if (i > std::numeric_limits<long long int>::max() or i < std::numeric_limits<long long int>::min()) return false;
+  t = (long long int)i;
+  return true;
+}
+template<>
+bool from_number(uint64_t u, unsigned int &t) {
+  if (u > std::numeric_limits<unsigned int>::max()) return false;
+  t = (unsigned int)u;
+  return true;
+}
+template<>
+bool from_number(uint64_t u, unsigned short int &t) {
+  if (u > std::numeric_limits<unsigned short int>::max()) return false;
+  t = (unsigned short int)u;
+  return true;
+}
+template<>
+bool from_number(uint64_t u, unsigned long int &t) {
+  if (u > std::numeric_limits<unsigned long int>::max()) return false;
+  t = (unsigned long int)u;
+  return true;
+}
+template<>
+bool from_number(uint64_t u, unsigned long long int &t) {
+  if (u > std::numeric_limits<unsigned long long int>::max()) return false;
+  t = (unsigned long long int)u;
+  return true;
+}
+template<>
+bool from_number(uint64_t u, bool &t) {
+  if (u > 1) return false;
+  t = u != 0;
+  return true;
+}
+template<>
+bool from_number(double d, float &t) { t = d; return true; }
+template<>
+bool from_number(double d, double &t) { t = d; return true; }
+
 
 
 class ConvFromStrHintDefault : virtual public ConvFromStrHint {

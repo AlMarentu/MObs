@@ -67,6 +67,12 @@ void MemberBase::activate()
     m_parent->activate();
 }
 
+std::string MemberBase::getName(const ConvToStrHint &cth) const {
+  size_t n = m_parent and cth.useAltNames() ? m_altName : SIZE_T_MAX;
+  return (n == SIZE_T_MAX) ? name() : m_parent->getConf(n);
+}
+
+
 
 
 void MemBaseVector::activate()
@@ -88,9 +94,21 @@ void MemBaseVector::doConfig(MemVarCfg c)
   
 }
 
+std::string MemBaseVector::getName(const ConvToStrHint &cth) const {
+  size_t n = m_parent and cth.useAltNames() ? m_altName : SIZE_T_MAX;
+  return (n == SIZE_T_MAX) ? name() : m_parent->getConf(n);
+}
+
+
 /////////////////////////////////////////////////
 /// ObjectBase
 /////////////////////////////////////////////////
+
+std::string ObjectBase::getName(const ConvToStrHint &cth) const {
+  size_t n = m_parent and cth.useAltNames() ? m_altName : SIZE_T_MAX;
+  return (n == SIZE_T_MAX) ? name() : m_parent->getConf(n);
+}
+
 
 void ObjectBase::activate()
 {
@@ -225,20 +243,24 @@ MemberBase &ObjectBase::get(string name)
 
 void ObjectBase::traverse(ObjTravConst &trav) const
 {
+  bool inNull = trav.inNull;
+  
   if (trav.doObjBeg(*this))
   {
+    size_t arrayIndex = trav.arrayIndex;
     for (auto const &m:mlist)
     {
+      trav.arrayIndex = SIZE_MAX;
+      trav.inNull = inNull or isNull();
       if (m.mem)
         m.mem->traverse(trav);
       if (m.vec)
         m.vec->traverse(trav);
       if (m.obj)
-      {
-        //cerr << "ooo " << m.obj->varName()  << endl;
         m.obj->traverse(trav);
-      }
     }
+    trav.inNull = inNull;
+    trav.arrayIndex = arrayIndex;
     trav.doObjEnd(*this);
   }
 }
@@ -247,8 +269,10 @@ void ObjectBase::traverse(ObjTrav &trav)
 {
   if (trav.doObjBeg(*this))
   {
+    size_t arrayIndex = trav.arrayIndex;
     for (auto const &m:mlist)
     {
+      trav.arrayIndex = SIZE_MAX;
       if (m.mem)
         m.mem->traverse(trav);
       if (m.vec)
@@ -259,11 +283,12 @@ void ObjectBase::traverse(ObjTrav &trav)
         m.obj->traverse(trav);
       }
     }
+    trav.arrayIndex = arrayIndex;
     trav.doObjEnd(*this);
   }
 }
 
-void ObjectBase::getKey(std::list<std::string> &key, const ConvToStrHint &cth) const
+void ObjectBase::traverseKey(ObjTravConst &trav) const
 {
   // Element-Liste nach Key-Nummer sortieren
   multimap<int, const MlistInfo *> tmp;
@@ -274,47 +299,55 @@ void ObjectBase::getKey(std::list<std::string> &key, const ConvToStrHint &cth) c
     if (m.obj and m.obj->key() > 0)
       tmp.insert(make_pair(m.obj->key(), &m));
   }
-  // Key-Elemente an Liste hängen
+  // Key-Elemente jetzt in richtiger Reihenfolge durchgehen
+  bool inNull = trav.inNull;
+  trav.keyMode = true;
+  trav.doObjBeg(*this);
   for (auto const &i:tmp)
   {
     auto &m = *i.second;
+    trav.inNull = inNull or isNull();
     if (m.mem)
-    {
-      if (isNull() or m.mem->isNull())
-        key.push_back("");
-      else
-        key.push_back(m.mem->toStr(cth));
-    }
+      trav.doMem(*m.mem);
     if (m.obj)
-    {
-      list<string> keyTmp;
-      m.obj->getKey(keyTmp, cth);
-      if (isNull())
-        for (auto i:keyTmp)
-          key.push_back("");
-      else
-        key.splice(key.end(), keyTmp);
-    }
+      m.obj->traverseKey(trav);
   }
+  trav.inNull = inNull;
+  trav.doObjEnd(*this);
 }
 
 std::string ObjectBase::keyStr() const
 {
+  class KeyDump : virtual public mobs::ObjTravConst {
+  public:
+    KeyDump(const mobs::ConvToStrHint &c) : cth(c) { };
+    virtual bool doObjBeg(const mobs::ObjectBase &obj) { return true; };
+    virtual void doObjEnd(const mobs::ObjectBase &obj) { };
+    virtual bool doArrayBeg(const mobs::MemBaseVector &vec) { return false; }
+    virtual void doArrayEnd(const mobs::MemBaseVector &vec) { }
+    virtual void doMem(const mobs::MemberBase &mem) {
+      if (not fst)
+        res << ",";
+      fst = false;
+      if (inNull or mem.isNull())
+        ;
+      else if (mem.is_chartype(cth))
+        res << mobs::to_quote(mem.toStr(cth));
+      else
+        res << mem.toStr(cth);
+    };
+    std::string result() { return res.str(); };
+  private:
+    bool fst = true;
+    stringstream res;
+    mobs::ConvToStrHint cth;
+  };
+
+
   ConvToStrHint cth(false);
-  list<string> key;
-  getKey(key, cth);
-  stringstream s;
-  bool f = true;
-  for (auto const &k:key)
-  {
-    // TODO Quoten
-    if (f)
-      f = false;
-    else
-      s << '.';
-    s << k;
-  }
-  return s.str();
+  KeyDump kd(cth);
+  traverseKey(kd);
+  return kd.result();
 }
 
 /////////////////////////////////////////////////
@@ -679,7 +712,7 @@ void ObjectNavigator::pushObject(ObjectBase &obj, const std::string &name) {
 namespace  {
 class ObjDump : virtual public ObjTravConst {
 public:
-  ObjDump(const ConvObjToString &c) : quoteKeys(c.withQuotes() ? "\"":""), cth(c) { inArray.push(false); };
+  ObjDump(const ConvObjToString &c) : quoteKeys(c.withQuotes() ? "\"":""), cth(c) { };
   void newline() {
     if (needBreak and cth.withIndentation())
     {
@@ -698,19 +731,15 @@ public:
     newline();
     fst = true;
     if (not obj.name().empty())
-    {
-      size_t n = obj.parent() and cth.useAltNames() ? obj.cAltName() : SIZE_T_MAX;
-      res << quoteKeys << (n == SIZE_T_MAX ? obj.name() : obj.parent()->getConf(n)) << quoteKeys << ":";
-    }
+      res << quoteKeys << obj.getName(cth) << quoteKeys << ":";
     if (obj.isNull())
     {
       res << "null";
       fst = false;
-//      if (inArray.empty() or not inArray.top())
-        needBreak = true;
+//      if (inArray())
+      needBreak = true;
       return false;
     }
-    inArray.push(false);
     res << "{";
     needBreak = true;
     level++;
@@ -723,21 +752,19 @@ public:
     level--;
     newline();
     res << "}";
-    fst = false;
-    inArray.pop();
-    if (inArray.empty() or not inArray.top())
+    if (level == 0)
       needBreak = true;
+    fst = false;
   };
   virtual bool doArrayBeg(const MemBaseVector &vec)
   {
     if (vec.isNull() and cth.omitNull())
       return false;
-    size_t n = vec.parent() and cth.useAltNames() ? vec.cAltName() : SIZE_T_MAX;
     if (not fst)
       res << ",";
     newline();
     fst = true;
-    res << quoteKeys << (n == SIZE_T_MAX ? vec.name() : vec.parent()->getConf(n)) << quoteKeys << ":";
+    res << quoteKeys << vec.getName(cth) << quoteKeys << ":";
     needBreak = true;
     if (vec.isNull())
     {
@@ -745,7 +772,6 @@ public:
       fst = false;
       return false;
     }
-    inArray.push(true);
     res << "[";
     return true;
   };
@@ -753,40 +779,22 @@ public:
   {
     res << "]";
     fst = false;
-    inArray.pop();
     needBreak = true;
   };
   virtual void doMem(const MemberBase &mem)
   {
     if (mem.isNull() and cth.omitNull())
       return;
-    size_t n = mem.parent() and cth.useAltNames() ? mem.cAltName() : SIZE_T_MAX;
     if (not fst)
       res << ",";
     newline();
     fst = false;
-    if (not inArray.empty() and not inArray.top())
-      res << boolalpha << quoteKeys << (n == SIZE_T_MAX ? mem.name() : mem.parent()->getConf(n)) << quoteKeys << ":";
+    if (not inArray())
+      res << boolalpha << quoteKeys << mem.getName(cth) << quoteKeys << ":";
     if (mem.isNull())
       res << "null";
     else if (mem.is_chartype(cth))
-    {
-      res << '"';
-      string s = mem.toStr(cth);
-      if (s.length() != 1 or s[0] != 0)
-      {
-        size_t pos = 0;
-        size_t pos2 = 0;
-        while ((pos = s.find('"', pos2)) != string::npos)
-        {
-          res << s.substr(pos2, pos - pos2) << "\\\"";
-          pos2 = pos+1;
-        }
-        res << s.substr(pos2);
-      }
-      res << '"';
-
-    }
+      res << mobs::to_quote(mem.toStr(cth));
     else
       res << mem.toStr(cth);
     needBreak = true;
@@ -798,7 +806,6 @@ private:
   bool needBreak = false;
   int level = 0;
   stringstream res;
-  stack<bool> inArray;
   ConvObjToString cth;
 };
 
