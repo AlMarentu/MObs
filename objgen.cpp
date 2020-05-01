@@ -138,7 +138,10 @@ void ObjectBase::regMem(MemberBase *mem)
 
 void ObjectBase::regObj(ObjectBase *obj)
 {
-  mlist.push_back(MlistInfo(0, obj, 0));
+  if (obj == nullptr) // used by MobsUnion
+    mlist.clear();
+  else
+    mlist.push_back(MlistInfo(0, obj, 0));
 }
 
 void ObjectBase::regArray(MemBaseVector *vec)
@@ -146,20 +149,20 @@ void ObjectBase::regArray(MemBaseVector *vec)
   mlist.push_back(MlistInfo(0, 0, vec));
 }
 
-map<string, ObjectBase *(*)()> ObjectBase::createMap;
+map<string, ObjectBase *(*)(ObjectBase *)> ObjectBase::createMap;
 
-void ObjectBase::regObject(string n, ObjectBase *fun())
+void ObjectBase::regObject(string n, ObjectBase *fun(ObjectBase *))
 {
   TRACE(PARAM(n));
   createMap[n] = fun;
 }
 
-ObjectBase *ObjectBase::createObj(string n)
+ObjectBase *ObjectBase::createObj(string n, ObjectBase *p)
 {
   auto it = createMap.find(n);
   if (it == createMap.end())
     return 0;
-  return (*it).second();
+  return (*it).second(p);
 }
 
 MemberBase *ObjectBase::getMemInfo(const std::string &name)
@@ -192,7 +195,7 @@ MemBaseVector *ObjectBase::getVecInfo(const std::string &name)
   return 0;
 }
 
-size_t ObjectBase::findConfToken(const std::string &name)
+size_t ObjectBase::findConfToken(const std::string &name) const
 {
   auto i = find(m_confToken.begin(), m_confToken.end(), name);
   if (i == m_confToken.end())
@@ -200,7 +203,7 @@ size_t ObjectBase::findConfToken(const std::string &name)
   return distance(m_confToken.begin(), i);
 }
 
-MemberBase *ObjectBase::getMemInfo(const size_t ctok)
+MemberBase *ObjectBase::getMemInfo(size_t ctok) const
 {
   for (auto i:mlist)
   {
@@ -210,17 +213,23 @@ MemberBase *ObjectBase::getMemInfo(const size_t ctok)
   return 0;
 }
 
-ObjectBase *ObjectBase::getObjInfo(const size_t ctok)
+ObjectBase *ObjectBase::getObjInfo(size_t ctok) const
 {
-  for (auto i:mlist)
-  {
-    if (i.obj and ctok == i.obj->cAltName())
-      return i.obj;
-  }
+//  if (ctok == SIZE_T_MAX) // MobsUnion-object
+//  {
+//    if (mlist.size() == 1)
+//      return mlist.front().obj;
+//  }
+//  else
+    for (auto i:mlist)
+    {
+      if (i.obj and ctok == i.obj->cAltName())
+        return i.obj;
+    }
   return 0;
 }
 
-MemBaseVector *ObjectBase::getVecInfo(const size_t ctok)
+MemBaseVector *ObjectBase::getVecInfo(size_t ctok) const
 {
   for (auto i:mlist)
   {
@@ -404,7 +413,7 @@ void ObjectBase::doCopy(const ObjectBase &other)
 }
 
 /////////////////////////////////////////////////
-/// ObjectBae::clear
+/// ObjectBase::clear
 /////////////////////////////////////////////////
 
 void ObjectBase::clear()
@@ -422,6 +431,7 @@ void ObjectBase::clear()
     setNull(true);
   else
     activate();
+  cleared(); // Callback
 }
 
 
@@ -577,7 +587,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
   memName = objekte.top().objName;
   memBase = nullptr;
   size_t altNamtok = SIZE_T_MAX;
-  //    LOG(LM_DEBUG, "Sind im Object " << memName);
+//  LOG(LM_DEBUG, "Im Object " << memName);
   if (objekte.top().obj)
   {
     if (cfs.acceptAltNames())
@@ -611,7 +621,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
           s = index;
         v->resize(s+1);
       }
-//              LOG(LM_INFO, element << " ist ein Vector " << s);
+//      LOG(LM_INFO, element << " ist ein Vector " << s);
       memName += ".";
       memName += v->name();
       memName += "[";
@@ -624,7 +634,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
       ObjectBase *o = v->getObjInfo(s);
       if (o)
       {
-        //          cerr << "Objekt" << endl;
+//        LOG(LM_INFO, "Obkekt")
         objekte.push(ObjectNavigator::Objekt(o, memName));
         return true;
       }
@@ -632,7 +642,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
       {
         memName += m->name();
         memBase = m;
-        //          LOG(LM_INFO, "Member: " << memName)
+        //        LOG(LM_INFO, "Member: " << memName)
         return true;
       }
       // Vector-element ist weder von MemberBase noch von ObjectBase abgeleitet
@@ -653,7 +663,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
       }
       if (o)
       {
-        //        LOG(LM_INFO, element << " ist ein Objekt");
+//        LOG(LM_INFO, element << " ist ein Objekt");
         memName += "." + o->name();
         objekte.push(ObjectNavigator::Objekt(o, memName));
         return true;
@@ -669,7 +679,6 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
       }
       if (m)
       {
-        //        cerr << element << " ist ein Member" << endl;
         memName += "." + m->name();
         memBase = m;
         //        LOG(LM_INFO, "Member: " << memName);
@@ -688,6 +697,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
 
 void ObjectNavigator::leave(const std::string &element) {
   TRACE(PARAM(element));
+//  LOG(LM_INFO, "leave " << element)
   if (memBase)  // letzte Ebene war ein MemberVariable
     memBase = nullptr;
   else if (objekte.empty() or path.empty())

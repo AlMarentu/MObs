@@ -1,21 +1,24 @@
 # :vim noet
 
-CXX     = clang++
+#CXX     = clang++
 
-TARGETS		= db tests
+TARGETS		= gtests db
 
+# Includepfade für googletest
 CPPFLAGS	= -I/usr/local/include -I.
+LDFLAGS		= -L/usr/local/lib
 CXXFLAGS	= -std=c++11 -g -Wall
 LDLIBS		= 
-LDFLAGS		= -L/usr/local/lib
 
 all::	$(TARGETS)
 	
 
-clean::
-	$(RM) *.o $(TARGETS)
+testobjects := $(patsubst %.cpp,%.o,$(wildcard googletest/*.cpp))
 
-mobs.a: objgen.o logging.o objpool.o dumpjson.o readjson.o xmlout.o xmlread.o
+clean::
+	$(RM) *.o $(TARGETS) $(testobjects)
+
+mobs.a: objgen.o objtypes.o logging.o strtoobj.o objpool.o xmlout.o xmlread.o unixtime.o 
 	$(AR) -rc $@ $^
 
 # Achtung linkage: objgen.o immer zuerst
@@ -23,12 +26,11 @@ mobs.a: objgen.o logging.o objpool.o dumpjson.o readjson.o xmlout.o xmlread.o
 db: mobs.a db.o 
 	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $^
 
-#testobjects := $(patsubst %.cpp,%.o,$(wildcard googletest/*.cpp))
-
-tests: mobs.a googletest/testObjgen.o
+gtests: mobs.a $(testobjects)
 	$(CXX) $(LDFLAGS) $(LDLIBS) -lgtest_main  -lgtest -o $@ $^
+	./gtests
 # -lpthread
 
-doc: 
+doc:
 	doxygen doxygen.conf
 

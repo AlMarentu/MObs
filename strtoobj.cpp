@@ -51,10 +51,10 @@ void string2Obj(const std::string &str, ObjectBase &obj, ConvObjFromStr cfh)
     }
     void StartObject() {
       TRACE(PARAM(lastKey));
+      if (++level > 1)
+        enter(lastKey, currentIdx);
       index.push(currentIdx);
       currentIdx = SIZE_T_MAX;
-      if (++level > 1)
-        enter(lastKey);
     }
     void Key(const string &key) {
       lastKey = key;
@@ -62,12 +62,14 @@ void string2Obj(const std::string &str, ObjectBase &obj, ConvObjFromStr cfh)
     void EndObject() {
       TRACE("");
       lastKey = current();
-      if (level-- > 1)
-        leave();
       if (index.empty())
         throw runtime_error(u8"string2Obj: Structure invalid");
       currentIdx = index.top();
       index.pop();
+      if (level-- > 1)
+        leave();
+      if (currentIdx != SIZE_T_MAX)
+        currentIdx++;
     }
     void StartArray() {
       TRACE("");

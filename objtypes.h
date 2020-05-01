@@ -55,7 +55,7 @@ bool string_to_##typ(std::string s, enum typ &x) { size_t p = 0; for (auto const
 class Str##typ##Conv { \
 public: \
   static inline bool c_string2x(const std::string &str, typ &t, const ::mobs::ConvFromStrHint &cfh) { if (cfh.acceptExtented()) { if (string_to_##typ(str, t)) return true; } \
-                                                    if (not cfh.acceptCompact()) return false; int i; if (not ::mobs::string2x(str, i)) return false; t = typ(i); return true; } \
+       if (not cfh.acceptCompact()) return false; int i; if (not ::mobs::string2x(str, i)) return false; t = typ(i); return true; } \
   static inline bool c_wstring2x(const std::wstring &wstr, typ &t, const ::mobs::ConvFromStrHint &cfh) { return c_string2x(::mobs::to_string(wstr), t, cfh); } \
   static inline std::string c_to_string(typ t, const ::mobs::ConvToStrHint &cth) { return cth.compact() ? ::mobs::to_string(int(t)) : typ##_to_string(t); } \
   static inline bool c_is_chartype(const ::mobs::ConvToStrHint &cth) { return not cth.compact(); } \

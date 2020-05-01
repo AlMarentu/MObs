@@ -161,6 +161,19 @@ cout << b->kontakte[1].number();
 cout << b->to_string();  // Ausgabe als vereinfachtes JSON
 ~~~~~~~~~~
 
+### Dynamische Objekte
+Mobs-Objekte könne einen dynamischen Anteil in form von Ableitungen einer Basisklasse enthalten.
+
+Dazu existiert eine Methode um beliebige Mobs-Objekte einer Basisiklasse in einen Vektor<MobsUnion> aufzunehmen. Das Objekt eines solchen 
+MobsUnions kann zur Laufzeit ausgetauscht werden.
+
+### Null-Values
+Alle Elemente haben zusätliche Eigenschaften für NULL.
+Wurde eine Variable mit "USENULL" definiert, so wir sie standartmäßig mit null initialisiert.
+Dies kann zur Laufzeit über  nullAllowed(bool) angepasst werden. 
+Wird ein Objekt auf null gesetzt, werden alle Unterelemente ebenfalls gelöscht.
+Wird Unterelement eines null-Objektes beschrieben, so wird automatisch der null-Status aufgehoben
+
 ### Serialisierung
 Die Umwandlung von Mobs in einen std::string erfolgt über die .to_string() Metode.
 
@@ -213,13 +226,6 @@ ausgelöste werden.
 Über den ObjectNavaigator könne Objekte-Teile gezielt angesprochen werden.
 
 
-### Null-Values
-Alle Elemente haben zusätliche Eigenschaften für NULL.
-Wurde eine Variable mit "USENULL" definiert, so wir sie standartmäßig mit null initialisiert.
-Dies kann zur Laufzeit über  nullAllowed(bool) angepasst werden. 
-Wird ein Objekt auf null gesetzt, werden alle Unterelemente ebenfalls gelöscht.
-Wird Unterelement eines null-Objektes beschrieben, so wird automatisch der null-Status aufgehoben
-
 ## Objektverwaltung NamedPool
 Über ein extra Modul könen beliebige Objekte in einen Pool abgelegt werden. Der Zugriff erfogt nur
 über den Objekt-Namen.
@@ -234,15 +240,15 @@ usw. realiesieren
 ## Installation
 Zum Übersetzen wird ein c++11 Compiler inkl. STL benötigt. Für die Test-Suite wird googletest benötigt
 Die Entwicklung efolgt mit clang version 11.0.3, sollte aber auch mit anderen Compilern funktionieren
-Einige optionale Module benötigen rapidjson (dumpjson und readjson) diese dienen nur als Beispiel und können  ohne Funktionseinschränkung weggelassen werden
 
-Das Makefile ist rudimentär und eine Installationsroutine fehlen noch. 
+Das Makefile ist rudimentär und eine Installationsroutine fehlt noch. 
 
 Dies folgt in einer späteren Version
 
 ## Module
 * objtypes.h Typ-Deklarationen
 * objgen.h  Deklaration um die Zielklassen zu generieren
+* union.h  Deklaration um ein MobsUnion zu generieren
 * jsonparser.h  Einfacher JSON-Parser
 * xmlparser.h  Einfacher XML-Parser
 * xmlout.h  Klasse um  XML zu generieren

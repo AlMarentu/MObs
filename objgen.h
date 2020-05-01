@@ -180,13 +180,13 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
  @param objname Name der Klasse (muss von ObjecBase abgeleitet sein)
  */
 #define ObjInit(objname) \
-objname() { TRACE(""); doInit(); init(); }; \
-objname(const objname &that) { TRACE(""); doCopy(that); }; \
-objname(mobs::MemBaseVector *m, mobs::ObjectBase *o, mobs::MemVarCfg c1 = mobs::Unset, mobs::MemVarCfg c2 = mobs::Unset, mobs::MemVarCfg c3 = mobs::Unset) : ObjectBase(m, o, c1, c2, c3) { TRACE(""); doInit(); init(); }; \
-objname(std::string name, ObjectBase *t, mobs::MemVarCfg c1 = mobs::Unset, mobs::MemVarCfg c2 = mobs::Unset, mobs::MemVarCfg c3 = mobs::Unset) : ObjectBase(name, t, c1, c2, c3) { TRACE(PARAM(name) << PARAM(this)); if (t) t->regObj(this); doInit(); init(); }; \
-objname &operator=(const objname &rhs) { TRACE(""); if (this != &rhs) { doCopy(rhs); } return *this; }; \
-static ObjectBase *createMe() { return new objname; } ; \
-virtual std::string typName() const { return #objname; };
+objname() { TRACE(""); doInit(); init(); } \
+objname(const objname &that) { TRACE(""); doCopy(that); } \
+objname(mobs::MemBaseVector *m, mobs::ObjectBase *o, mobs::MemVarCfg c1 = mobs::Unset, mobs::MemVarCfg c2 = mobs::Unset, mobs::MemVarCfg c3 = mobs::Unset) : ObjectBase(m, o, c1, c2, c3) { TRACE(""); doInit(); init(); } \
+objname(std::string name, ObjectBase *t, mobs::MemVarCfg c1 = mobs::Unset, mobs::MemVarCfg c2 = mobs::Unset, mobs::MemVarCfg c3 = mobs::Unset) : ObjectBase(name, t, c1, c2, c3) { TRACE(PARAM(name) << PARAM(this)); if (t) t->regObj(this); doInit(); init(); } \
+objname &operator=(const objname &rhs) { TRACE(""); if (this != &rhs) { doCopy(rhs); } return *this; } \
+static ObjectBase *createMe(ObjectBase *parent = nullptr) { return new objname(parent ? #objname:"", parent); } \
+virtual std::string typName() const { return #objname; }
 
 /*! \brief Makro um eine Objektklasse am Ojekt-Generator anzumelden
  @param name Name des Objektes
@@ -401,6 +401,8 @@ public:
   virtual std::string typName() const { return ""; }
   /// Callback-Funktion die einmalig im Constructor aufgerufen wird
   virtual void init() {};
+  /// Callback-Funktion die nach einem \c clear aufgerufen wird
+  virtual void cleared() {};
   /// liefert den Namen Membervariablen
   std::string name() const { return m_varNam; };
   /// Config-Token-Id alternativer Name oder \c SIZE_T_MAX
@@ -423,18 +425,18 @@ public:
   /// Suche eine Member-Objekt
   /// @param name Name des zu suchenden Objektes
   /// @return Zeiger auf Objekt \c ObjecBase oder \c nullptr
-  ObjectBase *getObjInfo(const std::string &name);
+  virtual ObjectBase *getObjInfo(const std::string &name);
   /// Suche einen Vector von Membervariablen oder Objekten
   /// @param name Name der zu suchenden Variable
   /// @return Zeiger auf Objekt \c MemBaseVector oder \c nullptr
   MemBaseVector *getVecInfo(const std::string &name);
 
   /// \private
-  static void regObject(std::string n, ObjectBase *fun());
+  static void regObject(std::string n, ObjectBase *fun(ObjectBase *));
   /// \brief Erzeuge ein neues Objekt
   /// @param n Typname des Objektes
   /// @return Zeiger auf das erzeugte Objekt oder \c nullptr falls ein solches Objekt nicht refgistriert wurde \see ObjRegister(name)
-  static ObjectBase *createObj(std::string n);
+  static ObjectBase *createObj(std::string n, ObjectBase *p = nullptr);
   /// Setze Inhalt auf leer, d.h. alle Vektoren sowie Unterobjekte und Varieblen werden gelöscht,
   void clear();
   /// Setze Inhalt auf null
@@ -457,7 +459,7 @@ public:
   /// \brief Kopiere ein Objekt aus einem bereits vorhandenen.
   /// @param other zu Kopierendes Objekt
   /// \throw runtime_error Sind die Strukturen nicht identisch, wird eine Exception erzeugt
-  void doCopy(const ObjectBase &other);
+  virtual void doCopy(const ObjectBase &other);
   /// Zeiger auf Vater-Objekt
   ObjectBase *parent() const { return m_parent; }
   /// Config-Token lesen
@@ -467,13 +469,13 @@ public:
 
 
   /// \private
-  size_t findConfToken(const std::string &name);
+  size_t findConfToken(const std::string &name) const;
   /// \private
-  MemberBase *getMemInfo(const size_t ctok);
+  MemberBase *getMemInfo(size_t ctok) const;
   /// \private
-  ObjectBase *getObjInfo(const size_t ctok);
+  ObjectBase *getObjInfo(size_t ctok) const;
   /// \private
-  MemBaseVector *getVecInfo(const size_t ctok);
+  MemBaseVector *getVecInfo(size_t ctok) const;
 
 
 protected:
@@ -500,7 +502,7 @@ private:
     MemBaseVector *vec = 0;
   };
   std::list<MlistInfo> mlist;
-  static std::map<std::string, ObjectBase *(*)()> createMap;
+  static std::map<std::string, ObjectBase *(*)(ObjectBase *)> createMap;
   
 };
 
@@ -658,7 +660,10 @@ public:
   virtual void traverse(ObjTravConst &trav) const;
   virtual MemberBase *getMemInfo(size_t i) { if (i >= size()) return 0; return dynamic_cast<MemberBase *>(werte[i]); }
   virtual ObjectBase *getObjInfo(size_t i) { if (i >= size()) return 0; return dynamic_cast<ObjectBase *>(werte[i]); }
- 
+
+  /// wegen Gewohnheit:
+  void push_back(const T &t) { operator[](size()) = t; }
+  
   /// Typ-Deklaration iterator auf Vector
   typedef MemberVectorIterator<T> iterator;
   /// Typ-Deklaration iterator auf Vector

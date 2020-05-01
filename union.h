@@ -37,7 +37,9 @@ namespace mobs {
 template <class T>
 /** \brief Klasse um verschiedene Objekte einer Basisklasse in einem Mobs-Vektor zu speichern
  
- \see MemVar
+ \see MemVector
+ 
+ Beispiel:
  \code
  
  // Deklaration einer Basisklasse
@@ -51,7 +53,7 @@ public:
  virtual Obj2 &toObj2() { throw runtime_error("invalid cast"); };
 };
 
- // Deklaration Variante 0
+ // Deklaration Variante 1
 class Obj0 : virtual public BaseObj, virtual public mobs::ObjectBase {
 public:
   ObjInit(Obj0);
@@ -63,7 +65,7 @@ public:
  // Objekt muss registriert werden
 ObjRegister(Obj0);
 
- // Deklaration Variante 0
+ // Deklaration Variante 2
 class Obj1 : virtual public BaseObj, virtual public mobs::ObjectBase {
   public:
   ObjInit(Obj1);
@@ -74,6 +76,7 @@ class Obj1 : virtual public BaseObj, virtual public mobs::ObjectBase {
 };
 ObjRegister(Obj1);
 
+// Deklaration Variante 3
 class Obj2 : virtual BaseObj, virtual public mobs::ObjectBase {
   public:
   ObjInit(Obj2);
@@ -108,36 +111,34 @@ class MobsUnion : virtual public mobs::ObjectBase {
 public:
   /// \private
   ObjInit(MobsUnion);
-  ~MobsUnion() { if (obj) delete obj; obj = nullptr; }
+  ~MobsUnion() { if (m_obj) delete m_obj; }
   /// liefert den Objekttyp des Unions oder \e leer  wenn nicht gesetzt
-  std::string type() const { if (obj) return obj->typName(); return ""; }
+  std::string type() const { if (m_obj) return m_obj->typName(); return ""; }
   /// setzt den Objekttyp des Unions, keine Aktion benn der Typ bereits passt
   /// @param t Objekttyp (muss mit \c ObjRegister) registriert sein; ist t leer, so wird das Objekt gelöscht
-  /// \throw runtime_erroe wenn der Objekttyp nicht von der Basisklasse \c T abgeleitet ist
+  /// \throw runtime_error wenn der Objekttyp nicht von der Basisklasse \c T abgeleitet ist
   void setType(std::string t);
   /// Übernehme eine Kopie des angegebenen Objektes
-  void operator() (const T &t) { setType(t.typName()); obj->doCopy(t); activate(); }
+  void operator() (const T &t) { setType(t.typName()); m_obj->doCopy(t); activate(); }
   /// const Zugriffsmethode auf die Basisklasse
-  const T *operator-> () const { return dynamic_cast<T *>(obj); }
+  const T *operator-> () const { return m_obj; }
   /// Prüfen, ob  Objekt gesetzt
-  operator bool () const { return obj; }
+  operator bool () const { return m_obj; }
   /// nicht const Zugriffsmethode auf die Basisklasse
-  T *operator-> () { return dynamic_cast<T *>(obj); }
+  T *operator-> () { return m_obj; }
   /// nicht const Zugriffsmethode auf die Basisklasse mit exception
-  T &operator() () { T *t = dynamic_cast<T *>(obj); if (not t) throw std::runtime_error("invalid cast"); return *t; }
+  T &operator() () { if (not m_obj) throw std::runtime_error("MobsUnion is empty"); return *m_obj; }
   /// const Zugriffsmethode auf die Basisklasse mit exception
-  const T &operator() () const  { T *t = dynamic_cast<T *>(obj); if (not t) throw std::runtime_error("invalid cast"); return *t; }
+  const T &operator() () const  { if (not m_obj) throw std::runtime_error("MobsUnion is empty"); return *m_obj; }
+  /// \brief Überladenen Methode, die das gewünschte MobsUnion-Objekt \c name zuerst zu erzeugen versucht
+  virtual ObjectBase *getObjInfo(const std::string &name) { setType(name); return m_obj; }
   /// \private
-  virtual ObjectBase *getObjInfo(const std::string &name) { setType(name); return obj; }
+  virtual void doCopy(const ObjectBase &other);
   /// \private
-  virtual void cleared() { if (obj) delete obj; obj = nullptr; }
-  /// Starte Traversierung nicht const
-  void traverse(ObjTrav &trav);
-  /// Starte Traversierung  const
-  void traverse(ObjTravConst &trav) const;
+  virtual void cleared() { if (m_obj) {delete m_obj; regObj(nullptr); }}
   
 private:
-  ObjectBase *obj = 0;
+  T *m_obj = nullptr;
 };
 
 
@@ -145,49 +146,41 @@ private:
 
 template <class T>
 void MobsUnion<T>::setType(std::string t) {
+  // hier mird als einziges ein neues Objekt erzeugt oder entfernt
+  // es muss immerm_obj mit ObjectBase.mlist synchron gehalten werden
   if (t.empty()) {
-    clear();
+    if (not m_obj)
+      return;
+    delete m_obj;
+    regObj(nullptr); // ObjectBase.mlist clear
+    m_obj = nullptr; // immer mit ObjectBase.mlist synchron halten
+    clear(); // wegen null-handling, Achtung ruft hinterher cleared() auf
     return;
   }
-  if (obj == nullptr or obj->typName() != t) {
-    if (obj) delete obj;
-    obj = ObjectBase::createObj(t, this);
-    if (not dynamic_cast<T *>(obj)) {
-      cleared();
-      throw std::runtime_error(u8"MobsUnion invalid object " + t);
+  if (m_obj == nullptr or m_obj->typName() != t) {
+    if (m_obj) delete m_obj;
+    regObj(nullptr); // ObjectBase.mlist clear
+    // wird über Constructor in Obj-Liste von ObjectBase eingefügt
+    ObjectBase *o = ObjectBase::createObj(t, this);
+    m_obj = dynamic_cast<T *>(o);
+    if (not m_obj) {
+      regObj(nullptr); // ObjectBase.mlist clear
+      if (o) LOG(LM_WARNING, "MobsUnion::setType " << t << " is not a valid base class");
+      if (o) delete o;
+      clear(); // wegen null-handling, Achtung ruft hinterher cleared() auf
     }
-    activate();
-  }
-}
-
-
-template <class T>
-void MobsUnion<T>::traverse(ObjTrav &trav) {
-  size_t arrayIndex = trav.arrayIndex;
-  if (trav.doObjBeg(*this)) {
-    if (obj) {
-      trav.arrayIndex = SIZE_MAX;
-      obj->traverse(trav);
-    }
-    trav.arrayIndex = arrayIndex;
-    trav.doObjEnd(*this);
+    else
+      activate();
   }
 }
 
 template <class T>
-void MobsUnion<T>::traverse(ObjTravConst &trav) const {
-  bool inNull = trav.inNull;
-  size_t arrayIndex = trav.arrayIndex;
-  if (trav.doObjBeg(*this)) {
-    if (obj) {
-      trav.inNull = inNull or isNull();
-      trav.arrayIndex = SIZE_MAX;
-      obj->traverse(trav);
-    }
-    trav.inNull = inNull;
-    trav.arrayIndex = arrayIndex;
-    trav.doObjEnd(*this);
-  }
+void MobsUnion<T>::doCopy(const ObjectBase &other) {
+  auto that = dynamic_cast<const MobsUnion<T> *>(&other);
+  if (not that)
+    throw std::runtime_error(u8"ObjectBase::doCopy: invalid Element (expected MobsUnion)");
+  setType(that->type());
+  ObjectBase::doCopy(other);
 }
 
 

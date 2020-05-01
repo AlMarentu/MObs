@@ -81,14 +81,8 @@ FileDatabase::~FileDatabase()
 bool FileDatabase::load(ObjectBase &obj)
 {
   TRACE(PARAM(obj.typName()));
-  ConvToStrHint cth(false);
-  list<string> key;
-  obj.getKey(key, cth);
-
   stringstream fname;
-  fname << base << "/" << obj.typName();
-  for (auto &k:key)
-    fname << '.' << k;
+  fname << base << "/" << obj.typName() << "." << obj.keyStr();
   cerr << "FileDatabase::load " << obj.typName() << " name: " << obj.keyStr() << endl;
   ifstream f(fname.str());
   if (not f.is_open())

@@ -162,5 +162,17 @@ TEST(unionTest, access) {
   EXPECT_NO_THROW(m.elements[1]->toObj1().i1(12));
   
 }
+
+
+TEST(unionTest, copy) {
+  Master m;
+  std::string j1 = u8"{id:123,xx:543,elements:[{Obj0:{aa:2,bb:7,cc:12,dd:0,ee:22}},{Obj1:{i1:567,xx:\"qwert\",zz:0,oo:{aa:7,bb:6,cc:5,dd:4,ee:3}}},null,{Obj2:{id:0,xx:0}}]}";
+  EXPECT_NO_THROW(mobs::string2Obj(j1, m));
+
+  Master m2 = m;
+  EXPECT_EQ(j1, m2.to_string());
+
+}
+
 }
 
