@@ -19,20 +19,24 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /** \file xmlout.h
-\brief optionale Klasse um Objekte in einen XML-String umzuwandeln */
+\brief Klasse zur Ausgabe von Mobs-Objekte im XML-Format */
+
+#ifndef MOBS_XMLOUT_H
+#define MOBS_XMLOUT_H
 
 #include "objgen.h"
 
 namespace mobs {
 
-class XmlOutData;
-/// KLasse zum Erzeugen von XML aud Objekten
-class XmlOut : virtual public ObjTravConst {
+class XmlWriter;
+
+/// KLasse zum Erzeugen von XML aus Objekten. benötigt einen XML-Writer
+class XmlOut  : virtual public ObjTravConst {
 public:
   /// Konstruktor
+  /// @param xwr XML-Writer-Objekt
   /// @param cth Konvertierungs-Hinweis
-  XmlOut(ConvObjToString cth);
-  ~XmlOut();
+  XmlOut(XmlWriter *xwr, const ConvObjToString &cth) : cth(cth), data(xwr) { };
   /// \private
   virtual bool doObjBeg(const ObjectBase &obj);
   /// \private
@@ -43,17 +47,17 @@ public:
   virtual void doArrayEnd(const MemBaseVector &vec);
   /// \private
   virtual void doMem(const MemberBase &mem);
-  /// liefert Ergebnis-XML
-  std::string getString();
-  /// löscht Buffer
-  void clear();
-  /// Angabe eines Start-Tokens falls mehrere Objekte einer Liste gelesen werden
-  void startList(std::string name);
-private:
-  XmlOutData *data;
 
+protected:
+  /// \private
+  const ConvObjToString cth;
+private:
+  XmlWriter *data;
+  std::stack<std::wstring> elements;
 };
+
 
 
 }
 
+#endif

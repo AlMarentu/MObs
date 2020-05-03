@@ -113,8 +113,8 @@ TEST(unionTest, create) {
   m.id(123);
   m.xx(543);
   mobs::ObjectBase *bp = o0.createMe(nullptr);
-  EXPECT_EQ("Obj0", bp->typName());
-  EXPECT_EQ("Obj0", o0.typName());
+  EXPECT_EQ("Obj0", bp->typeName());
+  EXPECT_EQ("Obj0", o0.typeName());
 
   EXPECT_NO_THROW(bp->doCopy(o0));
   EXPECT_NO_THROW(m.elements[1](o1));

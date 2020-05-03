@@ -197,6 +197,17 @@ TEST(objtypeTest, mobsconv) {
   EXPECT_FALSE(c.c_string2x("middle", d, ::mobs::ConvFromStrHint::convFromStrHintDflt));
 }
 
+TEST(objtypeTest, fromhtml) {
+  EXPECT_EQ(L'&', ::mobs::from_html_tag(L"amp"));
+  EXPECT_EQ(L'<', ::mobs::from_html_tag(L"lt"));
+  EXPECT_EQ(L'>', ::mobs::from_html_tag(L"gt"));
+  EXPECT_EQ(L'"', ::mobs::from_html_tag(L"quot"));
+  EXPECT_EQ(L'\0', ::mobs::from_html_tag(L"axxx"));
+  EXPECT_EQ(L'\0', ::mobs::from_html_tag(L""));
+  EXPECT_EQ(L'\n', ::mobs::from_html_tag(L"#xa"));
+  EXPECT_EQ(L'\t', ::mobs::from_html_tag(L"#9"));
+  EXPECT_EQ(L'\0', ::mobs::from_html_tag(L"#a"));
+}
 
 MOBS_ENUM_DEF(direction2, D2left, D2right, D2up, D2down, D2void)
 MOBS_ENUM_VAL(direction2, "left", "right", "up", "down")

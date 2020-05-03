@@ -19,7 +19,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+
 #include "xmlout.h"
+#include "xmlwriter.h"
 #include "logging.h"
 
 
@@ -33,156 +35,80 @@ using namespace std;
 namespace mobs {
 
 
-class XmlOutData {
-public:
-  XmlOutData(const ConvObjToString &c) : cth(c) { };
-  ~XmlOutData() {};
-  stringstream buffer;
-  int level = 0;
-  string prefix;
-  stack<string> elements;
-  const ConvObjToString cth;
-  void indent()
-  {
-    if (cth.withIndentation())
-    {
-      string s;
-      s.resize(level * 2, ' ');
-      buffer << s;
-    }
-  };
-};
-
-XmlOut::XmlOut(ConvObjToString cth)
-{
-  data = new XmlOutData(cth);
-}
-
-XmlOut::~XmlOut()
-{
-  delete data;
-}
-
-void XmlOut::startList(string name)
-{
-  data->buffer << u8"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
-  data->elements.push(u8"list");
-  data->buffer << "<" << data->prefix << data->elements.top() << ">\n";
-  data->level++;
-  data->elements.push(u8"entry");
-}
-
-
-
-void XmlOut::clear()
-{
-   data->buffer.clear();
-}
-
-string  XmlOut::getString()
-{
-  if (data->level == 1 and data->elements.size() == 2)
-  {
-    data->level--;
-    data->elements.pop();
-    data->buffer << "</" << data->prefix << data->elements.top() << ">\n";
-  }
-
-  return data->buffer.str();
-}
 
 
 
 bool XmlOut::doObjBeg(const ObjectBase &obj)
 {
-  if (obj.isNull() and data->cth.omitNull())
+  if (obj.isNull() and cth.omitNull())
     return true;
-  if (data->elements.empty())
-  {
-    data->buffer << u8"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
-    data->elements.push(u8"root");
-  }
   
-  string name;
-  if (not data->elements.empty())
-    name = data->elements.top();
+  wstring name;
+  if (not elements.empty())
+    name = elements.top();
   if (name.empty())
-    name = obj.getName(data->cth);
+    name = to_wstring(obj.getName(cth));
   if (name.empty())
-    name = u8"entry";
+    name = data->level() == 0 ? L"root": L"entry";
 
-  data->indent();
   if (obj.isNull())
   {
-    data->buffer << '<' << data->prefix << name << u8"/>\n";
+    data->writeTagBegin(name);
+    data->writeTagEnd();
     return false;
   }
   
-  data->buffer << '<' << data->prefix << name << u8">\n";
+  data->writeTagBegin(name);
   
-  data->elements.push("");
-  data->level++;
+  elements.push(L"");
   return true;
 }
 
 void XmlOut::doObjEnd(const ObjectBase &obj)
-{ 
-  data->level--;
-  data->elements.pop();
+{
+  elements.pop();
   
-  string name;
-  if (not data->elements.empty())
-    name = data->elements.top();
+  wstring name;
+  if (not elements.empty())
+    name = elements.top();
   if (name.empty())
-    name = obj.getName(data->cth);
+    name = to_wstring(obj.getName(cth));
   
-  data->indent();
-  data->buffer << u8"</" << data->prefix << name << u8">\n";
+  data->writeTagEnd();
 }
 
 bool XmlOut::doArrayBeg(const MemBaseVector &vec)
 {
-  if (vec.isNull() and data->cth.omitNull())
+  if (vec.isNull() and cth.omitNull())
     return false;
-  if (vec.isNull()) 
+  if (vec.isNull())
     return false;
-// TODO nei null etvl. data->buffer << '<' << data->prefix << (n == SIZE_T_MAX) ? vec.name() : vec.parent()->getConf(n) << u8"/>\n";
 
-  data->elements.push(vec.getName(data->cth));
+  elements.push(to_wstring(vec.getName(cth)));
   return true;
 }
 
 void XmlOut::doArrayEnd(const MemBaseVector &vec)
 {
-  data->elements.pop();
+  elements.pop();
 }
 
 void XmlOut::doMem(const MemberBase &mem)
 {
-  if (mem.isNull() and data->cth.omitNull())
+  if (mem.isNull() and cth.omitNull())
     return;
-  string name;
-  if (not data->elements.empty())
-    name = data->elements.top();
+  wstring name;
+  if (not elements.empty())
+    name = elements.top();
   if (name.empty())
-    name = mem.getName(data->cth);
-  data->indent();
-  data->buffer << '<' << data->prefix << name;
-  if (mem.isNull())
-    data->buffer << "/>\n";
-  else
+    name = to_wstring(mem.getName(cth));
+  data->writeTagBegin(name);
+  if (not mem.isNull())
   {
-    data->buffer << '>';
-    const string &value = mem.toStr(data->cth);
-    for (const auto c:value)
-      switch (c)
-      {
-        case '<': data->buffer << u8"&lt;"; break;
-        case '>': data->buffer << u8"&gt;"; break;
-        default: data->buffer << c;
-      }
-    data->buffer << u8"</" << data->prefix << name << u8">\n";
+    const wstring &value = to_wstring(mem.toStr(cth));
+    data->writeValue(value);
   }
+  data->writeTagEnd();
 }
 
 

@@ -18,7 +18,7 @@ testobjects := $(patsubst %.cpp,%.o,$(wildcard googletest/*.cpp))
 clean::
 	$(RM) *.o $(TARGETS) $(testobjects)
 
-mobs.a: objgen.o objtypes.o logging.o strtoobj.o objpool.o xmlout.o xmlread.o unixtime.o 
+mobs.a: objgen.o objtypes.o logging.o strtoobj.o objpool.o xmlwriter.o xmlout.o xmlread.o unixtime.o 
 	$(AR) -rc $@ $^
 
 # Achtung linkage: objgen.o immer zuerst

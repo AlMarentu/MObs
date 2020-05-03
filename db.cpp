@@ -39,6 +39,8 @@ class FileDatabase : public DatabaseInterface
 ////////////////
 
 #include "xmlout.h"
+#include "xmlwriter.h"
+#include "xmlread.h"
 #include <fstream>
 #include <sstream>
 
@@ -141,6 +143,26 @@ class Fahrzeug : virtual public NamedObject, virtual public ObjectBase
 };
 ObjRegister(Fahrzeug);
 
+class XmlInput : public XmlReader {
+public:
+  XmlInput(wistream &str) : XmlReader(str) { }
+  
+  virtual void StartTag(const std::string &element) {
+    LOG(LM_INFO, "start " << element);
+    if (element == "entry")
+      fill(new Fahrzeug);
+  }
+  virtual void EndTag(const std::string &element) {
+    LOG(LM_INFO, "end " << element);
+  }
+  virtual void filled(ObjectBase *obj, const string &error) {
+    LOG(LM_INFO, "filled " << obj->to_string() << (error.empty() ? " OK":" ERROR = ") << error);
+    delete obj;
+    stop();
+  }
+
+};
+
 int main(int argc, char* argv[])
 {
   TRACE("");
@@ -172,13 +194,35 @@ int main(int argc, char* argv[])
     list<ObjectBase> result;
     db.load(result, "Fahrzeug", "id = 2");
     
+
+    // Ausgabe XML
+
     ConvObjToString cth;
-    XmlOut dx2(ConvObjToString().doIndent());
-    dx2.startList("list");
-    f2->traverse(dx2);
-    f2->traverse(dx2);
-    cerr << dx2.getString() << endl;
-    
+    wofstream xout("test.xml", ios::trunc);
+    if (not xout.is_open())
+      throw runtime_error("File not open");
+    XmlWriter xf(xout, XmlWriter::CS_utf16_le, true);
+    XmlOut xo(&xf, cth);
+    xf.writeHead();
+    xf.writeTagBegin(L"list");
+    f2->traverse(xo);
+    xf.writeComment(L"und noch einer");
+    f2->typ("Mähdrescher");
+    f2->traverse(xo);
+    xf.writeTagEnd();
+    xout.close();
+
+    wifstream xin("test.xml");
+    if (not xin.is_open())
+      throw runtime_error("in File not open");
+    XmlInput xr(xin);
+    while (not xr.eof()) {
+      xr.parse();
+      LOG(LM_INFO, "Zwischenpause")
+    }
+
+    xin.close();
+
 
   }
   catch (exception &e)

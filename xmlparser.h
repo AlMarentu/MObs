@@ -31,6 +31,8 @@
 #include<stack>
 #include<exception>
 #include<iostream>
+#include <codecvt>
+
 
 namespace mobs {
 
@@ -48,7 +50,7 @@ namespace mobs {
  
  // Callback Funktionen
  void NullTag(const std::string &element);
- void Attribut(const std::string &element, const std::string &attribut, const std::string &value);
+ void Attribute(const std::string &element, const std::string &attribut, const std::string &value);
  void Value(const std::string &value);
  void Cdata(const char *value, size_t len);
  void StartTag(const std::string &element);
@@ -92,7 +94,7 @@ public:
    @param attribut Name des Attributes
    @param value Wert des Attributes
    */
-  virtual void Attribut(const std::string &element, const std::string &attribut, const std::string &value) = 0;
+  virtual void Attribute(const std::string &element, const std::string &attribut, const std::string &value) = 0;
   /** \brief Callback-Function: Ein Inhalt eines Tags
    @param value Inhalt des Tags
    */
@@ -285,7 +287,7 @@ public:
         parse2Char(c);
         std::string v = getValue();
         eat(c);
-        Attribut(element, a, v);
+        Attribute(element, a, v);
       }
       lastKey = element;
     }
@@ -450,7 +452,7 @@ void parse();
 
 // Callback Funktionen
 void NullTag(const std::string &element);
-void Attribut(const std::string &element, const std::string &attribut, const std::wstring &value);
+void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value);
 void Value(const std::wstring &value);
 void Cdata(const std::wstring &value);
 void StartTag(const std::string &element);
@@ -467,10 +469,10 @@ public:
   /*! Konstruktor der XML-Parser Basisklasse für std::wstring
    
      es kann z.B. ein \c std::wifstream dienen oder ein \c std::wistringstream übergeben werden
+          Als Zeichensätze sind UTF-8, UTF-16, ISO8859-1, -9 und -15 erlaubt; Dateien dürfen mit einem BOM beginnen
    @param input XML-stream der geparst werden soll   */
   XmlParserW(std::wistream &input) : istr(input) { };
   virtual ~XmlParserW() { };
-  
   /*! \brief Liefert XML-Puffer und aktuelle Position für detaillierte Fehlermeldung
    @param pos Position des Fehlers im Xml-Buffer
    @return zu parsender Text-Buffer
@@ -503,7 +505,7 @@ public:
    @param attribut Name des Attributes
    @param value Wert des Attributes
    */
-  virtual void Attribut(const std::string &element, const std::string &attribut, const std::wstring &value) = 0;
+  virtual void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) = 0;
   /** \brief Callback-Function: Ein Inhalt eines Tags
    @param value Inhalt des Tags
    */
@@ -527,59 +529,73 @@ public:
    */
   virtual void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) = 0;
   
+  /// ist beim Parsen das Ende erreicht
+  bool eof() const { return endOfFile; }
+  /// verlasse bein nächsten End-Tag den parser
+  void stop() { running = false; }
   /// Starte den Parser
   void parse() {
     TRACE("");
-    eat();  // erstes Zeichen einlesen
-    /// BOM bearbeiten
-    if (curr == 0xff)
+    if (not running)
     {
-      std::locale lo;
-      if ((curr = istr.get()) == 0xfe)
+      eat();  // erstes Zeichen einlesen
+              /// BOM bearbeiten
+      if (curr == 0xff)
       {
-        lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::little_endian>);
-        istr.imbue(lo);
-        encoding = u8"UTF-16 (LE)";
+        std::locale lo;
+        if ((curr = istr.get()) == 0xfe)
+        {
+          lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::little_endian>);
+          istr.imbue(lo);
+          encoding = u8"UTF-16"; // (LE)
+        }
+        else
+          throw std::runtime_error(u8"Error in BOM");
+        eat();
       }
-      else
-        throw std::runtime_error(u8"Error in BOM");
-      eat();
+      else if (curr == 0xfe)
+      {
+        std::locale lo;
+        if ((curr = istr.get()) == 0xff)
+          lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::codecvt_mode(0)>);
+        else
+          throw std::runtime_error(u8"Error in BOM");
+        istr.imbue(lo);
+        encoding = u8"UTF-16"; // (BE)
+      }
+      else if (curr == 0xef)
+      {
+        std::locale lo;
+        if ((curr = istr.get()) == 0xbb and (curr = istr.get()) == 0xbf)
+          lo = std::locale(istr.getloc(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
+        else
+          throw std::runtime_error(u8"Error in BOM");
+        encoding = u8"UTF-8";
+        istr.imbue(lo);
+        eat();
+      }
+      
+      buffer.clear();
+      parse2LT();
+      if (curr != '<')
+        throw std::runtime_error(u8"Syntax Head");
+      // BOM überlesen
+      if (not buffer.empty() and buffer != L"\0xEF\0xBB\0xBF" and buffer != L"\ufeff")
+      {
+        for (auto c:buffer) std::cerr << '#' <<  int(c) << std::endl;
+        throw std::runtime_error("invalid begin of File");
+      }
+      buffer.clear();
+      running = true;
     }
-//    else if (curr == 0xfe)
-//    {
-//      std::locale lo;
-//      if ((curr = istr.get()) == 0xff)
-//        lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::big_endian>);
-//      else
-//        throw std::runtime_error(u8"Error in BOM");
-//      istr.imbue(lo);
-//    }
-    else if (curr == 0xef)
-    {
-      std::locale lo;
-      if ((curr = istr.get()) == 0xbb and (curr = istr.get()) == 0xbf)
-        lo = std::locale(istr.getloc(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
-      else
-        throw std::runtime_error(u8"Error in BOM");
-      encoding = u8"UTF-8";
-      istr.imbue(lo);
-      eat();
-    }
-
-    buffer.clear();
-    parse2LT();
-    if (curr != '<')
-      throw std::runtime_error(u8"Syntax Head");
-    // BOM überlesen
-    if (not buffer.empty() and buffer != L"\0xEF\0xBB\0xBF" and buffer != L"\ufeff")
-    {
-      for (auto c:buffer) std::cerr << '#' <<  int(c) << std::endl;
-      throw std::runtime_error("invalid begin of File");
-    }
-    buffer.clear();
     // eigentliches Parsing
     while (curr == '<')
     {
+      if (not running)
+      {
+        running = true;
+        return;
+      }
       saveValue();
 //      saved = buffer;
       eat('<');
@@ -625,8 +641,7 @@ public:
           eat('[');
           saveValue();  // nur whitespace prüfen
           parse2CD();
-          buffer.erase(buffer.length() -2, 2);
-          Cdata(buffer);
+          Cdata(buffer.substr(2));
           clearValue();
           lastKey = "";
         }
@@ -684,6 +699,10 @@ public:
                 std::locale lo = std::locale(istr.getloc(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
                 istr.imbue(lo);
               }
+              else if (encoding == u8"ISO-8859-15")
+                conFun = from_iso_8859_15;
+              else if (encoding == u8"ISO-8859-9")
+                conFun = from_iso_8859_9;
               else if (encoding != u8"ISO-8859-1")
                 LOG(LM_WARNING, u8"encoding mismatch: " << encoding << " using ISO-8859-1");
             }
@@ -734,7 +753,7 @@ public:
           eat('\'');
         parse2Char(c);
         decode(buffer);
-        Attribut(element, a, buffer);
+        Attribute(element, a, buffer);
         eat(c);
       }
       lastKey = element;
@@ -748,6 +767,7 @@ public:
     saveValue();
     if (not tags.empty())
       throw std::runtime_error(u8" expected tag at EOF: " + tags.top());
+    endOfFile = true;
   };
   
 private:
@@ -866,25 +886,7 @@ private:
         {
           std::wstring tok = std::wstring(&buf[posS], pos-posS);
           //          std::cerr << "TOK " << tok << std::endl;
-          wchar_t c = '\0';
-          if (tok == L"lt")
-            c = '<';
-          else if (tok == L"gt")
-            c = '>';
-          else if (tok == L"amp")
-            c = '&';
-          else if (tok == L"quot")
-            c = '"';
-          else if (tok == L"apos")
-            c = '\'';
-          else if (tok[0] == L'#') {
-            size_t p;
-            int i = std::stoi(mobs::to_string(tok.substr(tok[1] == 'x' ? 2:1)), &p, tok[1] == 'x' ? 16:10);
-            if (p == tok.length() - (tok[1] == 'x' ? 2:1) and
-                (i == 9 or i == 10 or i == 13 or (i >= 32 and i <= 0xD7FF) or
-                (i >= 0xE000 and i <= 0xFFFD) or (i >= 0x10000 and i <= 0x10FFFF)))
-              c = i;
-          }
+          wchar_t c = from_html_tag(tok);
           if (c)
           {
             result += c;
@@ -894,6 +896,13 @@ private:
         }
         // wenn nichts passt dann einfach übernehmen
         result += '&';
+      }
+      else if (conFun) // Wandlung bei ISO-Zeichensätzen
+      {
+        wchar_t (*cf)(wchar_t) = conFun;
+        std::transform(buf.cbegin()+posS, buf.cbegin()+posE, std::back_inserter(result),
+        [cf](const wchar_t c) -> wchar_t { return (c <= 127) ? c : cf(c); });
+        break;
       }
       else
       {
@@ -910,6 +919,9 @@ private:
   std::string encoding;
   std::stack<std::string> tags;
   std::string lastKey;
+  wchar_t (*conFun)(wchar_t) = nullptr;
+  bool running = false;
+  bool endOfFile = false;
   
 };
 

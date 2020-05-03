@@ -19,6 +19,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "objgen.h"
+#include <codecvt>
+
 //#include <iostream>
 
 using namespace std;
@@ -26,6 +28,15 @@ using namespace std;
 
 namespace mobs {
 
+std::wstring to_wstring(std::string val) {
+  std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> c;
+  return c.from_bytes(val);
+};
+
+std::u32string to_u32string(std::string val) {
+  std::wstring_convert<std::codecvt_utf8<char32_t>,char32_t> c;
+  return c.from_bytes(val);
+};
 
 std::string to_quote(const std::string &s) {
   string result = "\"";
@@ -194,7 +205,141 @@ std::string to_string(long double t) {
   return str.str();
 }
 
+std::wstring to_wstring(float t) {
+  std::wstringstream str;
+  str << t;
+  return str.str();
+}
 
+std::wstring to_wstring(double t ){
+  std::wstringstream str;
+  str << t;
+  return str.str();
+}
+
+std::wstring to_wstring(long double t) {
+  std::wstringstream str;
+  str << t;
+  return str.str();
+}
+
+std::wstring to_wstring(const std::u32string &t) {
+  wstring result;
+  std::transform(t.cbegin(), t.cend(), std::back_inserter(result),
+  [](const wchar_t c) { return (c < 0 or c > 0x10FFFF) ? L'\uFFFD' : c; });
+//  copy(t.cbegin(), t.cend(), back_inserter(result));
+  return result;
+}
+
+std::wstring to_wstring(const std::u16string &t) {
+  wstring result;
+  std::transform(t.cbegin(), t.cend(), std::back_inserter(result),
+  [](const char16_t c) -> wchar_t{ return (c < 0) ? L'\uFFFD' : c; });
+//  copy(t.cbegin(), t.cend(), back_inserter(result));
+  return result;
+}
+
+
+static const wchar_t inval = L'\u00bf';            //       INVERTED QUESTION MARK
+//static const wchar_t inval = L'\uFFFD';
+
+wchar_t to_iso_8859_1(wchar_t c) {
+  return (c & ~0xff) ? inval : c;
+}
+
+wchar_t to_iso_8859_9(wchar_t c) {
+  switch (c) {
+    case 0x011E: return wchar_t(0xD0); //     LATIN CAPITAL LETTER G WITH BREVE
+    case 0x0130: return wchar_t(0xDD); //     LATIN CAPITAL LETTER I WITH DOT ABOVE
+    case 0x015E: return wchar_t(0xDE); //     LATIN CAPITAL LETTER S WITH CEDILLA
+    case 0x011F: return wchar_t(0xF0); //     LATIN SMALL LETTER G WITH BREVE
+    case 0x0131: return wchar_t(0xFD); //     LATIN SMALL LETTER DOTLESS I
+    case 0x015F: return wchar_t(0xFE); //     LATIN SMALL LETTER S WITH CEDILLA
+    case 0xD0:
+    case 0xDD:
+    case 0xDE:
+    case 0xF0:
+    case 0xFD:
+    case 0xFE:
+      return inval;
+    default: return (c & ~0xff) ? inval : c;
+  }
+}
+
+wchar_t to_iso_8859_15(wchar_t c) {
+  switch (c) {
+    case 0x20AC: return wchar_t(0xA4); //       EURO SIGN
+    case 0x0160: return wchar_t(0xA6); //       LATIN CAPITAL LETTER S WITH CARON
+    case 0x0161: return wchar_t(0xA8); //       LATIN SMALL LETTER S WITH CARON
+    case 0x017D: return wchar_t(0xB4); //       LATIN CAPITAL LETTER Z WITH CARON
+    case 0x017E: return wchar_t(0xB8); //       LATIN SMALL LETTER Z WITH CARON
+    case 0x0152: return wchar_t(0xBC); //       LATIN CAPITAL LIGATURE OE
+    case 0x0153: return wchar_t(0xBD); //       LATIN SMALL LIGATURE OE
+    case 0x0178: return wchar_t(0xBE); //       LATIN CAPITAL LETTER Y WITH DIAERESIS
+    case 0xA4:
+    case 0xA6:
+    case 0xA8:
+    case 0xB4:
+    case 0xB8:
+    case 0xBC:
+    case 0xBD:
+    case 0xBE:
+      return inval;
+    default: return (c & ~0xff) ? inval : c;
+  }
+}
+
+wchar_t from_iso_8859_9(wchar_t c) {
+  switch (c) {
+    case 0xD0: return wchar_t(0x011E); //     LATIN CAPITAL LETTER G WITH BREVE
+    case 0xDD: return wchar_t(0x0130); //     LATIN CAPITAL LETTER I WITH DOT ABOVE
+    case 0xDE: return wchar_t(0x015E); //     LATIN CAPITAL LETTER S WITH CEDILLA
+    case 0xF0: return wchar_t(0x011F); //     LATIN SMALL LETTER G WITH BREVE
+    case 0xFD: return wchar_t(0x0131); //     LATIN SMALL LETTER DOTLESS I
+    case 0xFE: return wchar_t(0x015F); //     LATIN SMALL LETTER S WITH CEDILLA
+    default: return c;
+  }
+}
+
+wchar_t from_iso_8859_15(wchar_t c) {
+  switch (c) {
+    case 0xA4: return wchar_t(0x20AC); //       EURO SIGN
+    case 0xA6: return wchar_t(0x0160); //       LATIN CAPITAL LETTER S WITH CARON
+    case 0xA8: return wchar_t(0x0161); //       LATIN SMALL LETTER S WITH CARON
+    case 0xB4: return wchar_t(0x017D); //       LATIN CAPITAL LETTER Z WITH CARON
+    case 0xB8: return wchar_t(0x017E); //       LATIN SMALL LETTER Z WITH CARON
+    case 0xBC: return wchar_t(0x0152); //       LATIN CAPITAL LIGATURE OE
+    case 0xBD: return wchar_t(0x0153); //       LATIN SMALL LIGATURE OE
+    case 0xBE: return wchar_t(0x0178); //       LATIN CAPITAL LETTER Y WITH DIAERESIS
+    default: return c;
+  }
+}
+
+wchar_t from_html_tag(const std::wstring &tok)
+{
+  wchar_t c = '\0';
+  if (tok == L"lt")
+    c = '<';
+  else if (tok == L"gt")
+    c = '>';
+  else if (tok == L"amp")
+    c = '&';
+  else if (tok == L"quot")
+    c = '"';
+  else if (tok == L"apos")
+    c = '\'';
+  else if (tok[0] == L'#') {
+    size_t p;
+    try {
+    int i = std::stoi(mobs::to_string(tok.substr(tok[1] == 'x' ? 2:1)), &p, tok[1] == 'x' ? 16:10);
+    if (p == tok.length() - (tok[1] == 'x' ? 2:1) and
+        (i == 9 or i == 10 or i == 13 or (i >= 32 and i <= 0xD7FF) or
+        (i >= 0xE000 and i <= 0xFFFD) or (i >= 0x10000 and i <= 0x10FFFF)))
+      c = i;
+    } catch (...) {}
+  }
+  return c;
+}
 
 template<>
 bool to_int64(int t, int64_t &i, int64_t &min, uint64_t &max)

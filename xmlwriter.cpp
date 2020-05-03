@@ -34,55 +34,6 @@ using namespace std;
 namespace mobs {
 
 
-static const wchar_t inval = L'\u00b8';            //       INVERTED QUESTION MARK
-//static const wchar_t inval = L'\uFFFD';
-
-wchar_t to_iso_8859_1(wchar_t c) {
-  return (c & ~0xff) ? inval : c;
-}
-
-wchar_t to_iso_8859_9(wchar_t c) {
-  switch (c) {
-    case 0x011E: return wchar_t(0xD0); //     LATIN CAPITAL LETTER G WITH BREVE
-    case 0x0130: return wchar_t(0xDD); //     LATIN CAPITAL LETTER I WITH DOT ABOVE
-    case 0x015E: return wchar_t(0xDE); //     LATIN CAPITAL LETTER S WITH CEDILLA
-    case 0x011F: return wchar_t(0xF0); //     LATIN SMALL LETTER G WITH BREVE
-    case 0x0131: return wchar_t(0xFD); //     LATIN SMALL LETTER DOTLESS I
-    case 0x015F: return wchar_t(0xFE); //     LATIN SMALL LETTER S WITH CEDILLA
-    case 0xD0:
-    case 0xDD:
-    case 0xDE:
-    case 0xF0:
-    case 0xFD:
-    case 0xFE:
-      return inval;
-    default: return (c & ~0xff) ? inval : c;
-  }
-}
-
-wchar_t to_iso_8859_15(wchar_t c) {
-  switch (c) {
-    case 0x20AC: return wchar_t(0xA4); //       EURO SIGN
-    case 0x0160: return wchar_t(0xA6); //       LATIN CAPITAL LETTER S WITH CARON
-    case 0x0161: return wchar_t(0xA8); //       LATIN SMALL LETTER S WITH CARON
-    case 0x017D: return wchar_t(0xB4); //       LATIN CAPITAL LETTER Z WITH CARON
-    case 0x017E: return wchar_t(0xB8); //       LATIN SMALL LETTER Z WITH CARON
-    case 0x0152: return wchar_t(0xBC); //       LATIN CAPITAL LIGATURE OE
-    case 0x0153: return wchar_t(0xBD); //       LATIN SMALL LIGATURE OE
-    case 0x0178: return wchar_t(0xBE); //       LATIN CAPITAL LETTER Y WITH DIAERESIS
-    case 0xA4:
-    case 0xA6:
-    case 0xA8:
-    case 0xB4:
-    case 0xB8:
-    case 0xBC:
-    case 0xBD:
-    case 0xBE:
-      return inval;
-    default: return (c & ~0xff) ? inval : c;
-  }
-}
-
 
 class XmlWriterData {
 public:
@@ -90,8 +41,8 @@ public:
   XmlWriterData(XmlWriter::charset c, bool i) : cs(c), indent(i) { setConFun(); }
   std::wostream &buffer = wstrBuff;
   XmlWriter::charset cs;
-  bool indent;
   int level = 0;
+  bool indent;
   bool openEnd = false;
   bool hasValue = false;
   wstring prefix;
@@ -211,6 +162,7 @@ void XmlWriter::writeAttribute(const std::wstring &attribute, const std::wstring
       case '<': data->buffer << L"&lt;"; break;
       case '"': data->buffer << L"&quot;"; break;
       case '&': data->buffer << L"&amp;"; break;
+      case 0 ... 0x1f: data->buffer << L"&#x" << hex << int(c) << L';'; break;
       default: data->write(c);
     }
   data->buffer << '"';
@@ -224,6 +176,7 @@ void XmlWriter::writeValue(const std::wstring &value) {
       case '<': data->buffer << L"&lt;"; break;
       case '>': data->buffer << L"&gt;"; break;
       case '&': data->buffer << L"&amp;"; break;
+      case 0 ... 0x1f: if (escapeControll) { data->buffer << L"&#x" << hex << int(c) << L';'; break; }
       default: data->write(c);
     }
   data->hasValue = true;

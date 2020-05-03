@@ -20,6 +20,7 @@
 
 #include "objgen.h"
 #include "xmlout.h"
+#include "xmlwriter.h"
 #include <map>
 
 using namespace std;
@@ -112,7 +113,7 @@ std::string ObjectBase::getName(const ConvToStrHint &cth) const {
 
 void ObjectBase::activate()
 {
-//  LOG(LM_INFO, "ACTIVATE ObjectBase " << typName() << "::" << name());
+//  LOG(LM_INFO, "ACTIVATE ObjectBase " << typeName() << "::" << name());
   setNull(false);
   if (m_parVec)
     m_parVec->activate();
@@ -373,7 +374,7 @@ public:
 void ObjectBase::doCopy(const ObjectBase &other)
 {
   ConvFromStrHintDoCopy cfh;
-  if (typName() != other.typName())
+  if (typeName() != other.typeName())
     throw runtime_error(u8"ObjectBase::doCopy: invalid Type");
   if (other.isNull())
   {
@@ -831,9 +832,11 @@ std::string ObjectBase::to_string(ConvObjToString cth) const
   }
   else if (cth.toXml())
   {
-    XmlOut xd(cth);
+    XmlWriter wr(XmlWriter::CS_utf8, cth.withIndentation());
+    XmlOut xd(&wr, cth);
+    wr.writeHead();
     traverse(xd);
-    return xd.getString();
+    return wr.getString();
   }
   else
     return "";

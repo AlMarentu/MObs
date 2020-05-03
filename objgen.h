@@ -186,7 +186,7 @@ objname(mobs::MemBaseVector *m, mobs::ObjectBase *o, mobs::MemVarCfg c1 = mobs::
 objname(std::string name, ObjectBase *t, mobs::MemVarCfg c1 = mobs::Unset, mobs::MemVarCfg c2 = mobs::Unset, mobs::MemVarCfg c3 = mobs::Unset) : ObjectBase(name, t, c1, c2, c3) { TRACE(PARAM(name) << PARAM(this)); if (t) t->regObj(this); doInit(); init(); } \
 objname &operator=(const objname &rhs) { TRACE(""); if (this != &rhs) { doCopy(rhs); } return *this; } \
 static ObjectBase *createMe(ObjectBase *parent = nullptr) { return new objname(parent ? #objname:"", parent); } \
-virtual std::string typName() const { return #objname; }
+virtual std::string typeName() const { return #objname; }
 
 /*! \brief Makro um eine Objektklasse am Ojekt-Generator anzumelden
  @param name Name des Objektes
@@ -248,6 +248,8 @@ public:
   virtual void clear() = 0;
   /// Ausgabe des Ihnhalts als \c std::string in UTF-8
   virtual std::string toStr(const ConvToStrHint &) const  = 0;
+  /// Ausgabe des Ihnhalts als \c std::wstring
+  virtual std::wstring toWstr(const ConvToStrHint &) const  = 0;
   /// Abfrage ob der Basistyp vom typ \c  std::is_specialized  ist; \see \<limits>
   virtual bool is_specialized() const  = 0;
   /// Abfrage, ob der Inhalt textbasiert ist (zb. in JSON in Hochkommata gestzt wird)
@@ -398,7 +400,7 @@ public:
   /// Starte Traversierung der Key-Elemente in exakter Reihenfolge
   void traverseKey(ObjTravConst &trav) const;
   /// liefert den Typnamen des Objektes
-  virtual std::string typName() const { return ""; }
+  virtual std::string typeName() const { return ""; }
   /// Callback-Funktion die einmalig im Constructor aufgerufen wird
   virtual void init() {};
   /// Callback-Funktion die nach einem \c clear aufgerufen wird
@@ -435,6 +437,7 @@ public:
   static void regObject(std::string n, ObjectBase *fun(ObjectBase *));
   /// \brief Erzeuge ein neues Objekt
   /// @param n Typname des Objektes
+  /// @param p  Zeiger auf Parent des Objektes, immer \c nullptr, wird nur intern verwendet
   /// @return Zeiger auf das erzeugte Objekt oder \c nullptr falls ein solches Objekt nicht refgistriert wurde \see ObjRegister(name)
   static ObjectBase *createObj(std::string n, ObjectBase *p = nullptr);
   /// Setze Inhalt auf leer, d.h. alle Vektoren sowie Unterobjekte und Varieblen werden gelöscht,
@@ -571,9 +574,10 @@ public:
 //  virtual void strOut(std::ostream &str) const { str << mobs::to_string(wert); }
   /// Setze Inhalt auf leer
   virtual void clear()  { wert = this->c_empty(); if (nullAllowed()) setNull(true); else activate(); }
-  //  virtual std::string toStr() const { std::stringstream s; s << wert; return s.str(); }
+  /// Abfragemethode mit Ausgabe als \c std::string
   virtual std::string toStr(const ConvToStrHint &cth) const { return this->c_to_string(wert, cth); }
-  //  virtual std::wstring toWStr2() const { return mobs::to_wstring(wert); }
+  /// Abfragemethode mit Ausgabe als \c std::wstring
+  virtual std::wstring toWstr(const ConvToStrHint &cth) const { return this->c_to_wstring(wert, cth); }
   /// Abfrage, ob der Inhalt textbasiert ist (zb. in JSON in Hochkommata gestzt wird)
   virtual bool is_specialized() const { return this->c_is_specialized(); }
   /// Abfrage, ob der Inhalt textbasiert ist (zb. in JSON in Hochkommata gestzt wird)
@@ -825,6 +829,8 @@ public:
   bool find(const std::string &path);
   /// setzte aktuelles Objekt im Pfad auf Null entsprechen der Einstellung \c ConvObjFromStr
   bool setNull();
+  /// Objekt zurücksetzen
+  void reset() { while (not objekte.empty()) objekte.pop(); while (not path.empty()) path.pop(); memBase = 0; memVec = 0; memName = ""; }
   
   /// Import-Konfiguration
   ConvObjFromStr cfs;

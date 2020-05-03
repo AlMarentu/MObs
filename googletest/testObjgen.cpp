@@ -113,7 +113,7 @@ ObjRegister(Person);
 //  MemVarVector(string, susi);
 //  MemVarVector(string, friederich);
 //
-//  virtual string objName() const { return typName() + "." + mom() + "." + mobs::to_string(otto()); };
+//  virtual string objName() const { return typeName() + "." + mom() + "." + mobs::to_string(otto()); };
 //  virtual void init() { otto.nullAllowed(true); pims.nullAllowed(true); pims.setNull(true);
 //    luzifer.nullAllowed(true); luzifer.setNull(true); keylist << peter << otto; };
 //};
@@ -126,7 +126,7 @@ TEST(objgenTest, leer) {
   EXPECT_EQ(0, info.kundennr());
   EXPECT_EQ(false, info.firma());
   EXPECT_EQ("", info.name());
-  EXPECT_EQ("Person", info.typName());
+  EXPECT_EQ("Person", info.typeName());
 }
 
 //Alle MemVar Datentypen Testen
@@ -299,7 +299,7 @@ TEST(objgenTest, setnull) {
 
   EXPECT_TRUE(info.adresse.isNull());
   EXPECT_EQ(2, info.kundennr());
-  EXPECT_EQ("Adresse", info.adresse.typName());
+  EXPECT_EQ("Adresse", info.adresse.typeName());
   EXPECT_EQ(R"({kundennr:2,firma:false,name:"Das war ein ßäöü <>\"' ss \"#  ö",vorname:"",adresse:null,kontakte:[],hobbies:[]})", mobs::to_string(info));
   info.name(u8"John");
   info.adresse.ort(u8"Berlin");
@@ -320,7 +320,7 @@ TEST(objgenTest, Vectors) {
   info.kontakte[4].number("+40 0000 1111 222");
   info.hobbies[1]("Piano");
 
-  EXPECT_EQ("Adresse", info.adresse.typName());
+  EXPECT_EQ("Adresse", info.adresse.typeName());
   EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:null,kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", info.to_string(mobs::ConvObjToString().exportCompact()));
   EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:null,kontakte:[{art:"fax",number:""},{art:"fax",number:""},{art:"fax",number:""},{art:"fax",number:""},{art:"mobil",number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", mobs::to_string(info));
   info.adresse.setEmpty();
@@ -348,7 +348,7 @@ TEST(objgenTest, Pointer) {
 
   Person *ip = dynamic_cast<Person *>(mobs::ObjectBase::createObj("Person"));
   ASSERT_NE(nullptr, ip);
-  EXPECT_EQ("Person", ip->typName());
+  EXPECT_EQ("Person", ip->typeName());
   ASSERT_NO_THROW(mobs::string2Obj( R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", *ip));
   // Gegenprobe
   EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", ip->to_string(mobs::ConvObjToString().exportCompact()));
@@ -717,6 +717,29 @@ TEST(objgenTest, readxml) {
   EXPECT_EQ("{id:12,a:17,b:22,c:33,o:{aa:1,bb:2,cc:3,dd:4,ee:6},d:[\"x\"]}", o2.to_string(mobs::ConvObjToString()));
 
 }
+
+TEST(objgenTest, readxml2) {
+  ObjX o, o2;
+
+  EXPECT_NO_THROW(mobs::string2Obj("{id:12,a:17,b:null,c:33,o:null,d:[null,\"c\"]}", o, mobs::ConvObjFromStr().useForceNull()));
+  EXPECT_EQ("{id:12,a:17,b:null,c:33,o:null,d:[null,\"c\"]}", o.to_string(mobs::ConvObjToString()));
+  string xml = o.to_string(mobs::ConvObjToString().exportXml().doIndent());
+  EXPECT_EQ(R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<root>
+  <id>12</id>
+  <a>17</a>
+  <b/>
+  <c>33</c>
+  <o/>
+  <d/>
+  <d>c</d>
+</root>
+)", xml);
+
+  EXPECT_NO_THROW(mobs::string2Obj(xml, o2, mobs::ConvObjFromStr().useXml().useForceNull()));
+  EXPECT_EQ("{id:12,a:17,b:null,c:33,o:null,d:[null,\"c\"]}", o2.to_string(mobs::ConvObjToString()));
+}
+
 
 #if 0
 TEST(objgenTest, compare) {

@@ -20,7 +20,7 @@
 
 #include "objgen.h"
 #include "jsonparser.h"
-#include "xmlparser.h"
+#include "xmlread.h"
 #include <map>
 
 using namespace std;
@@ -88,103 +88,12 @@ void string2Obj(const std::string &str, ObjectBase &obj, ConvObjFromStr cfh)
   };
   
   
-#if 0
-  class XmlReadData : public ObjectNavigator, public XmlParser  {
-  public:
-    XmlReadData(const std::string &input, const ConvObjFromStr &c) : XmlParser(input) { cfs = c; };
-      
-    void NullTag(const std::string &element) {
-      TRACE(PARAM(element));
-      setNull();
-      if (tagPath().size() > 1)
-        leave();
-    };
-    void Attribut(const std::string &element, const std::string &attribut, const std::string &value) {
-      TRACE(PARAM(element) << PARAM(attribut)<< PARAM(value));
-      LOG(LM_INFO, "string2Obj: ignoring attribute " << element << ":" << attribut << " = " << value);
-    };
-    void Value(const std::string &val) {
-      TRACE(PARAM(val));
-      if (not member())
-        throw runtime_error(u8"string2Obj: " + showName() + " is no variable, can't assign");
-      else if (not member()->fromStr(val, cfs))
-        throw runtime_error(u8"string2Obj: invalid type in variable " + showName() + " can't assign");
-    };
-    void Cdata(const char *value, size_t len) { Value(std::string(value, len)); }
-
-    void StartTag(const std::string &element) {
-      TRACE(PARAM(element));
-      if (tagPath().size() <= 1)
-        return;
-      if (not enter(element))
-        LOG(LM_INFO, element << " wurde nicht gefunden");
-    }
-    void EndTag(const std::string &element) {
-      TRACE(PARAM(element));
-      if (tagPath().size() > 1)
-        leave(element);
-    }
-    void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::string &value) {
-      TRACE(PARAM(element) << PARAM(attribut)<< PARAM(value));
-      if (element == "xml" and attribut == "encoding")
-        encoding = value;
-    }
-        
-    std::string encoding;
-    std::string prefix;
-  };
-    
-#else
-  class XmlReadData : public ObjectNavigator, public XmlParserW  {
-  public:
-    XmlReadData(const std::string &input, const ConvObjFromStr &c) : XmlParserW(str), str(to_wstring(input)) { cfs = c; };
-      
-    void NullTag(const std::string &element) {
-      TRACE(PARAM(element));
-      setNull();
-      if (tagPath().size() > 1)
-        leave();
-    };
-    void Attribut(const std::string &element, const std::string &attribut, const std::wstring &value) {
-//      TRACE(PARAM(element) << PARAM(attribut)<< PARAM(value));
-      LOG(LM_INFO, "string2Obj: ignoring attribute " << element << ":" << attribut << " = " << to_string(value));
-    };
-    void Value(const std::wstring &val) {
-//      TRACE(PARAM(val));
-      if (not member())
-        throw runtime_error(u8"string2Obj: " + showName() + " is no variable, can't assign");
-      else if (not member()->fromStr(val, cfs))
-        throw runtime_error(u8"string2Obj: invalid type in variable " + showName() + " can't assign");
-    };
-    void StartTag(const std::string &element) {
-      TRACE(PARAM(element));
-      if (tagPath().size() <= 1)
-        return;
-      if (not enter(element))
-        LOG(LM_INFO, element << " wurde nicht gefunden");
-    }
-    void EndTag(const std::string &element) {
-      TRACE(PARAM(element));
-      if (tagPath().size() > 1)
-        leave(element);
-    }
-    void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) {
-//      TRACE(PARAM(element) << PARAM(attribut)<< PARAM(value));
-      if (element == "xml" and attribut == "encoding")
-        encoding = mobs::to_string(value);
-    }
-    
-    std::wistringstream str;
-    std::string encoding;
-    std::string prefix;
-  };
-#endif
-
 
   if (cfh.acceptXml()) {
-    XmlReadData xd(str, cfh);
-    xd.pushObject(obj);
-      xd.parse();
+    XmlRead xd(str, obj, cfh);
+    xd.parse();
+    if (not xd.found())
+      throw runtime_error("string2Obj: no Object found");
 //    catch (std::exception &e) {
 //      LOG(LM_INFO, "Exception " << e.what());
 //      size_t pos;

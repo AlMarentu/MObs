@@ -85,6 +85,7 @@ public:
 
   std::wstring version = L"1.0"; ///< Version für Header
   bool standalone = true; ///< Angabe für Headert
+  bool escapeControll = false; ///< ersetze Zeichen wie "\n" durch "&#xa;"
 
 private:
   XmlWriterData *data;

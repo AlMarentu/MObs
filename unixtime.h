@@ -91,6 +91,11 @@ inline std::string to_string(UxTime t) {
   return t.toISO8601();
 }
 
+/// Konvertier-Funktion \c UxTime nach \c std::string im Format ISO8601
+inline std::wstring to_wstring(UxTime t) {
+  return mobs::to_wstring(t.toISO8601());
+}
+
 template <>
 /// Konvertiertungs-Klasse für \c UxTime um sie mit Mobs verwenden zu können
 class StrConv <UxTime> {
@@ -100,7 +105,9 @@ public:
   /// \private
   static inline bool c_wstring2x(const std::wstring &wstr, UxTime &t, const ConvFromStrHint &) { return mobs::string2x(mobs::to_string(wstr), t); }
   /// \private
-  static inline std::string c_to_string(UxTime t, const ConvToStrHint &cth) { if (cth.compact()) return to_string(t.toUxTime()); return to_string(t); };
+  static inline std::string c_to_string(UxTime t, const ConvToStrHint &cth) { if (cth.compact()) return std::to_string(t.toUxTime()); return to_string(t); };
+  /// \private
+  static inline std::wstring c_to_wstring(UxTime t, const ConvToStrHint &cth) { if (cth.compact()) return std::to_wstring(t.toUxTime()); return to_wstring(t); };
   /// \private
   static inline bool c_is_chartype(const ConvToStrHint &cth) { return not cth.compact(); }
   /// \private

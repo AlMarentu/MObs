@@ -53,7 +53,7 @@ class Fahrzeug : virtual public mobs::NamedObject, virtual public mobs::ObjectBa
 
 //    void init() { keylist << id; };
     // ist das nötig=?
-//    string objName() const { return typName() + "." + std::to_string(id()); };
+//    string objName() const { return typeName() + "." + std::to_string(id()); };
 };
 ObjRegister(Fahrzeug);
 

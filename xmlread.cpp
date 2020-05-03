@@ -26,110 +26,116 @@
 
 #include<stack>
 
+using namespace std;
 
 namespace mobs {
 
-class XmlReadData : public ObjectNavigator, public XmlParser  {
-public:
-  XmlReadData(const std::string &input) : XmlParser(input) {  };
-  ~XmlReadData() { };
-    
-  std::string encoding;
-    
-  void NullTag(const std::string &element) {
-    TRACE(PARAM(element));
-    LOG(LM_INFO, "NULL " << element);
 
-    if (member() and member()->nullAllowed())
-    {
-      member()->forceNull();
+  class XmlReadData : public ObjectNavigator, public XmlParserW  {
+  public:
+//    XmlReadData(const std::string &input, const ConvObjFromStr &c) : XmlParserW(str), str(to_wstring(input)) { cfs = c; };
+    XmlReadData(XmlReader *p, wistream &s) : XmlParserW(s), parent(p) {}
+    XmlReadData(XmlReader *p, const wstring &s) : XmlParserW(str), parent(p), str(s) {}
+
+    void NullTag(const std::string &element) {
+      TRACE(PARAM(element));
+      if (obj) {
+        setNull();
+        EndTag(element);
+      }
+      else
+        parent->NullTag(element);
+    };
+    void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) {
+      if (obj) {
+      }
+      else
+        parent->Attribute(element, attribut, value);
+    };
+    void Value(const std::wstring &val) {
+      if (obj) {
+        if (not member())
+          error += string(error.empty() ? "":"\n") + showName() + u8" is no variable, can't assign";
+        else if (not member()->fromStr(val, cfs))
+          error += string(error.empty() ? "":"\n") + u8"invalid type in variable " + showName() + u8" can't assign";
+      }
+      else
+        parent->Value(val);
+    };
+    void StartTag(const std::string &element) {
+      if (obj) {
+        if (not enter(element) and cfs.exceptionIfUnknown())
+          error += string(error.empty() ? "":"\n") + element + u8"not found";
+      }
+      else
+        parent->StartTag(element);
     }
-    EndTag(element);
-  };
-  void Attribut(const std::string &element, const std::string &attribut, const std::string &value) {
-    TRACE(PARAM(element) << PARAM(attribut)<< PARAM(value));
-    LOG(LM_INFO, "Attribut " << element << " " << attribut << " " << value);
-
-  };
-  void Value(const std::string &value) {
-    TRACE(PARAM(value));
-    LOG(LM_INFO, "Value " << showName() << " = " << value);
-    if (not member())
-      LOG(LM_INFO, "Variable fehlt " << showName())
-    else
-      member()->fromStr(value, cfh);
-  };
-  void Cdata(const char *val, size_t len) {
-    std::string value(val, len);
-    TRACE(PARAM(value));
-    LOG(LM_INFO, "Cdata " << value << " atadC");
-    if (not member())
-      LOG(LM_WARNING, "Variable fehlt " << showName())
-    else
-      member()->fromStr(value, cfh);
-  };
-  void StartTag(const std::string &element) {
-    TRACE(PARAM(element));
-    LOG(LM_INFO, "Start " << element << " " << tagPath().size());
-
-    if (tagPath().size() <= 1)
-      return;
-    if (not enter(element))
-      LOG(LM_INFO, element << " wurde nicht gefunden");
-
-
-  }
-  void EndTag(const std::string &element) {
-    TRACE(PARAM(element));
-    LOG(LM_INFO, "Ende " << element);
-    if (tagPath().size() > 1)
-      leave(element);
-  }
-  void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::string &value) {
-    TRACE(PARAM(element) << PARAM(attribut)<< PARAM(value));
-    LOG(LM_INFO, "ProcInst " << element << " " << attribut << " " << value);
-    if (element == "xml" and attribut == "encoding")
-      encoding = value;
-  }
-
-  private:
+    void EndTag(const std::string &element) {
+      if (obj) {
+        if (tagPath().size() == levelStart)
+        {
+          parent->filled(obj, error);
+          obj = nullptr;
+          error = "";
+          parent->EndTag(element);
+        }
+        else
+          leave(element);
+      }
+      else
+        parent->EndTag(element);
+    }
+    void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) {
+      if (element == "xml" and attribut == "encoding")
+        encoding = mobs::to_string(value);
+    }
+    
+    void setObj(ObjectBase *o) {
+      obj = o;
+      reset();  // ObjectNavigator zurücksetzen
+      if (obj)
+        pushObject(*obj);
+      levelStart = tagPath().size();
+    }
+    
+    XmlReader *parent;
+    std::wistringstream str;
+    ObjectBase *obj = 0;
+    size_t levelStart;
+    std::string error;
+    std::string encoding;
     std::string prefix;
-    const ConvFromStrHint &cfh = ConvFromStrHint::convFromStrHintDflt;
   };
-  
-  
-  
-  void XmlRead::parse()
-  {
-    TRACE("");
-    data->parse();
-  }
-  
-  XmlRead::XmlRead(const std::string &input)
-  {
-    TRACE("");
-    data = new XmlReadData(input);
-  }
-  
-  XmlRead::~XmlRead()
-  {
-    TRACE("");
-    delete data;
-  }
-  
-  void XmlRead::fill(ObjectBase &obj)
-  {
-    TRACE("");
-    data->pushObject(obj);
-    try {
-      parse();
-    } catch (std::exception &e) {
-      LOG(LM_INFO, "Exception " << e.what());
-      size_t pos;
-      const std::string &xml = data->info(pos);
-          LOG(LM_INFO, xml.substr(pos));
-      throw std::runtime_error(std::string("Parsing failed ") + " at pos. " + std::to_string(pos));
-    }
-  }
-  
+
+
+XmlReader::XmlReader(const std::string &input, const ConvObjFromStr &c) {
+  data = new XmlReadData(this, to_wstring(input));
+  data->cfs = c;
+}
+
+XmlReader::XmlReader(const std::wstring &input, const ConvObjFromStr &c) {
+  data = new XmlReadData(this, input);
+  data->cfs = c;
+}
+
+XmlReader::XmlReader(std::wistream &str, const ConvObjFromStr &c) {
+  data = new XmlReadData(this, str);
+  data->cfs = c;
+}
+
+XmlReader::~XmlReader() {
+  delete data;
+}
+void XmlReader::fill(ObjectBase *obj) {
+  data->setObj(obj);
+}
+
+void XmlReader::parse() { data->parse(); }
+bool XmlReader::eof() const { return data->eof(); }
+void XmlReader::stop() { data->stop(); }
+//  XmlReadData(const std::string &input, const ConvObjFromStr &c) : XmlParserW(str), str(to_wstring(input)) { cfs = c; };
+
+
+
+
 }

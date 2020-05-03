@@ -48,7 +48,7 @@ class XParser: public mobs::XmlParser {
 public:
   XParser(const string &i) : mobs::XmlParser(i) {}
   virtual void NullTag(const std::string &element) { LOG(LM_INFO, "NULL"); }
-  virtual void Attribut(const std::string &element, const std::string &attribut, const std::string &value) { LOG(LM_INFO, "ATTRIBUT " << element); }
+  virtual void Attribute(const std::string &element, const std::string &attribut, const std::string &value) { LOG(LM_INFO, "ATTRIBUT " << element); }
   virtual void Value(const std::string &value) { LOG(LM_INFO, "VALUE"); }
   virtual void Cdata(const char *value, size_t len) { LOG(LM_INFO, "CDATA >" << string(value, len) << "<"); }
   virtual void StartTag(const std::string &element) { LOG(LM_INFO, "START " << element); }
@@ -60,7 +60,7 @@ class XParserW: public mobs::XmlParserW {
 public:
   XParserW(const wstring &i) : mobs::XmlParserW(str), str(i) { }
   virtual void NullTag(const std::string &element) { LOG(LM_INFO, "NULL"); }
-  virtual void Attribut(const std::string &element, const std::string &attribut, const std::wstring &value) { LOG(LM_INFO, "ATTRIBUT " << element); }
+  virtual void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) { LOG(LM_INFO, "ATTRIBUT " << element); }
   virtual void Value(const std::wstring &value) { LOG(LM_INFO, "VALUE >" << mobs::to_string(value) << "<"); }
   virtual void Cdata(const std::wstring &value) { LOG(LM_INFO, "CDATA >" << mobs::to_string(value) << "<"); }
   virtual void StartTag(const std::string &element) { LOG(LM_INFO, "START " << element); }
@@ -178,6 +178,7 @@ TEST(parserTest, xmlStructW1) {
   EXPECT_ANY_THROW(xparse(L"<abc a=xx bcd=\"9999\"/>"));
 
 }
+
 
 }
 
