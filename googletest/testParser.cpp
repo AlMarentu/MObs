@@ -63,6 +63,13 @@ public:
   virtual void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) { LOG(LM_INFO, "ATTRIBUT " << element); }
   virtual void Value(const std::wstring &value) { LOG(LM_INFO, "VALUE >" << mobs::to_string(value) << "<"); }
   virtual void Cdata(const std::wstring &value) { LOG(LM_INFO, "CDATA >" << mobs::to_string(value) << "<"); }
+  virtual void Base64(const std::vector<u_char> &base64) {
+    std::string s;
+    std::copy(base64.cbegin(), base64.cend(), back_inserter(s));
+    LOG(LM_INFO, "BASE64 >" << s << "< " << base64.size());
+    if (s != u8"Polyfon zwitschernd aßen Mäxchens Vögel Rüben, Joghurt und Quark")
+      throw std::runtime_error("Ergebnis falsch");
+  }
   virtual void StartTag(const std::string &element) { LOG(LM_INFO, "START " << element); }
   virtual void EndTag(const std::string &element) { LOG(LM_INFO, "END " << element); }
   virtual void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) { LOG(LM_INFO, "PI" << element); }
@@ -127,7 +134,7 @@ TEST(parserTest, jsonStruct1) {
 }
 
 void xparse(string s) { XParser p(s); p.parse(); };
-void xparse(wstring s) { XParserW p(s); p.parse(); };
+void xparse(wstring s, bool b64 = false) { XParserW p(s); p.setBase64(b64); p.parse(); };
 
 // aus https://de.wikipedia.org/wiki/Extensible_Markup_Language
 const string x1 = R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -177,6 +184,14 @@ TEST(parserTest, xmlStructW1) {
   EXPECT_ANY_THROW(xparse(L"<abc a =\"xx\" bcd=\"9999\"/>"));
   EXPECT_ANY_THROW(xparse(L"<abc a=xx bcd=\"9999\"/>"));
 
+}
+
+TEST(parserTest, base64) {
+  EXPECT_NO_THROW(xparse(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n  biwgSm9naHVydCB1bmQgUXVhcms= ]]>  </abc>"));
+  EXPECT_NO_THROW(xparse(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n  biwgSm9naHVydCB1bmQgUXVhcms= ]]>  </abc>", true));
+  // missing padding
+  EXPECT_NO_THROW(xparse(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n  biwgSm9naHVydCB1bmQgUXVhcms ]]>  </abc>", true));
+  EXPECT_ANY_THROW(xparse(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n =  biwgSm9naHVydCB1bmQgUXVhcms= ]]>  </abc>", true));
 }
 
 

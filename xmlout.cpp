@@ -49,7 +49,7 @@ bool XmlOut::doObjBeg(const ObjectBase &obj)
   if (name.empty())
     name = to_wstring(obj.getName(cth));
   if (name.empty())
-    name = data->level() == 0 ? L"root": L"entry";
+    name = data->level() == 0 ? L"root": to_wstring(obj.typeName());
 
   if (obj.isNull())
   {
@@ -102,13 +102,25 @@ void XmlOut::doMem(const MemberBase &mem)
     name = elements.top();
   if (name.empty())
     name = to_wstring(mem.getName(cth));
-  data->writeTagBegin(name);
-  if (not mem.isNull())
+
+  if (mem.xmlAsAttr() and data->attributeAllowed())
   {
-    const wstring &value = to_wstring(mem.toStr(cth));
-    data->writeValue(value);
+    if (not mem.isNull())
+    {
+      const wstring &value = to_wstring(mem.toStr(cth));
+      data->writeAttribute(to_wstring(name), value);
+    }
   }
-  data->writeTagEnd();
+  else
+  {
+    data->writeTagBegin(name);
+    if (not mem.isNull())
+    {
+      const wstring &value = to_wstring(mem.toStr(cth));
+      data->writeValue(value);
+    }
+    data->writeTagEnd();
+  }
 }
 
 

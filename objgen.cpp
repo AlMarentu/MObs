@@ -44,6 +44,7 @@ void MemberBase::doConfig(MemVarCfg c)
     case InitialNull: nullAllowed(true); break;
     case Key1 ... Key5: m_key = c - Key1 + 1; break;
     case AltNameBase ... AltNameBaseEnd: m_altName = c - AltNameBase; break;
+    case XmlAsAttr: m_XmlAsAttr = true; break;
     case VectorNull: break;
   }
 }

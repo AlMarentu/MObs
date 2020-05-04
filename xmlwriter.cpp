@@ -22,6 +22,7 @@
 #include "xmlwriter.h"
 #include "xmlout.h"
 #include "logging.h"
+#include "base64.h"
 
 
 #include <stack>
@@ -100,6 +101,7 @@ XmlWriter::~XmlWriter() {
 }
 
 int XmlWriter::level() const { return data->level; }
+bool XmlWriter::attributeAllowed() const { return data->openEnd; }
 
 void XmlWriter::writeHead() {
   wstring encoding;
@@ -185,6 +187,14 @@ void XmlWriter::writeValue(const std::wstring &value) {
 void XmlWriter::writeCdata(const std::wstring &value) {
   data->closeTag();
   data->buffer << L"<![CDATA[" << value << L"]]>";
+  data->hasValue = true;
+}
+
+void XmlWriter::writeBase64(const std::vector<u_char> &value) {
+  data->closeTag();
+  data->buffer << L"<![CDATA[";
+  to_wostream_base64(data->buffer, value);
+  data->buffer << L"]]>";
   data->hasValue = true;
 }
 

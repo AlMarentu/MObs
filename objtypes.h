@@ -306,9 +306,7 @@ wchar_t from_iso_8859_15(wchar_t c);
 
 /// wandelt einen HTML-Character-Code in Unicode um; die Angabe erfolg ohne '&' und ';': Z.B.  "amp" oder "#xd"
 wchar_t from_html_tag(const std::wstring &tok);
-
-
-
+/// Rückgabe base64-Wert des Zeichens oder 99 bei whitespace oder -1 bei ungültig
 
 //template <typename T>
 /// String-Konvertierung

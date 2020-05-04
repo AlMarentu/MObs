@@ -27,6 +27,7 @@
 
 #include "logging.h"
 #include "objtypes.h"
+#include "base64.h"
 
 #include<stack>
 #include<exception>
@@ -513,7 +514,13 @@ public:
   /** \brief Callback-Function: Ein CDATA-Elemet (optional) ansonsten wird auf \c Value abgebildet
    @param value Inhalt des Tags
    */
-  virtual void Cdata(const std::wstring &value) { Value(value); };
+  virtual void Cdata(const std::wstring &value) { Value(value); }
+  /** \brief Callback-Function: Ein CDATA-Elemet mit base64 codiertem Inhalt
+   
+      nur, wenn setBase64(true) gesetzt wurde
+   @param base64 Inhalt des base64 codierden Wertes
+   */
+  virtual void Base64(const std::vector<u_char> &base64) { }
   /** \brief Callback-Function: Ein Start-Tag
    @param element Name des Elementes
    */
@@ -533,6 +540,9 @@ public:
   bool eof() const { return endOfFile; }
   /// verlasse bein nächsten End-Tag den parser
   void stop() { running = false; }
+  /// Aktiviere automatische base64 erkennung
+  /// \see Base64
+  void setBase64(bool b) { useBase64 = b; }
   /// Starte den Parser
   void parse() {
     TRACE("");
@@ -641,7 +651,15 @@ public:
           eat('[');
           saveValue();  // nur whitespace prüfen
           parse2CD();
-          Cdata(buffer.substr(2));
+          if (try64) {
+            if (b64Cnt > 0 and b64Cnt < 4)
+              base64Check('=');
+            Base64(base64);
+          }
+          else
+            Cdata(buffer.substr(2));
+          base64.clear();
+          try64 = false;
           clearValue();
           lastKey = "";
         }
@@ -790,12 +808,17 @@ private:
     buffer.clear();
     if (curr == c or curr <= 0)
       return;
-    buffer += curr;
+    if (try64)
+      base64Check(curr);
+    else
+      buffer += curr;
     while ((curr = istr.get()) > 0) {
       if (curr == c)
         break;
-//      std::cout << mobs::to_string(curr);
-      buffer += curr;
+      if (try64)
+        base64Check(curr);
+      else
+        buffer += curr;
     }
   };
   void parse2Com() {
@@ -822,6 +845,7 @@ private:
     buffer.clear();
     for (;;) {
       std::wstring tmp = buffer;
+      base64Start();
       parse2Char(']');
       buffer = tmp + buffer;
       if (peek() == ']') {
@@ -831,11 +855,17 @@ private:
             eat();
             if (peek() == '>')
               return;
+            if (try64)
+              throw std::runtime_error("base64 error");
+            base64.clear();
             if (peek() != ']')
               break;
           }
         }
       }
+      if (try64)
+        throw std::runtime_error("base64 error");
+      base64.clear();
       if (peek() < 0)
         throw std::runtime_error("Syntax");
     }
@@ -912,6 +942,52 @@ private:
     }
     buf = result;
   }
+  void base64Check(wchar_t c) {
+    int v = from_base64(c);
+    if (v < 0) {
+      if (c == '=') { // padding
+        v = 0;
+        switch (b64Cnt) {
+          case 3:
+            base64.push_back(b64Value >> 10);
+            base64.push_back((b64Value >> 2) & 0xff);
+            // fall into
+          case 100:
+            b64Cnt = 999; // Wenn noch ein = kommt -> fehler
+            break;
+          case 2:
+            base64.push_back(b64Value >> 4);
+            b64Cnt = 100; // es darf noch 1 = kommen
+            break;
+          case 1: throw std::runtime_error("base64 unexpecrted end");
+          default: throw std::runtime_error("base64 unexpecrted padding");
+        }
+      }
+      else
+        throw std::runtime_error("base64 padding");
+    }
+    else if (v < 64) {
+      if (b64Cnt > 3)
+        throw std::runtime_error("base64 invalid");
+      b64Value = (b64Value << 6) + v;
+      if (++b64Cnt == 4) {
+        base64.push_back(b64Value >> 16);
+        base64.push_back((b64Value >> 8) & 0xff);
+        base64.push_back(b64Value & 0xff);
+        b64Cnt = 0;
+        b64Value = 0;
+      }
+    }
+  }
+  void base64Start() {
+    if (not useBase64)
+      return;
+    base64.clear();
+    b64Cnt = 0;
+    b64Value = 0;
+    try64 = true;
+  }
+  
   std::wistream &istr;
   std::wstring buffer;
   std::wstring saved;
@@ -920,6 +996,11 @@ private:
   std::stack<std::string> tags;
   std::string lastKey;
   wchar_t (*conFun)(wchar_t) = nullptr;
+  std::vector<u_char> base64;
+  int b64Value = 0;
+  int b64Cnt = 0;
+  bool try64 = false;
+  bool useBase64 = false;
   bool running = false;
   bool endOfFile = false;
   

@@ -46,11 +46,18 @@ namespace mobs {
       else
         parent->NullTag(element);
     };
-    void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) {
-      if (obj) {
+    void Attribute(const std::string &element, const std::string &attribute, const std::wstring &value) {
+      if (obj and not member()) {
+        enter(attribute);
+        if (member() and member()->xmlAsAttr())
+        {
+          if (not member()->fromStr(value, cfs))
+            error += string(error.empty() ? "":"\n") + u8"invalid type in variable " + showName() + u8" can't assign";
+        }
+        leave();
       }
       else
-        parent->Attribute(element, attribut, value);
+        parent->Attribute(element, attribute, value);
     };
     void Value(const std::wstring &val) {
       if (obj) {
@@ -62,6 +69,22 @@ namespace mobs {
       else
         parent->Value(val);
     };
+    void Cdata(const std::wstring &value) {
+      if (obj)
+        Value(value);
+      else
+        parent->Cdata(value);
+    }
+    void Base64(const std::vector<u_char> &base64) {
+      if (obj) {
+        if (not member())
+          error += string(error.empty() ? "":"\n") + showName() + u8" is no variable, can't assign";
+        else //if (not member()->fromStr(val, cfs))
+          error += string(error.empty() ? "":"\n") + u8"invalid type in variable " + showName() + u8" can't assign";
+      }
+      else
+        parent->Base64(base64);
+    }
     void StartTag(const std::string &element) {
       if (obj) {
         if (not enter(element) and cfs.exceptionIfUnknown())
@@ -130,6 +153,7 @@ void XmlReader::fill(ObjectBase *obj) {
   data->setObj(obj);
 }
 
+void XmlReader::setBase64(bool b) { data->setBase64(b); }
 void XmlReader::parse() { data->parse(); }
 bool XmlReader::eof() const { return data->eof(); }
 void XmlReader::stop() { data->stop(); }

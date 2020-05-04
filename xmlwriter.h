@@ -45,15 +45,16 @@ class XmlWriterData;
  */
 class XmlWriter {
 public:
-  /// Verfügbare Charsets für die Ausgabe,
+  /// Verfügbare Charsets für die Ausgabe
   enum charset { CS_utf8, CS_utf8_bom, CS_utf16_le, CS_utf16_be, CS_iso8859_1, CS_iso8859_9, CS_iso8859_15 };
   /// \brief Konstruktor bei Verwendung mit std::wosteram
-  /// wird ein frisch geöffneter \c std::wofstream übergeben, so wird bei CS_utf16 sowie CS_utf8_bom ein BOM erzeugt
+  ///
+  /// Wird ein frisch geöffneter \c std::wofstream übergeben, so wird bei CS_utf16 sowie CS_utf8_bom ein BOM erzeugt,
+  /// ansonsten kann auch \c std::wstringstream übergeben werden, dann sind aber nur CS_utf8 oder CS_iso* erlaubt
   /// \see writeHead
-  /// ansonsten kann auch \c std::wstringstream übergeben werden, da sind aber nur CS_utf8 oder CS_iso* erlaubt
   /// @param str zu beschreibender stream
   /// @param c Charset für die Ausgabe
-  /// @param indent zum Abschaten von Einrückung und whitespace
+  /// @param indent zum Abschalten von Einrückung und whitespace
   XmlWriter(std::wostream &str, charset c = CS_utf8_bom, bool indent = true);
   /// Konstruktor bei Verwendung mit internen Buffer
   ///
@@ -72,19 +73,23 @@ public:
   void writeValue(const std::wstring &value);
   /// Schreibe ein CDATA-Element
   void writeCdata(const std::wstring &value);
+  /// Schreibe ein CDATA-Element mit Base64
+  void writeBase64(const std::vector<u_char> &value);
   /// Schreibe eine Ende-Tag
   void writeTagEnd(bool forceNoNulltag = false);
   /// Schreibe einen Kommentar
   void writeComment(const std::wstring &comment, bool inNewLine = true);
   /// Anzeige der aktuellen Ebene
   int level() const;
+  /// an dieser Stelle darf ein Attribute verwendet werden
+  bool attributeAllowed() const;
   /// lesen des XML-Ergebnisses im gewählten Charset, nur bei Verwendung des internen Buffers
   std::string getString() const;
   /// löschen des internen Buffers
   void clearString();
 
   std::wstring version = L"1.0"; ///< Version für Header
-  bool standalone = true; ///< Angabe für Headert
+  bool standalone = true; ///< Angabe für Header
   bool escapeControll = false; ///< ersetze Zeichen wie "\n" durch "&#xa;"
 
 private:

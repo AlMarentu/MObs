@@ -46,6 +46,12 @@ public:
   virtual void Value(const std::wstring &value) { }
   /// Callback für Cdata-Element
   virtual void Cdata(const std::wstring &value) { Value(value); }
+  /** \brief Callback-Function: Ein CDATA-Elemet mit base64 codiertem Inhalt
+   
+      nur, wenn setBase64(true) gesetzt wurde
+   @param base64 Inhalt des base64 codierden Wertes
+   */
+  virtual void Base64(const std::vector<u_char> &base64) { }
   /// Callback für Start-Tag
   virtual void StartTag(const std::string &element) { }
   /// Callback für Ende-Tag
@@ -55,6 +61,9 @@ public:
   /// @param error ist bei Fehler gefüllt, ansonsten leer
   virtual void filled(ObjectBase *obj, const std::string &error) = 0;
 
+  /// Aktiviere automatische base64 erkennung
+  /// \see Base64
+  void setBase64(bool b);
   /// ist beim Parsen das Ende erreicht
   bool eof() const;
   /// verlasse bein nächsten End-Tag den parser

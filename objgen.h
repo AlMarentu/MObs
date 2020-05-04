@@ -139,12 +139,13 @@ namespace mobs {
 #define MemMobsVar(typ, name, converter, ...) MemMobsVarType(typ, converter) name = MemMobsVarType(typ, converter) (#name, this __VA_ARGS__)
 
 /// \private
-enum MemVarCfg { Unset, InitialNull, VectorNull, Key1, Key2, Key3, Key4, Key5, AltNameBase = 100, AltNameBaseEnd = 299 };
+enum MemVarCfg { Unset, InitialNull, VectorNull, XmlAsAttr, Key1, Key2, Key3, Key4, Key5, AltNameBase = 100, AltNameBaseEnd = 299 };
 /// \private
 enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confToken, const std::string &s);
 
 #define USENULL ,mobs::InitialNull ///< Element wir mit\c null vorinitialisiert
 #define USEVECNULL ,mobs::VectorNull ///< Bei Vectoren wird der Vector selbst mit \c null vorinitialisiert
+#define XMLATTR ,mobs::XmlAsAttr ///< BeiXML-Ausgabe als Attribute ausgeben
 #define KEYELEMENT1 ,mobs::Key1 ///<  Keyelement der Priorität 1 (erstes Element)
 #define KEYELEMENT2 ,mobs::Key2 ///< Keyelement der Priorität 2
 #define KEYELEMENT3 ,mobs::Key3 ///< Keyelement der Priorität 3
@@ -289,6 +290,8 @@ public:
   ObjectBase *parent() const { return m_parent; }
   /// Objekt wurde beschrieben
   void activate();
+  /// Ausgabe bi XML als Attribute
+  bool xmlAsAttr() const { return m_XmlAsAttr; }
 
 protected:
   /// \private
@@ -299,6 +302,7 @@ protected:
 private:
   void doConfig(MemVarCfg c);
   std::string m_name;
+  bool m_XmlAsAttr = false;
   ObjectBase *m_parent = nullptr;
   MemBaseVector *m_parVec = nullptr;
 };

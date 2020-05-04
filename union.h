@@ -27,7 +27,6 @@
 
 #include <string>
 
-#include "logging.h"
 #include "objtypes.h"
 #include "objgen.h"
 
