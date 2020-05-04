@@ -25,6 +25,7 @@
 
 #include <sstream>
 #include <iostream>
+#include <iomanip>
 
 
 using namespace std;
@@ -91,6 +92,8 @@ std::string UxTime::toISO8601() const {
 
   // 2007-04-05T12:30:00+02:00
   std::stringstream s;
+  s << put_time(&ts, "%FT%T%z");
+#if 0
   s << std::setfill('0') << std::setw(4) << ts.tm_year + 1900 << '-'
     << std::setw(2) << ts.tm_mon +1 << '-' << std::setw(2) << ts.tm_mday << 'T'
     << std::setw(2) << ts.tm_hour << ':' << std::setw(2) << ts.tm_min << ':' << std::setw(2) << ts.tm_sec
@@ -99,7 +102,11 @@ std::string UxTime::toISO8601() const {
   s << std::setw(2) << off / 3600;
   off = off % 3600;
   s << ':' << std::setw(2) << off % 60;
-  return s.str();
+#endif
+  string res = s.str();
+  if (res.length() == 24)
+    res.insert(22, u8":");
+  return res;
 }
 
 

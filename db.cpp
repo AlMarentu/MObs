@@ -82,10 +82,10 @@ FileDatabase::~FileDatabase()
 
 bool FileDatabase::load(ObjectBase &obj)
 {
-  TRACE(PARAM(obj.typName()));
+  TRACE(PARAM(obj.typeName()));
   stringstream fname;
-  fname << base << "/" << obj.typName() << "." << obj.keyStr();
-  cerr << "FileDatabase::load " << obj.typName() << " name: " << obj.keyStr() << endl;
+  fname << base << "/" << obj.typeName() << "." << obj.keyStr();
+  cerr << "FileDatabase::load " << obj.typeName() << " name: " << obj.keyStr() << endl;
   ifstream f(fname.str());
   if (not f.is_open())
     throw runtime_error(string("File open error ") + fname.str());
@@ -106,10 +106,10 @@ bool FileDatabase::load(list<ObjectBase> &result, string objType, string query)
 
 bool FileDatabase::save(const ObjectBase &obj)
 {
-  TRACE(PARAM(obj.typName()));
+  TRACE(PARAM(obj.typeName()));
   
   stringstream fname;
-  fname << base << "/" << obj.typName() << "." << obj.keyStr();
+  fname << base << "/" << obj.typeName() << "." << obj.keyStr();
   fstream f(fname.str(), f.trunc | f.out);
   if (not f.is_open())
     throw runtime_error(string("File open error ") + fname.str());
@@ -118,7 +118,7 @@ bool FileDatabase::save(const ObjectBase &obj)
   if (f.fail())
     throw runtime_error(string("File write error ") + fname.str());
 
-  cerr << "FileDatabase::save " << obj.typName() << " name: " << obj.keyStr() << endl;
+  cerr << "FileDatabase::save " << obj.typeName() << " name: " << obj.keyStr() << endl;
   return true;
 }
 
@@ -139,7 +139,7 @@ class Fahrzeug : virtual public NamedObject, virtual public ObjectBase
 
     void init() { TRACE(""); };
     // ist das nötig=?
-    string objName() const { TRACE(""); return typName() + "." + std::to_string(id()); };
+    string objName() const { TRACE(""); return typeName() + "." + std::to_string(id()); };
 };
 ObjRegister(Fahrzeug);
 

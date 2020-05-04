@@ -88,6 +88,7 @@ void MemBaseVector::doConfig(MemVarCfg c)
 {
   switch(c) {
     case Unset: break;
+    case XmlAsAttr: break;
     case VectorNull: nullAllowed(true); break;
     case Key1 ... Key5: break;
     case AltNameBase ... AltNameBaseEnd: m_altName = c - AltNameBase; break;
@@ -126,6 +127,7 @@ void ObjectBase::doConfig(MemVarCfg c)
 {
   switch(c) {
     case Unset: break;
+    case XmlAsAttr: break;
     case InitialNull: nullAllowed(true); break;
     case Key1 ... Key5: m_key = c - Key1 + 1; break;
     case AltNameBase ... AltNameBaseEnd: m_altName = c - AltNameBase; break;

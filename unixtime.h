@@ -22,6 +22,7 @@
 #ifndef MOBS_DATETIME_H
 #define MOBS_DATETIME_H
 
+#include <ctime>
 #include <string>
 #include <iostream>
 #include <iomanip>
@@ -31,9 +32,6 @@
 
 /** \file unixtime.h
  \brief Optional: Wrapper für die Unix-Zeit \c time_t */
-
-#include <time.h>
-#include <stdio.h>
 
 
 namespace mobs {
@@ -47,7 +45,7 @@ namespace mobs {
 class UxTime {
 public:
   /// Konstruktor über unix-Zeit \c time_t
-  UxTime(time_t t = -1) : m_time(t) {}
+  UxTime(std::time_t t = -1) : m_time(t) {}
   /// \brief Konstruktor für lokale Zeit
   /// @param year  Jahr >= 1900
   /// @param month Monat 1..12
@@ -62,7 +60,7 @@ public:
   /// \throws std::runtime_error bei Fehler
   UxTime(std::string s);
   /// Ausgabe der unix-zeit in \c time_t
-  inline time_t toUxTime() const { return m_time; }
+  inline std::time_t toUxTime() const { return m_time; }
   /// Ausgabe der Zeit im Format ISO8601 als localtime mit Offset (2007-04-05T12:30:00+02:00)
   std::string toISO8601() const;
   /// liefert aktuelle Uhrzeit
@@ -73,7 +71,7 @@ private:
   void parseInt2(int &i, const char *&cp);
   void parseYear(int &y, const char *&cp);
   void parseOff(long &i, const char *&cp);
-  time_t m_time;
+  std::time_t m_time;
 };
 
 /// ermittelt eine Zeitdifferenz analog \c difftime
