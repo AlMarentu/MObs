@@ -46,7 +46,7 @@ class Obj2;
 class BaseObj : virtual public mobs::ObjectBase {
 public:
   ObjInit(BaseObj);
-  virtual ~BaseObj() {};
+//  virtual ~BaseObj() {};
   virtual Obj0 &toObj0() { throw runtime_error("invalid cast"); };
   virtual Obj1 &toObj1() { throw runtime_error("invalid cast"); };
   virtual Obj2 &toObj2() { throw runtime_error("invalid cast"); };

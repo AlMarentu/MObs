@@ -21,7 +21,8 @@
 
 #include "objtypes.h"
 #include "objtypes.h"
-#include "base64.h"
+#include "converter.h"
+#include "converter.h"
 
 
 #include <stdio.h>
@@ -235,14 +236,14 @@ TEST(objtypeTest, tobase64) {
   std::string r;
   ::mobs::copy_base64(s.cbegin(), s.cend(), std::back_inserter(r));
   
-  std::cerr << "XX " << r << std::endl;
+//  std::cerr << "XX " << r << std::endl;
   EXPECT_EQ("UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJlbiwgSm9naHVydCB1bmQgUXVhcms=", r);
 
   std::wstring s2;
   std::vector<unsigned char> v = { 'W', 'i', 't', 'z' };
   ::mobs::copy_base64(v.cbegin(), v.cend(), std::back_inserter(s2));
   
-  std::cerr << "XX " << ::mobs::to_string(s2) << std::endl;
+//  std::cerr << "XX " << ::mobs::to_string(s2) << std::endl;
   EXPECT_EQ(L"V2l0eg==", s2);
 
   

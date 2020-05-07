@@ -22,7 +22,7 @@
 #include "xmlwriter.h"
 #include "xmlout.h"
 #include "logging.h"
-#include "base64.h"
+#include "converter.h"
 
 
 #include <stack>
@@ -39,7 +39,7 @@ namespace mobs {
 class XmlWriterData {
 public:
   XmlWriterData(std::wostream &str, XmlWriter::charset c, bool i) : buffer(str), cs(c), indent(i) { setConFun(); }
-  XmlWriterData(XmlWriter::charset c, bool i) : cs(c), indent(i) { setConFun(); }
+  XmlWriterData(XmlWriter::charset c, bool i) : cs(c), indent(i) { }
   std::wostream &buffer = wstrBuff;
   XmlWriter::charset cs;
   int level = 0;
@@ -49,20 +49,49 @@ public:
   wstring prefix;
   stack<wstring> elements;
   wstringstream wstrBuff; // buffer für u8-Ausgabe in std::string
+  std::mbstate_t mbstate;
   wchar_t (*conFun)(wchar_t) = nullptr;
 
   void setConFun() {
+    std::locale lo;
+    lo = std::locale(buffer.getloc(), new codec_iso8859_1);
+    buffer.imbue(lo);
     switch (cs) {
-      case XmlWriter::CS_iso8859_1: conFun = &to_iso_8859_1; break;
-      case XmlWriter::CS_iso8859_9: conFun = &to_iso_8859_9; break;
-      case XmlWriter::CS_iso8859_15: conFun = &to_iso_8859_15; break;
-      default: break;
+      case XmlWriter::CS_iso8859_1:
+  //      lo = std::locale(data->buffer.getloc(), new codec_iso8859_1);
+        break;
+      case XmlWriter::CS_iso8859_9:
+        lo = std::locale(buffer.getloc(), new codec_iso8859_9);
+        break;
+      case XmlWriter::CS_iso8859_15:
+        lo = std::locale(buffer.getloc(), new codec_iso8859_15);
+        break;
+      case XmlWriter::CS_utf8_bom:
+        if (buffer.tellp() == 0)  // writing BOM
+          buffer << L'\u00ef' << L'\u00bb' << L'\u00bf';
+        lo = std::locale(buffer.getloc(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
+        break;
+      case XmlWriter::CS_utf8:
+        lo = std::locale(buffer.getloc(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
+        break;
+      case XmlWriter::CS_utf16_be:
+        if (buffer.tellp() == 0)  // writing BOM
+          buffer << L'\u00fe' << L'\u00ff';
+        lo = std::locale(buffer.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, codecvt_mode(0)>);
+        break;
+      case XmlWriter::CS_utf16_le:
+        if (buffer.tellp() == 0)  // writing BOM
+          buffer << L'\u00ff' << L'\u00fe';
+        lo = std::locale(buffer.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::little_endian>);
+        break;
     }
+    buffer.imbue(lo);
   }
+  
   void write(wchar_t c) {
-    if (conFun and (c & ~0x7f))
-      buffer << wchar_t(conFun(c));
-    else
+//    if (conFun and (c & ~0x7f))
+//      buffer << wchar_t(conFun(c));
+//    else
       buffer << c;
   }
   void writeIndent() {
@@ -103,43 +132,25 @@ XmlWriter::~XmlWriter() {
 int XmlWriter::level() const { return data->level; }
 bool XmlWriter::attributeAllowed() const { return data->openEnd; }
 
+
 void XmlWriter::writeHead() {
   wstring encoding;
-  std::locale lo;
   switch (data->cs) {
     case CS_iso8859_1: encoding = L"ISO-8859-1"; break;
     case CS_iso8859_9: encoding = L"ISO-8859-9"; break;
     case CS_iso8859_15: encoding = L"ISO-8859-15"; break;
-    case CS_utf8_bom:
-      if (data->buffer.tellp() == 0)  // writing BOM
-        data->buffer << L'\u00ef' << L'\u00bb' << L'\u00bf';
-    case CS_utf8:
-      lo = std::locale(data->buffer.getloc(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
-      data->buffer.imbue(lo);
-      encoding = L"UTF-8";
-      break;
-    case CS_utf16_be:
-      if (data->buffer.tellp() == 0)  // writing BOM
-        data->buffer << L'\u00fe' << L'\u00ff';
-      lo = std::locale(data->buffer.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, codecvt_mode(0)>);
-      data->buffer.imbue(lo);
-      encoding = L"UTF-16";
-      break;
-    case CS_utf16_le:
-      if (data->buffer.tellp() == 0)  // writing BOM
-        data->buffer << L'\u00ff' << L'\u00fe';
-      lo = std::locale(data->buffer.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::little_endian>);
-      data->buffer.imbue(lo);
-      encoding = L"UTF-16";
-      break;
+    case CS_utf8_bom: encoding = L"UTF-8"; break;
+    case CS_utf8: encoding = L"UTF-8"; break;
+    case CS_utf16_be: encoding = L"UTF-16"; break;
+    case CS_utf16_le: encoding = L"UTF-16"; break;
   }
-  
-  data->buffer << L"<?xml";
+
+  data->buffer << "<?xml";
   data->openEnd = true;
   writeAttribute(L"version", version);
   writeAttribute(L"encoding", encoding);
   writeAttribute(L"standalone", standalone ? L"yes":L"no");
-  data->buffer << L"?>";
+  data->buffer << "?>";
   data->openEnd = false;
 }
 
@@ -245,12 +256,22 @@ string XmlWriter::getString() const
   string result;
 // ist leer wenn filebuffer
   switch (data->cs) {
-    case CS_iso8859_1:
-    case CS_iso8859_9:
+    case CS_iso8859_1: {
+         const wstring &t = data->wstrBuff.str();
+         std::transform(t.begin(), t.cend(), std::back_inserter(result),
+                        [](wchar_t c) -> char{ return to_iso_8859_1(c); });
+         return result;
+       }
+    case CS_iso8859_9: {
+         const wstring &t = data->wstrBuff.str();
+         std::transform(t.begin(), t.cend(), std::back_inserter(result),
+                        [](wchar_t c) -> char{ return to_iso_8859_9(c); });
+         return result;
+       }
     case CS_iso8859_15: {
       const wstring &t = data->wstrBuff.str();
       std::transform(t.begin(), t.cend(), std::back_inserter(result),
-                     [](const wchar_t c) -> char{ return (c & ~0xff) ? char(0xbf) : c; });
+                     [](wchar_t c) -> char{ return to_iso_8859_15(c); });
       return result;
     }
     case CS_utf8_bom:

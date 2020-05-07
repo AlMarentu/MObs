@@ -100,6 +100,7 @@
 #include <map>
 #include <vector>
 #include <stack>
+#include <stdexcept>
 
 #include "logging.h"
 #include "objtypes.h"
@@ -181,8 +182,8 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
  @param objname Name der Klasse (muss von ObjecBase abgeleitet sein)
  */
 #define ObjInit(objname) \
-objname() { TRACE(""); doInit(); init(); } \
-objname(const objname &that) { TRACE(""); doCopy(that); } \
+objname() : ObjectBase() { TRACE(""); doInit(); init(); } \
+objname(const objname &that) : ObjectBase() { TRACE(""); doCopy(that); } \
 objname(mobs::MemBaseVector *m, mobs::ObjectBase *o, std::vector<mobs::MemVarCfg> cv = {}) : ObjectBase(m, o, cv) { TRACE(""); doInit(); init(); } \
 objname(std::string name, ObjectBase *t, std::vector<mobs::MemVarCfg> cv = {}) : ObjectBase(name, t, cv) { TRACE(PARAM(name) << PARAM(this)); if (t) t->regObj(this); doInit(); init(); } \
 objname &operator=(const objname &rhs) { TRACE(""); if (this != &rhs) { doCopy(rhs); } return *this; } \
@@ -508,9 +509,7 @@ private:
     ObjectBase *obj = 0;
     MemBaseVector *vec = 0;
   };
-  std::list<MlistInfo> mlist;
-  static std::map<std::string, ObjectBase *(*)(ObjectBase *)> createMap;
-  
+  std::list<MlistInfo> mlist;  
 };
 
 
@@ -562,13 +561,16 @@ template<typename T, class C>
  */
 class Member : virtual public MemberBase, public C {
 public:
-  /// \private   
+  /// Konstruktor für impliziten Cast zur Verwendung im MemVector::pudh_back 
+  Member(const T &t) : MemberBase("", nullptr) { TRACE(""); clear(); operator()(t); }  // Konstruktor Solo mit zZuweisung -> Cast
+  /// \private
   Member(std::vector<MemVarCfg> cv = {}) : MemberBase("", nullptr, cv) { TRACE(""); clear(); }  // Konstruktor für Array oder Solo
   /// \private
   Member(std::string n, ObjectBase *o, std::vector<MemVarCfg> cv) : MemberBase(n, o, cv), wert(T()) { TRACE(PARAM(n) << PARAM(this)); if (o) o->regMem(this); clear(); } // Konstruktor innerhalb  Objekt nur intern
   /// \private
   Member(MemBaseVector *m, ObjectBase *o, std::vector<MemVarCfg> cv = {}) : MemberBase(m, o, cv) {} // Konstruktor f. Objekt nur intern
-  Member &operator=(const Member &other) = delete;
+ /// Zuweisungsoperator
+  Member &operator=(const Member<T, C> &other) { clear(); doCopy(other); return *this; }
   ~Member() { TRACE(PARAM(name())); }
   /// Zugriff auf Inhalt
   inline T operator() () const { return wert; }
@@ -752,6 +754,7 @@ void Member<T, C>::memInfo(MobsMemberInfo &i) const
 /// Basisklasse zum rekursiven Durchlauf über eine Objektstruktur
 class ObjTrav {
 public:
+  virtual ~ObjTrav() { };
   /// Callbackfunktion, die bei Betreten eines Objektes aufgerufen wird
   /// \return wenn false zurückgeliefert wird, das gesamte Objekt übersprungen
   virtual bool doObjBeg(ObjectBase &obj) = 0;
@@ -773,6 +776,7 @@ public:
 /// Basisklasse zum rekursiven Durchlauf über eine  \c const  Objektstruktur
 class ObjTravConst {
 public:
+  virtual ~ObjTravConst() { };
   /// Callbackfunktion, die bei Betreten eines Objektes aufgerufen wird
   /// \return wenn false zurückgeliefert wird, das gesamte Objekt übersprungen
   virtual bool doObjBeg(const ObjectBase &obj) = 0;

@@ -23,10 +23,15 @@
 #define MOBS_OBJTYPES_H
 
 #include <string>
-#include <iostream>
 #include <sstream>
 #include <vector>
 #include <limits>
+#ifndef INT_MAX
+#include <limits.h>
+#endif
+#ifndef SIZE_T_MAX
+#define SIZE_T_MAX std::numeric_limits<size_t>::max() ///< Maximum des Typs size_t
+#endif
 
 
 /** \file objtypes.h
@@ -292,21 +297,6 @@ std::wstring to_wstring(double t);
 /// @return Wert als std::wstring
 std::wstring to_wstring(long double t);
 
-/// wandelt einen Unicode-zeichen in ein ISO8859-1 Zeichen um; im Fehlerfall wird U+00bf INVERTED QUESTION MARK geliefert
-wchar_t to_iso_8859_1(wchar_t c);
-/// wandelt einen Unicode-zeichen in ein ISO8859-9 Zeichen um; im Fehlerfall wird U+00bf INVERTED QUESTION MARK geliefert
-wchar_t to_iso_8859_9(wchar_t c);
-/// wandelt einen Unicode-zeichen in ein ISO8859-15 Zeichen um; im Fehlerfall wird U+00bf INVERTED QUESTION MARK geliefert
-wchar_t to_iso_8859_15(wchar_t c);
-
-/// wandelt ein ISO8859-9 Zeichen in Unicode um
-wchar_t from_iso_8859_9(wchar_t c);
-/// wandelt ein ISO8859-15 Zeichen in Unicode um
-wchar_t from_iso_8859_15(wchar_t c);
-
-/// wandelt einen HTML-Character-Code in Unicode um; die Angabe erfolg ohne '&' und ';': Z.B.  "amp" oder "#xd"
-wchar_t from_html_tag(const std::wstring &tok);
-/// Rückgabe base64-Wert des Zeichens oder 99 bei whitespace oder -1 bei ungültig
 
 //template <typename T>
 /// String-Konvertierung

@@ -176,7 +176,7 @@ int main(int argc, char* argv[])
     f1->achsen(2);
     cout << "Fahrzeug[" << f1->id() << "] hat " << f1->achsen() << " Achsen und ist ein " << f1->typ() << endl;
 
-    FileDatabase db("/Users/lautner/Work/mobs/mobs/mobs/data");
+    FileDatabase db("data");
     db.save(*f1);
 
     NamedObjRef<Fahrzeug> f2(pool, "2");

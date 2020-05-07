@@ -70,6 +70,10 @@ void logMessage(loglevel l, const std::string &message);
 #define LM_WARNING logging::lm_warn ///< Log-Level für Warning
 #define LM_ERROR logging::lm_error  ///< Log-Level für Error
 
+#ifndef __FILE_NAME__
+#define __FILE_NAME__ __FILE__
+#endif
+
 
 /// \brief Erzeugt eine Logmeldung aud stderr.
 #define LOG(l,x) { std::stringstream ___s___; ___s___ << __FILE_NAME__ << ':' << __LINE__ << " " << std::boolalpha << x; logging::logMessage(l, ___s___.str()); }

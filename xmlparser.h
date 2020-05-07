@@ -27,7 +27,7 @@
 
 #include "logging.h"
 #include "objtypes.h"
-#include "base64.h"
+#include "converter.h"
 
 #include<stack>
 #include<exception>
@@ -480,7 +480,7 @@ public:
    */
   std::string info(size_t &pos) const {
     pos = istr.tellg();
-    std::cerr << "CUR = " << curr << " " << pos << std::endl;
+//    std::cerr << "CUR = " << curr << " " << pos << std::endl;
     std::wstring w;
     wchar_t c;
     w += curr;
@@ -490,7 +490,7 @@ public:
       else
         w += c;
     }
-    std::cerr << mobs::to_string(w) << std::endl;
+//    std::cerr << mobs::to_string(w) << std::endl;
     return to_string(w);
   };
   /** \brief zugriff auf den Stack der Element-Struktur
@@ -548,30 +548,30 @@ public:
     TRACE("");
     if (not running)
     {
+      std::locale lo = std::locale(istr.getloc(), new codec_iso8859_1);
+      istr.imbue(lo);
+
       eat();  // erstes Zeichen einlesen
               /// BOM bearbeiten
       if (curr == 0xff)
       {
         std::locale lo;
-        if ((curr = istr.get()) == 0xfe)
-        {
-          lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::little_endian>);
-          istr.imbue(lo);
-          encoding = u8"UTF-16"; // (LE)
-        }
-        else
+        if ((curr = istr.get()) != 0xfe)
           throw std::runtime_error(u8"Error in BOM");
+        lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::little_endian>);
+        istr.imbue(lo);
+        encoding = u8"UTF-16"; // (LE)
         eat();
       }
       else if (curr == 0xfe)
       {
         std::locale lo;
-        if ((curr = istr.get()) == 0xff)
-          lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::codecvt_mode(0)>);
-        else
+        if ((curr = istr.get()) != 0xff)
           throw std::runtime_error(u8"Error in BOM");
+        lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::codecvt_mode(0)>);
         istr.imbue(lo);
         encoding = u8"UTF-16"; // (BE)
+        eat();
       }
       else if (curr == 0xef)
       {
@@ -592,7 +592,7 @@ public:
       // BOM überlesen
       if (not buffer.empty() and buffer != L"\0xEF\0xBB\0xBF" and buffer != L"\ufeff")
       {
-        for (auto c:buffer) std::cerr << '#' <<  int(c) << std::endl;
+//        for (auto c:buffer) std::cerr << '#' <<  int(c) << std::endl;
         throw std::runtime_error("invalid begin of File");
       }
       buffer.clear();
@@ -718,11 +718,17 @@ public:
                 istr.imbue(lo);
               }
               else if (encoding == u8"ISO-8859-15")
-                conFun = from_iso_8859_15;
+              {
+                std::locale lo = std::locale(istr.getloc(), new codec_iso8859_15);
+                istr.imbue(lo);
+              }
               else if (encoding == u8"ISO-8859-9")
-                conFun = from_iso_8859_9;
+              {
+                std::locale lo = std::locale(istr.getloc(), new codec_iso8859_9);
+                istr.imbue(lo);
+              }
               else if (encoding != u8"ISO-8859-1")
-                LOG(LM_WARNING, u8"encoding mismatch: " << encoding << " using ISO-8859-1");
+                LOG(LM_WARNING, u8"unknown encoding: " << encoding << " using ISO-8859-1");
             }
             else if (encoding != mobs::to_string(v))
               LOG(LM_WARNING, u8"encoding mismatch: " << encoding << " " << mobs::to_string(v));
@@ -777,8 +783,6 @@ public:
       lastKey = element;
     }
     saveValue();
-//    std::cerr << "LAST BUFFER " <<  mobs::to_string(buffer) << "|" << curr << std::endl;
-//    for (auto i:buffer) std::cerr << "#" << int(i) << std::endl;
     if (curr != -1)
       throw std::runtime_error(u8"Syntax error");
     // nur noch für check Whitespace bis eof

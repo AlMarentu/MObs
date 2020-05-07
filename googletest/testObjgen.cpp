@@ -289,6 +289,9 @@ TEST(objgenTest, setVars) {
   EXPECT_EQ(inhalt, mobs::to_string(dt2));
 }
 
+//template<typename T>
+//operator mobs::Member<T, mobs::StrConv<T>>(const T &s) { return mobs::Member<T, mobs::StrConv<T>>(s); };
+
 
 TEST(objgenTest, setnull) {
   Person info;
@@ -307,8 +310,7 @@ TEST(objgenTest, setnull) {
   EXPECT_FALSE(info.adresse.isNull());
   EXPECT_EQ(R"({kundennr:2,firma:false,name:"John",vorname:"",adresse:{strasse:"",plz:"",ort:"Berlin"},kontakte:[],hobbies:[]})", mobs::to_string(info));
   EXPECT_EQ(u8"Berlin", info.adresse.ort());
-  
-  
+
 }
 
 TEST(objgenTest, Vectors) {
@@ -328,6 +330,10 @@ TEST(objgenTest, Vectors) {
   EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", info.to_string(mobs::ConvObjToString().exportCompact()));
 // dito mit to_json
   EXPECT_EQ(R"({"kundennr":44,"firma":false,"name":"Peter","vorname":"","adresse":{"strasse":"","plz":"","ort":""},"kontakte":[{"art":"fax","number":""},{"art":"fax","number":""},{"art":"fax","number":""},{"art":"fax","number":""},{"art":"mobil","number":"+40 0000 1111 222"}],"hobbies":["","Piano"]})", info.to_string(mobs::ConvObjToString().exportJson()));
+
+  info.hobbies.push_back(string("Schlafen"));
+  EXPECT_EQ(R"({"kundennr":44,"firma":false,"name":"Peter","vorname":"","adresse":{"strasse":"","plz":"","ort":""},"kontakte":[{"art":"fax","number":""},{"art":"fax","number":""},{"art":"fax","number":""},{"art":"fax","number":""},{"art":"mobil","number":"+40 0000 1111 222"}],"hobbies":["","Piano","Schlafen"]})", info.to_string(mobs::ConvObjToString().exportJson()));
+
 }
   
 TEST(objgenTest, iterator) {

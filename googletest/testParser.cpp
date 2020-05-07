@@ -194,6 +194,5 @@ TEST(parserTest, base64) {
   EXPECT_ANY_THROW(xparse(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n =  biwgSm9naHVydCB1bmQgUXVhcms= ]]>  </abc>", true));
 }
 
-
 }
 

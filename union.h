@@ -110,7 +110,7 @@ class MobsUnion : virtual public mobs::ObjectBase {
 public:
   /// \private
   ObjInit(MobsUnion);
-  ~MobsUnion() { if (m_obj) delete m_obj; }
+  virtual ~MobsUnion() { if (m_obj) delete m_obj; }
   /// liefert den Objekttyp des Unions oder \e leer  wenn nicht gesetzt
   std::string type() const { if (m_obj) return m_obj->typeName(); return ""; }
   /// setzt den Objekttyp des Unions, keine Aktion benn der Typ bereits passt

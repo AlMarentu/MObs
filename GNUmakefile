@@ -3,12 +3,14 @@
 #CXX     = clang++
 
 TARGETS		= gtests db
+LIB		= libmobs.a
 
 # Includepfade für googletest
 CPPFLAGS	= -I/usr/local/include -I.
-LDFLAGS		= -L/usr/local/lib
+LDFLAGS		= -L. -L/usr/local/lib
 CXXFLAGS	= -std=c++11 -g -Wall
-LDLIBS		= 
+LDLIBS		= -lpthread -lmobs
+#ARFLAGS	= -crs
 
 all::	$(TARGETS)
 	
@@ -16,21 +18,24 @@ all::	$(TARGETS)
 testobjects := $(patsubst %.cpp,%.o,$(wildcard googletest/*.cpp))
 
 clean::
-	$(RM) *.o $(TARGETS) $(testobjects)
+	$(RM) *.o $(TARGETS) $(LIB) $(testobjects)
+	$(RM) -r doc
 
-mobs.a: objgen.o objtypes.o logging.o strtoobj.o objpool.o xmlwriter.o xmlout.o xmlread.o unixtime.o 
-	$(AR) -rc $@ $^
+$(LIB): objgen.o objtypes.o logging.o strtoobj.o objpool.o xmlwriter.o xmlout.o xmlread.o converter.o unixtime.o 
+	$(AR) $(ARFLAGS) $@ $^
 
-# Achtung linkage: objgen.o immer zuerst
 
-db: mobs.a db.o 
-	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $^
+db: db.o $(LIB)
+	#$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@ 
+	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $<
+	install -d data
+	echo '{\n  "id": 2,\n  "typ": "Rollschuh",\n  "achsen": 2\n}\n' >data/Fahrzeug.2
 
-gtests: mobs.a $(testobjects)
-	$(CXX) $(LDFLAGS) $(LDLIBS) -lgtest_main  -lgtest -o $@ $^
+gtests: $(LIB) $(testobjects)
+	$(CXX) $(LDFLAGS) $(testobjects) $(LDLIBS) -lgtest -lgtest_main -o $@ 
 	./gtests
-# -lpthread
 
 doc:
 	doxygen doxygen.conf
+
 

@@ -153,19 +153,24 @@ void ObjectBase::regArray(MemBaseVector *vec)
   mlist.push_back(MlistInfo(0, 0, vec));
 }
 
-map<string, ObjectBase *(*)(ObjectBase *)> ObjectBase::createMap;
+extern map<string, ObjectBase *(*)(ObjectBase *)> *ObjectBase__createMap;
+map<string, ObjectBase *(*)(ObjectBase *)> *ObjectBase__createMap = nullptr;
 
 void ObjectBase::regObject(string n, ObjectBase *fun(ObjectBase *))
 {
-  TRACE(PARAM(n));
-  createMap[n] = fun;
+  if (ObjectBase__createMap == nullptr)
+    ObjectBase__createMap = new map<string, ObjectBase *(*)(ObjectBase *)>;
+  
+  ObjectBase__createMap->insert(make_pair(n, fun));
 }
 
 ObjectBase *ObjectBase::createObj(string n, ObjectBase *p)
 {
-  auto it = createMap.find(n);
-  if (it == createMap.end())
-    return 0;
+  if (ObjectBase__createMap == nullptr)
+    return nullptr;
+  auto it = ObjectBase__createMap->find(n);
+  if (it == ObjectBase__createMap->end())
+    return nullptr;
   return (*it).second(p);
 }
 
@@ -201,10 +206,13 @@ MemBaseVector *ObjectBase::getVecInfo(const std::string &name)
 
 size_t ObjectBase::findConfToken(const std::string &name) const
 {
-  auto i = find(m_confToken.begin(), m_confToken.end(), name);
-  if (i == m_confToken.end())
-    return SIZE_T_MAX;
-  return distance(m_confToken.begin(), i);
+  size_t pos = 0;
+  for (auto &i:m_confToken)
+    if (i == name)
+      return pos;
+    else
+      pos++;
+  return SIZE_T_MAX;
 }
 
 MemberBase *ObjectBase::getMemInfo(size_t ctok) const

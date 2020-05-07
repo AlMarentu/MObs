@@ -30,7 +30,7 @@ class XmlReadData;
 /// \throw runtime_error wenn in der Struktur des XML ein Fehler ist
 class XmlReader {
 public:
-  /// Konstruktor mit XML und conversion-hints initialisieren
+  /// Konstruktor mit XML in UTF-8 und conversion-hints initialisieren
   XmlReader(const std::string &input, const ConvObjFromStr &c = ConvObjFromStr());
   /// Konstruktor mit XML und conversion-hints initialisieren
   XmlReader(const std::wstring &input, const ConvObjFromStr &c = ConvObjFromStr());
