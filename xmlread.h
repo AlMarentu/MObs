@@ -64,6 +64,11 @@ public:
   /// @param error ist bei Fehler gefüllt, ansonsten leer
   virtual void filled(ObjectBase *obj, const std::string &error) = 0;
 
+  /// setzte ein XML-Prefix
+  void setPrefix(const std::string &pf);
+  /// entferne das Prefix
+  /// \throw runtime_error falls das prefix nicht übereinstimmt
+  std::string elementRemovePrefix(const std::string &element) const;
   /// Aktiviere automatische base64 erkennung
   /// \see Base64
   void setBase64(bool b);

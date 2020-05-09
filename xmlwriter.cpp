@@ -46,11 +46,12 @@ public:
   bool indent;
   bool openEnd = false;
   bool hasValue = false;
-  wstring prefix;
+  std::wstring prefix;
   stack<wstring> elements;
   wstringstream wstrBuff; // buffer für u8-Ausgabe in std::string
   std::mbstate_t mbstate;
   wchar_t (*conFun)(wchar_t) = nullptr;
+  
 
   void setConFun() {
     std::locale lo;
@@ -244,6 +245,10 @@ void XmlWriter::writeComment(const std::wstring &value, bool inNewLine) {
       default: data->write(c);
     }
   data->buffer << L" -->";
+}
+
+void XmlWriter::setPrefix(const std::wstring &pf) {
+  data->prefix = pf;
 }
 
 void XmlWriter::clearString()

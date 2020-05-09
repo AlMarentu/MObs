@@ -87,6 +87,8 @@ public:
   std::string getString() const;
   /// löschen des internen Buffers
   void clearString();
+  /// setzte ein XML-Prefix
+  void setPrefix(const std::wstring &pf);
 
   std::wstring version = L"1.0"; ///< Version für Header
   bool standalone = true; ///< Angabe für Header

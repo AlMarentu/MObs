@@ -46,6 +46,13 @@ static std::wstring stow(const string &s, bool dontConvert) {
     XmlReadData(XmlReader *p, const string &s, bool charsetUnknown = false) : XmlParserW(str), parent(p),
                 str(stow(s, charsetUnknown)), doConversion(charsetUnknown) { }
 
+    std::string elementRemovePrefix(const std::string &element) const {
+      if (prefix.empty())
+        return element;
+      if (element.length() > prefix.length() and element.substr(0, prefix.length()) == prefix)
+        return element.substr(prefix.length());
+      throw runtime_error("Prefix mismatch");
+    }
     void NullTag(const std::string &element) {
       TRACE(PARAM(element));
       if (obj) {
@@ -53,7 +60,7 @@ static std::wstring stow(const string &s, bool dontConvert) {
         EndTag(element);
       }
       else
-        parent->NullTag(element);
+        parent->NullTag(elementRemovePrefix(element));
     };
     void Attribute(const std::string &element, const std::string &attribute, const std::wstring &value) {
       if (obj and not member()) {
@@ -66,7 +73,7 @@ static std::wstring stow(const string &s, bool dontConvert) {
         leave();
       }
       else
-        parent->Attribute(element, attribute, value);
+        parent->Attribute(elementRemovePrefix(element), attribute, value);
     };
     void Value(const std::wstring &val) {
       if (obj) {
@@ -96,8 +103,8 @@ static std::wstring stow(const string &s, bool dontConvert) {
     }
     void StartTag(const std::string &element) {
       if (obj) {
-        if (not enter(element) and cfs.exceptionIfUnknown())
-          error += string(error.empty() ? "":"\n") + element + u8"not found";
+        if (not enter(elementRemovePrefix(element)) and cfs.exceptionIfUnknown())
+          error += string(error.empty() ? "":"\n") + elementRemovePrefix(element) + u8"not found";
       }
       else
         parent->StartTag(element);
@@ -112,7 +119,7 @@ static std::wstring stow(const string &s, bool dontConvert) {
           parent->EndTag(element);
         }
         else
-          leave(element);
+          leave(elementRemovePrefix(element));
       }
       else
         parent->EndTag(element);
@@ -187,7 +194,12 @@ XmlReader::~XmlReader() {
 void XmlReader::fill(ObjectBase *obj) {
   data->setObj(obj);
 }
+std::string XmlReader::elementRemovePrefix(const std::string &element) const {
+  return data->elementRemovePrefix(element);
+}
 
+
+void XmlReader::setPrefix(const std::string &pf) { data->prefix = pf; }
 void XmlReader::setBase64(bool b) { data->setBase64(b); }
 void XmlReader::parse() { data->parse(); }
 bool XmlReader::eof() const { return data->eof(); }
