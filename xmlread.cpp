@@ -30,12 +30,21 @@ using namespace std;
 
 namespace mobs {
 
-
+static std::wstring stow(const string &s, bool dontConvert) {
+  wstring res;
+  if (dontConvert)
+    transform(s.cbegin(), s.cend(), back_inserter(res), [](char c) -> wchar_t{ return u_char(c); });
+  else
+    res = to_wstring(s);
+  return res;
+}
+                                                     
   class XmlReadData : public ObjectNavigator, public XmlParserW  {
   public:
-//    XmlReadData(const std::string &input, const ConvObjFromStr &c) : XmlParserW(str), str(to_wstring(input)) { cfs = c; };
     XmlReadData(XmlReader *p, wistream &s) : XmlParserW(s), parent(p) {}
     XmlReadData(XmlReader *p, const wstring &s) : XmlParserW(str), parent(p), str(s) {}
+    XmlReadData(XmlReader *p, const string &s, bool charsetUnknown = false) : XmlParserW(str), parent(p),
+                str(stow(s, charsetUnknown)), doConversion(charsetUnknown) { }
 
     void NullTag(const std::string &element) {
       TRACE(PARAM(element));
@@ -109,8 +118,33 @@ namespace mobs {
         parent->EndTag(element);
     }
     void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) {
-      if (element == "xml" and attribut == "encoding")
+      if (element == "xml" and attribut == "encoding") {
         encoding = mobs::to_string(value);
+        
+        // da wstringstream das encoding der loacal ignoriert, hir explizit umstzen wenn Input ei std::string mit undefiniertem Zeichensatz war
+        if (doConversion and encoding != "ISO-8859-1") {
+          size_t pos = str.tellg();
+          std::wistringstream str2;
+          str2.swap(str);
+          const std::wstring &s = str2.str();
+          if (encoding == "UTF-8") {
+            std::string res;
+            transform(s.cbegin(), s.cend(), back_inserter(res), [](char c) { return char(c); });
+            str.str(to_wstring(res));
+          }
+          else if (encoding == "ISO-8859-15") {
+            std::wstring res;
+            transform(s.cbegin(), s.cend(), back_inserter(res), [](wchar_t c) { return from_iso_8859_15(c); });
+            str.str(res);
+          }
+          else if (encoding == "ISO-8859-9") {
+            std::wstring res;
+            transform(s.cbegin(), s.cend(), back_inserter(res), [](wchar_t c) { return from_iso_8859_9(c); });
+            str.str(res);
+          }
+          str.seekg(pos);
+        }
+      }
     }
     
     void setObj(ObjectBase *o) {
@@ -128,11 +162,12 @@ namespace mobs {
     std::string error;
     std::string encoding;
     std::string prefix;
+    bool doConversion = false;
   };
 
 
-XmlReader::XmlReader(const std::string &input, const ConvObjFromStr &c) {
-  data = new XmlReadData(this, to_wstring(input));
+XmlReader::XmlReader(const std::string &input, const ConvObjFromStr &c, bool charsetUnknown) {
+  data = new XmlReadData(this, input, charsetUnknown);
   data->cfs = c;
 }
 

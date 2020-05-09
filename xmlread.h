@@ -30,8 +30,11 @@ class XmlReadData;
 /// \throw runtime_error wenn in der Struktur des XML ein Fehler ist
 class XmlReader {
 public:
-  /// Konstruktor mit XML in UTF-8 und conversion-hints initialisieren
-  XmlReader(const std::string &input, const ConvObjFromStr &c = ConvObjFromStr());
+  /// Konstruktor mit Übergabe eines \c std::string
+  /// @param input XML
+  /// @param c conversion-hints
+  /// @param charsetUnknown default ist der übergebene String in UTF-8 codiert, wird hier false übergeben, wird der Zeichensatz ermittelt (UTF-8, ISO-8869-1, -9, -15)
+  XmlReader(const std::string &input, const ConvObjFromStr &c = ConvObjFromStr(), bool charsetUnknown = false);
   /// Konstruktor mit XML und conversion-hints initialisieren
   XmlReader(const std::wstring &input, const ConvObjFromStr &c = ConvObjFromStr());
   /// Konstruktor mit XML und conversion-hints initialisieren
