@@ -507,7 +507,7 @@ bool ObjectNavigator::find(const std::string &path) {
       pos2 = path.find(']', pos);
       if (pos2 == std::string::npos)
       {
-        index = INT_MAX;  // hinten anhängen
+        index = MemBaseVector::nextpos;  // hinten anhängen
         break;
       }
       string i = path.substr(pos, pos2-pos);
@@ -621,7 +621,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
       {
         memVec = v;
       }
-      if (index < INT_MAX and index < s)
+      if (index < MemBaseVector::nextpos and index < s)
       {
         s = index;
         if (cfs.shrinkArray())
@@ -629,7 +629,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
       }
       else if (index != SIZE_T_MAX)
       {
-        if (index < INT_MAX)
+        if (index < MemBaseVector::nextpos)
           s = index;
         v->resize(s+1);
       }
@@ -662,7 +662,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
 //      objekte.push(ObjectNavigator::Objekt(nullptr, memName));
 //      return false;
     }
-    if (index >= INT_MAX)
+    if (index >= MemBaseVector::nextpos)
     {
       ObjectBase *o = nullptr;
       if (altNamtok != SIZE_T_MAX)

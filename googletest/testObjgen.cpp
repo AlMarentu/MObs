@@ -331,8 +331,14 @@ TEST(objgenTest, Vectors) {
 // dito mit to_json
   EXPECT_EQ(R"({"kundennr":44,"firma":false,"name":"Peter","vorname":"","adresse":{"strasse":"","plz":"","ort":""},"kontakte":[{"art":"fax","number":""},{"art":"fax","number":""},{"art":"fax","number":""},{"art":"fax","number":""},{"art":"mobil","number":"+40 0000 1111 222"}],"hobbies":["","Piano"]})", info.to_string(mobs::ConvObjToString().exportJson()));
 
-  info.hobbies.push_back(string("Schlafen"));
-  EXPECT_EQ(R"({"kundennr":44,"firma":false,"name":"Peter","vorname":"","adresse":{"strasse":"","plz":"","ort":""},"kontakte":[{"art":"fax","number":""},{"art":"fax","number":""},{"art":"fax","number":""},{"art":"fax","number":""},{"art":"mobil","number":"+40 0000 1111 222"}],"hobbies":["","Piano","Schlafen"]})", info.to_string(mobs::ConvObjToString().exportJson()));
+  info.hobbies.back()("Schlafen");
+  info.hobbies[mobs::MemBaseVector::nextpos]("Schlafen");
+  EXPECT_EQ(R"({"kundennr":44,"firma":false,"name":"Peter","vorname":"","adresse":{"strasse":"","plz":"","ort":""},"kontakte":[{"art":"fax","number":""},{"art":"fax","number":""},{"art":"fax","number":""},{"art":"fax","number":""},{"art":"mobil","number":"+40 0000 1111 222"}],"hobbies":["","Schlafen","Schlafen"]})", info.to_string(mobs::ConvObjToString().exportJson()));
+  info.hobbies.clear();
+  ASSERT_ANY_THROW(info.hobbies.back()("Schlafen"));
+  const Person &copers = info;
+  string s;
+  ASSERT_ANY_THROW((s=copers.hobbies[mobs::MemBaseVector::nextpos]()));
 
 }
   

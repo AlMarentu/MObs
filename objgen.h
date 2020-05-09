@@ -316,6 +316,8 @@ private:
 /// \see MemVector
 class MemBaseVector : public NullValue {
 public:
+  /// Konstatnte, die auf das nächste Element eines MenBaseVectors verweist, das dann automatisch erzeugt wird
+  static const size_t nextpos = INT_MAX;
   /// \private
   MemBaseVector(std::string n, ObjectBase *obj, std::vector<MemVarCfg> cv) : m_name(n), m_parent(obj)
   { TRACE(PARAM(n)); for (auto c:cv) doConfig(c); if (nullAllowed()) setNull(true); }
@@ -561,23 +563,23 @@ template<typename T, class C>
  */
 class Member : virtual public MemberBase, public C {
 public:
-  /// Konstruktor für impliziten Cast zur Verwendung im MemVector::pudh_back 
-  Member(const T &t) : MemberBase("", nullptr) { TRACE(""); clear(); operator()(t); }  // Konstruktor Solo mit zZuweisung -> Cast
+//  /// Konstruktor für impliziten Cast
+//  Member(const T &t) : MemberBase("", nullptr) { TRACE(""); clear(); operator()(t); }  // Konstruktor Solo mit zZuweisung -> Cast
   /// \private
   Member(std::vector<MemVarCfg> cv = {}) : MemberBase("", nullptr, cv) { TRACE(""); clear(); }  // Konstruktor für Array oder Solo
   /// \private
   Member(std::string n, ObjectBase *o, std::vector<MemVarCfg> cv) : MemberBase(n, o, cv), wert(T()) { TRACE(PARAM(n) << PARAM(this)); if (o) o->regMem(this); clear(); } // Konstruktor innerhalb  Objekt nur intern
   /// \private
   Member(MemBaseVector *m, ObjectBase *o, std::vector<MemVarCfg> cv = {}) : MemberBase(m, o, cv) {} // Konstruktor f. Objekt nur intern
- /// Zuweisungsoperator
-  Member &operator=(const Member<T, C> &other) { clear(); doCopy(other); return *this; }
+// /// Zuweisungsoperator
+//  Member &operator=(const Member<T, C> &other) { clear(); doCopy(other); return *this; }
+  Member &operator=(const Member<T, C> &other) = delete;
   ~Member() { TRACE(PARAM(name())); }
   /// Zugriff auf Inhalt
   inline T operator() () const { return wert; }
   /// Zuweisung eines Wertes
   inline void operator() (const T &t) { TRACE(PARAM(this)); wert = t; activate(); }
   
-//  virtual void strOut(std::ostream &str) const { str << mobs::to_string(wert); }
   /// Setze Inhalt auf leer
   virtual void clear()  { wert = this->c_empty(); if (nullAllowed()) setNull(true); else activate(); }
   /// Abfragemethode mit Ausgabe als \c std::string
@@ -662,8 +664,14 @@ public:
   /// \private
   MemberVector(std::string n, ObjectBase *o, std::vector<MemVarCfg> cv = {}) : MemBaseVector(n, o, cv) { TRACE(PARAM(n)); o->regArray(this); }
   ~MemberVector() { TRACE(PARAM(m_name)); resize(0); };   // heap Aufräumen
-  /// Zugriff auf das entsprechende Vector-Element
-  T &operator[] (size_t t) { if (t >= size()) resize(t+1); return *werte[t]; }
+  /// Zugriff auf das entsprechende Vector-Element, mit automatischem Erweiwern
+  T &operator[] (size_t t) { if (t == MemBaseVector::nextpos) t = size(); if (t >= size()) resize(t+1); return *werte[t]; }
+  /// Zugriff auf das entsprechende const Vector-Element
+  /// \throw runtime_error wenn der Index den gültigen Bereich überscheitet
+  const T &operator[] (size_t t) const { if (t >= size()) throw std::runtime_error("MemberVector out of range"); return *werte[t]; }
+  /// Zugriff auf das letzte Vector-Element
+  T &back() { if (not size()) throw std::runtime_error("MemberVector is empty"); return *werte[size()-1]; }
+
   virtual size_t size() const { return werte.size(); }
   virtual void resize(size_t s);
   virtual void traverse(ObjTrav &trav);
@@ -671,8 +679,8 @@ public:
   virtual MemberBase *getMemInfo(size_t i) { if (i >= size()) return 0; return dynamic_cast<MemberBase *>(werte[i]); }
   virtual ObjectBase *getObjInfo(size_t i) { if (i >= size()) return 0; return dynamic_cast<ObjectBase *>(werte[i]); }
 
-  /// wegen Gewohnheit:
-  void push_back(const T &t) { operator[](size()) = t; }
+//  void push_back(const T &t) { operator[](size()) = t; }
+//  benötigt Member::operator= und Member::Member(const T &t)
   
   /// Typ-Deklaration iterator auf Vector
   typedef MemberVectorIterator<T> iterator;
@@ -820,9 +828,9 @@ public:
    Ist das Element  eine Variable, so Kann über \c member darauf zugegriffen werden. Bei Objekten wird in die neue Objektebene gesprungen. Im Falle von Arrays wird ein neues Element angehängt.
       Sind entsprechnde Objekte nicht vorhanden, wird trotzdem die Struktur verfolgt und bei Rückkehr in die entsprechende Eben die Bearbeitung wieder aufgenommen.
     
-   Wird \c INT_MAX übergeben wird automatisch erweitert; bei \c SIZE_T_MAX  wird  der Vector selbst betrachtet -> memVec
+   Wird \c MemBaseVector::next übergeben wird automposatisch erweitert; bei \c SIZE_T_MAX  wird  der Vector selbst betrachtet -> memVec
    */
-  bool enter(const std::string &element, std::size_t index = INT_MAX);
+  bool enter(const std::string &element, std::size_t index = MemBaseVector::nextpos);
   /// Verlassen einer Ebene in der Objektstruktur
   /// @param element Name des Elementes oder leer, wenn der Name der Struktur nicht geprüft werden soll
   /// \throw std::runtime_error bei Strukturfehler
