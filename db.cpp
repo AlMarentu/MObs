@@ -149,7 +149,7 @@ public:
   
   virtual void StartTag(const std::string &element) {
     LOG(LM_INFO, "start " << element);
-    if (element == "entry")
+    if (elementRemovePrefix(element) == "Fahrzeug")
       fill(new Fahrzeug);
   }
   virtual void EndTag(const std::string &element) {
@@ -202,6 +202,7 @@ int main(int argc, char* argv[])
     if (not xout.is_open())
       throw runtime_error("File not open");
     XmlWriter xf(xout, XmlWriter::CS_utf16_le, true);
+    xf.setPrefix(L"m:");
     XmlOut xo(&xf, cth);
     xf.writeHead();
     xf.writeTagBegin(L"list");
@@ -216,6 +217,7 @@ int main(int argc, char* argv[])
     if (not xin.is_open())
       throw runtime_error("in File not open");
     XmlInput xr(xin);
+    xr.setPrefix("m:");
     while (not xr.eof()) {
       xr.parse();
       LOG(LM_INFO, "Zwischenpause")
