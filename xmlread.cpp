@@ -65,7 +65,7 @@ static std::wstring stow(const string &s, bool dontConvert) {
     void Attribute(const std::string &element, const std::string &attribute, const std::wstring &value) {
       if (obj and not member()) {
         enter(attribute);
-        if (member() and member()->xmlAsAttr())
+        if (member() and member()->hasFeature(XmlAsAttr))
         {
           if (not member()->fromStr(value, cfs))
             error += string(error.empty() ? "":"\n") + u8"invalid type in variable " + showName() + u8" can't assign";

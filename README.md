@@ -211,6 +211,13 @@ Konfiguriert werden kann:
 * useClearNull() null-Elemente werden beim Einlesen abhängig von "USENULL"  auf null gesetzt. Ansonsten nur gelöscht.
 * useForceNull() null-Elemente werden beim Einlesen unabhängig von "USENULL"   auf null gesetzt.
 
+### Binäre Objekte
+
+Als binäres Objekt kann eine MemVar vom Typ std::vector<u_char> verwendet werden. Es ist ratsam, keine zu großen Objekte
+zu speichern, da bei einigen Operationen, wie auch der Zuweisung, der Inhalt umkopiert werden muss. 
+
+
+Bei der Serialisierung wird automatisch in Base64 gewandelt
 
 ### Traversierung
 Über einen Operator kann ein Objekt rekursiv durchlaufen werden

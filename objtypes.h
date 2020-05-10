@@ -56,16 +56,14 @@ namespace mobs { \
 const std::vector<std::string> mobsinternal_text_##typ = { __VA_ARGS__ }; \
 std::string typ##_to_string(enum typ x) { size_t p = 0; for (auto const i:mobsinternal_elements_##typ) { if (i==x) { return mobsinternal_text_##typ.at(p); } p++;} throw std::runtime_error(#typ "to_string fails"); }; \
 bool string_to_##typ(std::string s, enum typ &x) { size_t p = 0; for (auto const &i:mobsinternal_text_##typ) { if (i==s) { x = mobsinternal_elements_##typ.at(p); return true; } p++;} return false; };  \
-class Str##typ##Conv { \
+class Str##typ##Conv : public ::mobs::StrConvBase { \
 public: \
   static inline bool c_string2x(const std::string &str, typ &t, const ::mobs::ConvFromStrHint &cfh) { if (cfh.acceptExtented()) { if (string_to_##typ(str, t)) return true; } \
        if (not cfh.acceptCompact()) return false; int i; if (not ::mobs::string2x(str, i)) return false; t = typ(i); return true; } \
   static inline bool c_wstring2x(const std::wstring &wstr, typ &t, const ::mobs::ConvFromStrHint &cfh) { return c_string2x(::mobs::to_string(wstr), t, cfh); } \
-  static inline std::string c_to_string(typ t, const ::mobs::ConvToStrHint &cth) { return cth.compact() ? ::mobs::to_string(int(t)) : typ##_to_string(t); } \
-  static inline std::wstring c_to_wstring(typ t, const ::mobs::ConvToStrHint &cth) { return cth.compact() ? std::to_wstring(int(t)) : ::mobs::to_wstring(typ##_to_string(t)); }; \
+  static inline std::string c_to_string(const typ &t, const ::mobs::ConvToStrHint &cth) { return cth.compact() ? ::mobs::to_string(int(t)) : typ##_to_string(t); } \
+  static inline std::wstring c_to_wstring(const typ &t, const ::mobs::ConvToStrHint &cth) { return cth.compact() ? std::to_wstring(int(t)) : ::mobs::to_wstring(typ##_to_string(t)); }; \
   static inline bool c_is_chartype(const ::mobs::ConvToStrHint &cth) { return not cth.compact(); } \
-  static inline bool c_is_specialized() { return false; } \
-  static inline uint64_t c_time_granularity() { return 0; } \
   static inline typ c_empty() { return mobsinternal_elements_##typ.front(); } \
 }; }
 
@@ -384,12 +382,16 @@ public:
   virtual bool compact() const { return comp; }
   /// \private
   virtual bool useAltNames() const { return altnam; }
+  /// \private
+  bool withIndentation() const { return indent; }
 
 protected:
   /// \private
-  bool comp;
+  bool comp = false;
   /// \private
-  bool altnam;
+  bool altnam = false;
+  /// \private
+  bool indent = false;
 };
 
 /// Hilfsklasse für Konvertierungsklasse - Basisklasse
@@ -419,8 +421,6 @@ public:
   /// \private
   bool withQuotes() const { return quotes; }
   /// \private
-  bool withIndentation() const { return indent; }
-  /// \private
   bool omitNull() const { return onull; }
   /// Ausgabe als XML-Datei
   ConvObjToString exportXml() const { ConvObjToString c(*this); c.xml = true; return c; }
@@ -441,7 +441,6 @@ public:
 private:
   bool xml = false;
   bool quotes = false;
-  bool indent = false;
   bool onull = false;
 
 };
@@ -582,22 +581,41 @@ public:
   bool isEnum = false; ///<  Wert ist ein enum -> besser als Klartext darstellen \see acceptExtented
   bool isTime = false; ///< Wert ist Millsekunde seit Unix-Epoche i64 ist gesetzt
   bool is_spezialized = false; ///< is_spezialized aus std::numeric_limits
-  
+  bool isBlob = false; ///< Binär-Daten-Objekt
 
+
+};
+
+/// Basis der Konvertierungs-Klasse für Serialisierung von und nach std::string
+class StrConvBase {
+public:
+  /// Angabe, ob die Ausgabe als Text erfolgt (quoting, escaping nötig)
+  static inline bool c_is_chartype(const ConvToStrHint &) { return true; }
+  /// zeigt an, ob spezialisierter Typ vorliegt (\c \<limits>)
+  static inline bool c_is_specialized() { return false; }
+  /// zeigt an, ob des Element ein binäres Datenobjekt ist
+  static inline bool c_is_blob() { return false; }
+  /// Körnung des Datentyps wenn es ein Date-Typ ist, \c 0 sonst
+  static inline uint64_t c_time_granularity() { return 0; }
+  /// \private
+  static inline uint64_t c_max() { return 0; }
+  /// \private
+  static inline int64_t c_min() { return 0; }
 };
 
 template <typename T>
 /// Standard Konvertierungs-Klasse für Serialisierung von und nach std::string
-class StrConv {
+class StrConv : public StrConvBase {
 public:
   /// liest eine Variable aus einem \c std::string
   static inline bool c_string2x(const std::string &str, T &t, const ConvFromStrHint &) { return mobs::string2x(str, t); }
   /// liest eine Variable aus einem \c std::wstring
   static inline bool c_wstring2x(const std::wstring &wstr, T &t, const ConvFromStrHint &) { return mobs::string2x(mobs::to_string(wstr), t); }
   /// Wandelt eine Variable in einen \c std::string um
-  static inline std::string c_to_string(T t, const ConvToStrHint &) { return to_string(t); };
+  static inline std::string c_to_string(const T &t, const ConvToStrHint &) { return to_string(t); };
   /// Wandelt eine Variable in einen \c std::wstring um
-  static inline std::wstring c_to_wstring(T t, const ConvToStrHint &) { return to_wstring(t); };
+  static inline std::wstring c_to_wstring(const T &t, const ConvToStrHint &) { return to_wstring(t); };
+//  static inline bool c_blob_ref(const T &t, const char *&ptr, size_t &sz) { return false; }
   /// Angabe, ob die Ausgabe als Text erfolgt (quoting, escaping nötig)
   static inline bool c_is_chartype(const ConvToStrHint &) { return mobschar(T()); }
   /// zeigt an, ob spezialisierter Typ vorliegt (\c \<limits>)
@@ -605,23 +623,39 @@ public:
   /// liefert eine \e leere Variable die zum löschen oder Initialisieren einer Membervarieblen verwendet wird
   /// \see clear()
   static inline T c_empty() { return T(); }
-  /// Körnung des Datentyps wenn es ein Date-Typ ist, \c 0 sonst
-  static inline uint64_t c_time_granularity() { return 0; }
 
+};
+
+template <>
+/// \private
+class StrConv<std::vector<u_char>> : public StrConvBase {
+public:
+  /// \private
+  static bool c_string2x(const std::string &str, std::vector<u_char> &t, const ConvFromStrHint &);
+  /// \private
+  static bool c_wstring2x(const std::wstring &wstr, std::vector<u_char> &t, const ConvFromStrHint &);
+  /// \private
+  static std::string c_to_string(const std::vector<u_char> &t, const ConvToStrHint &);
+  /// \private
+  static std::wstring c_to_wstring(const std::vector<u_char> &t, const ConvToStrHint &);
+  /// \private
+  static inline  std::vector<u_char> c_empty() { return std::vector<u_char>(); }
+  /// \private
+  static inline bool c_is_blob() { return true; }
 };
 
 template <typename T>
 /// Konvertiertungs-Klasse für enums mit Ein-/Ausgabe als \c int
-class StrIntConv {
+class StrIntConv : public StrConvBase {
 public:
   /// \private
   static inline bool c_string2x(const std::string &str, T &t, const ConvFromStrHint &) { int i; if (not mobs::string2x(str, i)) return false; t = T(i); return true; }
   /// \private
   static inline bool c_wstring2x(const std::wstring &wstr, T &t, const ConvFromStrHint &) { int i; if (not mobs::wstring2x(wstr, i)) return false; t = T(i); return true; }
   /// \private
-  static inline std::string c_to_string(T t, const ConvToStrHint &) { return std::to_string(int(t)); }
+  static inline std::string c_to_string(const T &t, const ConvToStrHint &) { return std::to_string(int(t)); }
   /// \private
-  static inline std::wstring c_to_wstring(T t, const ConvToStrHint &) { return std::to_wstring(int(t)); };
+  static inline std::wstring c_to_wstring(const T &t, const ConvToStrHint &) { return std::to_wstring(int(t)); };
   /// \private
   static inline bool c_is_chartype(const ConvToStrHint &) { return false; }
   /// \private
@@ -629,11 +663,7 @@ public:
   /// \private
   static inline uint64_t c_max() { return std::numeric_limits<unsigned short int>::max(); }
   /// \private
-  static inline int64_t c_min() { return 0; }
-  /// \private
   static inline T c_empty() { return T(0); }
-  /// \private
-  static inline uint64_t c_time_granularity() { return 0; }
 };
 
 

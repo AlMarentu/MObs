@@ -140,7 +140,7 @@ namespace mobs {
 #define MemMobsVar(typ, name, converter, ...) MemMobsVarType(typ, converter) name = MemMobsVarType(typ, converter) (#name, this, { __VA_ARGS__ })
 
 /// \private
-enum MemVarCfg { Unset, InitialNull, VectorNull, XmlAsAttr, Key1, Key2, Key3, Key4, Key5, AltNameBase = 100, AltNameBaseEnd = 299 };
+enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Key1, Key2, Key3, Key4, Key5, AltNameBase = 100, AltNameBaseEnd = 299 };
 /// \private
 enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confToken, const std::string &s);
 
@@ -291,8 +291,9 @@ public:
   ObjectBase *parent() const { return m_parent; }
   /// Objekt wurde beschrieben
   void activate();
-  /// Ausgabe bi XML als Attribute
-  bool xmlAsAttr() const { return m_XmlAsAttr; }
+  /// Abfrage gesetzter  Attribute
+  MemVarCfg hasFeature(MemVarCfg c) const;
+  
 
 protected:
   /// \private
@@ -303,7 +304,7 @@ protected:
 private:
   void doConfig(MemVarCfg c);
   std::string m_name;
-  bool m_XmlAsAttr = false;
+  std::vector<MemVarCfg> m_config;
   ObjectBase *m_parent = nullptr;
   MemBaseVector *m_parVec = nullptr;
 };
@@ -352,18 +353,21 @@ public:
   void activate();
   /// Zeiger auf Vater-Objekt
   inline ObjectBase *parent() const { return m_parent; }
+  /// Abfrage gesetzter  Attribute
+  MemVarCfg hasFeature(MemVarCfg c) const;
 
 protected:
   /// \private
   std::string m_name;
   /// \private
-  std::vector<MemVarCfg> m_c;
+  std::vector<MemVarCfg> m_c; // config für Member
   /// \private
   size_t m_altName = SIZE_T_MAX;
 
 
 private:
   void doConfig(MemVarCfg c);
+  std::vector<MemVarCfg> m_config;
   ObjectBase *m_parent = nullptr;
 };
 
@@ -404,7 +408,7 @@ public:
   void traverse(ObjTrav &trav);
   /// Starte Traversierung  const
   void traverse(ObjTravConst &trav) const;
-  /// Starte Traversierung der Key-Elemente in exakter Reihenfolge
+  /// Starte Traversierung der Key-Elemente in der durch das Element key angegebenen Reihenfolge
   void traverseKey(ObjTravConst &trav) const;
   /// liefert den Typnamen des Objektes
   virtual std::string typeName() const { return ""; }
@@ -472,6 +476,8 @@ public:
   virtual void doCopy(const ObjectBase &other);
   /// Zeiger auf Vater-Objekt
   ObjectBase *parent() const { return m_parent; }
+  /// Abfrage gesetzter  Attribute
+  MemVarCfg hasFeature(MemVarCfg c) const;
   /// Config-Token lesen
   const std::string &getConf(std::size_t i) const { static std::string x; if (i < m_confToken.size()) return m_confToken[i]; return x; }
   /// Ausgabe als \c std::string (Json)
@@ -501,6 +507,7 @@ private:
   MemBaseVector *m_parVec = nullptr;
   int m_key = 0;
   size_t m_altName = SIZE_T_MAX;
+  std::vector<MemVarCfg> m_config;
 
   void doConfig(MemVarCfg c);
 
@@ -744,6 +751,7 @@ void Member<T, C>::memInfo(MobsMemberInfo &i) const
   i.isSigned = to_int64(wert, i.i64, i.min, i.max);
   i.isUnsigned = to_uint64(wert, i.u64, i.max);
   i.is_spezialized = this->c_is_specialized();
+  i.isBlob = this->c_is_blob(); 
   i.isEnum = false;
   i.isTime = false;
   i.granularity = this->c_time_granularity();

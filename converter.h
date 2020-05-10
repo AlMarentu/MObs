@@ -82,16 +82,17 @@ int from_base64(wchar_t c);
 /// Rückgabe des zum base64-Wert gehörigen Zeichens
 wchar_t to_base64(int i);
 
-
 template<class InputIt, class OutputIt>
 /// transformer, der Container umkopiert und dabei im Ziel die untersten 8-Bit der Quelle bas64 Kodiert
 /// @param first Quell-Itertor Start
 /// @param last Quell-Iterator Ende
 /// @param d_first Ziel-Insert-Iterator
-OutputIt copy_base64(InputIt first, InputIt last, OutputIt d_first)
+/// @param linebreak String, der nach 15 Blöcken ausgegeben wird
+OutputIt copy_base64(InputIt first, InputIt last, OutputIt d_first, std::string linebreak = "")
 {
   int i = 0;
   int a = 0;
+  int l = 0;
   while (first != last) {
     a = (a << 8) + (*first & 0xff);
     if (++i == 3) {
@@ -100,6 +101,11 @@ OutputIt copy_base64(InputIt first, InputIt last, OutputIt d_first)
       *d_first++ = char(to_base64((a >> 6) & 0x3f));
       *d_first++ = char(to_base64(a & 0x3f));
       i = a = 0;
+      if (l++ > 15) {
+        for (auto c:linebreak)
+          *d_first++ = c;
+        l = 0;
+      }
     }
     first++;
   }
@@ -133,6 +139,25 @@ std::wostream &to_wostream_base64(std::wostream &str, const T &t) { copy_base64(
 
 /// wandelt einen HTML-Character-Code in Unicode um; die Angabe erfolg ohne '&' und ';': Z.B.  "amp" oder "#xd"
 wchar_t from_html_tag(const std::wstring &tok);
+
+/// Klasse zum Auswerten vin Base64
+class Base64Reader {
+public:
+  /// Konstruktor übergibt Buffer
+  Base64Reader(std::vector<u_char> &v) : base64(v) { start(); }
+  /// nächstes Zeichen parsen
+  void put(wchar_t c);
+  /// Ende des zu parsenden Textes
+  void done();
+  /// Neustart
+  void clear() { start(); };
+
+  private:
+  void start();
+  std::vector<u_char> &base64;
+  int b64Value = 0;
+  int b64Cnt = 0;
+};
 
 
 

@@ -162,12 +162,14 @@ bool string2x(const std::string &str, wstring &t) {
 
 
 template <>
+/// \private
 bool wstring2x(const std::wstring &wstr, std::u32string &t) {
   std::copy(wstr.cbegin(), wstr.cend(), back_inserter(t));
   return true;
 }
 
 template <>
+/// \private
 bool wstring2x(const std::wstring &wstr, std::u16string &t) {
   std::copy(wstr.cbegin(), wstr.cend(), back_inserter(t));
   return true;
@@ -246,96 +248,118 @@ std::wstring to_wstring(const std::u16string &t) {
 
 
 template<>
+/// \private
 bool to_int64(int t, int64_t &i, int64_t &min, uint64_t &max)
 { i = t; min = std::numeric_limits<int>::min(); max = std::numeric_limits<int>::max(); return true; }
 template<>
+/// \private
 bool to_int64(short int t, int64_t &i, int64_t &min, uint64_t &max)
 { i = t; min = std::numeric_limits<short int>::min(); max = std::numeric_limits<short int>::max(); return true; }
 template<>
+/// \private
 bool to_int64(long int t, int64_t &i, int64_t &min, uint64_t &max)
 { i = t; min = std::numeric_limits<long int>::min(); max = std::numeric_limits<long int>::max(); return true; }
 template<>
+/// \private
 bool to_int64(long long int t, int64_t &i, int64_t &min, uint64_t &max)
 { i = t; min = std::numeric_limits<long long int>::min(); max = std::numeric_limits<long long int>::max(); return true; }
 template<>
+/// \private
 bool to_uint64(unsigned int t, uint64_t &u, uint64_t &max)
 { u = t; max = std::numeric_limits<unsigned int>::max(); return true; }
 template<>
+/// \private
 bool to_uint64(unsigned short int t, uint64_t &u, uint64_t &max)
 { u = t; max = std::numeric_limits<unsigned short int>::max(); return true; }
 template<>
+/// \private
 bool to_uint64(unsigned long int t, uint64_t &u, uint64_t &max)
 { u = t; max = std::numeric_limits<unsigned long int>::max(); return true; }
 template<>
+/// \private
 bool to_uint64(unsigned long long int t, uint64_t &u, uint64_t &max)
 { u = t; max = std::numeric_limits<unsigned long long int>::max(); return true; }
 template<>
+/// \private
 bool to_uint64(bool t, uint64_t &u, uint64_t &max)
 { u = t ? 1:0; max = 1; return true; }
 template<>
+/// \private
 bool to_double(double t, double &d) { d = t; return true; }
 template<>
+/// \private
 bool to_double(float t, double &d) { d = t; return true; }
 //template<>
 //bool to_double(long double t, double &d) { d = t; return true; }
 
 template<>
+/// \private
 bool from_number(int64_t i, int &t) {
   if (i > std::numeric_limits<int>::max() or i < std::numeric_limits<int>::min()) return false;
   t = ( int)i;
   return true;
 }
 template<>
+/// \private
 bool from_number(int64_t i, short int &t) {
   if (i > std::numeric_limits<short int>::max() or i < std::numeric_limits<short int>::min()) return false;
   t = (short int)i;
   return true;
 }
 template<>
+/// \private
 bool from_number(int64_t i, long int &t) {
   if (i > std::numeric_limits<long int>::max() or i < std::numeric_limits<long int>::min()) return false;
   t = (long int)i;
   return true;
 }
 template<>
+/// \private
 bool from_number(int64_t i, long long int &t) {
   if (i > std::numeric_limits<long long int>::max() or i < std::numeric_limits<long long int>::min()) return false;
   t = (long long int)i;
   return true;
 }
 template<>
+/// \private
 bool from_number(uint64_t u, unsigned int &t) {
   if (u > std::numeric_limits<unsigned int>::max()) return false;
   t = (unsigned int)u;
   return true;
 }
 template<>
+/// \private
 bool from_number(uint64_t u, unsigned short int &t) {
   if (u > std::numeric_limits<unsigned short int>::max()) return false;
   t = (unsigned short int)u;
   return true;
 }
 template<>
+/// \private
 bool from_number(uint64_t u, unsigned long int &t) {
   if (u > std::numeric_limits<unsigned long int>::max()) return false;
   t = (unsigned long int)u;
   return true;
 }
 template<>
+/// \private
 bool from_number(uint64_t u, unsigned long long int &t) {
   if (u > std::numeric_limits<unsigned long long int>::max()) return false;
   t = (unsigned long long int)u;
   return true;
 }
 template<>
+/// \private
 bool from_number(uint64_t u, bool &t) {
   if (u > 1) return false;
   t = u != 0;
   return true;
 }
 template<>
+/// \private
 bool from_number(double d, float &t) { t = d; return true; }
 template<>
+/// \private
 bool from_number(double d, double &t) { t = d; return true; }
 
 

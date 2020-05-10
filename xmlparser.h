@@ -472,7 +472,7 @@ public:
      es kann z.B. ein \c std::wifstream dienen oder ein \c std::wistringstream übergeben werden
           Als Zeichensätze sind UTF-8, UTF-16, ISO8859-1, -9 und -15 erlaubt; Dateien dürfen mit einem BOM beginnen
    @param input XML-stream der geparst werden soll   */
-  XmlParserW(std::wistream &input) : istr(input) { };
+  XmlParserW(std::wistream &input) : istr(input), base64(base64data) { };
   virtual ~XmlParserW() { };
   /*! \brief Liefert XML-Puffer und aktuelle Position für detaillierte Fehlermeldung
    @param pos Position des Fehlers im Xml-Buffer
@@ -652,9 +652,8 @@ public:
           saveValue();  // nur whitespace prüfen
           parse2CD();
           if (try64) {
-            if (b64Cnt > 0 and b64Cnt < 4)
-              base64Check('=');
-            Base64(base64);
+            base64.done();
+            Base64(base64data);
           }
           else
             Cdata(buffer.substr(2));
@@ -813,14 +812,14 @@ private:
     if (curr == c or curr <= 0)
       return;
     if (try64)
-      base64Check(curr);
+      base64.put(curr);
     else
       buffer += curr;
     while ((curr = istr.get()) > 0) {
       if (curr == c)
         break;
       if (try64)
-        base64Check(curr);
+        base64.put(curr);
       else
         buffer += curr;
     }
@@ -946,49 +945,10 @@ private:
     }
     buf = result;
   }
-  void base64Check(wchar_t c) {
-    int v = from_base64(c);
-    if (v < 0) {
-      if (c == '=') { // padding
-        v = 0;
-        switch (b64Cnt) {
-          case 3:
-            base64.push_back(b64Value >> 10);
-            base64.push_back((b64Value >> 2) & 0xff);
-            // fall into
-          case 100:
-            b64Cnt = 999; // Wenn noch ein = kommt -> fehler
-            break;
-          case 2:
-            base64.push_back(b64Value >> 4);
-            b64Cnt = 100; // es darf noch 1 = kommen
-            break;
-          case 1: throw std::runtime_error("base64 unexpecrted end");
-          default: throw std::runtime_error("base64 unexpecrted padding");
-        }
-      }
-      else
-        throw std::runtime_error("base64 padding");
-    }
-    else if (v < 64) {
-      if (b64Cnt > 3)
-        throw std::runtime_error("base64 invalid");
-      b64Value = (b64Value << 6) + v;
-      if (++b64Cnt == 4) {
-        base64.push_back(b64Value >> 16);
-        base64.push_back((b64Value >> 8) & 0xff);
-        base64.push_back(b64Value & 0xff);
-        b64Cnt = 0;
-        b64Value = 0;
-      }
-    }
-  }
   void base64Start() {
     if (not useBase64)
       return;
     base64.clear();
-    b64Cnt = 0;
-    b64Value = 0;
     try64 = true;
   }
   
@@ -1000,9 +960,8 @@ private:
   std::stack<std::string> tags;
   std::string lastKey;
   wchar_t (*conFun)(wchar_t) = nullptr;
-  std::vector<u_char> base64;
-  int b64Value = 0;
-  int b64Cnt = 0;
+  std::vector<u_char> base64data;
+  Base64Reader base64;
   bool try64 = false;
   bool useBase64 = false;
   bool running = false;

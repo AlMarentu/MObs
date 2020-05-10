@@ -103,7 +103,7 @@ void XmlOut::doMem(const MemberBase &mem)
   if (name.empty())
     name = to_wstring(mem.getName(cth));
 
-  if (mem.xmlAsAttr() and data->attributeAllowed())
+  if (mem.hasFeature(XmlAsAttr) and data->attributeAllowed())
   {
     if (not mem.isNull())
     {
@@ -117,7 +117,12 @@ void XmlOut::doMem(const MemberBase &mem)
     if (not mem.isNull())
     {
       const wstring &value = to_wstring(mem.toStr(cth));
-      data->writeValue(value);
+      MobsMemberInfo mi;
+      mem.memInfo(mi);
+      if (mi.isBlob)
+        data->writeCdata(value);
+      else
+        data->writeValue(value);
     }
     data->writeTagEnd();
   }

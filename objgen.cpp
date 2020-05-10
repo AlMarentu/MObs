@@ -44,10 +44,19 @@ void MemberBase::doConfig(MemVarCfg c)
     case InitialNull: nullAllowed(true); break;
     case Key1 ... Key5: m_key = c - Key1 + 1; break;
     case AltNameBase ... AltNameBaseEnd: m_altName = c - AltNameBase; break;
-    case XmlAsAttr: m_XmlAsAttr = true; break;
+    case XmlAsAttr: m_config.push_back(c); break;
     case VectorNull: break;
   }
 }
+
+MemVarCfg MemberBase::hasFeature(MemVarCfg c) const
+{
+  for (auto i:m_config)
+    if (i == c)
+      return i;
+  return Unset;
+}
+
 
 void MemberBase::traverse(ObjTrav &trav)
 {
@@ -97,6 +106,14 @@ void MemBaseVector::doConfig(MemVarCfg c)
   
 }
 
+MemVarCfg MemBaseVector::hasFeature(MemVarCfg c) const
+{
+  for (auto i:m_config)
+    if (i == c)
+      return i;
+  return Unset;
+}
+
 std::string MemBaseVector::getName(const ConvToStrHint &cth) const {
   size_t n = m_parent and cth.useAltNames() ? m_altName : SIZE_T_MAX;
   return (n == SIZE_T_MAX) ? name() : m_parent->getConf(n);
@@ -133,6 +150,14 @@ void ObjectBase::doConfig(MemVarCfg c)
     case AltNameBase ... AltNameBaseEnd: m_altName = c - AltNameBase; break;
     case VectorNull: break;
   }
+}
+
+MemVarCfg ObjectBase::hasFeature(MemVarCfg c) const
+{
+  for (auto i:m_config)
+    if (i == c)
+      return i;
+  return Unset;
 }
 
 void ObjectBase::regMem(MemberBase *mem)

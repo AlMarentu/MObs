@@ -272,4 +272,94 @@ wchar_t from_html_tag(const std::wstring &tok)
 }
 
 
+void Base64Reader::start() {
+  base64.clear();
+  b64Cnt = 0;
+  b64Value = 0;
+}
+
+void Base64Reader::done() {
+  if (b64Cnt > 0 and b64Cnt < 4)
+    put('=');
+}
+
+void Base64Reader::put(wchar_t c) {
+  int v = from_base64(c);
+  if (v < 0) {
+    if (c == '=') { // padding
+      v = 0;
+      switch (b64Cnt) {
+        case 3:
+          base64.push_back(b64Value >> 10);
+          base64.push_back((b64Value >> 2) & 0xff);
+          // fall into
+        case 100:
+          b64Cnt = 999; // Wenn noch ein = kommt -> fehler
+          break;
+        case 2:
+          base64.push_back(b64Value >> 4);
+          b64Cnt = 100; // es darf noch 1 = kommen
+          break;
+        case 1: throw std::runtime_error("base64 unexpected end");
+        default: throw std::runtime_error("base64 unexpected padding");
+      }
+    }
+    else
+      throw std::runtime_error("base64 padding");
+  }
+  else if (v < 64) {
+    if (b64Cnt > 3)
+      throw std::runtime_error("base64 invalid");
+    b64Value = (b64Value << 6) + v;
+    if (++b64Cnt == 4) {
+      base64.push_back(b64Value >> 16);
+      base64.push_back((b64Value >> 8) & 0xff);
+      base64.push_back(b64Value & 0xff);
+      b64Cnt = 0;
+      b64Value = 0;
+    }
+  }
+}
+
+
+
+bool StrConv<std::vector<u_char>>::c_string2x(const std::string &str, std::vector<u_char> &t, const ConvFromStrHint &) {
+  try {
+    Base64Reader r(t);
+    for (auto c:str)
+      r.put(c);
+    r.done();
+  }
+  catch (exception &e) {
+    LOG(LM_INFO, "Erro, in base64: " << e.what());
+    return false;
+  }
+  return true;
+}
+bool StrConv<std::vector<u_char>>::c_wstring2x(const std::wstring &wstr, std::vector<u_char> &t, const ConvFromStrHint &) {
+  try {
+    Base64Reader r(t);
+    for (auto c:wstr)
+      r.put(c);
+    r.done();
+  }
+  catch (exception &e) {
+    LOG(LM_INFO, "Error, in base64: " << e.what());
+    return false;
+  }
+  return true;
+}
+
+
+std::string StrConv<std::vector<u_char>>::StrConv<std::vector<u_char>>::c_to_string(const std::vector<u_char> &t, const ConvToStrHint &cts) {
+  std::string u;
+  copy_base64(t.cbegin(), t.cend(), std::back_inserter(u), cts.withIndentation() ? "\n  ":"");
+  return u;
+}
+std::wstring StrConv<std::vector<u_char>>::c_to_wstring(const std::vector<u_char> &t, const ConvToStrHint &cts) {
+  std::wstring u;
+  copy_base64(t.cbegin(), t.cend(), std::back_inserter(u), cts.withIndentation() ? "\n  ":"");
+  return u;
+}
+
 }

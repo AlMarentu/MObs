@@ -167,6 +167,7 @@ template <> bool string2x(const std::string &str, UxTime &t)
   return true;
 }
 
+/// \private
 template<> bool to_int64(UxTime t, int64_t &i, int64_t &min, uint64_t &max)
 {
   i = t.toUxTime() * 1000;
@@ -175,6 +176,7 @@ template<> bool to_int64(UxTime t, int64_t &i, int64_t &min, uint64_t &max)
   return true;
 }
 
+/// \private
 template<> bool from_number(int64_t i, UxTime &t)
 {
   i /= 1000;
