@@ -351,7 +351,7 @@ bool StrConv<std::vector<u_char>>::c_wstring2x(const std::wstring &wstr, std::ve
 }
 
 
-std::string StrConv<std::vector<u_char>>::StrConv<std::vector<u_char>>::c_to_string(const std::vector<u_char> &t, const ConvToStrHint &cts) {
+std::string StrConv<std::vector<u_char>>::c_to_string(const std::vector<u_char> &t, const ConvToStrHint &cts) {
   std::string u;
   copy_base64(t.cbegin(), t.cend(), std::back_inserter(u), cts.withIndentation() ? "\n  ":"");
   return u;
