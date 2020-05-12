@@ -136,7 +136,12 @@ void UxTime::parseOff(long &i, const char *&cp) {
   if (not *cp)
     return;
   int sign = 1;
-  if (*cp == '-')
+  if (*cp == 'Z') {
+    if (*++cp == 0)
+      return;
+    throw std::runtime_error("extra char after Z");
+  }
+  else if (*cp == '-')
     sign = -1;
   else if (*cp != '+')
     throw std::runtime_error("+/- expected");

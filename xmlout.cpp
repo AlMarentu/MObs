@@ -41,7 +41,7 @@ namespace mobs {
 bool XmlOut::doObjBeg(const ObjectBase &obj)
 {
   if (obj.isNull() and cth.omitNull())
-    return true;
+    return false;
   
   wstring name;
   if (not elements.empty())
@@ -51,14 +51,13 @@ bool XmlOut::doObjBeg(const ObjectBase &obj)
   if (name.empty())
     name = data->level() == 0 ? L"root": to_wstring(obj.typeName());
 
+  data->writeTagBegin(name);
+
   if (obj.isNull())
   {
-    data->writeTagBegin(name);
     data->writeTagEnd();
     return false;
   }
-  
-  data->writeTagBegin(name);
   
   elements.push(L"");
   return true;
@@ -67,20 +66,13 @@ bool XmlOut::doObjBeg(const ObjectBase &obj)
 void XmlOut::doObjEnd(const ObjectBase &obj)
 {
   elements.pop();
-  
-  wstring name;
-  if (not elements.empty())
-    name = elements.top();
-  if (name.empty())
-    name = to_wstring(obj.getName(cth));
-  
   data->writeTagEnd();
 }
 
 bool XmlOut::doArrayBeg(const MemBaseVector &vec)
 {
-  if (vec.isNull() and cth.omitNull())
-    return false;
+//  if (vec.isNull() and cth.omitNull())
+//    return false;
   if (vec.isNull())
     return false;
 

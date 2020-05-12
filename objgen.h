@@ -650,7 +650,7 @@ public:
   MemberVectorIterator<T> operator--(int) { auto temp(*this); --m_iter; return temp; }
   MemberVectorIterator<T> operator+(const difference_type& movement) { auto oldIdx = m_iter; m_iter+=movement; auto temp(*this); m_iter = oldIdx; return temp; }
   MemberVectorIterator<T> operator-(const difference_type& movement) { auto oldIdx = m_iter; m_iter-=movement; auto temp(*this); m_iter = oldIdx; return temp; }
-  difference_type operator-(const MemberVectorIterator<T>& rawIterator) { return std::distance(rawIterator.m_ite,this->m_iter); }
+  difference_type operator-(const MemberVectorIterator<T>& rawIterator) { return std::distance(rawIterator.m_iter,this->m_iter); }
   
   T &operator*(){return **m_iter;}
   const T &operator*()const{return **m_iter;}
