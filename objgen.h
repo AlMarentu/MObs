@@ -524,7 +524,6 @@ private:
 };
 
 
-
 // ------------------ Member ------------------
 
 template<typename T, class C> 
@@ -580,15 +579,27 @@ public:
   Member(std::string n, ObjectBase *o, std::vector<MemVarCfg> cv) : MemberBase(n, o, cv), wert(T()) { TRACE(PARAM(n) << PARAM(this)); if (o) o->regMem(this); clear(); } // Konstruktor innerhalb  Objekt nur intern
   /// \private
   Member(MemBaseVector *m, ObjectBase *o, std::vector<MemVarCfg> cv = {}) : MemberBase(m, o, cv) {} // Konstruktor f. Objekt nur intern
+  /// \private
+  Member(const Member &) = default; // für Zuweisung in MemVar-Macro, move constructor unnötig
+  /// move constructor
+//  Member(Member &&other) : MemberBase(std::move(other)) { wert = std::move(other.wert); }
 // /// Zuweisungsoperator
 //  Member &operator=(const Member<T, C> &other) { clear(); doCopy(other); return *this; }
+  // Keine Zuweisung, nur getter und setter
   Member &operator=(const Member<T, C> &other) = delete;
+  Member &operator=(Member<T, C> &&other) = delete;
   ~Member() { TRACE(PARAM(name())); }
   /// Zugriff auf Inhalt
   inline T operator() () const { return wert; }
   /// Zuweisung eines Wertes
-  inline void operator() (const T &t) { TRACE(PARAM(this)); wert = t; activate(); }
-  
+  inline void operator() (const T &t) { wert = t; activate(); }
+  /// \brief Zuweisung eines Wertes mit move
+  /// sinvoll für für zB. Byte-Arrays, um nicht doppelten Speicherplatz zu verbrauchen
+  /// \code
+  /// x.emplace(vector<u_char>(cp, cp + size));
+  /// \endcode
+  void emplace(const T &&t) { TRACE(PARAM(this)); wert = std::move(t); activate(); }
+
   /// Setze Inhalt auf leer
   virtual void clear()  { wert = this->c_empty(); if (nullAllowed()) setNull(true); else activate(); }
   /// Abfragemethode mit Ausgabe als \c std::string
@@ -672,6 +683,10 @@ class MemberVector : virtual public MemBaseVector {
 public:
   /// \private
   MemberVector(std::string n, ObjectBase *o, std::vector<MemVarCfg> cv = {}) : MemBaseVector(n, o, cv) { TRACE(PARAM(n)); o->regArray(this); }
+  /// \private
+  MemberVector &operator=(const MemberVector<T> &other) = delete;
+  /// \private
+  MemberVector(const MemberVector &) = default; // für Zuweisung in MemVector-Macro
   ~MemberVector() { TRACE(PARAM(m_name)); resize(0); };   // heap Aufräumen
   /// Zugriff auf das entsprechende Vector-Element, mit automatischem Erweiwern
   T &operator[] (size_t t) { if (t == MemBaseVector::nextpos) t = size(); if (t >= size()) resize(t+1); return *werte[t]; }
