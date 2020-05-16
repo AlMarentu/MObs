@@ -624,12 +624,12 @@ ObjInit(ObjX);
 
 TEST(objgenTest, conftoken) {
   ObjX o;
-  EXPECT_EQ("grimoald", o.getConf(0));
-  EXPECT_EQ("", o.getConf(99));
-  EXPECT_EQ(0, o.id.cAltName());
-  EXPECT_EQ(1, o.a.cAltName());
-  EXPECT_EQ(2, o.b.cAltName());
-  EXPECT_EQ(SIZE_T_MAX, o.c.cAltName());
+  EXPECT_EQ("grimoald", o.getConf(mobs::AltNameBase));
+  EXPECT_EQ("", o.getConf(mobs::AltNameEnd));
+  EXPECT_EQ(mobs::AltNameBase + 0, o.id.cAltName());
+  EXPECT_EQ(mobs::AltNameBase + 1, o.a.cAltName());
+  EXPECT_EQ(mobs::AltNameBase + 2, o.b.cAltName());
+  EXPECT_EQ(mobs::Unset, o.c.cAltName());
   EXPECT_EQ("grimoald", o.getConf(o.id.cAltName()));
   EXPECT_EQ("pippin", o.getConf(o.a.cAltName()));
   EXPECT_EQ("", o.getConf(o.c.cAltName()));

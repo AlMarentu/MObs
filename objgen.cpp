@@ -43,7 +43,8 @@ void MemberBase::doConfig(MemVarCfg c)
     case Unset: break;
     case InitialNull: nullAllowed(true); break;
     case Key1 ... Key5: m_key = c - Key1 + 1; break;
-    case AltNameBase ... AltNameBaseEnd: m_altName = c - AltNameBase; break;
+    case AltNameBase ... AltNameEnd: m_altName = c; break;
+    case ColNameBase ... ColNameEnd: break;
     case XmlAsAttr: m_config.push_back(c); break;
     case VectorNull: break;
   }
@@ -79,8 +80,8 @@ void MemberBase::activate()
 }
 
 std::string MemberBase::getName(const ConvToStrHint &cth) const {
-  size_t n = m_parent and cth.useAltNames() ? m_altName : SIZE_T_MAX;
-  return (n == SIZE_T_MAX) ? name() : m_parent->getConf(n);
+  MemVarCfg n = m_parent and cth.useAltNames() ? m_altName : Unset;
+  return (n == Unset) ? name() : m_parent->getConf(n);
 }
 
 
@@ -100,7 +101,8 @@ void MemBaseVector::doConfig(MemVarCfg c)
     case XmlAsAttr: break;
     case VectorNull: nullAllowed(true); break;
     case Key1 ... Key5: break;
-    case AltNameBase ... AltNameBaseEnd: m_altName = c - AltNameBase; break;
+    case AltNameBase ... AltNameEnd: m_altName = c; break;
+    case ColNameBase ... ColNameEnd: break;
     case InitialNull: m_c.push_back(c); break;
   }
   
@@ -115,8 +117,8 @@ MemVarCfg MemBaseVector::hasFeature(MemVarCfg c) const
 }
 
 std::string MemBaseVector::getName(const ConvToStrHint &cth) const {
-  size_t n = m_parent and cth.useAltNames() ? m_altName : SIZE_T_MAX;
-  return (n == SIZE_T_MAX) ? name() : m_parent->getConf(n);
+  MemVarCfg n = m_parent and cth.useAltNames() ? m_altName : Unset;
+  return (n == Unset) ? name() : m_parent->getConf(n);
 }
 
 
@@ -125,8 +127,8 @@ std::string MemBaseVector::getName(const ConvToStrHint &cth) const {
 /////////////////////////////////////////////////
 
 std::string ObjectBase::getName(const ConvToStrHint &cth) const {
-  size_t n = m_parent and cth.useAltNames() ? m_altName : SIZE_T_MAX;
-  return (n == SIZE_T_MAX) ? name() : m_parent->getConf(n);
+  MemVarCfg n = m_parent and cth.useAltNames() ? m_altName : Unset;
+  return (n == Unset) ? name() : m_parent->getConf(n);
 }
 
 
@@ -147,16 +149,47 @@ void ObjectBase::doConfig(MemVarCfg c)
     case XmlAsAttr: break;
     case InitialNull: nullAllowed(true); break;
     case Key1 ... Key5: m_key = c - Key1 + 1; break;
-    case AltNameBase ... AltNameBaseEnd: m_altName = c - AltNameBase; break;
+    case AltNameBase ... AltNameEnd: m_altName = c; break;
+    case ColNameBase ... ColNameEnd: break;
     case VectorNull: break;
   }
 }
 
+void ObjectBase::doConfigObj(MemVarCfg c)
+{
+  switch(c) {
+    case Unset: break;
+    case XmlAsAttr: break;
+    case InitialNull: nullAllowed(true); break;
+    case Key1 ... Key5: break;
+    case AltNameBase ... AltNameEnd: break;
+    case ColNameBase ... ColNameEnd: m_config.push_back(c); break;
+    case VectorNull: break;
+  }
+}
+
+const std::string &ObjectBase::getConf(MemVarCfg c) const
+{
+  static const std::string x;
+  size_t i;
+  switch(c) {
+    case AltNameBase ... AltNameEnd: i = c - AltNameBase; break;
+    case ColNameBase ... ColNameEnd: i = c - ColNameBase; break;
+    default: return x;
+  }
+  if (i < m_confToken.size())
+    return m_confToken[i];
+  return x;
+}
+
 MemVarCfg ObjectBase::hasFeature(MemVarCfg c) const
 {
-  for (auto i:m_config)
+  for (auto i:m_config) {
     if (i == c)
       return i;
+    else if (c == ColNameBase and i >= ColNameBase and i <= ColNameEnd)
+      return i;
+  }
   return Unset;
 }
 
@@ -229,15 +262,16 @@ MemBaseVector *ObjectBase::getVecInfo(const std::string &name)
   return 0;
 }
 
-size_t ObjectBase::findConfToken(const std::string &name) const
+std::list<MemVarCfg> ObjectBase::findConfToken(MemVarCfg base, const std::string &name, ConvObjFromStr &cfh) const
 {
-  size_t pos = 0;
-  for (auto &i:m_confToken)
+  list<MemVarCfg> result;
+  int pos = 0;
+  for (auto &i:m_confToken) {
     if (i == name)
-      return pos;
-    else
-      pos++;
-  return SIZE_T_MAX;
+      result.push_back(MemVarCfg(base + pos));
+    pos++;
+  }
+  return result;
 }
 
 MemberBase *ObjectBase::getMemInfo(size_t ctok) const
@@ -623,20 +657,20 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
   memVec = nullptr;
   memName = objekte.top().objName;
   memBase = nullptr;
-  size_t altNamtok = SIZE_T_MAX;
+  list<MemVarCfg> altNamTok; // alle Config-Ids die zum Namen passen
 //  LOG(LM_DEBUG, "Im Object " << memName);
   if (objekte.top().obj)
   {
     if (cfs.acceptAltNames())
-      altNamtok = objekte.top().obj->findConfToken(element);
-//    LOG(LM_INFO, "ALT " << altNamtok << " " << boolalpha << cfs.acceptAltNames());
+      altNamTok = objekte.top().obj->findConfToken(AltNameBase, element, cfs);
     MemBaseVector *v = nullptr;
-    if (altNamtok != SIZE_T_MAX)
-      v = objekte.top().obj->getVecInfo(altNamtok);
+    for (auto c:altNamTok)
+      if ((v = objekte.top().obj->getVecInfo(c)))
+        break;
     if (v == nullptr)
     {
       v = objekte.top().obj->getVecInfo(element);
-      if (v and not cfs.acceptOriNames() and v->cAltName() != SIZE_T_MAX)
+      if (v and not cfs.acceptOriNames() and v->cAltName() != Unset)
         v = nullptr;
     }
     if (v)
@@ -690,12 +724,13 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
     if (index >= MemBaseVector::nextpos)
     {
       ObjectBase *o = nullptr;
-      if (altNamtok != SIZE_T_MAX)
-        o = objekte.top().obj->getObjInfo(altNamtok);
+      for (auto c:altNamTok)
+        if ((o = objekte.top().obj->getObjInfo(c)))
+          break;
       if (o == nullptr)
       {
         o = objekte.top().obj->getObjInfo(element);
-        if (o and not cfs.acceptOriNames() and o->cAltName() != SIZE_T_MAX)
+        if (o and not cfs.acceptOriNames() and o->cAltName() != Unset)
           o = nullptr;
       }
       if (o)
@@ -706,12 +741,13 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
         return true;
       }
       MemberBase *m = nullptr;
-      if (altNamtok != SIZE_T_MAX)
-        m = objekte.top().obj->getMemInfo(altNamtok);
+      for (auto c:altNamTok)
+        if ((m = objekte.top().obj->getMemInfo(c)))
+          break;
       if (m == nullptr)
       {
         m = objekte.top().obj->getMemInfo(element);
-        if (m and not cfs.acceptOriNames() and m->cAltName() != SIZE_T_MAX)
+        if (m and not cfs.acceptOriNames() and m->cAltName() != Unset)
           m = nullptr;
       }
       if (m)

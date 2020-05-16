@@ -140,7 +140,8 @@ namespace mobs {
 #define MemMobsVar(typ, name, converter, ...) MemMobsVarType(typ, converter) name = MemMobsVarType(typ, converter) (#name, this, { __VA_ARGS__ })
 
 /// \private
-enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Key1, Key2, Key3, Key4, Key5, AltNameBase = 100, AltNameBaseEnd = 299 };
+enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Key1, Key2, Key3, Key4, Key5, AltNameBase = 1000, AltNameEnd = 1999,
+                 ColNameBase = 2000, ColNameEnd = 3999 };
 /// \private
 enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confToken, const std::string &s);
 
@@ -153,6 +154,7 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 #define KEYELEMENT4 mobs::Key4, ///< Keyelement der Priorität 4
 #define KEYELEMENT5 mobs::Key5, ///< Keyelement der Priorität 5
 #define ALTNAME(name) ::mobs::mobsToken(::mobs::AltNameBase,m_confToken,#name), ///< Definition eines Alternativen Namens für die Ein-/Ausgsbe
+#define COLNAME(name) ::mobs::mobsToken(::mobs::ColNameBase,m_confToken,#name), ///< Definition eines Alternativen Namens für den Collection-Namen (oder Tabellennamen) der Datenbank
 
 
 
@@ -181,8 +183,8 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 /*! \brief Makro für Definitionen im Objekt das von ObjecBase ist
  @param objname Name der Klasse (muss von ObjecBase abgeleitet sein)
  */
-#define ObjInit(objname) \
-objname() : ObjectBase() { TRACE(""); doInit(); init(); } \
+#define ObjInit(objname, ...) \
+objname() : ObjectBase() { TRACE(""); std::vector<mobs::MemVarCfg> cv = { __VA_ARGS__ }; for (auto c:cv) doConfigObj(c); doInit(); init(); } \
 objname(const objname &that) : ObjectBase() { TRACE(""); doCopy(that); } \
 objname(mobs::MemBaseVector *m, mobs::ObjectBase *o, std::vector<mobs::MemVarCfg> cv = {}) : ObjectBase(m, o, cv) { TRACE(""); doInit(); init(); } \
 objname(std::string name, ObjectBase *t, std::vector<mobs::MemVarCfg> cv = {}) : ObjectBase(name, t, cv) { TRACE(PARAM(name) << PARAM(this)); if (t) t->regObj(this); doInit(); init(); } \
@@ -241,8 +243,8 @@ public:
   virtual ~MemberBase() {}
   /// Abfrage des Namen der Membervariablen
   std::string name() const { return m_name; }
-  /// Config-Token alternativer Name oder \c SIZE_T_MAX
-  size_t cAltName() const { return m_altName; };
+  /// Config-Token alternativer Name oder \c Unset
+  MemVarCfg cAltName() const { return m_altName; };
   /// Abfrage des originalen oder des alternativen Namens der Membervariablen
   std::string getName(const ConvToStrHint &) const;
   //  virtual void strOut(std::ostream &str) const  = 0;
@@ -299,8 +301,8 @@ protected:
   /// \private
   int m_key = 0;
   /// \private
-  size_t m_altName = SIZE_T_MAX;
-  
+  MemVarCfg m_altName = Unset;
+
 private:
   void doConfig(MemVarCfg c);
   std::string m_name;
@@ -334,7 +336,7 @@ public:
   /// liefert den Namen der Vektor variablen
   inline std::string name() const { return m_name; }
   /// Config-Token alternativer Name oder \c SIZE_T_MAX
-  size_t cAltName() const { return m_altName; };
+  MemVarCfg cAltName() const { return m_altName; };
   /// Abfrage des originalen oder des alternativen Namens des Vektors
   std::string getName(const ConvToStrHint &) const;
   /// \private
@@ -362,8 +364,7 @@ protected:
   /// \private
   std::vector<MemVarCfg> m_c; // config für Member
   /// \private
-  size_t m_altName = SIZE_T_MAX;
-
+  MemVarCfg m_altName = Unset;
 
 private:
   void doConfig(MemVarCfg c);
@@ -418,8 +419,8 @@ public:
   virtual void cleared() {};
   /// liefert den Namen Membervariablen
   std::string name() const { return m_varNam; };
-  /// Config-Token-Id alternativer Name oder \c SIZE_T_MAX
-  size_t cAltName() const { return m_altName; };
+  /// Config-Token-Id alternativer Name oder \c Unset
+  MemVarCfg cAltName() const { return m_altName; };
   /// Abfrage des originalen oder des alternativen Namens des Objektes
   std::string getName(const ConvToStrHint &) const;
   /// Objekt wurde beschrieben
@@ -476,16 +477,16 @@ public:
   virtual void doCopy(const ObjectBase &other);
   /// Zeiger auf Vater-Objekt
   ObjectBase *parent() const { return m_parent; }
-  /// Abfrage gesetzter  Attribute
+  /// Abfrage gesetzter  Attribute (nur Basisattribute)
   MemVarCfg hasFeature(MemVarCfg c) const;
   /// Config-Token lesen
-  const std::string &getConf(std::size_t i) const { static std::string x; if (i < m_confToken.size()) return m_confToken[i]; return x; }
+  const std::string &getConf(MemVarCfg c) const;
   /// Ausgabe als \c std::string (Json)
   std::string to_string(ConvObjToString cft = ConvObjToString()) const;
 
 
   /// \private
-  size_t findConfToken(const std::string &name) const;
+  std::list<MemVarCfg> findConfToken(MemVarCfg base, const std::string &name, ConvObjFromStr &cfh) const;
   /// \private
   MemberBase *getMemInfo(size_t ctok) const;
   /// \private
@@ -499,14 +500,15 @@ protected:
   void doInit() { if (nullAllowed()) setNull(true); } // Initialisierung am Ende des Konstruktors
   /// \private
   std::vector<std::string> m_confToken; // Liste der Konfigurationstokens
+  /// \private
+  void doConfigObj(MemVarCfg c);
 
 private:
-
   std::string m_varNam;
   ObjectBase *m_parent = nullptr;
   MemBaseVector *m_parVec = nullptr;
   int m_key = 0;
-  size_t m_altName = SIZE_T_MAX;
+  MemVarCfg m_altName = Unset;
   std::vector<MemVarCfg> m_config;
 
   void doConfig(MemVarCfg c);
