@@ -1,12 +1,12 @@
 #include <iostream>
 
 //#define NDEBUG
-#include "logging.h"
+#include "mobs/logging.h"
 
 
 
-#include "objgen.h"
-#include "objpool.h"
+#include "mobs/objgen.h"
+#include "mobs/objpool.h"
 
 using namespace mobs;
 
@@ -37,10 +37,11 @@ class FileDatabase : public DatabaseInterface
 };
 
 ////////////////
+#include <sys/stat.h>
 
-#include "xmlout.h"
-#include "xmlwriter.h"
-#include "xmlread.h"
+#include "mobs/xmlout.h"
+#include "mobs/xmlwriter.h"
+#include "mobs/xmlread.h"
 #include <fstream>
 #include <sstream>
 
@@ -122,8 +123,8 @@ bool FileDatabase::save(const ObjectBase &obj)
   return true;
 }
 
-#include "objgen.h"
-#include "objpool.h"
+#include "mobs/objgen.h"
+#include "mobs/objpool.h"
 
 using namespace std;
 
@@ -166,6 +167,11 @@ public:
 int main(int argc, char* argv[])
 {
   TRACE("");
+  mkdir("data", 0755);
+  ofstream init("data/Fahrzeug.2");
+  init << R"({\n  "id": 2,\n  "typ": "Rollschuh",\n  "achsen": 2\n}\n)";
+  init.close();
+
   try {
     shared_ptr<NamedObjPool> pool = make_shared<NamedObjPool>();
 
