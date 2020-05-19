@@ -33,12 +33,12 @@ namespace mobs {
 std::wstring to_wstring(std::string val) {
   std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> c;
   return c.from_bytes(val);
-};
+}
 
 std::u32string to_u32string(std::string val) {
   std::wstring_convert<std::codecvt_utf8<char32_t>,char32_t> c;
   return c.from_bytes(val);
-};
+}
 
 std::string to_quote(const std::string &s) {
   string result = "\"";
