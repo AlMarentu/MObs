@@ -24,6 +24,8 @@
 #ifndef MOBS_XMLOUT_H
 #define MOBS_XMLOUT_H
 
+#include <utility>
+
 #include "objgen.h"
 
 namespace mobs {
@@ -35,18 +37,18 @@ class XmlOut  : virtual public ObjTravConst {
 public:
   /// Konstruktor
   /// @param xwr XML-Writer-Objekt
-  /// @param cth Konvertierungs-Hinweis
-  XmlOut(XmlWriter *xwr, const ConvObjToString &cth) : cth(cth), data(xwr) { };
+  /// @param cth Konvertierung-Hinweis
+  XmlOut(XmlWriter *xwr, ConvObjToString cth) : cth(std::move(cth)), data(xwr) { };
   /// \private
-  virtual bool doObjBeg(const ObjectBase &obj);
+  bool doObjBeg(const ObjectBase &obj) override;
   /// \private
-  virtual void doObjEnd(const ObjectBase &obj);
+  void doObjEnd(const ObjectBase &obj) override;
   /// \private
-  virtual bool doArrayBeg(const MemBaseVector &vec);
+  bool doArrayBeg(const MemBaseVector &vec) override;
   /// \private
-  virtual void doArrayEnd(const MemBaseVector &vec);
+  void doArrayEnd(const MemBaseVector &vec) override;
   /// \private
-  virtual void doMem(const MemberBase &mem);
+  void doMem(const MemberBase &mem) override;
 
 protected:
   /// \private

@@ -28,13 +28,13 @@ using namespace std;
 namespace mobs {
 
 
-void string2Obj(const std::string &str, ObjectBase &obj, ConvObjFromStr cfh)
+void string2Obj(const std::string &str, ObjectBase &obj, const ConvObjFromStr& cfh)
 {
   class JsonReadData : public ObjectNavigator, public JsonParser  {
   public:
     JsonReadData(const string &input, const ConvObjFromStr &c) : JsonParser(input) { cfs = c; }
     
-    void Value(const string &val, bool charType) {
+    void Value(const string &val, bool charType) override {
       TRACE(PARAM(val));
       if (enter(lastKey, currentIdx))
       {
@@ -49,17 +49,17 @@ void string2Obj(const std::string &str, ObjectBase &obj, ConvObjFromStr cfh)
         currentIdx++;
       leave();
     }
-    void StartObject() {
+    void StartObject() override {
       TRACE(PARAM(lastKey));
       if (++level > 1)
         enter(lastKey, currentIdx);
       index.push(currentIdx);
       currentIdx = SIZE_T_MAX;
     }
-    void Key(const string &key) {
+    void Key(const string &key) override {
       lastKey = key;
     }
-    void EndObject() {
+    void EndObject() override {
       TRACE("");
       lastKey = current();
       if (index.empty())
@@ -71,11 +71,11 @@ void string2Obj(const std::string &str, ObjectBase &obj, ConvObjFromStr cfh)
       if (currentIdx != SIZE_T_MAX)
         currentIdx++;
     }
-    void StartArray() {
+    void StartArray() override {
       TRACE("");
       currentIdx = 0;
     }
-    void EndArray() {
+    void EndArray() override {
       TRACE("");
       currentIdx = SIZE_T_MAX;
     }

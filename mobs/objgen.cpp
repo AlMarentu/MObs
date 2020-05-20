@@ -1,3 +1,5 @@
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "bugprone-branch-clone"
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
@@ -23,6 +25,8 @@
 #include "xmlwriter.h"
 #include <map>
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "UnusedGlobalDeclarationInspection"
 using namespace std;
 
 namespace mobs {
@@ -145,11 +149,11 @@ void ObjectBase::activate()
 void ObjectBase::clearModified() {
   class ClearModified  : virtual public ObjTrav {
   public:
-    bool doObjBeg(ObjectBase &obj) { obj.setModified(false); return true; }
-    void doObjEnd(ObjectBase &obj) {  }
-    bool doArrayBeg(MemBaseVector &vec) { vec.setModified(false); return true; }
-    void doArrayEnd(MemBaseVector &vec) { }
-    void doMem(MemberBase &mem) { mem.setModified(false); }
+    bool doObjBeg(ObjectBase &obj) override { obj.setModified(false); return true; }
+    void doObjEnd(ObjectBase &obj) override {  }
+    bool doArrayBeg(MemBaseVector &vec) override { vec.setModified(false); return true; }
+    void doArrayEnd(MemBaseVector &vec) override { }
+    void doMem(MemberBase &mem) override { mem.setModified(false); }
   };
   ClearModified cm;
   traverse(cm);
@@ -208,7 +212,7 @@ MemVarCfg ObjectBase::hasFeature(MemVarCfg c) const
 
 void ObjectBase::regMem(MemberBase *mem)
 {
-  mlist.push_back(MlistInfo(mem, 0, 0));
+  mlist.emplace_back(mem, nullptr, nullptr);
 }
 
 void ObjectBase::regObj(ObjectBase *obj)
@@ -216,31 +220,31 @@ void ObjectBase::regObj(ObjectBase *obj)
   if (obj == nullptr) // used by MobsUnion
     mlist.clear();
   else
-    mlist.push_back(MlistInfo(0, obj, 0));
+    mlist.emplace_back(nullptr, obj, nullptr);
 }
 
 void ObjectBase::regArray(MemBaseVector *vec)
 {
-  mlist.push_back(MlistInfo(0, 0, vec));
+  mlist.emplace_back(nullptr, nullptr, vec);
 }
 
-extern map<string, ObjectBase *(*)(ObjectBase *)> *ObjectBase__createMap;
-map<string, ObjectBase *(*)(ObjectBase *)> *ObjectBase__createMap = nullptr;
+extern map<string, ObjectBase *(*)(ObjectBase *)> *ObjectBase_Reg_createMap;
+map<string, ObjectBase *(*)(ObjectBase *)> *ObjectBase_Reg_createMap = nullptr;
 
-void ObjectBase::regObject(string n, ObjectBase *fun(ObjectBase *))
+void ObjectBase::regObject(string n, ObjectBase *fun(ObjectBase *)) noexcept
 {
-  if (ObjectBase__createMap == nullptr)
-    ObjectBase__createMap = new map<string, ObjectBase *(*)(ObjectBase *)>;
+  if (ObjectBase_Reg_createMap == nullptr)
+    ObjectBase_Reg_createMap = new map<string, ObjectBase *(*)(ObjectBase *)>;
   
-  ObjectBase__createMap->insert(make_pair(n, fun));
+  ObjectBase_Reg_createMap->insert(make_pair(n, fun));
 }
 
-ObjectBase *ObjectBase::createObj(string n, ObjectBase *p)
+ObjectBase *ObjectBase::createObj(const string& n, ObjectBase *p)
 {
-  if (ObjectBase__createMap == nullptr)
+  if (ObjectBase_Reg_createMap == nullptr)
     return nullptr;
-  auto it = ObjectBase__createMap->find(n);
-  if (it == ObjectBase__createMap->end())
+  auto it = ObjectBase_Reg_createMap->find(n);
+  if (it == ObjectBase_Reg_createMap->end())
     return nullptr;
   return (*it).second(p);
 }
@@ -252,7 +256,7 @@ MemberBase *ObjectBase::getMemInfo(const std::string &name)
     if (i.mem and name == i.mem->name())
       return i.mem;
   }
-  return 0;
+  return nullptr;
 }
 
 ObjectBase *ObjectBase::getObjInfo(const std::string &name)
@@ -262,7 +266,7 @@ ObjectBase *ObjectBase::getObjInfo(const std::string &name)
     if (i.obj and name == i.obj->name())
       return i.obj;
   }
-  return 0;
+  return nullptr;
 }
 
 MemBaseVector *ObjectBase::getVecInfo(const std::string &name)
@@ -272,7 +276,7 @@ MemBaseVector *ObjectBase::getVecInfo(const std::string &name)
     if (i.vec and name == i.vec->name())
       return i.vec;
   }
-  return 0;
+  return nullptr;
 }
 
 std::list<MemVarCfg> ObjectBase::findConfToken(MemVarCfg base, const std::string &name, ConvObjFromStr &cfh) const
@@ -294,7 +298,7 @@ MemberBase *ObjectBase::getMemInfo(size_t ctok) const
     if (i.mem and ctok == i.mem->cAltName())
       return i.mem;
   }
-  return 0;
+  return nullptr;
 }
 
 ObjectBase *ObjectBase::getObjInfo(size_t ctok) const
@@ -310,7 +314,7 @@ ObjectBase *ObjectBase::getObjInfo(size_t ctok) const
       if (i.obj and ctok == i.obj->cAltName())
         return i.obj;
     }
-  return 0;
+  return nullptr;
 }
 
 MemBaseVector *ObjectBase::getVecInfo(size_t ctok) const
@@ -320,10 +324,10 @@ MemBaseVector *ObjectBase::getVecInfo(size_t ctok) const
     if (i.vec and ctok == i.vec->cAltName())
       return i.vec;
   }
-  return 0;
+  return nullptr;
 }
 
-MemberBase &ObjectBase::get(string name)
+MemberBase &ObjectBase::get(const string& name)
 {
   for (auto m:mlist)
   {
@@ -413,12 +417,12 @@ std::string ObjectBase::keyStr() const
 {
   class KeyDump : virtual public mobs::ObjTravConst {
   public:
-    KeyDump(const mobs::ConvToStrHint &c) : cth(c) { };
-    virtual bool doObjBeg(const mobs::ObjectBase &obj) { return true; };
-    virtual void doObjEnd(const mobs::ObjectBase &obj) { };
-    virtual bool doArrayBeg(const mobs::MemBaseVector &vec) { return false; }
-    virtual void doArrayEnd(const mobs::MemBaseVector &vec) { }
-    virtual void doMem(const mobs::MemberBase &mem) {
+    explicit KeyDump(const mobs::ConvToStrHint &c) : cth(c) { };
+    bool doObjBeg(const mobs::ObjectBase &obj) override { return true; };
+    void doObjEnd(const mobs::ObjectBase &obj) override { };
+    bool doArrayBeg(const mobs::MemBaseVector &vec) override { return false; }
+    void doArrayEnd(const mobs::MemBaseVector &vec) override { }
+    void doMem(const mobs::MemberBase &mem) override {
       if (not fst)
         res << ",";
       fst = false;
@@ -448,10 +452,9 @@ std::string ObjectBase::keyStr() const
 /////////////////////////////////////////////////
 class ConvFromStrHintDoCopy : virtual public ConvFromStrHint {
 public:
-  ConvFromStrHintDoCopy() {}
-  virtual ~ConvFromStrHintDoCopy() {}
-  virtual bool acceptCompact() const { return true; }
-  virtual bool acceptExtented() const { return false; }
+  ~ConvFromStrHintDoCopy() override = default;
+  bool acceptCompact() const override { return true; }
+  bool acceptExtented() const override { return false; }
 };
 
 void ObjectBase::doCopy(const ObjectBase &other)
@@ -560,38 +563,38 @@ std::string ObjectBase::getVariable(const std::string &path, bool *found, bool c
 /// Object Inserter
 /////////////////////////////////////////////////
 
-bool ObjectNavigator::find(const std::string &path) {
-  TRACE(PARAM(path));
+bool ObjectNavigator::find(const std::string &varName) {
+  TRACE(PARAM(varName));
   memName = "";
-  for (size_t pos = 0; pos < path.length();)
+  for (size_t pos = 0; pos < varName.length();)
   {
-    size_t pos2 = path.find_first_of(".[", pos);
+    size_t pos2 = varName.find_first_of(".[", pos);
     if (pos2 == std::string::npos)
     {
-      enter(path.substr(pos));
+      enter(varName.substr(pos));
       return true;
     }
-    string element = path.substr(pos, pos2-pos);
+    string element = varName.substr(pos, pos2 - pos);
     size_t index = SIZE_T_MAX; // Vector selbst
-    if (path[pos2] == '[')
+    if (varName[pos2] == '[')
     {
       pos = pos2 +1;
-      pos2 = path.find(']', pos);
+      pos2 = varName.find(']', pos);
       if (pos2 == std::string::npos)
       {
         index = MemBaseVector::nextpos;  // hinten anhängen
         break;
       }
-      string i = path.substr(pos, pos2-pos);
+      string i = varName.substr(pos, pos2 - pos);
       if (not mobs::string2x(i, index))
         break;
 //      std::cerr << "XX " << element << " " << index << " " << i << std::endl;
       pos2++;
     }
     enter(element, index);
-    if (pos2 == path.length())
+    if (pos2 == varName.length())
       return true;
-    if (path[pos2] != '.')
+    if (varName[pos2] != '.')
       break;
     pos = pos2 +1;
   }
@@ -657,7 +660,7 @@ bool ObjectNavigator::setNull() {
 }
   
 bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
-  TRACE(PARAM(element) << PARAM(index))
+  TRACE(PARAM(element) << PARAM(index));
 //  LOG(LM_INFO, "enter " << element << " " << index)
   path.push(element);
   
@@ -808,7 +811,7 @@ void ObjectNavigator::pushObject(ObjectBase &obj, const std::string &name) {
 namespace  {
 class ObjDump : virtual public ObjTravConst {
 public:
-  ObjDump(const ConvObjToString &c) : quoteKeys(c.withQuotes() ? "\"":""), cth(c) { };
+  explicit ObjDump(const ConvObjToString &c) : quoteKeys(c.withQuotes() ? "\"":""), cth(c) { };
   void newline() {
     if (needBreak and cth.withIndentation())
     {
@@ -818,7 +821,7 @@ public:
     }
     needBreak = false;
   };
-  virtual bool doObjBeg(const ObjectBase &obj)
+  bool doObjBeg(const ObjectBase &obj) override
   {
     if (obj.isNull() and cth.omitNull())
       return false;
@@ -843,7 +846,7 @@ public:
     level++;
     return true;
   };
-  virtual void doObjEnd(const ObjectBase &obj)
+  void doObjEnd(const ObjectBase &obj) override
   {
     if (obj.isNull() and cth.omitNull())
       return;
@@ -854,7 +857,7 @@ public:
       needBreak = true;
     fst = false;
   };
-  virtual bool doArrayBeg(const MemBaseVector &vec)
+  bool doArrayBeg(const MemBaseVector &vec) override
   {
     if (vec.isNull() and cth.omitNull())
       return false;
@@ -875,13 +878,13 @@ public:
     res << "[";
     return true;
   };
-  virtual void doArrayEnd(const MemBaseVector &vec)
+  void doArrayEnd(const MemBaseVector &vec) override
   {
     res << "]";
     fst = false;
     needBreak = true;
   };
-  virtual void doMem(const MemberBase &mem)
+  void doMem(const MemberBase &mem) override
   {
     if (mem.isNull() and cth.omitNull())
       return;
@@ -913,7 +916,7 @@ private:
 
 }
 
-std::string ObjectBase::to_string(ConvObjToString cth) const
+std::string ObjectBase::to_string(const ConvObjToString& cth) const
 {
   if (cth.toJson())
   {
@@ -939,3 +942,5 @@ std::string ObjectBase::to_string(ConvObjToString cth) const
 
 
 }
+
+#pragma clang diagnostic pop

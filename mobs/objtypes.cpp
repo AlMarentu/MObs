@@ -33,12 +33,12 @@ namespace mobs {
 std::wstring to_wstring(std::string val) {
   std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> c;
   return c.from_bytes(val);
-};
+}
 
 std::u32string to_u32string(std::string val) {
   std::wstring_convert<std::codecvt_utf8<char32_t>,char32_t> c;
   return c.from_bytes(val);
-};
+}
 
 std::string to_quote(const std::string &s) {
   string result = "\"";
@@ -77,7 +77,7 @@ bool string2x(const std::string &str, char &t) {
     return false;
   t = c;
   return true;
-};
+}
 
 template<>
 /// \private
@@ -89,7 +89,7 @@ bool string2x(const std::string &str, signed char &t) {
     return false;
   t = c;
   return true;
-};
+}
 
 template<>
 /// \private
@@ -101,7 +101,7 @@ bool string2x(const std::string &str, unsigned char &t) {
     return false;
   t = c;
   return true;
-};
+}
 
 template<>
 /// \private
@@ -113,7 +113,7 @@ bool string2x(const std::string &str, char16_t &t) {
     return false;
   t = c;
   return true;
-};
+}
 
 template<>
 /// \private
@@ -125,7 +125,7 @@ bool string2x(const std::string &str, wchar_t &t) {
     return false;
   t = c;
   return true;
-};
+}
 
 template<>
 /// \private

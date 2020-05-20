@@ -20,14 +20,12 @@
 
 
 #include "xmlwriter.h"
-#include "xmlout.h"
 #include "logging.h"
 #include "converter.h"
 
 
 #include <stack>
 #include <sstream>
-#include <iostream>
 
 
 using namespace std;
@@ -49,9 +47,6 @@ public:
   std::wstring prefix;
   stack<wstring> elements;
   wstringstream wstrBuff; // buffer für u8-Ausgabe in std::string
-  std::mbstate_t mbstate;
-  wchar_t (*conFun)(wchar_t) = nullptr;
-  
 
   void setConFun() {
     std::locale lo;
@@ -140,9 +135,9 @@ void XmlWriter::writeHead() {
     case CS_iso8859_1: encoding = L"ISO-8859-1"; break;
     case CS_iso8859_9: encoding = L"ISO-8859-9"; break;
     case CS_iso8859_15: encoding = L"ISO-8859-15"; break;
-    case CS_utf8_bom: encoding = L"UTF-8"; break;
+    case CS_utf8_bom:
     case CS_utf8: encoding = L"UTF-8"; break;
-    case CS_utf16_be: encoding = L"UTF-16"; break;
+    case CS_utf16_be:
     case CS_utf16_le: encoding = L"UTF-16"; break;
   }
 
@@ -190,7 +185,7 @@ void XmlWriter::writeValue(const std::wstring &value) {
       case '<': data->buffer << L"&lt;"; break;
       case '>': data->buffer << L"&gt;"; break;
       case '&': data->buffer << L"&amp;"; break;
-      case 0 ... 0x1f: if (escapeControll) { data->buffer << L"&#x" << hex << int(c) << L';'; break; }
+      case 0 ... 0x1f: if (escapeControl) { data->buffer << L"&#x" << hex << int(c) << L';'; break; }
       default: data->write(c);
     }
   data->hasValue = true;
@@ -264,19 +259,19 @@ string XmlWriter::getString() const
     case CS_iso8859_1: {
          const wstring &t = data->wstrBuff.str();
          std::transform(t.begin(), t.cend(), std::back_inserter(result),
-                        [](wchar_t c) -> char{ return to_iso_8859_1(c); });
+                        [](wchar_t c) -> char{ return u_char(to_iso_8859_1(c)); });
          return result;
        }
     case CS_iso8859_9: {
          const wstring &t = data->wstrBuff.str();
          std::transform(t.begin(), t.cend(), std::back_inserter(result),
-                        [](wchar_t c) -> char{ return to_iso_8859_9(c); });
+                        [](wchar_t c) -> char{ return u_char(to_iso_8859_9(c)); });
          return result;
        }
     case CS_iso8859_15: {
       const wstring &t = data->wstrBuff.str();
       std::transform(t.begin(), t.cend(), std::back_inserter(result),
-                     [](wchar_t c) -> char{ return to_iso_8859_15(c); });
+                     [](wchar_t c) -> char{ return u_char(to_iso_8859_15(c)); });
       return result;
     }
     case CS_utf8_bom:

@@ -53,7 +53,7 @@ static std::wstring stow(const string &s, bool dontConvert) {
         return element.substr(prefix.length());
       throw runtime_error("Prefix mismatch");
     }
-    void NullTag(const std::string &element) {
+    void NullTag(const std::string &element) override {
       TRACE(PARAM(element));
       if (obj) {
         setNull();
@@ -62,7 +62,7 @@ static std::wstring stow(const string &s, bool dontConvert) {
       else
         parent->NullTag(elementRemovePrefix(element));
     };
-    void Attribute(const std::string &element, const std::string &attribute, const std::wstring &value) {
+    void Attribute(const std::string &element, const std::string &attribute, const std::wstring &value) override {
       if (obj and not member()) {
         enter(attribute);
         if (member() and member()->hasFeature(XmlAsAttr))
@@ -75,7 +75,7 @@ static std::wstring stow(const string &s, bool dontConvert) {
       else
         parent->Attribute(elementRemovePrefix(element), attribute, value);
     };
-    void Value(const std::wstring &val) {
+    void Value(const std::wstring &val) override {
       if (obj) {
         if (not member())
           error += string(error.empty() ? "":"\n") + showName() + u8" is no variable, can't assign";
@@ -85,13 +85,13 @@ static std::wstring stow(const string &s, bool dontConvert) {
       else
         parent->Value(val);
     };
-    void Cdata(const std::wstring &value) {
+    void Cdata(const std::wstring &value) override {
       if (obj)
         Value(value);
       else
         parent->Cdata(value);
     }
-    void Base64(const std::vector<u_char> &base64) {
+    void Base64(const std::vector<u_char> &base64) override {
       if (obj) {
         if (not member())
           error += string(error.empty() ? "":"\n") + showName() + u8" is no variable, can't assign";
@@ -101,7 +101,7 @@ static std::wstring stow(const string &s, bool dontConvert) {
       else
         parent->Base64(base64);
     }
-    void StartTag(const std::string &element) {
+    void StartTag(const std::string &element) override {
       if (obj) {
         if (not enter(elementRemovePrefix(element)) and cfs.exceptionIfUnknown())
           error += string(error.empty() ? "":"\n") + elementRemovePrefix(element) + u8"not found";
@@ -109,7 +109,7 @@ static std::wstring stow(const string &s, bool dontConvert) {
       else
         parent->StartTag(element);
     }
-    void EndTag(const std::string &element) {
+    void EndTag(const std::string &element) override {
       if (obj) {
         if (tagPath().size() == levelStart)
         {
@@ -124,7 +124,7 @@ static std::wstring stow(const string &s, bool dontConvert) {
       else
         parent->EndTag(element);
     }
-    void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) {
+    void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) override {
       if (element == "xml" and attribut == "encoding") {
         encoding = mobs::to_string(value);
         
@@ -164,8 +164,8 @@ static std::wstring stow(const string &s, bool dontConvert) {
     
     XmlReader *parent;
     std::wistringstream str;
-    ObjectBase *obj = 0;
-    size_t levelStart;
+    ObjectBase *obj = nullptr;
+    size_t levelStart{};
     std::string error;
     std::string encoding;
     std::string prefix;

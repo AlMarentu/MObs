@@ -23,6 +23,8 @@
 
 #include "objgen.h"
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "UnusedGlobalDeclarationInspection"
 namespace mobs {
 
 class XmlReadData;
@@ -34,11 +36,11 @@ public:
   /// @param input XML
   /// @param c conversion-hints
   /// @param charsetUnknown default ist der übergebene String in UTF-8 codiert, wird hier false übergeben, wird der Zeichensatz ermittelt (UTF-8, ISO-8869-1, -9, -15)
-  XmlReader(const std::string &input, const ConvObjFromStr &c = ConvObjFromStr(), bool charsetUnknown = false);
+  explicit XmlReader(const std::string &input, const ConvObjFromStr &c = ConvObjFromStr(), bool charsetUnknown = false);
   /// Konstruktor mit XML und conversion-hints initialisieren
-  XmlReader(const std::wstring &input, const ConvObjFromStr &c = ConvObjFromStr());
+  explicit XmlReader(const std::wstring &input, const ConvObjFromStr &c = ConvObjFromStr());
   /// Konstruktor mit XML und conversion-hints initialisieren
-  XmlReader(std::wistream &str, const ConvObjFromStr &c = ConvObjFromStr());
+  explicit XmlReader(std::wistream &str, const ConvObjFromStr &c = ConvObjFromStr());
   ~XmlReader();
 
   /// Callback für Null-Tag
@@ -92,22 +94,24 @@ public:
   /// Alles initialisieren
   XmlRead(const std::string &str, ObjectBase &obj, const ConvObjFromStr &c) : XmlReader(str, c), object(obj) { }
   /// \private
-  virtual void StartTag(const std::string &element) {
+  void StartTag(const std::string &element) override {
     if (element == "root") {
       fill(&object);
       done = true;
     }
   }
   /// \private
-  virtual void filled(ObjectBase *obj, const std::string &error) {
+  void filled(ObjectBase *obj, const std::string &error) override {
     if (not error.empty())
       throw std::runtime_error(error);
   }
   /// wurde überhaupt eine Wurzel gefunden
-  bool found() { return done; }
+  bool found() const { return done; }
 private:
   ObjectBase &object;
   bool done = false;
 };
 
 }
+
+#pragma clang diagnostic pop

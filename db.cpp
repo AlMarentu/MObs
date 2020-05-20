@@ -13,8 +13,7 @@ using namespace mobs;
 class DatabaseInterface
 {
   public:
-    DatabaseInterface() {};
-    virtual ~DatabaseInterface() {};
+    virtual ~DatabaseInterface() = default;;
     virtual bool load(ObjectBase &obj) = 0;
     virtual bool load(std::list<ObjectBase> &result, std::string objType, std::string query) = 0;
     virtual bool save(const ObjectBase &obj) = 0;
@@ -25,11 +24,11 @@ class DatabaseInterface
 class FileDatabase : public DatabaseInterface
 {
   public:
-    FileDatabase(std::string path);
+    explicit FileDatabase(std::string path);
     virtual ~FileDatabase();
-    virtual bool load(ObjectBase &obj);
-    virtual bool load(std::list<ObjectBase> &result, std::string objType, std::string query);
-    virtual bool save(const ObjectBase &obj);
+    bool load(ObjectBase &obj) override;
+    bool load(std::list<ObjectBase> &result, std::string objType, std::string query) override;
+    bool save(const ObjectBase &obj) override;
     //bool load(std::shared_ptr<NamedObject> &ptr) { return load(*obj); };
 
   protected:
@@ -111,7 +110,7 @@ bool FileDatabase::save(const ObjectBase &obj)
   
   stringstream fname;
   fname << base << "/" << obj.typeName() << "." << obj.keyStr();
-  fstream f(fname.str(), f.trunc | f.out);
+  fstream f(fname.str(), std::fstream::trunc | std::fstream::out);
   if (not f.is_open())
     throw runtime_error(string("File open error ") + fname.str());
   f << obj.to_string(ConvObjToString().exportJson()) << endl;
@@ -132,13 +131,15 @@ using namespace std;
 class Fahrzeug : virtual public NamedObject, virtual public ObjectBase
 {
   public:
-    ObjInit(Fahrzeug);
+    ObjInit1(Fahrzeug);
+    Fahrzeug(const Fahrzeug &that) : NamedObject(that), ObjectBase(that) {  /*ObjectBase::doCopy(that);*/ }
 
-    MemVar(int, id, KEYELEMENT1);
+
+  MemVar(int, id, KEYELEMENT1);
     MemVar(string, typ);
     MemVar(int, achsen, USENULL);
 
-    void init() { TRACE(""); };
+    void init() override { TRACE(""); };
     // ist das nötig=?
     string objName() const { TRACE(""); return typeName() + "." + std::to_string(id()); };
 };
@@ -146,17 +147,17 @@ ObjRegister(Fahrzeug);
 
 class XmlInput : public XmlReader {
 public:
-  XmlInput(wistream &str) : XmlReader(str) { }
+  explicit XmlInput(wistream &str) : XmlReader(str) { }
   
-  virtual void StartTag(const std::string &element) {
+  void StartTag(const std::string &element) override {
     LOG(LM_INFO, "start " << element);
     if (elementRemovePrefix(element) == "Fahrzeug")
       fill(new Fahrzeug);
   }
-  virtual void EndTag(const std::string &element) {
+  void EndTag(const std::string &element) override {
     LOG(LM_INFO, "end " << element);
   }
-  virtual void filled(ObjectBase *obj, const string &error) {
+  void filled(ObjectBase *obj, const string &error) override {
     LOG(LM_INFO, "filled " << obj->to_string() << (error.empty() ? " OK":" ERROR = ") << error);
     delete obj;
     stop();

@@ -19,6 +19,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "UnusedGlobalDeclarationInspection"
 #ifndef MOBS_CONVERTER_H
 #define MOBS_CONVERTER_H
 
@@ -49,31 +51,31 @@ wchar_t from_iso_8859_15(wchar_t c);
 class codec_iso8859_1 : virtual public std::codecvt<wchar_t, char, std::mbstate_t> {
 public:
 /// \private
-  virtual result do_out(mbstate_t& state, const wchar_t* from, const wchar_t* from_end, const wchar_t*& from_next,
-                        char* to, char* to_end, char*& to_next) const;
+  result do_out(mbstate_t& state, const wchar_t* from, const wchar_t* from_end, const wchar_t*& from_next,
+                        char* to, char* to_end, char*& to_next) const override;
   /// \private
-  virtual result do_in (state_type& state, const char* from, const char* from_end, const char*& from_next,
-                        wchar_t* to, wchar_t* to_limit, wchar_t*& to_next) const;
+  result do_in (state_type& state, const char* from, const char* from_end, const char*& from_next,
+                        wchar_t* to, wchar_t* to_limit, wchar_t*& to_next) const override;
 };
 /// codec für wfstream
 class codec_iso8859_9 : virtual public std::codecvt<wchar_t, char, std::mbstate_t> {
 public:
   /// \private
-  virtual result do_out(mbstate_t& state, const wchar_t* from, const wchar_t* from_end, const wchar_t*& from_next,
-                        char* to, char* to_end, char*& to_next) const;
+  result do_out(mbstate_t& state, const wchar_t* from, const wchar_t* from_end, const wchar_t*& from_next,
+                        char* to, char* to_end, char*& to_next) const override;
   /// \private
-  virtual result do_in (state_type& state, const char* from, const char* from_end, const char*& from_next,
-                        wchar_t* to, wchar_t* to_limit, wchar_t*& to_next) const;
+  result do_in (state_type& state, const char* from, const char* from_end, const char*& from_next,
+                        wchar_t* to, wchar_t* to_limit, wchar_t*& to_next) const override;
 };
 /// codec für wfstream
 class codec_iso8859_15 : virtual public std::codecvt<wchar_t, char, std::mbstate_t> {
 public:
   /// \private
-  virtual result do_out(mbstate_t& state, const wchar_t* from, const wchar_t* from_end, const wchar_t*& from_next,
-                        char* to, char* to_end, char*& to_next) const;
+  result do_out(mbstate_t& state, const wchar_t* from, const wchar_t* from_end, const wchar_t*& from_next,
+                        char* to, char* to_end, char*& to_next) const override;
   /// \private
-  virtual result do_in (state_type& state, const char* from, const char* from_end, const char*& from_next,
-                        wchar_t* to, wchar_t* to_limit, wchar_t*& to_next) const;
+  result do_in (state_type& state, const char* from, const char* from_end, const char*& from_next,
+                        wchar_t* to, wchar_t* to_limit, wchar_t*& to_next) const override;
 };
 
 
@@ -82,13 +84,15 @@ int from_base64(wchar_t c);
 /// Rückgabe des zum base64-Wert gehörigen Zeichens
 wchar_t to_base64(int i);
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "hicpp-signed-bitwise"
 template<class InputIt, class OutputIt>
 /// transformer, der Container umkopiert und dabei im Ziel die untersten 8-Bit der Quelle bas64 Kodiert
 /// @param first Quell-Itertor Start
 /// @param last Quell-Iterator Ende
 /// @param d_first Ziel-Insert-Iterator
 /// @param linebreak String, der nach 15 Blöcken ausgegeben wird
-OutputIt copy_base64(InputIt first, InputIt last, OutputIt d_first, std::string linebreak = "")
+OutputIt copy_base64(InputIt first, InputIt last, OutputIt d_first, const std::string& linebreak = "")
 {
   int i = 0;
   int a = 0;
@@ -100,7 +104,8 @@ OutputIt copy_base64(InputIt first, InputIt last, OutputIt d_first, std::string 
       *d_first++ = char(to_base64((a >> 12) & 0x3f));
       *d_first++ = char(to_base64((a >> 6) & 0x3f));
       *d_first++ = char(to_base64(a & 0x3f));
-      i = a = 0;
+      i = 0;
+      a = 0;
       if (l++ > 15) {
         for (auto c:linebreak)
           *d_first++ = c;
@@ -111,7 +116,7 @@ OutputIt copy_base64(InputIt first, InputIt last, OutputIt d_first, std::string 
   }
   if (i == 2) {
     *d_first++ = char(to_base64(a >> 10));
-    *d_first++ = char(to_base64((a >> 4) & 0x3f));
+    *d_first++ = char(to_base64(a >> 4 & 0x3f));
     *d_first++ = char(to_base64((a & 0x0f) << 2));
     *d_first++ = ('=');
   }
@@ -122,7 +127,8 @@ OutputIt copy_base64(InputIt first, InputIt last, OutputIt d_first, std::string 
     *d_first++ = ('=');
   }
   return d_first;
-};
+}
+#pragma clang diagnostic pop
 
 /// Umwandlung eies Containers mit base64-Inhalt nach \c std::string
 template<typename T>
@@ -144,7 +150,7 @@ wchar_t from_html_tag(const std::wstring &tok);
 class Base64Reader {
 public:
   /// Konstruktor übergibt Buffer
-  Base64Reader(std::vector<u_char> &v) : base64(v) { start(); }
+  explicit Base64Reader(std::vector<u_char> &v) : base64(v) { start(); }
   /// nächstes Zeichen parsen
   void put(wchar_t c);
   /// Ende des zu parsenden Textes
@@ -165,3 +171,5 @@ public:
 }
 
 #endif
+
+#pragma clang diagnostic pop

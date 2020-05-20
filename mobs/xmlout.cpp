@@ -22,12 +22,9 @@
 
 #include "xmlout.h"
 #include "xmlwriter.h"
-#include "logging.h"
 
 
 #include <stack>
-#include <sstream>
-#include <iostream>
 
 
 using namespace std;

@@ -22,6 +22,8 @@
 \brief EInfacher XML-Parser */
 
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "UnusedGlobalDeclarationInspection"
 #ifndef MOBS_XMLPARSER_H
 #define MOBS_XMLPARSER_H
 
@@ -50,13 +52,13 @@ namespace mobs {
  void parse();
  
  // Callback Funktionen
- void NullTag(const std::string &element);
- void Attribute(const std::string &element, const std::string &attribut, const std::string &value);
- void Value(const std::string &value);
- void Cdata(const char *value, size_t len);
- void StartTag(const std::string &element);
- void EndTag(const std::string &element);
- void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::string &value);
+ void NullTag(const std::string &element) override;
+ void Attribute(const std::string &element, const std::string &attribut, const std::string &value) override;
+ void Value(const std::string &value) override;
+ void Cdata(const char *value, size_t len) override;
+ void StartTag(const std::string &element) override;
+ void EndTag(const std::string &element) override;
+ void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::string &value) override;
  };
  \endcode
  */
@@ -69,10 +71,10 @@ class XmlParser  {
 public:
   /*! Konstruktor der XML-Parser Basisklasse
    @param input XML-Text der geparst werden soll   */
-  XmlParser(const std::string &input) : Xml(input) {
+  explicit XmlParser(const std::string &input) : Xml(input) {
     pos1 = pos2 = posS = posE = 0;
   };
-  virtual ~XmlParser() { };
+  virtual ~XmlParser() = default;;
   
   /*! \brief Liefert XML-Puffer und aktuelle Position für detaillierte Fehlermeldung
    @param pos Position des Fehlers im Xml-Buffer
@@ -372,23 +374,23 @@ private:
     return Xml[pos1];
   };
   /// Wandelt einen Teilstring aus Xml von der HTML-Notation in ASCII zurück
-  /// @param posS StartPosition
-  /// @param posE EndePosition
-  std::string decode(size_t posS, size_t posE) {
+  /// @param pos_S StartPosition
+  /// @param pos_E EndePosition
+  std::string decode(size_t pos_S, size_t pos_E) {
     // Da in XML Die Zeicxhe & und < immer escaped (in HTML) werden müssen, kann ein Rückwandlung
     // immer erfolgen, da ein '&' ansonsten nicht vorkommen sollte
     std::string result;
     for (;;)
     {
-      size_t pos = Xml.find('&', posS);
-      if (pos < posE) // & gefunden
+      size_t pos = Xml.find('&', pos_S);
+      if (pos < pos_E) // & gefunden
       {
-        result += std::string(&Xml[posS], pos-posS);
-        posS = pos +1;
-        pos = Xml.find(';', posS);
-        if (pos < posE and pos < posS + 16) // Token &xxxx; gefunden
+        result += std::string(&Xml[pos_S], pos - pos_S);
+        pos_S = pos + 1;
+        pos = Xml.find(';', pos_S);
+        if (pos < pos_E and pos < pos_S + 16) // Token &xxxx; gefunden
         {
-          std::string tok = std::string(&Xml[posS], pos-posS);
+          std::string tok = std::string(&Xml[pos_S], pos - pos_S);
           //          std::cerr << "TOK " << tok << std::endl;
           char c = '\0';
           if (tok == "lt")
@@ -404,7 +406,7 @@ private:
           if (c)
           {
             result += c;
-            posS = pos +1;
+            pos_S = pos + 1;
             continue;
           }
         }
@@ -413,7 +415,7 @@ private:
       }
       else
       {
-        result += std::string(&Xml[posS], posE-posS);
+        result += std::string(&Xml[pos_S], pos_E - pos_S);
         break;
       }
     }
@@ -472,8 +474,8 @@ public:
      es kann z.B. ein \c std::wifstream dienen oder ein \c std::wistringstream übergeben werden
           Als Zeichensätze sind UTF-8, UTF-16, ISO8859-1, -9 und -15 erlaubt; Dateien dürfen mit einem BOM beginnen
    @param input XML-stream der geparst werden soll   */
-  XmlParserW(std::wistream &input) : istr(input), base64(base64data) { };
-  virtual ~XmlParserW() { };
+  explicit XmlParserW(std::wistream &input) : istr(input), base64(base64data) { };
+  virtual ~XmlParserW() = default;;
   /*! \brief Liefert XML-Puffer und aktuelle Position für detaillierte Fehlermeldung
    @param pos Position des Fehlers im Xml-Buffer
    @return zu parsender Text-Buffer
@@ -501,7 +503,7 @@ public:
    @param element Name des Elementes
    */
   virtual void NullTag(const std::string &element) = 0;
-  /** \brief Callback-Function: Ein Atributwert einses Tags
+  /** \brief Callback-Function: Ein Attributwert eines Tags
    @param element Name des Elementes
    @param attribut Name des Attributes
    @param value Wert des Attributes
@@ -511,16 +513,16 @@ public:
    @param value Inhalt des Tags
    */
   virtual void Value(const std::wstring &value) = 0;
-  /** \brief Callback-Function: Ein CDATA-Elemet (optional) ansonsten wird auf \c Value abgebildet
+  /** \brief Callback-Function: Ein CDATA-Element (optional) ansonsten wird auf \c Value abgebildet
    @param value Inhalt des Tags
    */
   virtual void Cdata(const std::wstring &value) { Value(value); }
-  /** \brief Callback-Function: Ein CDATA-Elemet mit base64 codiertem Inhalt
+  /** \brief Callback-Function: Ein CDATA-Element mit base64 codiertem Inhalt
    
       nur, wenn setBase64(true) gesetzt wurde
-   @param base64 Inhalt des base64 codierden Wertes
+   @param input Inhalt des base64 codierten Wertes
    */
-  virtual void Base64(const std::vector<u_char> &base64) { }
+  virtual void Base64(const std::vector<u_char> &input) { }
   /** \brief Callback-Function: Ein Start-Tag
    @param element Name des Elementes
    */
@@ -532,7 +534,7 @@ public:
   /** \brief Callback-Function: Eine Verarbeitungsanweisung z.B, "xml", "encoding", "UTF-8"
    @param element Name des Tags
    @param attribut Name der Verarbeitungsanweisung
-   @param value Inhalz der Verarbeitungsanweisung
+   @param value Inhalt der Verarbeitungsanweisung
    */
   virtual void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) = 0;
   
@@ -548,8 +550,8 @@ public:
     TRACE("");
     if (not running)
     {
-      std::locale lo = std::locale(istr.getloc(), new codec_iso8859_1);
-      istr.imbue(lo);
+      std::locale lo1 = std::locale(istr.getloc(), new codec_iso8859_1);
+      istr.imbue(lo1);
 
       eat();  // erstes Zeichen einlesen
               /// BOM bearbeiten
@@ -590,7 +592,7 @@ public:
       if (curr != '<')
         throw std::runtime_error(u8"Syntax Head");
       // BOM überlesen
-      if (not buffer.empty() and buffer != L"\0xEF\0xBB\0xBF" and buffer != L"\ufeff")
+      if (not buffer.empty() and buffer != L"\u00EF\u00BB\u00BF" and buffer != L"\ufeff")
       {
 //        for (auto c:buffer) std::cerr << '#' <<  int(c) << std::endl;
         throw std::runtime_error("invalid begin of File");
@@ -696,7 +698,7 @@ public:
           if (peek() == '=')
           {
             eat('=');
-            char c = peek();
+            wchar_t c = peek();
             if (c == '"')
               eat('"');
             else
@@ -897,7 +899,7 @@ private:
     buffer += curr;
     curr = istr.get();
   };
-  wchar_t peek() {
+  wchar_t peek() const {
     if (curr < 0)
       throw std::runtime_error(u8"unexpected EOF");
     //cerr << "Peek " << Xml[pos1] << " " << pos1 << endl;
@@ -974,3 +976,5 @@ private:
 }
 
 #endif
+
+#pragma clang diagnostic pop

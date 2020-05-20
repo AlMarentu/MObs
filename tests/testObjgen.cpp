@@ -94,7 +94,7 @@ class Person : virtual public mobs::ObjectBase {
 //  MemVector(MemVarType(std::string), hobbies);
   MemVarVector(std::string, hobbies);
 
-  virtual void init() {  };
+  void init() override {  };
 };
 ObjRegister(Person);
 

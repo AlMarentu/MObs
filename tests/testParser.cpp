@@ -35,44 +35,44 @@ namespace {
 
 class JParser: public mobs::JsonParser {
 public:
-  JParser(const string &i) : mobs::JsonParser(i) {};
-  virtual void Key(const std::string &value) { LOG(LM_INFO, "KEY " << value); };
-  virtual void Value(const std::string &value, bool charType) { LOG(LM_INFO, "VALUE " << value); };
-  virtual void StartArray() { LOG(LM_INFO, "START ARRAY"); };
-  virtual void EndArray() { LOG(LM_INFO, "END ARRAY"); };
-  virtual void StartObject() { LOG(LM_INFO, "START OBJECT"); };
-  virtual void EndObject() { LOG(LM_INFO, "END OBJECT"); };
+  explicit JParser(const string &i) : mobs::JsonParser(i) {};
+  void Key(const std::string &value) override { LOG(LM_INFO, "KEY " << value) };
+  void Value(const std::string &value, bool charType) override { LOG(LM_INFO, "VALUE " << value); }
+  void StartArray() override { LOG(LM_INFO, "START ARRAY"); }
+  void EndArray() override { LOG(LM_INFO, "END ARRAY"); }
+  void StartObject() override { LOG(LM_INFO, "START OBJECT"); }
+  void EndObject() override { LOG(LM_INFO, "END OBJECT"); }
 };
 
 class XParser: public mobs::XmlParser {
 public:
-  XParser(const string &i) : mobs::XmlParser(i) {}
-  virtual void NullTag(const std::string &element) { LOG(LM_INFO, "NULL"); }
-  virtual void Attribute(const std::string &element, const std::string &attribut, const std::string &value) { LOG(LM_INFO, "ATTRIBUT " << element); }
-  virtual void Value(const std::string &value) { LOG(LM_INFO, "VALUE"); }
-  virtual void Cdata(const char *value, size_t len) { LOG(LM_INFO, "CDATA >" << string(value, len) << "<"); }
-  virtual void StartTag(const std::string &element) { LOG(LM_INFO, "START " << element); }
-  virtual void EndTag(const std::string &element) { LOG(LM_INFO, "END " << element); }
-  virtual void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::string &value) { LOG(LM_INFO, "PI" << element); }
+  explicit XParser(const string &i) : mobs::XmlParser(i) {}
+  void NullTag(const std::string &element) override { LOG(LM_INFO, "NULL"); }
+  void Attribute(const std::string &element, const std::string &attribut, const std::string &value) override { LOG(LM_INFO, "ATTRIBUT " << element); }
+  void Value(const std::string &value) override { LOG(LM_INFO, "VALUE"); }
+  void Cdata(const char *value, size_t len) override { LOG(LM_INFO, "CDATA >" << string(value, len) << "<"); }
+  void StartTag(const std::string &element) override { LOG(LM_INFO, "START " << element); }
+  void EndTag(const std::string &element) override { LOG(LM_INFO, "END " << element); }
+  void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::string &value) override { LOG(LM_INFO, "PI" << element); }
 };
 
 class XParserW: public mobs::XmlParserW {
 public:
-  XParserW(const wstring &i) : mobs::XmlParserW(str), str(i) { }
-  virtual void NullTag(const std::string &element) { LOG(LM_INFO, "NULL"); }
-  virtual void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) { LOG(LM_INFO, "ATTRIBUT " << element); }
-  virtual void Value(const std::wstring &value) { LOG(LM_INFO, "VALUE >" << mobs::to_string(value) << "<"); }
-  virtual void Cdata(const std::wstring &value) { LOG(LM_INFO, "CDATA >" << mobs::to_string(value) << "<"); }
-  virtual void Base64(const std::vector<u_char> &base64) {
+  explicit XParserW(const wstring &i) : mobs::XmlParserW(str), str(i) { }
+  void NullTag(const std::string &element) override { LOG(LM_INFO, "NULL"); }
+  void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) override { LOG(LM_INFO, "ATTRIBUT " << element); }
+  void Value(const std::wstring &value) override { LOG(LM_INFO, "VALUE >" << mobs::to_string(value) << "<"); }
+  void Cdata(const std::wstring &value) override { LOG(LM_INFO, "CDATA >" << mobs::to_string(value) << "<"); }
+  void Base64(const std::vector<u_char> &base64) override {
     std::string s;
     std::copy(base64.cbegin(), base64.cend(), back_inserter(s));
     LOG(LM_INFO, "BASE64 >" << s << "< " << base64.size());
     if (s != u8"Polyfon zwitschernd aßen Mäxchens Vögel Rüben, Joghurt und Quark")
       throw std::runtime_error("Ergebnis falsch");
   }
-  virtual void StartTag(const std::string &element) { LOG(LM_INFO, "START " << element); }
-  virtual void EndTag(const std::string &element) { LOG(LM_INFO, "END " << element); }
-  virtual void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) { LOG(LM_INFO, "PI" << element); }
+  void StartTag(const std::string &element) override { LOG(LM_INFO, "START " << element); }
+  void EndTag(const std::string &element) override { LOG(LM_INFO, "END " << element); }
+  void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) override { LOG(LM_INFO, "PI" << element); }
   std::wistringstream str;
 };
 

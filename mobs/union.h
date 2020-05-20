@@ -19,7 +19,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /** \file union.h
- \brief Deklaration um variable Objektyben  analog Union zu generieren */
+ \brief Deklaration um variable Objekttypen  analog Union zu generieren */
 
 
 #ifndef MOBS_UNION_H
@@ -109,20 +109,22 @@ class Master : virtual public mobs::ObjectBase {
 class MobsUnion : virtual public mobs::ObjectBase {
 public:
   /// \private
-  ObjInit(MobsUnion);
-  virtual ~MobsUnion() { if (m_obj) delete m_obj; }
+  ObjInit1(MobsUnion);
+  /// \private
+  MobsUnion(const MobsUnion &that) : ObjectBase() { TRACE(""); MobsUnion::doCopy(that); }
+  ~MobsUnion() override { if (m_obj) delete m_obj; }
   /// liefert den Objekttyp des Unions oder \e leer  wenn nicht gesetzt
   std::string type() const { if (m_obj) return m_obj->typeName(); return ""; }
   /// setzt den Objekttyp des Unions, keine Aktion benn der Typ bereits passt
   /// @param t Objekttyp (muss mit \c ObjRegister) registriert sein; ist t leer, so wird das Objekt gelöscht
   /// \throw runtime_error wenn der Objekttyp nicht von der Basisklasse \c T abgeleitet ist
-  void setType(std::string t);
+  void setType(const std::string& t);
   /// Übernehme eine Kopie des angegebenen Objektes
   void operator() (const T &t) { setType(t.typeName()); m_obj->doCopy(t); activate(); }
   /// const Zugriffsmethode auf die Basisklasse
   const T *operator-> () const { return m_obj; }
   /// Prüfen, ob  Objekt gesetzt
-  operator bool () const { return m_obj; }
+  explicit operator bool () const { return m_obj; }
   /// nicht const Zugriffsmethode auf die Basisklasse
   T *operator-> () { return m_obj; }
   /// nicht const Zugriffsmethode auf die Basisklasse mit exception
@@ -130,11 +132,11 @@ public:
   /// const Zugriffsmethode auf die Basisklasse mit exception
   const T &operator() () const  { if (not m_obj) throw std::runtime_error("MobsUnion is empty"); return *m_obj; }
   /// \brief Überladenen Methode, die das gewünschte MobsUnion-Objekt \c name zuerst zu erzeugen versucht
-  virtual ObjectBase *getObjInfo(const std::string &name) { setType(name); return m_obj; }
+  ObjectBase *getObjInfo(const std::string &name) override { setType(name); return m_obj; }
   /// \private
-  virtual void doCopy(const ObjectBase &other);
+  void doCopy(const ObjectBase &other) override;
   /// \private
-  virtual void cleared() { if (m_obj) {delete m_obj; regObj(nullptr); }}
+  void cleared() final { if (m_obj) {delete m_obj; regObj(nullptr); } }
   
 private:
   T *m_obj = nullptr;
@@ -144,9 +146,9 @@ private:
 
 
 template <class T>
-void MobsUnion<T>::setType(std::string t) {
-  // hier mird als einziges ein neues Objekt erzeugt oder entfernt
-  // es muss immerm_obj mit ObjectBase.mlist synchron gehalten werden
+void MobsUnion<T>::setType(const std::string& t) {
+  // hier wird als einziges ein neues Objekt erzeugt oder entfernt
+  // es muss immer m_obj mit ObjectBase.mlist synchron gehalten werden
   if (t.empty()) {
     if (not m_obj)
       return;
@@ -165,7 +167,7 @@ void MobsUnion<T>::setType(std::string t) {
     if (not m_obj) {
       regObj(nullptr); // ObjectBase.mlist clear
       if (o) LOG(LM_WARNING, "MobsUnion::setType " << t << " is not a valid base class");
-      if (o) delete o;
+      delete o;
       clear(); // wegen null-handling, Achtung ruft hinterher cleared() auf
     }
     else

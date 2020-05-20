@@ -1,3 +1,4 @@
+#include <climits>
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
@@ -26,6 +27,7 @@
 #include <unordered_map>
 #include <map>
 #include <list>
+#include <utility>
 
 using namespace std;
 
@@ -35,7 +37,7 @@ namespace {
   class NOD {
     public:
       NOD(const string &/*objName*/, shared_ptr<NamedObject> obj) /* : name(objName)*/ {
-        ptr = obj;
+        ptr = std::move(obj);
       };
       //string name;
       shared_ptr<NamedObject> ptr;
@@ -46,10 +48,10 @@ namespace {
 class NOPData {
 public:
 //  NOPData() { TRACE(""); };
-  virtual ~NOPData() {};
-  virtual void assign(string objName, shared_ptr<NamedObject> obj) = 0;
-  virtual bool lookup(string objName, weak_ptr<NamedObject> &ptr) = 0;
-  virtual void search(std::string searchName, std::list<pair<std::string, std::weak_ptr<NamedObject>>> &result) = 0;
+  virtual ~NOPData() = default;;
+  virtual void assign(const string &objName, shared_ptr<NamedObject> obj) = 0;
+  virtual bool lookup(const string &objName, weak_ptr<NamedObject> &ptr) = 0;
+  virtual void search(const string &searchName, std::list<pair<std::string, std::weak_ptr<NamedObject>>> &result) = 0;
   virtual void clearUnlocked() = 0;
 
 };
@@ -60,16 +62,16 @@ public:
 class NOPDataMap : virtual public NOPData {
   public:
     NOPDataMap() { TRACE(""); };
-    ~NOPDataMap() { TRACE(""); clearUnlocked(); };
+    ~NOPDataMap() override { TRACE(""); NOPDataMap::clearUnlocked(); }
     map<string, NOD> pool;
-    void assign(string objName, shared_ptr<NamedObject> obj);
-    bool lookup(string objName, weak_ptr<NamedObject> &ptr);
-    void search(std::string searchName, std::list<pair<std::string, std::weak_ptr<NamedObject>>> &result);
-    void clearUnlocked();
+    void assign(const string &objName, shared_ptr<NamedObject> obj) override;
+    bool lookup(const string &objName, weak_ptr<NamedObject> &ptr) override;
+    void search(const string &searchName, std::list<pair<std::string, std::weak_ptr<NamedObject>>> &result) override;
+    void clearUnlocked() override;
 
 };
 
-void NOPDataMap::assign(string objName, shared_ptr<NamedObject> obj)
+void NOPDataMap::assign(const string &objName, shared_ptr<NamedObject> obj)
 {
   TRACE(PARAM(objName));
   auto search = pool.find(objName);
@@ -96,7 +98,7 @@ void NOPDataMap::assign(string objName, shared_ptr<NamedObject> obj)
   }
 }
 
-bool NOPDataMap::lookup(string objName, weak_ptr<NamedObject> &ptr)
+bool NOPDataMap::lookup(const string &objName, weak_ptr<NamedObject> &ptr)
 {
   TRACE(PARAM(objName));
   auto result = pool.find(objName);
@@ -106,7 +108,7 @@ bool NOPDataMap::lookup(string objName, weak_ptr<NamedObject> &ptr)
   return true;
 }
 
-void NOPDataMap::search(std::string searchName, std::list<pair<std::string, std::weak_ptr<NamedObject>>> &result)
+void NOPDataMap::search(const string &searchName, std::list<pair<std::string, std::weak_ptr<NamedObject>>> &result)
 {
   TRACE(PARAM(searchName));
   auto e = pool.upper_bound(searchName + "\177");
@@ -139,20 +141,22 @@ void NOPDataMap::clearUnlocked()
 //////////////////////////////////////////
 
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "UnusedStructInspection"
 class NOPDataUnordered : virtual public NOPData {
-  public:
-    NOPDataUnordered() { TRACE(""); };
-    ~NOPDataUnordered() { TRACE(""); clearUnlocked(); };
-    unordered_map<string, NOD> pool;
+public:
+  NOPDataUnordered() { TRACE(""); };
+  ~NOPDataUnordered() override { TRACE(""); NOPDataUnordered::clearUnlocked(); };
+  unordered_map<string, NOD> pool;
 //    map<string, NOD> pool;
-    void assign(string objName, shared_ptr<NamedObject> obj);
-    bool lookup(string objName, weak_ptr<NamedObject> &ptr);
-  void search(std::string searchName, std::list<pair<std::string, std::weak_ptr<NamedObject>>> &result);
-    void clearUnlocked();
+  void assign(const string &objName, shared_ptr<NamedObject> obj) override;
+  bool lookup(const string &objName, weak_ptr<NamedObject> &ptr) override;
+  void search(const string &searchName, std::list<pair<std::string, std::weak_ptr<NamedObject>>> &result) override;
+  void clearUnlocked() override;
+} __unused;
+#pragma clang diagnostic pop
 
-};
-
-void NOPDataUnordered::assign(string objName, shared_ptr<NamedObject> obj)
+void NOPDataUnordered::assign(const string &objName, shared_ptr<NamedObject> obj)
 {
   TRACE(PARAM(objName));
   auto search = pool.find(objName);
@@ -179,7 +183,7 @@ void NOPDataUnordered::assign(string objName, shared_ptr<NamedObject> obj)
   }
 }
 
-bool NOPDataUnordered::lookup(string objName, weak_ptr<NamedObject> &ptr)
+bool NOPDataUnordered::lookup(const string &objName, weak_ptr<NamedObject> &ptr)
 {
   TRACE(PARAM(objName));
   auto result = pool.find(objName);
@@ -189,7 +193,7 @@ bool NOPDataUnordered::lookup(string objName, weak_ptr<NamedObject> &ptr)
   return true;
 }
 
-void NOPDataUnordered::search(std::string searchName, std::list<pair<std::string, std::weak_ptr<NamedObject>>> &result)
+void NOPDataUnordered::search(const string &searchName, std::list<pair<std::string, std::weak_ptr<NamedObject>>> &result)
 {
   TRACE(PARAM(searchName));
   throw runtime_error(u8"function search not nimplemented");
@@ -230,24 +234,23 @@ NamedObjPool::~NamedObjPool()
 {
   TRACE("");
   delete data;
-  data = 0;
+  data = nullptr;
 }
 
-void NamedObjPool::assign(string objName, shared_ptr<NamedObject> obj)
+void NamedObjPool::assign(const string& objName, shared_ptr<NamedObject> obj)
 {
   TRACE(PARAM(objName));
-  return data->assign(objName, obj);
+  return data->assign(objName, std::move(obj));
 }
 
-bool NamedObjPool::lookup(string objName, weak_ptr<NamedObject> &ptr)
+bool NamedObjPool::lookup(const string &objName, weak_ptr<NamedObject> &ptr)
 {
   TRACE(PARAM(objName));
   return data->lookup(objName, ptr);
 }
 
-void NamedObjPool::search(std::string searchName, std::list<pair<std::string, std::weak_ptr<NamedObject>>> &result)
+void NamedObjPool::search(const string &searchName, std::list<pair<std::string, std::weak_ptr<NamedObject>>> &result)
 {
-  TRACE(PARAM(searchName));
   result.clear();
   data->search(searchName, result);
 }

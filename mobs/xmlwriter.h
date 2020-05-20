@@ -55,13 +55,13 @@ public:
   /// @param str zu beschreibender stream
   /// @param c Charset für die Ausgabe
   /// @param indent zum Abschalten von Einrückung und whitespace
-  XmlWriter(std::wostream &str, charset c = CS_utf8_bom, bool indent = true);
+  explicit XmlWriter(std::wostream &str, charset c = CS_utf8_bom, bool indent = true);
   /// Konstruktor bei Verwendung mit internen Buffer
   ///
   /// als Charsets sind nur UTF-8 ohne BOM und ISO* erlaubt
   /// \see getString
   /// \see clearString
-  XmlWriter(charset c = CS_utf8, bool indent = true);
+  explicit XmlWriter(charset c = CS_utf8, bool indent = true);
   ~XmlWriter();
   /// Schreibe XML-Header, bei Files auch BOM
   void writeHead();
@@ -92,7 +92,7 @@ public:
 
   std::wstring version = L"1.0"; ///< Version für Header
   bool standalone = true; ///< Angabe für Header
-  bool escapeControll = false; ///< ersetze Zeichen wie "\n" durch "&#xa;"
+  bool escapeControl = false; ///< ersetze Zeichen wie "\n" durch "&#xa;"
 
 private:
   XmlWriterData *data;

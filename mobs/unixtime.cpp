@@ -20,10 +20,7 @@
 
 
 #include "unixtime.h"
-#include "logging.h"
 
-
-#include <sstream>
 #include <iostream>
 #include <iomanip>
 
@@ -36,7 +33,7 @@ UxTime::UxTime(int year, int month, int day, int hour, int minute, int second) {
   // TODO checks
 //  if (year < 1900)
 //    throw std::runtime_error(u8"UxTime: year below 1900");
-  struct tm ts;
+  struct tm ts{};
   ts.tm_isdst = -1;
   ts.tm_year = year - 1900;
   ts.tm_mon = month-1;
@@ -48,46 +45,45 @@ UxTime::UxTime(int year, int month, int day, int hour, int minute, int second) {
   m_time = ::timelocal(&ts);
 }
 
-UxTime::UxTime(std::string s) {
-    struct tm ts;
-//    memset(&ts, 0, sizeof(struct tm));
-    ts.tm_isdst = -1;
-    const char *cp = s.c_str();
-    parseYear(ts.tm_year, cp);
-    parseChar('-', cp);
-    parseInt2(ts.tm_mon, cp);
-    ts.tm_mon -= 1;
-    parseChar('-', cp);
-    parseInt2(ts.tm_mday, cp);
-    if (*cp == ' ')
-      parseChar(' ', cp);
-    else
-      parseChar('T', cp);
-    parseInt2(ts.tm_hour, cp);
-    parseChar(':', cp);
-    parseInt2(ts.tm_min, cp);
-    parseChar(':', cp);
-    parseInt2(ts.tm_sec, cp);
-    ts.tm_gmtoff = 0;
+UxTime::UxTime(const std::string& s) {
+  struct tm ts{};
+  ts.tm_isdst = -1;
+  const char *cp = s.c_str();
+  parseYear(ts.tm_year, cp);
+  parseChar('-', cp);
+  parseInt2(ts.tm_mon, cp);
+  ts.tm_mon -= 1;
+  parseChar('-', cp);
+  parseInt2(ts.tm_mday, cp);
+  if (*cp == ' ')
+    parseChar(' ', cp);
+  else
+    parseChar('T', cp);
+  parseInt2(ts.tm_hour, cp);
+  parseChar(':', cp);
+  parseInt2(ts.tm_min, cp);
+  parseChar(':', cp);
+  parseInt2(ts.tm_sec, cp);
+  ts.tm_gmtoff = 0;
 
+  if (*cp)
+  {
+    long off;
+    parseOff(off, cp);
     if (*cp)
-    {
-      long off;
-      parseOff(off, cp);
-      if (*cp)
-        throw std::runtime_error(u8"extra characters at end");
-      m_time = ::timegm(&ts) + off;
-    }
-    else
-    {
-      cerr << "---" << endl;
-      m_time = ::timelocal(&ts);
-    }
+      throw std::runtime_error(u8"extra characters at end");
+    m_time = ::timegm(&ts) + off;
   }
+  else
+  {
+    cerr << "---" << endl;
+    m_time = ::timelocal(&ts);
+  }
+}
 
 
-std::string UxTime::toISO8601() const {
-  struct tm ts;
+  std::string UxTime::toISO8601() const {
+  struct tm ts{};
   ::localtime_r(&m_time, &ts);
 
   // 2007-04-05T12:30:00+02:00
@@ -164,11 +160,14 @@ template <> bool string2x(const std::string &str, UxTime &t)
   try {
     t = UxTime(str);
   }
-  catch (std::exception &x)
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "UnreachableCode"
+  catch (std::runtime_error &x)
   {
     std::cerr << x.what() << std::endl;
     return false;
   }
+#pragma clang diagnostic pop
   return true;
 }
 
@@ -185,7 +184,7 @@ template<> bool to_int64(UxTime t, int64_t &i, int64_t &min, uint64_t &max)
 template<> bool from_number(int64_t i, UxTime &t)
 {
   i /= 1000;
-  if (i >= 0 or i < std::numeric_limits<time_t>::max())
+  if (i > std::numeric_limits<time_t>::min() and i < std::numeric_limits<time_t>::max())
   {
     t = UxTime(i);
     return true;

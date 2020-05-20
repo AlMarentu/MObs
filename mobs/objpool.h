@@ -22,6 +22,8 @@
 /** \file objpool.h
 \brief Klassen für Object-Pool - benamte Objekte minimale in memory Datenbank oder Objekt-Cache  */
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "UnusedGlobalDeclarationInspection"
 #ifndef MOBS_OBJPOOL_H
 #define MOBS_OBJPOOL_H
 
@@ -36,9 +38,8 @@ namespace mobs {
 class NamedObject
 {
   public:
-    NamedObject() {};
 //    virtual std::string objName() const = 0;
-    virtual ~NamedObject() {};
+    virtual ~NamedObject() = default;;
     /// \private
     bool nOdestroyed() const { return not valid; };
     /// \private
@@ -55,11 +56,11 @@ public:
   NamedObjPool();
   ~NamedObjPool();
   /// \private
-  void assign(std::string objName, std::shared_ptr<NamedObject> obj);
+  void assign(const std::string &objName, std::shared_ptr<NamedObject> obj);
   /// \private
-  bool lookup(std::string objName, std::weak_ptr<NamedObject> &ptr);
+  bool lookup(const std::string &objName, std::weak_ptr<NamedObject> &ptr);
   /// \private
-  void search(std::string searchName, std::list<std::pair<std::string, std::weak_ptr<NamedObject>>> &result);
+  void search(const std::string &searchName, std::list<std::pair<std::string, std::weak_ptr<NamedObject>>> &result);
   /// Entfernt  Objekte die nicht in Verwendung sind \c shared_ptr<T>
   void clearUnlocked();
 private:
@@ -109,12 +110,14 @@ public:
   /// Konstruktor für eine Named Object
   /// @param nOPool Zeiger auf den zugehörigen Daten-Pool
   /// @param objName Name des Objektes unter dem es abgelegt werden soll
-    NamedObjRef(std::shared_ptr<NamedObjPool> nOPool, std::string objName) : pool(nOPool), name(objName) {
+    NamedObjRef(std::shared_ptr<NamedObjPool> nOPool, std::string objName) : pool(std::move(nOPool)), name(std::move(objName)) {
       pool->lookup(name, ptr);
     };
   /// \private
-    NamedObjRef(const std::shared_ptr<NamedObjPool> &nOPool, const std::string &objName, std::weak_ptr<NamedObject> &p) : pool(nOPool), name(objName), ptr(p) {};
-    ~NamedObjRef() {};
+    NamedObjRef(std::shared_ptr<NamedObjPool> nOPool, std::string objName, std::weak_ptr<NamedObject> &p) : pool(std::move(nOPool)), name(std::move(objName)), ptr(p) {};
+    ~NamedObjRef() = default;;
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "misc-unconventional-assign-operator"
   /// Zuweisung eines Objektes per C-Pointer
       T *operator=(T *t) {
       auto tmp = std::shared_ptr<T>(t);
@@ -122,6 +125,7 @@ public:
       ptr = tmp;
       return t;
     };
+#pragma clang diagnostic pop
   /// Erzeuge ein neues Objekt, überschreibt, falls bereits vorhanden
     std::shared_ptr<T> create() {
       auto tmp = std::make_shared<T>();
@@ -190,7 +194,7 @@ public:
   /// @param pool Zeiger auf Pool aus dem gesucht weden soll
   /// @param searchName Suchmuster
   /// \throws runtime_error falls Methode nicht implementiert (unordered pool)
-  void serchBeginsWith(std::shared_ptr<NamedObjPool> pool, std::string searchName) {
+  void serchBeginsWith(std::shared_ptr<NamedObjPool> pool, const std::string &searchName) {
     std::list<std::pair<std::string, std::weak_ptr<NamedObject>>> result;
     pool->search(searchName, result);
     this->clear();
@@ -202,3 +206,5 @@ public:
 }
 
 #endif
+
+#pragma clang diagnostic pop

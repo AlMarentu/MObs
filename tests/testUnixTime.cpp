@@ -48,10 +48,18 @@ TEST(dateTimeTest, einAusgabe) {
   UxTime t4(2004, 9, 17, 1, 59, 58);
   EXPECT_EQ(1095379198, t4.toUxTime());
 
+  EXPECT_ANY_THROW(UxTime("AAA"));
+
   UxTime t6(3402, 9, 17, 1, 59, 58);
   EXPECT_EQ(45211910398, t6.toUxTime());
   EXPECT_EQ("3402-09-17T01:59:58+02:00", t6.toISO8601());
 
+}
+
+TEST(dateTimeTest, string2x) {
+    UxTime t;
+    EXPECT_TRUE(string2x("2020-02-02T14:22:02+02:00", t));
+    EXPECT_FALSE(string2x("2ZZZ2T14:22:02+02:00", t));
 }
 
 TEST(dateTimeTest, timeBeforeEpochIsInvalid) {

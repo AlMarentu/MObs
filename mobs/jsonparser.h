@@ -42,12 +42,12 @@ concept JsonParser {
     void parse();
 
     // Callback Funktionen
-    void Key(const std::string &value);
-    void Value(const std::string &value, bool charType);
-    void StartArray();
-    void EndArray();
-    void StartObject();
-    void EndObject();
+    void Key(const std::string &value) override;
+    void Value(const std::string &value, bool charType) override;
+    void StartArray() override;
+    void EndArray() override;
+    void StartObject() override;
+    void EndObject() override;
  };
 \endcode
 */
@@ -61,10 +61,10 @@ public:
   /*! Generiere Parser-Objekt
    @param input JSON Text zum Parsen
    */
-  JsonParser(const std::string &input) : buffer(input) {
+  explicit JsonParser(const std::string &input) : buffer(input) {
     pos1 = pos2 = 0;
   };
-  virtual ~JsonParser() { };
+  virtual ~JsonParser() = default;;
   
   /** \brief Liefert JSON-Puffer und aktuelle Position für detaillierte Fehlermeldung
    @param pos Position des Fehlers im Json-Buffer
@@ -250,8 +250,8 @@ public:
     }
     if (not tags.empty())
       throw std::runtime_error(u8"unexpected EOF: missing " + std::string((tags.top() == '[' ? "]":"}")));
-    if (not expectDelimiter)
-      throw std::runtime_error(u8"unexpected EOF: missing " + std::string((tags.top() == '[' ? "]":"}")));
+//    if (expectDelimiter != ' ')
+//      throw std::runtime_error(u8"unexpected EOF: missing " + std::string((tags.top() == '[' ? "]":"}")));
     if (not expectEnd)
       throw std::runtime_error(u8"missing element");
   };
@@ -271,12 +271,11 @@ public:
     pos1 = pos2;
     return std::string(&buffer[p], pos2-p);
   };
-  /// Verwaltet den Zischenraum zwischen den <..Tags..>
-  void eat(char c) {
-    if (buffer[pos1] != c)
-      throw std::runtime_error(u8"Expected " + std::to_string(c) + " got " + std::to_string(buffer[pos1]));
-    pos1++;
-  };
+//  void eat(char c) {
+//    if (buffer[pos1] != c)
+//      throw std::runtime_error(u8"Expected " + std::to_string(c) + " got " + std::to_string(buffer[pos1]));
+//    pos1++;
+//  };
   void eat() { pos1++; };
   char peek() {
     if (pos1 >= buffer.length())

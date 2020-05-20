@@ -45,7 +45,7 @@ namespace mobs {
 class UxTime {
 public:
   /// Konstruktor über unix-Zeit \c time_t
-  UxTime(std::time_t t = -1) : m_time(t) {}
+  explicit UxTime(std::time_t t = -1) : m_time(t) {}
   /// \brief Konstruktor für lokale Zeit
   /// @param year  Jahr >= 1900
   /// @param month Monat 1..12
@@ -58,19 +58,19 @@ public:
   /// \brief Konstruktor als \c std::string, im Format ISO8601
   /// @param s Zeit im Format ISO8601 mit oder ohne Zeitoffset
   /// \throws std::runtime_error bei Fehler
-  UxTime(std::string s);
+  explicit UxTime(const std::string& s);
   /// Ausgabe der unix-zeit in \c time_t
   inline std::time_t toUxTime() const { return m_time; }
   /// Ausgabe der Zeit im Format ISO8601 als localtime mit Offset (2007-04-05T12:30:00+02:00)
   std::string toISO8601() const;
   /// liefert aktuelle Uhrzeit
-  static UxTime now() { return UxTime(time(0)); }
+  static UxTime now() { return UxTime(time(nullptr)); }
 private:
-  void parseChar(char c, const char *&cp);
-  int parseDigit(const char *&cp);
-  void parseInt2(int &i, const char *&cp);
-  void parseYear(int &y, const char *&cp);
-  void parseOff(long &i, const char *&cp);
+  static void parseChar(char c, const char *&cp);
+  static int parseDigit(const char *&cp);
+  static void parseInt2(int &i, const char *&cp);
+  static void parseYear(int &y, const char *&cp);
+  static void parseOff(long &i, const char *&cp);
   std::time_t m_time;
 };
 

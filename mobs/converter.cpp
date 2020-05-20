@@ -39,7 +39,7 @@ static const wchar_t inval = L'\u00bf';            //       INVERTED QUESTION MA
 static const wchar_t winval = L'\uFFFD';
 
 wchar_t to_iso_8859_1(wchar_t c) {
-  return (c & ~0xff) ? inval : c;
+  return (c < L'\u0000' or c > L'\u00ff') ? inval : c;
 }
 
 wchar_t to_iso_8859_9(wchar_t c) {
@@ -57,7 +57,7 @@ wchar_t to_iso_8859_9(wchar_t c) {
     case 0xFD:
     case 0xFE:
       return inval;
-    default: return (c & ~0xff) ? inval : c;
+    default: return (c < L'\u0000' or c > L'\u00ff') ? inval : c;
   }
 }
 
@@ -80,7 +80,7 @@ wchar_t to_iso_8859_15(wchar_t c) {
     case 0xBD:
     case 0xBE:
       return inval;
-    default: return (c & ~0xff) ? inval : c;
+    default: return (c < L'\u0000' or c > L'\u00ff') ? inval : c;
   }
 }
 
@@ -123,7 +123,7 @@ codec_iso8859_1::result codec_iso8859_1::do_out(mbstate_t& state,
 {
   for (; from != from_end and to != to_end; from++, to++)
   {
-    *to = to_iso_8859_1(*from);
+    *to = u_char(to_iso_8859_1(*from));
 //    cerr << to_string(*from);
   }
   to_next = to;
@@ -159,7 +159,7 @@ codec_iso8859_9::result codec_iso8859_9::do_out(mbstate_t& state,
 {
   for (; from != from_end and to != to_end; from++, to++)
   {
-    *to = to_iso_8859_9(*from);
+    *to = u_char(to_iso_8859_9(*from));
   }
   to_next = to;
   from_next = from;
@@ -193,7 +193,7 @@ codec_iso8859_15::result codec_iso8859_15::do_out(mbstate_t& state,
 {
   for (; from != from_end and to != to_end; from++, to++)
   {
-    *to = to_iso_8859_15(*from);
+    *to = u_char(to_iso_8859_15(*from));
   }
   to_next = to;
   from_next = from;
@@ -218,7 +218,7 @@ codec_iso8859_15::result codec_iso8859_15::do_in (state_type& state,
 }
 
 
-static vector<int> b64Chars = {
+static const vector<int> b64Chars = {
   -1, -1, -1, -1, -1, -1, -1, -1, -1, 99, 99, -1, 99, 99, -1, -1,
   -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
   99, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -283,11 +283,12 @@ void Base64Reader::done() {
     put('=');
 }
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "hicpp-signed-bitwise"
 void Base64Reader::put(wchar_t c) {
   int v = from_base64(c);
   if (v < 0) {
     if (c == '=') { // padding
-      v = 0;
       switch (b64Cnt) {
         case 3:
           base64.push_back(b64Value >> 10);
@@ -320,6 +321,7 @@ void Base64Reader::put(wchar_t c) {
     }
   }
 }
+#pragma clang diagnostic pop
 
 
 

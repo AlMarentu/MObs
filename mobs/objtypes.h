@@ -19,8 +19,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+
 #ifndef MOBS_OBJTYPES_H
 #define MOBS_OBJTYPES_H
+
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "UnusedGlobalDeclarationInspection"
 
 #include <string>
 #include <sstream>
@@ -84,7 +88,7 @@ std::string to_quote(const std::string &s);
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(std::string t) { return t; };
+inline std::string to_string(std::string t) { return t; }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
@@ -100,79 +104,79 @@ std::string to_string(std::wstring t);
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(char t) { return std::string() + t; };
+inline std::string to_string(char t) { return std::string() + t; }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(signed char t) { return to_string(char(t)); };
+inline std::string to_string(signed char t) { return to_string(char(t)); }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(unsigned char t) { return to_string(char(t)); };
+inline std::string to_string(unsigned char t) { return to_string(char(t)); }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(char16_t t) { return to_string(std::u16string() + t); };
+inline std::string to_string(char16_t t) { return to_string(std::u16string() + t); }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(char32_t t) { return to_string(std::u32string() + t); };
+inline std::string to_string(char32_t t) { return to_string(std::u32string() + t); }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(wchar_t t) { return to_string(std::wstring() + t); };
+inline std::string to_string(wchar_t t) { return to_string(std::wstring() + t); }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(int t) { return std::to_string(t); };
+inline std::string to_string(int t) { return std::to_string(t); }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(short int t) { return std::to_string(t); };
+inline std::string to_string(short int t) { return std::to_string(t); }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(long int t) { return std::to_string(t); };
+inline std::string to_string(long int t) { return std::to_string(t); }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(long long int t) { return std::to_string(t); };
+inline std::string to_string(long long int t) { return std::to_string(t); }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(unsigned int t) { return std::to_string(t); };
+inline std::string to_string(unsigned int t) { return std::to_string(t); }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(unsigned short int t) { return std::to_string(t); };
+inline std::string to_string(unsigned short int t) { return std::to_string(t); }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(unsigned long int t) { return std::to_string(t); };
+inline std::string to_string(unsigned long int t) { return std::to_string(t); }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(unsigned long long int t) { return std::to_string(t); };
+inline std::string to_string(unsigned long long int t) { return std::to_string(t); }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(bool t) { return t ? u8"true":u8"false"; };
+inline std::string to_string(bool t) { return t ? u8"true":u8"false"; }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(const char *t) { return to_string(std::string(t)); };
+inline std::string to_string(const char *t) { return to_string(std::string(t)); }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(const wchar_t *t) { return to_string(std::wstring(t)); };
+inline std::string to_string(const wchar_t *t) { return to_string(std::wstring(t)); }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(const char16_t *t) { return to_string(std::u16string(t)); };
+inline std::string to_string(const char16_t *t) { return to_string(std::u16string(t)); }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(const char32_t *t) { return to_string(std::u32string(t)); };
+inline std::string to_string(const char32_t *t) { return to_string(std::u32string(t)); }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
@@ -205,83 +209,83 @@ std::wstring to_wstring(const std::u16string &t);
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(std::wstring t) { return t; };
+inline std::wstring to_wstring(std::wstring t) { return t; }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(wchar_t t) { if (t < 0 or t > 0x10FFFF) return L"\uFFFD"; else return std::wstring() + t; };
+inline std::wstring to_wstring(wchar_t t) { if (t < 0 or t > 0x10FFFF) return L"\uFFFD"; else return std::wstring() + t; }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(char t) { return to_wstring(wchar_t(t)); };
+inline std::wstring to_wstring(char t) { return to_wstring(wchar_t(t)); }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(signed char t) { return to_wstring(wchar_t(t)); };
+inline std::wstring to_wstring(signed char t) { return to_wstring(wchar_t(t)); }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(unsigned char t) { return to_wstring(wchar_t(t)); };
+inline std::wstring to_wstring(unsigned char t) { return to_wstring(wchar_t(t)); }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(char16_t t) { return to_wstring(wchar_t(t)); };
+inline std::wstring to_wstring(char16_t t) { return to_wstring(wchar_t(t)); }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(char32_t t) { return to_wstring(wchar_t(t)); };
+inline std::wstring to_wstring(char32_t t) { return to_wstring(wchar_t(t)); }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(int t) { return std::to_wstring(t); };
+inline std::wstring to_wstring(int t) { return std::to_wstring(t); }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(short int t) { return std::to_wstring(t); };
+inline std::wstring to_wstring(short int t) { return std::to_wstring(t); }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(long int t) { return std::to_wstring(t); };
+inline std::wstring to_wstring(long int t) { return std::to_wstring(t); }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(long long int t) { return std::to_wstring(t); };
+inline std::wstring to_wstring(long long int t) { return std::to_wstring(t); }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(unsigned int t) { return std::to_wstring(t); };
+inline std::wstring to_wstring(unsigned int t) { return std::to_wstring(t); }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(unsigned short int t) { return std::to_wstring(t); };
+inline std::wstring to_wstring(unsigned short int t) { return std::to_wstring(t); }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(unsigned long int t) { return std::to_wstring(t); };
+inline std::wstring to_wstring(unsigned long int t) { return std::to_wstring(t); }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(unsigned long long int t) { return std::to_wstring(t); };
+inline std::wstring to_wstring(unsigned long long int t) { return std::to_wstring(t); }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(bool t) { return t ? L"true":L"false"; };
+inline std::wstring to_wstring(bool t) { return t ? L"true":L"false"; }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(const char *t) { return to_wstring(std::string(t)); };
+inline std::wstring to_wstring(const char *t) { return to_wstring(std::string(t)); }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(const wchar_t *t) { return std::wstring(t); };
+inline std::wstring to_wstring(const wchar_t *t) { return std::wstring(t); }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(const char16_t *t) { return to_wstring(std::u16string(t)); };
+inline std::wstring to_wstring(const char16_t *t) { return to_wstring(std::u16string(t)); }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(const char32_t *t) { return to_wstring(std::u32string(t)); };
+inline std::wstring to_wstring(const char32_t *t) { return to_wstring(std::u32string(t)); }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
@@ -300,7 +304,7 @@ std::wstring to_wstring(long double t);
 /// String-Konvertierung
 /// @param val Wert in utf8
 /// @return Wert als wstring
-//inline std::wstring to_wstring(T t) { return to_wstring(to_string(t)); };
+//inline std::wstring to_wstring(T t) { return to_wstring(to_string(t)); }
 
 /// \private
 //template <>
@@ -357,27 +361,27 @@ template <typename T>
 /// \brief prüft, ob der Typ T aus Text besteht - also zB. in JSON in Hochkommata steht
 inline bool mobschar(T) { return not std::numeric_limits<T>::is_specialized; }
 /// \private
-template <> inline bool mobschar(char) { return true; };
+template <> inline bool mobschar(char) { return true; }
 /// \private
-template <> inline bool mobschar(char16_t) { return true; };
+template <> inline bool mobschar(char16_t) { return true; }
 /// \private
-template <> inline bool mobschar(char32_t) { return true; };
+template <> inline bool mobschar(char32_t) { return true; }
 /// \private
-template <> inline bool mobschar(wchar_t) { return true; };
+template <> inline bool mobschar(wchar_t) { return true; }
 /// \private
-template <> inline bool mobschar(unsigned char) { return true; };
+template <> inline bool mobschar(unsigned char) { return true; }
 /// \private
-template <> inline bool mobschar(signed char) { return true; };
+template <> inline bool mobschar(signed char) { return true; }
 
 /// Hilfsklasse für Konvertierungsklasse
 class ConvToStrHint {
 public:
   ConvToStrHint() = delete;
-  /// Konstructor
+  /// Konstruktor
   /// @param print_compact führt bei einigen Typen zur vereinfachten Ausgabe
-  /// @param altNames verwende alternative Namen wenn VOrhanden
-  ConvToStrHint(bool print_compact, bool altNames = false) : comp(print_compact), altnam(altNames) {}
-  virtual ~ConvToStrHint() {}
+  /// @param altNames verwende alternative Namen wenn Vorhanden
+  explicit ConvToStrHint(bool print_compact, bool altNames = false) : comp(print_compact), altnam(altNames) {}
+  virtual ~ConvToStrHint() = default;
   /// \private
   virtual bool compact() const { return comp; }
   /// \private
@@ -397,13 +401,13 @@ protected:
 /// Hilfsklasse für Konvertierungsklasse - Basisklasse
 class ConvFromStrHint {
 public:
-  virtual ~ConvFromStrHint() {}
+  virtual ~ConvFromStrHint() = default;
   /// darf ein nicht-kompakter Wert als Eingabe fungieren
   virtual bool acceptExtented() const = 0;
   /// darf ein kompakter Wert als Eingabe fungieren
   virtual bool acceptCompact() const = 0;
 
-  /// Standard Konvertierungshinweis, kompake und erweiterte Eingaben sind erlaubt
+  /// Standard Konvertierungshinweis, kompakte und erweiterte Eingaben sind erlaubt
   static const ConvFromStrHint &convFromStrHintDflt;
   /// Konvertierungshinweis, der nur erweiterte Eingabe zulässt
   static const ConvFromStrHint &convFromStrHintExplizit;
@@ -455,13 +459,12 @@ class ConvObjFromStr : virtual public ConvFromStrHint {
 public:
   /// Enums für Behandlung NULL-Werte
   enum Nulls { ignore, omit, clear, force, except };
-  virtual ~ConvObjFromStr() {}
   /// Eingabe ist im XML-Format
   virtual bool acceptXml() const { return xml; }
   /// darf ein kompakter Wert als Eingabe fungieren
-  virtual bool acceptCompact() const { return compact; }
+  bool acceptCompact() const override { return compact; }
   /// darf ein nicht-kompakter Wert als Eingabe fungieren
-  virtual bool acceptExtented() const { return extented; };
+  bool acceptExtented() const override { return extented; };
   /// Verwende alternative Namen
   virtual bool acceptAltNames() const { return altNam; };
   /// Verwende original Namen
@@ -674,4 +677,7 @@ public:
 
 }
 
+#pragma clang diagnostic pop
+
 #endif
+
