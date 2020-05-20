@@ -622,6 +622,16 @@ ObjInit(ObjX);
   MemVector(MemVarType(std::string), d, ALTNAME(ludwig));
 };
 
+TEST(objgenTest, modified) {
+  ObjX x;
+  EXPECT_EQ("", x.to_string(mobs::ConvObjToString().exportModified()));
+  x.c(7);
+  x.o.ee(21);
+  EXPECT_EQ("{c:7,o:{ee:21}}", x.to_string(mobs::ConvObjToString().exportModified()));
+  x.clearModified();
+  EXPECT_EQ("", x.to_string(mobs::ConvObjToString().exportModified()));
+}
+
 TEST(objgenTest, conftoken) {
   ObjX o;
   EXPECT_EQ("grimoald", o.getConf(mobs::AltNameBase));

@@ -184,10 +184,10 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
  @param objname Name der Klasse (muss von ObjecBase abgeleitet sein)
  */
 #define ObjInit(objname, ...) \
-objname() : ObjectBase() { TRACE(""); std::vector<mobs::MemVarCfg> cv = { __VA_ARGS__ }; for (auto c:cv) doConfigObj(c); doInit(); init(); } \
+objname() : ObjectBase() { TRACE(""); std::vector<mobs::MemVarCfg> cv = { __VA_ARGS__ }; for (auto c:cv) doConfigObj(c); doInit(); init(); setModified(false); } \
 objname(const objname &that) : ObjectBase() { TRACE(""); doCopy(that); } \
-objname(mobs::MemBaseVector *m, mobs::ObjectBase *o, std::vector<mobs::MemVarCfg> cv = {}) : ObjectBase(m, o, cv) { TRACE(""); doInit(); init(); } \
-objname(std::string name, ObjectBase *t, std::vector<mobs::MemVarCfg> cv = {}) : ObjectBase(name, t, cv) { TRACE(PARAM(name) << PARAM(this)); if (t) t->regObj(this); doInit(); init(); } \
+objname(mobs::MemBaseVector *m, mobs::ObjectBase *o, std::vector<mobs::MemVarCfg> cv = {}) : ObjectBase(m, o, cv) { TRACE(""); doInit(); init(); setModified(false); } \
+objname(std::string name, ObjectBase *t, std::vector<mobs::MemVarCfg> cv = {}) : ObjectBase(name, t, cv) { TRACE(PARAM(name) << PARAM(this)); if (t) t->regObj(this); doInit(); init(); setModified(false); } \
 objname &operator=(const objname &rhs) { TRACE(""); if (this != &rhs) { doCopy(rhs); } return *this; } \
 static ObjectBase *createMe(ObjectBase *parent = nullptr) { return new objname(parent ? #objname:"", parent); } \
 virtual std::string typeName() const { return #objname; }
@@ -214,17 +214,22 @@ class ObjTravConst;
 class NullValue {
 public:
   /// Abfrage, ob eine Variable den Wet \c NULL hat (nur möglich, wenn \c nullAllowed gesetzt ist.
-  bool isNull() const { return m_null; };
+  bool isNull() const { return m_null; }
   /// Abfrage ob \c NULL -Werte erlaubt sind
-  void nullAllowed(bool on) { m_nullAllowed = on; };
+  void nullAllowed(bool on) { m_nullAllowed = on; }
   /// Abfrage ob für diese Variable Null-Werte erlaubt sind
-  bool nullAllowed() const { return m_nullAllowed; };
+  bool nullAllowed() const { return m_nullAllowed; }
+  /// Setzmethode für Modified-Flag
+  void setModified(bool m) { m_modified = m; }
+  /// Abfragemethode Modified-Flag
+  bool isModified() const { return m_modified; }
 protected:
   /// Setzmethode für Membevasriable ist \c NULL
-  void setNull(bool n) { m_null = n; } ;
+  void setNull(bool n) { m_null = n; m_modified = true; }
 private:
   bool m_null = false;
   bool m_nullAllowed = false;
+  bool m_modified = false;
 };
 
 class ObjectBase;
@@ -458,6 +463,8 @@ public:
   void forceNull() { clear(); setNull(true);}
   /// Setze Inhalt auf leer,
   void setEmpty() { clear(); setNull(false);}
+  /// lösche alle Modified-Flags
+  void clearModified();
   /// Setzt eine Variable mit dem angegebene Inhalt
   /// @param path Pfad der Variable z.B.: kontakt[3].number
   /// @param value Inhalt, der geschrieben werden soll
@@ -573,12 +580,13 @@ class Member : virtual public MemberBase, public C {
 public:
 //  /// Konstruktor für impliziten Cast
 //  Member(const T &t) : MemberBase("", nullptr) { TRACE(""); clear(); operator()(t); }  // Konstruktor Solo mit zZuweisung -> Cast
+//  /// \private
+//  Member() : MemberBase("", nullptr, {}) { TRACE(""); clear(); setModified(false); }  // Konstruktor Solo
+  Member() = delete;
   /// \private
-  Member(std::vector<MemVarCfg> cv = {}) : MemberBase("", nullptr, cv) { TRACE(""); clear(); }  // Konstruktor für Array oder Solo
+  Member(std::string n, ObjectBase *o, std::vector<MemVarCfg> cv) : MemberBase(n, o, cv), wert(T()) { TRACE(PARAM(n) << PARAM(this)); if (o) o->regMem(this); clear(); setModified(false); } // Konstruktor innerhalb  Objekt nur intern
   /// \private
-  Member(std::string n, ObjectBase *o, std::vector<MemVarCfg> cv) : MemberBase(n, o, cv), wert(T()) { TRACE(PARAM(n) << PARAM(this)); if (o) o->regMem(this); clear(); } // Konstruktor innerhalb  Objekt nur intern
-  /// \private
-  Member(MemBaseVector *m, ObjectBase *o, std::vector<MemVarCfg> cv = {}) : MemberBase(m, o, cv) {} // Konstruktor f. Objekt nur intern
+  Member(MemBaseVector *m, ObjectBase *o, std::vector<MemVarCfg> cv = {}) : MemberBase(m, o, cv) { setModified(false); } // Konstruktor f. Array nur intern
   /// \private
   Member(const Member &) = default; // für Zuweisung in MemVar-Macro, move constructor unnötig
   /// move constructor
@@ -752,12 +760,14 @@ void MemberVector<T>::resize(size_t s)
     for (size_t i = s; i < old; i++)
       delete werte[i];
     werte.resize(s);
+    activate();
   }
   else if (old < s)
   {
     werte.resize(s);
     for (size_t i = old; i < s; i++)
       werte[i] = new T(this, parent(), m_c);
+    activate();
   }
 }
 
@@ -948,6 +958,8 @@ inline std::string to_string(const ObjectBase &obj) { return obj.to_string(); };
 //std::wstring to_wstring(const ObjectBase &obj);
 /// Einlesen der Daten eines std::string in ein Objekt. Das Objekt muss vorher gelöscht werden, ansonsten wird es überschrieben
 void string2Obj(const std::string &str, ObjectBase &obj, ConvObjFromStr cfs = ConvObjFromStr());
+
+
 }
 
 #endif

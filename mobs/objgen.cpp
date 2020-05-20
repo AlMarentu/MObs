@@ -142,6 +142,19 @@ void ObjectBase::activate()
     m_parent->activate();
 }
 
+void ObjectBase::clearModified() {
+  class ClearModified  : virtual public ObjTrav {
+  public:
+    bool doObjBeg(ObjectBase &obj) { obj.setModified(false); return true; }
+    void doObjEnd(ObjectBase &obj) {  }
+    bool doArrayBeg(MemBaseVector &vec) { vec.setModified(false); return true; }
+    void doArrayEnd(MemBaseVector &vec) { }
+    void doMem(MemberBase &mem) { mem.setModified(false); }
+  };
+  ClearModified cm;
+  traverse(cm);
+}
+
 void ObjectBase::doConfig(MemVarCfg c)
 {
   switch(c) {
@@ -431,7 +444,7 @@ std::string ObjectBase::keyStr() const
 }
 
 /////////////////////////////////////////////////
-/// ObjectBae::doCopy
+/// ObjectBase::doCopy
 /////////////////////////////////////////////////
 class ConvFromStrHintDoCopy : virtual public ConvFromStrHint {
 public:
@@ -809,6 +822,8 @@ public:
   {
     if (obj.isNull() and cth.omitNull())
       return false;
+    if (not obj.isModified() and cth.modOnly())
+      return false;
     if (not fst)
       res << ",";
     newline();
@@ -843,6 +858,8 @@ public:
   {
     if (vec.isNull() and cth.omitNull())
       return false;
+    if (not vec.isModified() and cth.modOnly())
+      return false;
     if (not fst)
       res << ",";
     newline();
@@ -867,6 +884,8 @@ public:
   virtual void doMem(const MemberBase &mem)
   {
     if (mem.isNull() and cth.omitNull())
+      return;
+    if (not mem.isModified() and cth.modOnly())
       return;
     if (not fst)
       res << ",";

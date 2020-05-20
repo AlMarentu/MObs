@@ -422,6 +422,8 @@ public:
   bool withQuotes() const { return quotes; }
   /// \private
   bool omitNull() const { return onull; }
+  /// \private
+  bool modOnly() const { return modified; }
   /// Ausgabe als XML-Datei
   ConvObjToString exportXml() const { ConvObjToString c(*this); c.xml = true; return c; }
   /// Ausgabe als JSON
@@ -438,10 +440,13 @@ public:
   ConvObjToString exportExtendet() const { ConvObjToString c(*this); c.comp = false; return c; }
   /// Ausgabe von null-Werten überspringen
   ConvObjToString exportWoNull() const { ConvObjToString c(*this); c.onull = true; return c; }
+  /// Ausgabe von Elementen mit Modified-Flag
+  ConvObjToString exportModified() const { ConvObjToString c(*this); c.modified = true; return c; }
 private:
   bool xml = false;
   bool quotes = false;
   bool onull = false;
+  bool modified = false;
 
 };
 
