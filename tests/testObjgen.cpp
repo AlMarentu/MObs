@@ -1,3 +1,5 @@
+#pragma clang diagnostic push
+//#pragma ide diagnostic ignored "cert-err58-cpp"
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
@@ -21,7 +23,6 @@
 #include "objgen.h"
 #include "objgen.h"
 #include "jsonparser.h"
-#include "xmlout.h"
 
 #include <stdio.h>
 #include <sstream>
@@ -35,12 +36,12 @@ using namespace std;
 //namespace mobs {std::string to_string(enum device t);}
 
 
-MOBS_ENUM_DEF(device, fax, sms, mobil, privat, arbeit )
-MOBS_ENUM_VAL(device, "fax", "sms", "mobil", "privat", "arbeit" )
 
 
 namespace {
 
+MOBS_ENUM_DEF(device, fax, sms, mobil, privat, arbeit );
+MOBS_ENUM_VAL(device, "fax", "sms", "mobil", "privat", "arbeit" );
 
 
 class Kontakt : virtual public mobs::ObjectBase {
@@ -96,7 +97,7 @@ class Person : virtual public mobs::ObjectBase {
 
   void init() override {  };
 };
-ObjRegister(Person);
+ObjRegister(Person)
 
 //
 //class Info : virtual public mobs::ObjectBase {
@@ -434,7 +435,7 @@ class Rechnung : virtual public mobs::ObjectBase {
   MemVector(RechPos, position, USENULL USEVECNULL);
 
 };
-ObjRegister(Rechnung);
+ObjRegister(Rechnung)
 
 TEST(objgenTest, usenullAndIndent) {
   Rechnung rech;
@@ -541,19 +542,19 @@ class Obj2 : virtual public mobs::ObjectBase {
 
 class KeyDump : virtual public mobs::ObjTravConst {
 public:
-  KeyDump(const mobs::ConvObjToString &c) : quoteKeys(c.withQuotes() ? "\"":""), cth(c) { };
-  virtual bool doObjBeg(const mobs::ObjectBase &obj) {
+  explicit KeyDump(const mobs::ConvObjToString &c) : quoteKeys(c.withQuotes() ? "\"":""), cth(c) { };
+  bool doObjBeg(const mobs::ObjectBase &obj) override {
     if (not obj.name().empty())
       objNames.push(obj.getName(cth) + ".");
     return true;
   };
-  virtual void doObjEnd(const mobs::ObjectBase &obj) {
+  void doObjEnd(const mobs::ObjectBase &obj) override {
     if (not objNames.empty())
       objNames.pop();
   };
-  virtual bool doArrayBeg(const mobs::MemBaseVector &vec) { return false; }
-  virtual void doArrayEnd(const mobs::MemBaseVector &vec) { }
-  virtual void doMem(const mobs::MemberBase &mem) {
+  bool doArrayBeg(const mobs::MemBaseVector &vec) override { return false; }
+  void doArrayEnd(const mobs::MemBaseVector &vec) override { }
+  void doMem(const mobs::MemberBase &mem) override {
     std::string name;
     if (not objNames.empty())
       name = objNames.top();
@@ -608,12 +609,12 @@ TEST(objgenTest, keys) {
   o.oo.forceNull();
   EXPECT_EQ("id:1,oo.cc:null,oo.dd:null,oo.aa:null,yy:3", showKey(o));
 
-  // TODO test mit qouted string
+  // TODO test mit quoted string
 }
 
 class ObjX : virtual public mobs::ObjectBase {
 public:
-ObjInit(ObjX);
+ObjInit(ObjX, COLNAME(sonst));
   MemVar(int, id, KEYELEMENT1 ALTNAME(grimoald));
   MemVar(int, a, ALTNAME(pippin));
   MemVar(int, b, ALTNAME(karl));
@@ -645,7 +646,8 @@ TEST(objgenTest, conftoken) {
   EXPECT_EQ("", o.getConf(o.c.cAltName()));
   EXPECT_EQ("karlmann", o.getConf(o.o.cAltName()));
   EXPECT_EQ("ludwig", o.getConf(o.d.cAltName()));
-  
+  EXPECT_EQ("sonst", o.getConf(o.hasFeature(mobs::ColNameBase)));
+
   mobs::ConvToStrHint cth1(false, false);
   EXPECT_EQ("{id:0,a:0,b:0,c:0,o:null,d:[]}", o.to_string(mobs::ConvObjToString()));
   mobs::ConvToStrHint cth2(false, true);
@@ -779,3 +781,5 @@ TEST(objgenTest, compare) {
 
 }
 
+
+#pragma clang diagnostic pop

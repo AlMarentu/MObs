@@ -71,6 +71,7 @@ void logMessage(loglevel l, const std::string &message);
 #define LM_ERROR logging::lm_error  ///< Log-Level für Error
 
 #ifndef __FILE_NAME__
+/// \private
 #define __FILE_NAME__ __FILE__
 #endif
 

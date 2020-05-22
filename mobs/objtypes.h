@@ -45,31 +45,70 @@
  \brief Deklaration einses \c enum
  
  Im Beispiel wird ein enum direction {Dleft, Dright, Dup, Ddown};
- deklariert. Zusätzlich wird eine Konvertierungsklasse \c StrdirectionConv sowie 2 Hilfs-Arrays erzeugt.
+ deklariert. Zusätzlich wird eine Konvertierungsklasse \c directionStrEnumConv sowie eine weitere Hilfsklasse erzeugt.
  \code
- MOBS_ENUM_DEF(direction, Dleft, Dright, Dup, Ddown)
- MOBS_ENUM_VAL(direction, "left", "right", "up", "down")
+ MOBS_ENUM_DEF(direction, Dleft, Dright, Dup, Ddown);
+ MOBS_ENUM_VAL(direction, "left", "right", "up", "down");
  \endcode
+ Danach kann eine Variable
+ \code
+     MemMobsEnumVar(direction, d);
+ \endcode
+im Mobs-Objekt verwendet werden, mit Klartext-Namen arbeiten kann
 */
 #define MOBS_ENUM_DEF(typ, ... ) \
 enum typ { __VA_ARGS__ }; \
-namespace mobs { const std::vector<enum typ> mobsinternal_elements_##typ = { __VA_ARGS__ }; }
+class mobsEnum_##typ##_define { \
+public: \
+static size_t numOf(enum typ e) { \
+  static const std::vector<enum typ> v = { __VA_ARGS__ }; \
+  size_t pos = 0; \
+  for (auto i:v) \
+    if (i == e) \
+      return pos; \
+    else \
+      pos++; \
+  throw std::runtime_error("enum does not exist"); \
+} \
+static enum typ toEnum(size_t pos) { \
+  static const std::vector<enum typ> v = { __VA_ARGS__ }; \
+  if (pos >= v.size()) \
+    throw std::runtime_error("enum out of range"); \
+  return v[pos]; } \
+}
+
 /// Deklaration der Ausgabewerte zu einem \c MOBS_ENUM_DEF
 #define MOBS_ENUM_VAL(typ, ... ) \
-namespace mobs { \
-const std::vector<std::string> mobsinternal_text_##typ = { __VA_ARGS__ }; \
-std::string typ##_to_string(enum typ x) { size_t p = 0; for (auto const i:mobsinternal_elements_##typ) { if (i==x) { return mobsinternal_text_##typ.at(p); } p++;} throw std::runtime_error(#typ "to_string fails"); }; \
-bool string_to_##typ(std::string s, enum typ &x) { size_t p = 0; for (auto const &i:mobsinternal_text_##typ) { if (i==s) { x = mobsinternal_elements_##typ.at(p); return true; } p++;} return false; };  \
-class Str##typ##Conv : public ::mobs::StrConvBase { \
+class typ##StrEnumConv : public mobs::StrConvBase { \
 public: \
-  static inline bool c_string2x(const std::string &str, typ &t, const ::mobs::ConvFromStrHint &cfh) { if (cfh.acceptExtented()) { if (string_to_##typ(str, t)) return true; } \
-       if (not cfh.acceptCompact()) return false; int i; if (not ::mobs::string2x(str, i)) return false; t = typ(i); return true; } \
-  static inline bool c_wstring2x(const std::wstring &wstr, typ &t, const ::mobs::ConvFromStrHint &cfh) { return c_string2x(::mobs::to_string(wstr), t, cfh); } \
-  static inline std::string c_to_string(const typ &t, const ::mobs::ConvToStrHint &cth) { return cth.compact() ? ::mobs::to_string(int(t)) : typ##_to_string(t); } \
-  static inline std::wstring c_to_wstring(const typ &t, const ::mobs::ConvToStrHint &cth) { return cth.compact() ? std::to_wstring(int(t)) : ::mobs::to_wstring(typ##_to_string(t)); }; \
-  static inline bool c_is_chartype(const ::mobs::ConvToStrHint &cth) { return not cth.compact(); } \
-  static inline typ c_empty() { return mobsinternal_elements_##typ.front(); } \
-}; }
+  static std::string toStr(size_t pos) { \
+    static const std::vector<std::string> v = { __VA_ARGS__ }; \
+    if (pos >= v.size()) \
+      throw std::runtime_error("enum " #typ " out of range"); \
+    return v[pos]; } \
+  static size_t numOf(const std::string &s) { \
+    static const std::vector<std::string> v = { __VA_ARGS__ }; \
+    size_t pos = 0; \
+    for (auto i:v) \
+      if (i == s) \
+        return pos; \
+      else \
+        pos++; \
+    throw std::runtime_error("enum " #typ ": name does not exist"); \
+  } \
+  static enum typ fromStr(const std::string &s) { return mobsEnum_##typ##_define::toEnum(numOf(s)); } \
+  static std::string toStr(enum typ e) { return (toStr(mobsEnum_##typ##_define::numOf(e))); } \
+  static size_t numOf(enum typ e) { return mobsEnum_##typ##_define::toEnum(e); } \
+  static inline bool c_string2x(const std::string &str, typ &t, const mobs::ConvFromStrHint &cfh) { \
+    if (cfh.acceptExtented()) { try { t = fromStr(str); return true; } catch (...) { } } \
+    if (not cfh.acceptCompact()) return false; \
+    int i; if (not mobs::string2x(str, i)) return false; t = typ(i); return true; } \
+  static inline bool c_wstring2x(const std::wstring &wstr, typ &t, const mobs::ConvFromStrHint &cfh) { return c_string2x(mobs::to_string(wstr), t, cfh); } \
+  static inline std::string c_to_string(const typ &t, const mobs::ConvToStrHint &cth) { return cth.compact() ? mobs::to_string(int(t)) : toStr(t); } \
+  static inline std::wstring c_to_wstring(const typ &t, const mobs::ConvToStrHint &cth) { return cth.compact() ? mobs::to_wstring(int(t)) : mobs::to_wstring(toStr(t)); }; \
+  static inline bool c_is_chartype(const mobs::ConvToStrHint &cth) { return not cth.compact(); } \
+  static inline typ c_empty() { return mobsEnum_##typ##_define::toEnum(0); } \
+}
 
 
 namespace mobs {

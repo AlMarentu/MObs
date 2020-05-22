@@ -59,7 +59,7 @@ public:
 
   MemVar(int, aa);
   MemVar(int, bb);
-  virtual Obj0 &toObj0() { return *this; };
+  Obj0 &toObj0() override { return *this; };
 };
  // Objekt muss registriert werden
 ObjRegister(Obj0);
@@ -71,7 +71,7 @@ class Obj1 : virtual public BaseObj, virtual public mobs::ObjectBase {
   MemVar(int, i1,);
   MemVar(std::string, xx);
   MemObj(Obj0, oo, USENULL KEYELEMENT2);
-  virtual Obj1 &toObj1() { return *this; };
+  Obj1 &toObj1() override{ return *this; };
 };
 ObjRegister(Obj1);
 
@@ -81,7 +81,7 @@ class Obj2 : virtual BaseObj, virtual public mobs::ObjectBase {
   ObjInit(Obj2);
   MemVar(int, id);
   MemVar(int, xx);
-  virtual Obj2 &toObj2() { return *this; };
+  Obj2 &toObj2() override { return *this; };
 };
 ObjRegister(Obj2);
 

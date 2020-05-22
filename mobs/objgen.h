@@ -31,7 +31,7 @@
  
  Das Grundelement ist ein Objekt bestehend aus einer Klasse die von \c ObjectBase abgeleitet ist.
  Dieses Objekt kann wiederum verschiedene Objekte oder Variablen von Basistypen enthalten.
- Außderdem können auch Vektoren dieser beiden Typen existieren.
+ Zusätzlich können auch Vektoren dieser beiden Typen existieren.
  \code
  class Kontakt : virtual public mobs::ObjectBase {
  public:
@@ -76,10 +76,10 @@
  p.kontakt[3].number("+49 0000 00000");
  std::cout << p.adresse.ort() << " " << p.hobbies[2]();
  \endcode
- DIe Vectoren werden bei Zugriffen automatisch vergrößert, so dass eine Überprüfung entfallen kann.
+ Die Vektoren werden bei Zugriffen automatisch vergrößert, so dass eine Überprüfung entfallen kann.
  
  Zum Verarbeiten solcher Objekte gibt es verschiedene Methoden:
- \arg Rekursiver Durchlauf mit Hilfe einer Traversier-Klasse
+ \arg Rekursiver Durchlauf mit Hilfe einer Traverse-Klasse
  \arg Füllen über eine sequentiellen Pfad
  \see ObjTravConst
  \see ObjTrav
@@ -113,21 +113,21 @@ namespace mobs {
 
 /// Makro für Typ-Deklaration zu \c MemVar
 #define MemVarType(typ) mobs::Member<typ, mobs::StrConv<typ>>
-/*! \brief Deklarations-Makro für eine  Membervariable
+/*! \brief Deklarations-Makro für eine Membervariable
 @param typ Basistyp
 @param name Name
 */
 #define MemVar(typ, name, ...) MemVarType(typ) name = MemVarType(typ) (#name, this, { __VA_ARGS__ })
 /// Makro für Typ-Deklaration zu \c MemEnumVar
-#define MemEnumVarTyp(typ) mobs::Member<typ, mobs::StrIntConv<typ>>
-/*! \brief Deklarations-Makro für eine  Membervariable des Typs \c enum
+#define MemEnumVarTyp(typ) mobs::Member<typ, StrIntConv<typ>>
+/*! \brief Deklarations-Makro für eine Membervariable des Typs \c enum
 @param typ Basistyp
 @param name Name
 */
-#define MemEnumVar(typ, name, ...) MemEnumVarTyp(typ) name = MemEnumVarTyp(typ) (#name, this)
+#define MemEnumVar(typ, name, ...) MemEnumVarTyp(typ) name = MemEnumVarTyp(typ) (#name, this, { __VA_ARGS__ })
 /// Makro für Typ-Deklaration zu \c MemMobsEnumVar
-#define MemMobsEnumVarType(typ) mobs::Member<enum typ, mobs::Str##typ##Conv>
-/*! \brief Deklarations-Makro für eine  Membervariable eines mit \c MOBS_ENUM_DEF erzeugten enums
+#define MemMobsEnumVarType(typ) mobs::Member<enum typ, typ##StrEnumConv>
+/*! \brief Deklarations-Makro für eine Membervariable eines mit \c MOBS_ENUM_DEF erzeugten enums
 @param typ Name des enums (ohne Token: \c enum)
 @param name Name
 */
@@ -135,8 +135,8 @@ namespace mobs {
 
 /// Makro für Typ-Deklaration zu \c MemMobsVar
 #define MemMobsVarType(typ, converter) mobs::Member<typ, converter>
-/*! \brief Deklarations-Makro für eine  Membervariable eines mit \c MOBS_ENUM_DEF erzeugten enums
-@param typ Name des enums (ohne Tiken \c enum
+/*! \brief Deklarations-Makro für eine Membervariable eines mit \c MOBS_ENUM_DEF erzeugten enums
+@param typ Name des enums (ohne Token: \c enum
 @param name Name
 @param converter Konverter-Klasse von und nach \c std::string
 \see  ConvToStrHint
@@ -184,21 +184,23 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
  */
 #define MemObj(typ, name, ...) typ name = typ(#name, this, { __VA_ARGS__ })
 
-/*! \brief Makro für Definitionen im Objekt das von ObjectBase ist
+/*! \brief Makro für Definitionen im Objekt das von ObjectBase angeleitet ist
  @param objname Name der Klasse (muss von ObjectBase abgeleitet sein)
  */
 #define ObjInit(objname, ...) \
-objname(const objname &that) : ObjectBase() { TRACE(""); ObjectBase::doCopy(that); } \
+objname(const objname &that) : ObjectBase() { ObjectBase::doCopy(that); } \
 ObjInit1(objname, __VA_ARGS__ )
-
+/*! \brief Makro für Definitionen im Objekt das von ObjectBase abgeleitet ist ohne copy constructor
+ @param objname Name der Klasse (muss von ObjectBase abgeleitet sein)
+ */
 #define ObjInit1(objname, ...) \
-objname() : ObjectBase() { TRACE(""); std::vector<mobs::MemVarCfg> cv = { __VA_ARGS__ }; for (auto c:cv) doConfigObj(c); doInit(); objname::init(); setModified(false); } \
+objname() : ObjectBase() { std::vector<mobs::MemVarCfg> cv = { __VA_ARGS__ }; for (auto c:cv) doConfigObj(c); doInit(); objname::init(); setModified(false); } \
 objname(mobs::MemBaseVector *m, mobs::ObjectBase *o, const std::vector<mobs::MemVarCfg> &cv = {}) : ObjectBase(m, o, cv) \
-  { TRACE(""); doInit(); objname::init(); setModified(false); } \
+  { doInit(); objname::init(); setModified(false); } \
 objname(const std::string &name, ObjectBase *t, const std::vector<mobs::MemVarCfg> &cv) : ObjectBase(name, t, cv) \
-  { TRACE(PARAM(name) << PARAM(this)); if (t) t->regObj(this); doInit(); objname::init(); setModified(false); } \
-objname &operator=(const objname &rhs) { TRACE(""); if (this != &rhs) { doCopy(rhs); } return *this; } \
-static ObjectBase *createMe(ObjectBase *parent = nullptr) { return new objname(parent ? #objname:"", parent, { __VA_ARGS__ }); } \
+  { if (t) t->regObj(this); doInit(); objname::init(); setModified(false); } \
+objname &operator=(const objname &rhs) { if (this != &rhs) { doCopy(rhs); } return *this; } \
+static ObjectBase *createMe(ObjectBase *parent = nullptr) { if (parent) return new objname(#objname, parent, { }); else return new objname(); } \
 std::string typeName() const override { return #objname; }
 
 /*! \brief Makro um eine Objektklasse am Objekt-Generator anzumelden
@@ -405,6 +407,7 @@ public:
 class ObjectBase : public NullValue {
 public:
   ObjectBase() = default;
+  ObjectBase(const ObjectBase &that) = delete;
   /// \private
   ObjectBase(std::string n, ObjectBase *obj, const std::vector<MemVarCfg>& cv ) : m_varNam(std::move(n)), m_parent(obj) { for (auto c:cv) doConfig(c); } // Konstruktor for MemObj
   /// \private

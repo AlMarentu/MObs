@@ -6,32 +6,48 @@ Lizenz: LGPL
 
 ## Einführung
 
-Werden Programme komplexer, müssen Daten zwischen verschiedenen Schichten ausgetauscht, über Netzwerke übertragen oder in Datenbanken abgelegt werden.
-Für solche Serialisierungen von Daten-Stömen/-Objekten hat sich mittlerweile JSON oder XML als Standard etabliert.
+Werden Programme komplexer, müssen Daten zwischen verschiedenen Schichten ausgetauscht, über Netzwerke übertragen oder 
+in Datenbanken abgelegt werden.
+Für solche Serialisierungen von Daten-Strömen/-Objekten hat sich mittlerweile JSON oder XML als Standard etabliert.
+Zum Lesen bzw. Speichern in Datenbanken existieren verschiedene Mechanismen. So wird bei NO-SQL-Datenbanken idR.
+auf JSON zurückgegriffen, in SQL-Datenbanken wird eine tabellenartige Struktur verwendet.
 
-In C++-Programmen werden Strukturen jedoch idealerweise in Klassen abgelegt. Dadurch ergeben sich Typ-Sicherheit und Hirarchische Definitionen.
+In C++-Programmen werden Strukturen jedoch idealerweise in Klassen abgelegt. Dadurch ergeben sich Typ-Sicherheit und 
+hierarchische Definitionen.
 
-Mobs vereint hier eine Vereinfachung der Deklaration über Basisklassen und Definitionsmakros. So lässt sich sehr einfach eine Struktur abbilden, die dann entsprechend
-weiterverarbeitet werden kann. Die Mobs-Objekte lifern automatische Getter und Setter, Methoden zur Traversierung und Navigation sowie textbasierte Zugriffe auf die Elemente.
-Die Umwandlung der Objekte von und nach Text (JSON bzw. XML) sind ebenso vorhanden, wie die Definition von Schlüsselelementen alternativer Member-Namen sowie
-eine erweiterte behandlung von NULL-Werten.
+MObs versucht hier die typische C++-Klassenstruktur in die gewünschten Zielstrukturen abzubilden, indem
+- Datei Im- und Exportschnittstellen für XML (in den Zeichensätzen UTF-8, ISO8859-1,9,15, UTF1-6)
+- Konvertierroutinen von und nach JSON
+- Datenbankoperationen (MongoDb in Arbeit)
+angeboten werden.
 
-Als weieres Feature können enum-Werte im Klartext serialisiert weden um designunabhängig zu bleiben. Unterstützt werden alle gängigen C++ und STL Basistypen.
+Mobs vereint hier eine Vereinfachung der Deklaration über Basisklassen und Definitionsmakros. So lässt sich sehr einfach 
+eine Struktur abbilden, die dann entsprechend
+weiterverarbeitet werden kann. Die Mobs-Objekte liefern automatische Getter und Setter, Methoden zur Traversierung und 
+Navigation sowie textbasierte Zugriffe auf die Elemente.
 
-Erweitert werden dies Funktionen durch eine Klasse mit Benamten-Zeigern. Mobs-Objekte können in einen Daten-Pool abgelegt, und über einen Schlüsselwert wieder abgerufen werden.
+Weitere Features sind die
+- Behandlung von NULL-values
+- Möglichkeit der Definition von primär-Schlüsseln aus mehreren Elementen
+- Markierung von geänderten Elementen
+- Verwaltung von enum-Tags im Klartext
+- Ablage verschiedener Objekte in einer Liste (MobsUnion)
+ 
+Unterstützt werden alle gängigen C++ und STL Basistypen.
+
+Erweitert werden dies Funktionen durch eine Klasse mit benamten-Zeigern. 
+Mobs-Objekte können in einen Daten-Pool abgelegt, und über einen Schlüsselwert wieder abgerufen werden.
 So kann eine simple In-Memory Datenbank aufgebaut werden oder Objekt-Caches angelegt werden.
-
-Als zukünftige Erweiterung ist ein Datenbank-Interface geplant, um Mobs-Objekte in File-, und (NO-)SQL-Datenbanken zu speichern.
 
 
 ## MObs Objektdefinition
 
-Die Konstruktoren und nötigen Hilfsfunktionen weden über das Makro ObjInit(<class name>) ; erzeugt.
+Die Konstruktoren und nötigen Hilfsfunktionen werden über das Makro ObjInit(<class name>); erzeugt.
 
 Die Zugriffsmethoden für einfache Variablen erzeugt das Makro MemVar<type>, <variable name>);
 
 ~~~~~~~~~~cpp
-#include "objgen.h"
+#include "mobs/objgen.h"
 
 class Fahrzeug : virtual public mobs::ObjectBase
  {
@@ -43,7 +59,7 @@ class Fahrzeug : virtual public mobs::ObjectBase
 }
 ~~~~~~~~~~
 
-Der Zugriff auf die Variablen erfolgd dann über Getter und Setter-Methoden
+Der Zugriff auf die Variablen erfolgt dann über Getter und Setter-Methoden
 ~~~~~~~~~~cpp
 Fahrzeug f;
 f.fahrzeugTyp("PKW");
@@ -74,7 +90,7 @@ Als Basistypen für Variablen sid folgende erlaubt:
 * std::u16string
 * std::u32string
 
-Die Klasse UxTime steht als Wrapper für den typ time_t zur Verfügung, um Zeitpunkte in den Objekten verwenden zu können
+Die Klasse UxTime steht als Wrapper für den Typ time_t zur Verfügung, um Zeitpunkte in den Objekten verwenden zu können
 
 Zusätzlich können auch wieder MObs-Objekte als Member verwendet werden sowie Vektoren von diesen Elementen.
 
@@ -86,8 +102,8 @@ Dazu stehen die Makros
 * MemMobsEnumVar, MOBS_ENUM_DEF und MOBS_ENUM_VAL für enum-definitionen
 zur Verfügung
 ~~~~~~~~~~cpp
-MOBS_ENUM_DEF(device,  fax,   sms,   mobil,   privat,   arbeit )
-MOBS_ENUM_VAL(device, "fax", "sms", "mobil", "privat", "arbeit" )
+MOBS_ENUM_DEF(device,  fax,   sms,   mobil,   privat,   arbeit );
+MOBS_ENUM_VAL(device, "fax", "sms", "mobil", "privat", "arbeit" );
 
 class Kontakt : virtual public mobs::ObjectBase {
 public:
@@ -168,8 +184,8 @@ Dazu existiert eine Methode um beliebige Mobs-Objekte einer Basisiklasse in eine
 MobsUnions kann zur Laufzeit ausgetauscht werden.
 
 ### Null-Values
-Alle Elemente haben zusätliche Eigenschaften für NULL.
-Wurde eine Variable mit "USENULL" definiert, so wir sie standartmäßig mit null initialisiert.
+Alle Elemente haben zusätzliche Eigenschaften für NULL.
+Wurde eine Variable mit "USENULL" definiert, so wir sie standardmäßig mit null initialisiert.
 Dies kann zur Laufzeit über  nullAllowed(bool) angepasst werden. 
 Wird ein Objekt auf null gesetzt, werden alle Unterelemente ebenfalls gelöscht.
 Wird Unterelement eines null-Objektes beschrieben, so wird automatisch der null-Status aufgehoben
@@ -221,11 +237,11 @@ Bei der Serialisierung wird automatisch in Base64 gewandelt
 
 ### Traversierung
 Über einen Operator kann ein Objekt rekursiv durchlaufen werden
-Über Callback-Functions könen Aktionen bei
+Über Callback-Functions können Aktionen bei
 * Betreten eines Objektes
 * Verlassen eines Objektes
 * Betreten eines Vectors
-* Verlassen eines Vectos
+* Verlassen eines Vektos
 * Zugriff auf einen Basistyp
 ausgelöste werden.
 
@@ -234,7 +250,7 @@ ausgelöste werden.
 
 
 ## Objektverwaltung NamedPool
-Über ein extra Modul könen beliebige Objekte in einen Pool abgelegt werden. Der Zugriff erfogt nur
+Über ein extra Modul können beliebige Objekte in einen Pool abgelegt werden. Der Zugriff erfogt nur
 über den Objekt-Namen.
 
 Darüber lassen sich
@@ -242,26 +258,25 @@ Darüber lassen sich
 * Objekt-Referenzen,
 * On-Demand Datenbakkzugriffe
 * in-Memory Datenbanken
-usw. realiesieren
+usw. realisieren
 
 ## Installation
 Zum Übersetzen wird ein c++11 Compiler inkl. STL benötigt. Für die Test-Suite wird googletest benötigt
-Die Entwicklung efolgt mit clang version 11.0.3, sollte aber auch mit anderen Compilern funktionieren
+Die Entwicklung erfolgt mit clang version 11.0.3
 
-Das Makefile ist rudimentär und eine Installationsroutine fehlt noch. 
-
-Dies folgt in einer späteren Version
+Build und Installation erfolgen über cmake
 
 ## Module
 * objtypes.h Typ-Deklarationen
 * objgen.h  Deklaration um die Zielklassen zu generieren
-* union.h  Deklaration um ein MobsUnion zu generieren
+* union.h  Deklaration um variable Objekttypen analog Union zu generieren
+* converter.h	Hilfsklassen für codecs und base64
 * jsonparser.h  Einfacher JSON-Parser
 * xmlparser.h  Einfacher XML-Parser
-* xmlout.h  Klasse um  XML zu generieren
+* xmlread.h	Klasse um Objekte aus einen XML-String/File auszulesen
+* xmlwriter.h	Klasse zur Ausgabe von XML in Dateien oder als String in verschiedenen Zeichensätzen
+* xmlout.h  Klasse zur Ausgabe von Mobs-Objekte im XML-Format
 * objpool.h  Klassen für Named Objects 
-* logging.h Makros und Klassen für Logging und TRACING auf stderr 
-* unixtime.h Wrapper Klasse für Datum-Zeit auf basis von Unix-time_t
-
-
+* logging.h Makros und Klassen für Logging und Tracing auf stderr 
+* unixtime.h Wrapper Klasse für Datum-Zeit auf Basis von Unix-time_t
 

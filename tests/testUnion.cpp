@@ -64,7 +64,7 @@ public:
   MemVar(int, cc);
   MemVar(int, dd);
   MemVar(int, ee);
-  virtual Obj0 &toObj0() { return *this; };
+  Obj0 &toObj0() override { return *this; };
 };
 ObjRegister(Obj0);
 
@@ -75,7 +75,7 @@ class Obj1 : virtual public BaseObj, virtual public mobs::ObjectBase {
   MemVar(std::string, xx);
   MemVar(int, zz);
   MemObj(Obj0, oo, USENULL KEYELEMENT2);
-  virtual Obj1 &toObj1() { return *this; };
+  Obj1 &toObj1() override { return *this; };
 
 };
 ObjRegister(Obj1);
@@ -85,7 +85,7 @@ class Obj2 : virtual BaseObj, virtual public mobs::ObjectBase {
   ObjInit(Obj2);
   MemVar(int, id, KEYELEMENT1);
   MemVar(int, xx);
-  virtual Obj2 &toObj2() { return *this; };
+  Obj2 &toObj2() override { return *this; };
 };
 ObjRegister(Obj2);
 
@@ -175,4 +175,5 @@ TEST(unionTest, copy) {
 }
 
 }
+
 
