@@ -765,6 +765,45 @@ TEST(objgenTest, readxml2) {
 }
 
 
+  class ObjE1 : virtual public mobs::ObjectBase {
+  public:
+    ObjInit(ObjE1);
+
+    MemVar(int, aa);
+    MemVar(int, bb);
+    MemVar(int, cc);
+  };
+
+  class ObjE2 : virtual public mobs::ObjectBase {
+  public:
+    ObjInit(ObjE2);
+
+    MemVar(int, xx);
+    MemObj(ObjE1, yy);
+    MemVar(int, zz);
+  };
+
+  class ObjE3 : virtual public mobs::ObjectBase {
+  public:
+    ObjInit(ObjE3);
+
+    MemVar(int, xx);
+    MemObj(ObjE1, yy, EMBEDDED);
+    MemVar(int, zz);
+  };
+
+  TEST(objgenTest, embedded) {
+    ObjE2 e2;
+    ObjE3 e3;
+
+    EXPECT_NO_THROW(mobs::string2Obj("{xx:1,aa:2,bb:3,cc:4,zz:5}", e3, mobs::ConvObjFromStr().useExceptUnknown()));
+    EXPECT_EQ("{xx:1,aa:2,bb:3,cc:4,zz:5}", e3.to_string(mobs::ConvObjToString()));
+
+
+
+  }
+
+
 #if 0
 TEST(objgenTest, compare) {
   Person p;

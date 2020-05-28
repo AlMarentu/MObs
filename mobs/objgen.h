@@ -144,7 +144,7 @@ namespace mobs {
 #define MemMobsVar(typ, name, converter, ...) MemMobsVarType(typ, converter) name = MemMobsVarType(typ, converter) (#name, this, { __VA_ARGS__ })
 
 /// \private
-enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Key1, Key2, Key3, Key4, Key5, AltNameBase = 1000, AltNameEnd = 1999,
+enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Embedded, Key1, Key2, Key3, Key4, Key5, AltNameBase = 1000, AltNameEnd = 1999,
                  ColNameBase = 2000, ColNameEnd = 3999 };
 /// \private
 enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confToken, const std::string &s);
@@ -152,6 +152,7 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 #define USENULL mobs::InitialNull, ///< Element wir mit\c null vorinitialisiert
 #define USEVECNULL mobs::VectorNull, ///< Bei Vektoren wird der Vector selbst mit \c null vorinitialisiert
 #define XMLATTR mobs::XmlAsAttr, ///< Bei XML-Ausgabe als Attribute ausgeben (nur MemberVariable, nur von erstem Element fortlaufend)
+#define EMBEDDED mobs::Embedded, ///< Bei Ausgabe als Attribute/Traversierung werden die Member des Objektes direkt, auf ser selben Ebene, serialisiert
 #define KEYELEMENT1 mobs::Key1, ///<  Schlüsselelement der Priorität 1 (erstes Element)
 #define KEYELEMENT2 mobs::Key2, ///< Schlüsselelement der Priorität 2
 #define KEYELEMENT3 mobs::Key3, ///< Schlüsselelement der Priorität 3
@@ -330,7 +331,9 @@ private:
 // ------------------ VectorBase ------------------
 
 
-/// \brief Basisklasse für Vectoren auf Membervariablen oder Objekten innerhalb von von \c ObjectBase angeleiteten Klasse; Bitte als Makro MemVarVector oder MemVector verwenden
+/// \brief Basisklasse für Vektoren auf Membervariablen oder Objekten innerhalb von von \c ObjectBase angeleiteten Klasse
+///
+/// Bitte als Makro MemVarVector oder MemVector verwenden
 /// \see MemVarVector
 /// \see MemVector
 class MemBaseVector : public NullValue {
@@ -882,8 +885,10 @@ public:
    @param index optonal: Index bei Vectoren; ansosnten wir der Vector um ein Element erweitert
    @return liefert false, wenn das Element nicht existiert
 
-   Ist das Element  eine Variable, so Kann über \c member darauf zugegriffen werden. Bei Objekten wird in die neue Objektebene gesprungen. Im Falle von Arrays wird ein neues Element angehängt.
-      Sind entsprechnde Objekte nicht vorhanden, wird trotzdem die Struktur verfolgt und bei Rückkehr in die entsprechende Eben die Bearbeitung wieder aufgenommen.
+   Ist das Element  eine Variable, so Kann über \c member darauf zugegriffen werden. Bei Objekten wird in die neue
+   Objektebene gesprungen. Im Falle von Arrays wird ein neues Element angehängt.
+   Sind entsprechende Objekte nicht vorhanden, wird trotzdem die Struktur verfolgt und bei Rückkehr in die entsprechende
+   Eben die Bearbeitung wieder aufgenommen.
 
    Wird \c MemBaseVector::next übergeben wird automposatisch erweitert; bei \c SIZE_T_MAX  wird  der Vector selbst betrachtet -> memVec
    */

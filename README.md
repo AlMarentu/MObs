@@ -1,5 +1,5 @@
 #  MObs
-Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
+Bibliothek für serialisierbare C++-Objekte zur Übergabe oder zum Speichern in Datenbanken
 
 [MObs GitHub](https://github.com/AlMarentu/MObs)
 Lizenz: LGPL
@@ -18,7 +18,7 @@ hierarchische Definitionen.
 MObs versucht hier die typische C++-Klassenstruktur in die gewünschten Zielstrukturen abzubilden, indem
 - Datei Im- und Exportschnittstellen für XML (in den Zeichensätzen UTF-8, ISO8859-1,9,15, UTF1-6)
 - Konvertierroutinen von und nach JSON
-- Datenbankoperationen (MongoDb in Arbeit)
+- Datenbankoperationen (MongoDb[^1] bzw. MariaDb[^1] in Arbeit)
 angeboten werden.
 
 Mobs vereint hier eine Vereinfachung der Deklaration über Basisklassen und Definitionsmakros. So lässt sich sehr einfach 
@@ -164,6 +164,9 @@ class Obj1 : virtual public mobs::ObjectBase {
   MemObj(Obj0, oo, USENULL KEYELEMENT2);
 };
 ~~~~~~~~~~
+Über das Token EMBEDDED bei einer Objektvariable werden alle Elemente dieser beim Serialisieren flach, also auf der Ebene 
+der Variable selbst eingebunden.
+
 
 ## Features
 ### Basisklasse
@@ -280,3 +283,6 @@ Build und Installation erfolgen über cmake
 * logging.h Makros und Klassen für Logging und Tracing auf stderr 
 * unixtime.h Wrapper Klasse für Datum-Zeit auf Basis von Unix-time_t
 
+
+
+[^1]: MongoDb und MariaDB sind eingetragene Markenzeichen der jeweiligen Firmen

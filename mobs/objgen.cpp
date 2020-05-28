@@ -45,6 +45,7 @@ void MemberBase::doConfig(MemVarCfg c)
 {
   switch(c) {
     case Unset: break;
+    case Embedded: break;
     case InitialNull: nullAllowed(true); break;
     case Key1 ... Key5: m_key = c - Key1 + 1; break;
     case AltNameBase ... AltNameEnd: m_altName = c; break;
@@ -102,6 +103,7 @@ void MemBaseVector::doConfig(MemVarCfg c)
 {
   switch(c) {
     case Unset: break;
+    case Embedded: break;
     case XmlAsAttr: break;
     case VectorNull: nullAllowed(true); break;
     case Key1 ... Key5: break;
@@ -164,6 +166,7 @@ void ObjectBase::doConfig(MemVarCfg c)
   switch(c) {
     case Unset: break;
     case XmlAsAttr: break;
+    case Embedded: m_config.push_back(c); break;
     case InitialNull: nullAllowed(true); break;
     case Key1 ... Key5: m_key = c - Key1 + 1; break;
     case AltNameBase ... AltNameEnd: m_altName = c; break;
@@ -177,6 +180,7 @@ void ObjectBase::doConfigObj(MemVarCfg c)
   switch(c) {
     case Unset: break;
     case XmlAsAttr: break;
+    case Embedded: break;
     case InitialNull: nullAllowed(true); break;
     case Key1 ... Key5: break;
     case AltNameBase ... AltNameEnd: break;
@@ -219,6 +223,8 @@ void ObjectBase::regObj(ObjectBase *obj)
 {
   if (obj == nullptr) // used by MobsUnion
     mlist.clear();
+  else if (obj->hasFeature(Embedded))
+    mlist.splice(mlist.end(), obj->mlist);
   else
     mlist.emplace_back(nullptr, obj, nullptr);
 }
