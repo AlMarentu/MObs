@@ -367,12 +367,12 @@ TEST(objgenTest, Pointer) {
   EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", ip->to_string(mobs::ConvObjToString().exportCompact()));
 
   // Test ob Objekte nativ zurückgegeben werden und keine Kopien
-  EXPECT_EQ(&ip->kontakte, ip->getVecInfo("kontakte"));
+  EXPECT_EQ(&ip->kontakte, ip->getVecInfo("kontakte", mobs::ConvObjFromStr()));
   EXPECT_EQ(&ip->kontakte[3], dynamic_cast<Kontakt *>(ip->kontakte.getObjInfo(3)));
   EXPECT_EQ(static_cast<mobs::ObjectBase *>(&ip->kontakte[3]), ip->kontakte.getObjInfo(3));
   EXPECT_EQ(ip, dynamic_cast<mobs::ObjectBase *>(ip));
-  EXPECT_EQ(&ip->kontakte[0].number, (dynamic_cast<MemVarType(string) *>(ip->kontakte[0].getMemInfo("number"))));
-  EXPECT_EQ(&ip->kontakte[1].art, (dynamic_cast<MemMobsEnumVarType(device) *>(ip->kontakte[1].getMemInfo("art"))));
+  EXPECT_EQ(&ip->kontakte[0].number, (dynamic_cast<MemVarType(string) *>(ip->kontakte[0].getMemInfo("number", mobs::ConvObjFromStr()))));
+  EXPECT_EQ(&ip->kontakte[1].art, (dynamic_cast<MemMobsEnumVarType(device) *>(ip->kontakte[1].getMemInfo("art", mobs::ConvObjFromStr()))));
 //  cerr << typeid(&ip->kontakte[0].number).name() << endl;
 //  cerr << typeid(ip->kontakte[0].getMemInfo("number")).name() << endl;
 }
@@ -765,43 +765,67 @@ TEST(objgenTest, readxml2) {
 }
 
 
-  class ObjE1 : virtual public mobs::ObjectBase {
-  public:
-    ObjInit(ObjE1);
+class ObjE1 : virtual public mobs::ObjectBase {
+public:
+  ObjInit(ObjE1);
 
-    MemVar(int, aa);
-    MemVar(int, bb);
-    MemVar(int, cc);
-  };
+  MemVar(int, aa);
+  MemVar(int, bb, ALTNAME(bu));
+  MemVar(int, cc);
+};
 
-  class ObjE2 : virtual public mobs::ObjectBase {
-  public:
-    ObjInit(ObjE2);
+class ObjE2 : virtual public mobs::ObjectBase {
+public:
+  ObjInit(ObjE2);
 
-    MemVar(int, xx);
-    MemObj(ObjE1, yy);
-    MemVar(int, zz);
-  };
+  MemVar(int, xx);
+  MemObj(ObjE1, yy, EMBEDDED PREFIX(a_));
+  MemVar(int, aa);
+  MemObj(ObjE1, ww, PREFIX(b_));
 
-  class ObjE3 : virtual public mobs::ObjectBase {
-  public:
-    ObjInit(ObjE3);
+};
 
-    MemVar(int, xx);
-    MemObj(ObjE1, yy, EMBEDDED);
-    MemVar(int, zz);
-  };
+class ObjE3 : virtual public mobs::ObjectBase {
+public:
+  ObjInit(ObjE3);
 
-  TEST(objgenTest, embedded) {
-    ObjE2 e2;
-    ObjE3 e3;
-
-    EXPECT_NO_THROW(mobs::string2Obj("{xx:1,aa:2,bb:3,cc:4,zz:5}", e3, mobs::ConvObjFromStr().useExceptUnknown()));
-    EXPECT_EQ("{xx:1,aa:2,bb:3,cc:4,zz:5}", e3.to_string(mobs::ConvObjToString()));
+  MemVar(int, xx);
+  MemObj(ObjE1, yy, EMBEDDED);
+  MemVar(int, zz);
+};
 
 
+TEST(objgenTest, embedded) {
+  ObjE2 e2;
+  ObjE3 e3;
 
-  }
+  EXPECT_NO_THROW(mobs::string2Obj("{xx:1,aa:2,bb:3,cc:4,zz:5}", e3, mobs::ConvObjFromStr().useExceptUnknown()));
+  EXPECT_EQ("{xx:1,aa:2,bb:3,cc:4,zz:5}", e3.to_string(mobs::ConvObjToString()));
+
+  EXPECT_EQ("{xx:0,a_aa:0,a_bb:0,a_cc:0,aa:0,ww:{b_aa:0,b_bb:0,b_cc:0}}", e2.to_string(mobs::ConvObjToString().exportPrefix()));
+  EXPECT_EQ("{xx:0,a_aa:0,a_bb:0,a_cc:0,aa:0,ww:{aa:0,bb:0,cc:0}}", e2.to_string(mobs::ConvObjToString()));
+  EXPECT_NO_THROW(mobs::string2Obj("{xx:1,a_aa:2,a_bu:3,a_cc:4,aa:5,ww:{aa:0,bb:0,cc:0}}", e2, mobs::ConvObjFromStr().useAutoNames().useExceptUnknown()));
+
+}
+
+class ObjE4 : virtual public mobs::ObjectBase {
+public:
+  ObjInit(ObjE4);
+
+  MemVar(int, Xx);
+  MemVar(int, zz);
+};
+
+
+TEST(objgenTest, ignoreCase) {
+  ObjE4 e4;
+
+  EXPECT_ANY_THROW(mobs::string2Obj("{xx:1,zz:2}", e4, mobs::ConvObjFromStr().useExceptUnknown()));
+  EXPECT_NO_THROW(mobs::string2Obj("{xx:1,zz:2}", e4, mobs::ConvObjFromStr().useExceptUnknown().useIgnoreCase()));
+  EXPECT_EQ("{xx:1,zz:2}", e4.to_string(mobs::ConvObjToString().exportLowercase()));
+
+}
+
 
 
 #if 0

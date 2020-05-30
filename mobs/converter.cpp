@@ -25,9 +25,7 @@
 
 
 #include <sstream>
-#include <iostream>
 #include <vector>
-//include <iomanip>
 
 
 using namespace std;
@@ -184,12 +182,12 @@ codec_iso8859_9::result codec_iso8859_9::do_in (state_type& state,
 }
 
 codec_iso8859_15::result codec_iso8859_15::do_out(mbstate_t& state,
-                                                const wchar_t* from,
-                                                const wchar_t* from_end,
-                                                const wchar_t*& from_next,
-                                                char* to,
-                                                char* to_end,
-                                                char*& to_next) const
+                                                  const wchar_t* from,
+                                                  const wchar_t* from_end,
+                                                  const wchar_t*& from_next,
+                                                  char* to,
+                                                  char* to_end,
+                                                  char*& to_next) const
 {
   for (; from != from_end and to != to_end; from++, to++)
   {
@@ -201,12 +199,12 @@ codec_iso8859_15::result codec_iso8859_15::do_out(mbstate_t& state,
 }
 
 codec_iso8859_15::result codec_iso8859_15::do_in (state_type& state,
-                                                const char* from,
-                                                const char* from_end,
-                                                const char*& from_next,
-                                                wchar_t* to,
-                                                wchar_t* to_end,
-                                                wchar_t*& to_next) const
+                                                  const char* from,
+                                                  const char* from_end,
+                                                  const char*& from_next,
+                                                  wchar_t* to,
+                                                  wchar_t* to_end,
+                                                  wchar_t*& to_next) const
 {
   for (; from != from_end and to != to_end; from++, to++)
   {
@@ -218,20 +216,20 @@ codec_iso8859_15::result codec_iso8859_15::do_in (state_type& state,
 }
 
 
-static const vector<int> b64Chars = {
-  -1, -1, -1, -1, -1, -1, -1, -1, -1, 99, 99, -1, 99, 99, -1, -1,
-  -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-  99, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-  52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1, -1, -1, -1, -1, -1,
-  -1,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14,
-  15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, -1, -1, -1, -1, -1,
-  -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
-  41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, -1, -1, -1, -1, -1 };
+
 
 int from_base64(wchar_t c) {
   if (c < 0 or c > 127)
     return -1;
-
+  static const vector<int> b64Chars = {
+          -1, -1, -1, -1, -1, -1, -1, -1, -1, 99, 99, -1, 99, 99, -1, -1,
+          -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+          99, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+          52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1, -1, -1, -1, -1, -1,
+          -1,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14,
+          15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, -1, -1, -1, -1, -1,
+          -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
+          41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, -1, -1, -1, -1, -1 };
   return b64Chars[c];
 }
 
@@ -261,14 +259,58 @@ wchar_t from_html_tag(const std::wstring &tok)
   else if (tok[0] == L'#') {
     size_t p;
     try {
-    int i = std::stoi(mobs::to_string(tok.substr(tok[1] == 'x' ? 2:1)), &p, tok[1] == 'x' ? 16:10);
-    if (p == tok.length() - (tok[1] == 'x' ? 2:1) and
-        (i == 9 or i == 10 or i == 13 or (i >= 32 and i <= 0xD7FF) or
-        (i >= 0xE000 and i <= 0xFFFD) or (i >= 0x10000 and i <= 0x10FFFF)))
-      c = i;
+      int i = std::stoi(mobs::to_string(tok.substr(tok[1] == 'x' ? 2:1)), &p, tok[1] == 'x' ? 16:10);
+      if (p == tok.length() - (tok[1] == 'x' ? 2:1) and
+          (i == 9 or i == 10 or i == 13 or (i >= 32 and i <= 0xD7FF) or
+           (i >= 0xE000 and i <= 0xFFFD) or (i >= 0x10000 and i <= 0x10FFFF)))
+        c = i;
     } catch (...) {}
   }
   return c;
+}
+
+std::wstring toLower(const std::wstring &tx) {
+  std::locale loc;
+  try {
+    const char *cp = getenv("LANG");
+    if (cp)
+      loc = std::locale(cp);
+    else
+      loc = std::locale("de_DE.UTF-8");
+  } catch (...) {
+    loc = std::locale();
+  }
+  LOG(LM_DEBUG, "LOCALE = " << loc.name());
+  wstring lo;
+  lo.reserve(tx.length());
+  std::transform(tx.begin(), tx.end(), std::back_inserter(lo), [loc](const wchar_t c) { return std::tolower(c, loc);} );
+  return lo;
+}
+
+std::wstring toUpper(const std::wstring &tx) {
+  std::locale loc;
+  try {
+    const char *cp = getenv("LANG");
+    if (cp)
+      loc = std::locale(cp);
+    else
+      loc = std::locale("de_DE.UTF-8");
+  } catch (...) {
+    loc = std::locale();
+  }
+  LOG(LM_DEBUG, "LOCALE = " << loc.name());
+  wstring lo;
+  lo.reserve(tx.length());
+  std::transform(tx.begin(), tx.end(), std::back_inserter(lo), [loc](const wchar_t c) { return std::toupper(c, loc);} );
+  return lo;
+}
+
+std::string toLower(const string &tx) {
+  return mobs::to_string(mobs::toLower(mobs::to_wstring(tx)));
+}
+
+std::string toUpper(const string &tx) {
+  return mobs::to_string(mobs::toUpper(mobs::to_wstring(tx)));
 }
 
 
@@ -363,5 +405,6 @@ std::wstring StrConv<std::vector<u_char>>::c_to_wstring(const std::vector<u_char
   copy_base64(t.cbegin(), t.cend(), std::back_inserter(u), cts.withIndentation() ? "\n  ":"");
   return u;
 }
+
 
 }

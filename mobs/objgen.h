@@ -144,8 +144,8 @@ namespace mobs {
 #define MemMobsVar(typ, name, converter, ...) MemMobsVarType(typ, converter) name = MemMobsVarType(typ, converter) (#name, this, { __VA_ARGS__ })
 
 /// \private
-enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Embedded, Key1, Key2, Key3, Key4, Key5, AltNameBase = 1000, AltNameEnd = 1999,
-                 ColNameBase = 2000, ColNameEnd = 3999 };
+enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Embedded, Key1, Key2, Key3, Key4, Key5, AltNameBase = 1000,
+                 AltNameEnd = 1999, ColNameBase = 2000, ColNameEnd = 3999, PrefixBase = 4000, PrefixEnd = 4999 };
 /// \private
 enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confToken, const std::string &s);
 
@@ -160,6 +160,7 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 #define KEYELEMENT5 mobs::Key5, ///< Schlüsselelement der Priorität 5
 #define ALTNAME(name) ::mobs::mobsToken(::mobs::AltNameBase,m_confToken,#name), ///< Definition eines Alternativen Namens für die Ein-/Ausgabe
 #define COLNAME(name) ::mobs::mobsToken(::mobs::ColNameBase,m_confToken,#name), ///< Definition eines Alternativen Namens für den Collection-Namen (oder Tabellennamen) der Datenbank
+#define PREFIX(name) ::mobs::mobsToken(::mobs::PrefixBase,m_confToken,#name), ///< Definition eines Prefix für den Export-Namen, wenn in eine flache Struktur exportiert wird \see EMBEDDED
 
 
 
@@ -257,6 +258,7 @@ protected:
   /// \private
   MemberBase(mobs::MemBaseVector *m, mobs::ObjectBase *o, const std::vector<MemVarCfg>& cv) : m_name(""), m_parent(o), m_parVec(m) { for (auto c:cv) doConfig(c); }
 public:
+  friend class ObjectBase;
   virtual ~MemberBase() = default;
   /// Abfrage des Namen der Membervariablen
   std::string name() const { return m_name; }
@@ -271,8 +273,6 @@ public:
   virtual std::string toStr(const ConvToStrHint &) const  = 0;
   /// Ausgabe des Inhalts als \c std::wstring
   virtual std::wstring toWstr(const ConvToStrHint &) const  = 0;
-  /// Abfrage ob der Basistyp vom typ \c  std::is_specialized  ist; \see \<limits>
-  virtual bool is_specialized() const  = 0;
   /// Abfrage, ob der Inhalt textbasiert ist (zb. in JSON in Hochkommata gesetzt wird)
   virtual bool is_chartype(const ConvToStrHint &) const = 0;
   /// Versuch, die  Variable aus einem \c std::string im Format UTF-8 einzulesen
@@ -338,6 +338,7 @@ private:
 /// \see MemVector
 class MemBaseVector : public NullValue {
 public:
+  friend class ObjectBase;
   /// Konstatnte, die auf das nächste Element eines MenBaseVectors verweist, das dann automatisch erzeugt wird
   static const size_t nextpos = INT_MAX;
   /// \private
@@ -450,27 +451,28 @@ public:
   /// \brief Abfrage ob Unterobjekt ein Key-Element enthält
   /// @return Position im Schlüssel oder \c 0 wenn kein Schlüsselelement
   int key() const { return m_key; }
-  /// liefert ???  TODO
-  MemberBase &get(const std::string& name);
   /// Suche eine Membervariable
   /// @param name Name der zu suchenden Variable
+  /// @param cfh Konvertierung Hinweise
   /// @return Zeiger auf Objekt \c Memberbase oder \c nullptr
-  MemberBase *getMemInfo(const std::string &name);
+  MemberBase *getMemInfo(const std::string &name, const ConvObjFromStr &cfh);
   /// Suche eine Member-Objekt
   /// @param name Name des zu suchenden Objektes
+  /// @param cfh Konvertierung Hinweise
   /// @return Zeiger auf Objekt \c ObjectBase oder \c nullptr
-  virtual ObjectBase *getObjInfo(const std::string &name);
+  virtual ObjectBase *getObjInfo(const std::string &name, const ConvObjFromStr &cfh);
   /// Suche einen Vector von Membervariablen oder Objekten
   /// @param name Name der zu suchenden Variable
+  /// @param cfh Konvertierung Hinweise
   /// @return Zeiger auf Objekt \c MemBaseVector oder \c nullptr
-  MemBaseVector *getVecInfo(const std::string &name);
+  MemBaseVector *getVecInfo(const std::string &name, const ConvObjFromStr &cfh);
 
   /// \private
   static void regObject(std::string n, ObjectBase *fun(ObjectBase *)) noexcept;
   /// \brief Erzeuge ein neues Objekt
   /// @param name Typname des Objektes
   /// @param parent  Zeiger auf Parent des Objektes, immer \c nullptr, wird nur intern verwendet
-  /// @return Zeiger auf das erzeugte Objekt oder \c nullptr falls ein solches Objekt nicht refgistriert wurde \see ObjRegister(name)
+  /// @return Zeiger auf das erzeugte Objekt oder \c nullptr falls ein solches Objekt nicht registriert wurde \see ObjRegister(name)
   static ObjectBase *createObj(const std::string& name, ObjectBase *parent = nullptr);
   /// Setze Inhalt auf leer, d.h. alle Vektoren sowie Unterobjekte und Varieblen werden gelöscht,
   void clear();
@@ -506,15 +508,6 @@ public:
   /// Ausgabe als \c std::string (Json)
   std::string to_string(const ConvObjToString& cft = ConvObjToString()) const;
 
-
-  /// \private
-  std::list<MemVarCfg> findConfToken(MemVarCfg base, const std::string &name, ConvObjFromStr &cfh) const;
-  /// \private
-  MemberBase *getMemInfo(size_t ctok) const;
-  /// \private
-  ObjectBase *getObjInfo(size_t ctok) const;
-  /// \private
-  MemBaseVector *getVecInfo(size_t ctok) const;
 
 
 protected:
@@ -630,8 +623,6 @@ public:
   std::string toStr(const ConvToStrHint &cth) const override { return this->c_to_string(wert, cth); }
   /// Abfragemethode mit Ausgabe als \c std::wstring
   std::wstring toWstr(const ConvToStrHint &cth) const override { return this->c_to_wstring(wert, cth); }
-  /// Abfrage, ob der Inhalt textbasiert ist (zb. in JSON in Hochkommata gesetzt wird)
-  bool is_specialized() const override { return this->c_is_specialized(); }  // TODO weg?
   /// Abfrage, ob der Inhalt textbasiert ist (zb. in JSON in Hochkommata gesetzt wird)
   bool is_chartype(const ConvToStrHint &cth) const override { return this->c_is_chartype(cth); }
   /// Einlesen der Variable aus einem \c std::string im Format UTF-8

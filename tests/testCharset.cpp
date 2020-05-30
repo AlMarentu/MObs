@@ -20,6 +20,7 @@
 
 
 #include "objgen.h"
+#include "converter.h"
 #include "xmlout.h"
 #include "xmlwriter.h"
 #include "xmlread.h"
@@ -179,7 +180,7 @@ TEST(parserTest, charsetUtf8) {
   EXPECT_EQ("€Mähr", person.name());
 }
 
-TEST(parserTest, charsetUtf8bom) {
+TEST(charsetTest, charsetUtf8bom) {
   Person p;
   p.name("€Mähr");
   wofstream xout("pt.xml", ios::trunc);
@@ -208,7 +209,7 @@ TEST(parserTest, charsetUtf8bom) {
 
 }
 
-TEST(parserTest, charsetUtf16le) {
+TEST(charsetTest, charsetUtf16le) {
   Person p;
   p.name("€Mähr");
   wofstream xout("pt.xml", ios::trunc);
@@ -238,7 +239,7 @@ TEST(parserTest, charsetUtf16le) {
   
 }
 
-TEST(parserTest, charsetUtf16be) {
+TEST(charsetTest, charsetUtf16be) {
   Person p;
   p.name("€Mähr");
   wofstream xout("pt.xml", ios::trunc);
@@ -268,7 +269,7 @@ TEST(parserTest, charsetUtf16be) {
   
 }
 
-TEST(parserTest, charsetStrIso1) {
+TEST(charsetTest, charsetStrIso1) {
   Person p;
   p.name("Mähr");
   XmlWriter xf(mobs::XmlWriter::CS_iso8859_1, false);
@@ -283,7 +284,7 @@ TEST(parserTest, charsetStrIso1) {
 
 }
 
-TEST(parserTest, charsetStrIso9) {
+TEST(charsetTest, charsetStrIso9) {
   Person p;
   p.name("Mähr\u015F");
   XmlWriter xf(mobs::XmlWriter::CS_iso8859_9, false);
@@ -298,7 +299,7 @@ TEST(parserTest, charsetStrIso9) {
 
 }
 
-TEST(parserTest, charsetStrIso15) {
+TEST(charsetTest, charsetStrIso15) {
   Person p;
   p.name("€Mähr");
   XmlWriter xf(mobs::XmlWriter::CS_iso8859_15, false);
@@ -313,7 +314,7 @@ TEST(parserTest, charsetStrIso15) {
 
 }
 
-TEST(parserTest, charsetStrUtf8) {
+TEST(charsetTest, charsetStrUtf8) {
   Person p;
   p.name("€Mähr");
   XmlWriter xf(mobs::XmlWriter::CS_utf8, false);
@@ -331,7 +332,13 @@ TEST(parserTest, charsetStrUtf8) {
   EXPECT_EQ("€Mähr", person.name());
 }
 
+TEST(charsetTest, upperLower) {
+  EXPECT_EQ(wstring(L"möèt"), mobs::toLower(L"MÖÈT"));
+  EXPECT_EQ(wstring(L"MÖÈT"), mobs::toUpper(L"möèt"));
+  EXPECT_EQ(string(u8"möètßa"), mobs::toLower(u8"MÖÈTßa"));
+  EXPECT_EQ(string(u8"MÖÈTAß"), mobs::toUpper(u8"möètAß"));
 
+}
 
 }
 

@@ -23,10 +23,10 @@
 #include "objgen.h"
 #include "xmlout.h"
 #include "xmlwriter.h"
+#include "converter.h"
 #include <map>
 
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "UnusedGlobalDeclarationInspection"
+
 using namespace std;
 
 namespace mobs {
@@ -50,6 +50,7 @@ void MemberBase::doConfig(MemVarCfg c)
     case Key1 ... Key5: m_key = c - Key1 + 1; break;
     case AltNameBase ... AltNameEnd: m_altName = c; break;
     case ColNameBase ... ColNameEnd: break;
+    case PrefixBase ... PrefixEnd: break;
     case XmlAsAttr: m_config.push_back(c); break;
     case VectorNull: break;
   }
@@ -84,12 +85,28 @@ void MemberBase::activate()
     m_parent->activate();
 }
 
-std::string MemberBase::getName(const ConvToStrHint &cth) const {
-  MemVarCfg n = m_parent and cth.useAltNames() ? m_altName : Unset;
-  return (n == Unset) ? name() : m_parent->getConf(n);
+static std::string getNameAll(const mobs::ObjectBase *parent, const std::string &name,  MemVarCfg altName, const ConvToStrHint &cth)
+{
+  MemVarCfg n = parent and cth.useAltNames() ? altName : Unset;
+  std::string tmp;
+  if (parent and ((cth.usePrefix() and (n or not parent->hasFeature(Embedded))) or
+                  (n and parent->hasFeature(Embedded)))) {
+    MemVarCfg p = parent->hasFeature(PrefixBase);
+    if (p and parent->parent())
+      tmp = parent->parent()->getConf(p);
+  }
+  tmp += ((n == Unset) ? name : parent->getConf(n));
+  if (cth.toLowercase()) {
+    wstring tx = to_wstring(tmp);
+    return to_string(mobs::toLower(tx));
+  }
+  return tmp;
 }
 
 
+std::string MemberBase::getName(const ConvToStrHint &cth) const {
+  return getNameAll(m_parent, name(), m_altName, cth);
+}
 
 
 void MemBaseVector::activate()
@@ -109,9 +126,10 @@ void MemBaseVector::doConfig(MemVarCfg c)
     case Key1 ... Key5: break;
     case AltNameBase ... AltNameEnd: m_altName = c; break;
     case ColNameBase ... ColNameEnd: break;
+    case PrefixBase ... PrefixEnd: break;
     case InitialNull: m_c.push_back(c); break;
   }
-  
+
 }
 
 MemVarCfg MemBaseVector::hasFeature(MemVarCfg c) const
@@ -123,8 +141,7 @@ MemVarCfg MemBaseVector::hasFeature(MemVarCfg c) const
 }
 
 std::string MemBaseVector::getName(const ConvToStrHint &cth) const {
-  MemVarCfg n = m_parent and cth.useAltNames() ? m_altName : Unset;
-  return (n == Unset) ? name() : m_parent->getConf(n);
+  return getNameAll(m_parent, name(), m_altName, cth);
 }
 
 
@@ -133,8 +150,7 @@ std::string MemBaseVector::getName(const ConvToStrHint &cth) const {
 /////////////////////////////////////////////////
 
 std::string ObjectBase::getName(const ConvToStrHint &cth) const {
-  MemVarCfg n = m_parent and cth.useAltNames() ? m_altName : Unset;
-  return (n == Unset) ? name() : m_parent->getConf(n);
+  return getNameAll(m_parent, name(), m_altName, cth);
 }
 
 
@@ -166,6 +182,7 @@ void ObjectBase::doConfig(MemVarCfg c)
   switch(c) {
     case Unset: break;
     case XmlAsAttr: break;
+    case PrefixBase ... PrefixEnd:
     case Embedded: m_config.push_back(c); break;
     case InitialNull: nullAllowed(true); break;
     case Key1 ... Key5: m_key = c - Key1 + 1; break;
@@ -184,6 +201,7 @@ void ObjectBase::doConfigObj(MemVarCfg c)
     case InitialNull: nullAllowed(true); break;
     case Key1 ... Key5: break;
     case AltNameBase ... AltNameEnd: break;
+    case PrefixBase ... PrefixEnd: break;
     case ColNameBase ... ColNameEnd: m_config.push_back(c); break;
     case VectorNull: break;
   }
@@ -196,6 +214,7 @@ const std::string &ObjectBase::getConf(MemVarCfg c) const
   switch(c) {
     case AltNameBase ... AltNameEnd: i = c - AltNameBase; break;
     case ColNameBase ... ColNameEnd: i = c - ColNameBase; break;
+    case PrefixBase ... PrefixEnd: i = c - PrefixBase; break;
     default: return x;
   }
   if (i < m_confToken.size())
@@ -208,7 +227,11 @@ MemVarCfg ObjectBase::hasFeature(MemVarCfg c) const
   for (auto i:m_config) {
     if (i == c)
       return i;
+    else if (c == AltNameBase and i >= AltNameBase and i <= AltNameEnd)
+      return i;
     else if (c == ColNameBase and i >= ColNameBase and i <= ColNameEnd)
+      return i;
+    else if (c == PrefixBase and i >= PrefixBase and i <= PrefixEnd)
       return i;
   }
   return Unset;
@@ -223,9 +246,20 @@ void ObjectBase::regObj(ObjectBase *obj)
 {
   if (obj == nullptr) // used by MobsUnion
     mlist.clear();
-  else if (obj->hasFeature(Embedded))
+  else if (obj->hasFeature(Embedded)) {
+    // Objekt-Prefix auf Membernamen übertragen
+    MemVarCfg pfx = obj->hasFeature(PrefixBase);
+    if (pfx and obj->parent()) {
+      string prefix = obj->parent()->getConf(pfx);
+
+      for (auto &m:obj->mlist) {
+        if (m.obj) m.obj->m_varNam.insert(0, prefix);
+        if (m.vec) m.vec->m_name.insert(0, prefix);
+        if (m.mem) m.mem->m_name.insert(0, prefix);
+      }
+    }
     mlist.splice(mlist.end(), obj->mlist);
-  else
+  } else
     mlist.emplace_back(nullptr, obj, nullptr);
 }
 
@@ -241,7 +275,7 @@ void ObjectBase::regObject(string n, ObjectBase *fun(ObjectBase *)) noexcept
 {
   if (ObjectBase_Reg_createMap == nullptr)
     ObjectBase_Reg_createMap = new map<string, ObjectBase *(*)(ObjectBase *)>;
-  
+
   ObjectBase_Reg_createMap->insert(make_pair(n, fun));
 }
 
@@ -255,99 +289,46 @@ ObjectBase *ObjectBase::createObj(const string& n, ObjectBase *p)
   return (*it).second(p);
 }
 
-MemberBase *ObjectBase::getMemInfo(const std::string &name)
+ObjectBase *ObjectBase::getObjInfo(const std::string &name, const ConvObjFromStr &cfh)
 {
-  for (auto i:mlist)
-  {
-    if (i.mem and name == i.mem->name())
-      return i.mem;
-  }
-  return nullptr;
-}
-
-ObjectBase *ObjectBase::getObjInfo(const std::string &name)
-{
-  for (auto i:mlist)
-  {
-    if (i.obj and name == i.obj->name())
+  for (auto i:mlist) {
+    if (not i.obj) continue;
+    if ((cfh.acceptOriNames() and name == i.obj->getName(ConvToStrHint(false, false, false, cfh.caseinsesitive()))) or
+        (cfh.acceptAltNames() and name == i.obj->getName(ConvToStrHint(false, true, false, cfh.caseinsesitive()))))
       return i.obj;
   }
   return nullptr;
 }
 
-MemBaseVector *ObjectBase::getVecInfo(const std::string &name)
+MemBaseVector *ObjectBase::getVecInfo(const std::string &name, const ConvObjFromStr &cfh)
 {
-  for (auto i:mlist)
-  {
-    if (i.vec and name == i.vec->name())
+  for (auto i:mlist) {
+    if (not i.vec) continue;
+    if ((cfh.acceptOriNames() and name == i.vec->getName(ConvToStrHint(false, false, false, cfh.caseinsesitive()))) or
+        (cfh.acceptAltNames() and name == i.vec->getName(ConvToStrHint(false, true, false, cfh.caseinsesitive()))))
       return i.vec;
   }
   return nullptr;
 }
 
-std::list<MemVarCfg> ObjectBase::findConfToken(MemVarCfg base, const std::string &name, ConvObjFromStr &cfh) const
+MemberBase *ObjectBase::getMemInfo(const std::string &name, const ConvObjFromStr &cfh)
 {
-  list<MemVarCfg> result;
-  int pos = 0;
-  for (auto &i:m_confToken) {
-    if (i == name)
-      result.push_back(MemVarCfg(base + pos));
-    pos++;
-  }
-  return result;
-}
-
-MemberBase *ObjectBase::getMemInfo(size_t ctok) const
-{
-  for (auto i:mlist)
-  {
-    if (i.mem and ctok == i.mem->cAltName())
+  for (auto i:mlist) {
+    if (not i.mem) continue;
+    if ((cfh.acceptOriNames() and name == i.mem->getName(ConvToStrHint(false, false, false, cfh.caseinsesitive()))) or
+        (cfh.acceptAltNames() and name == i.mem->getName(ConvToStrHint(false, true, false, cfh.caseinsesitive()))))
       return i.mem;
   }
   return nullptr;
 }
 
-ObjectBase *ObjectBase::getObjInfo(size_t ctok) const
-{
-//  if (ctok == SIZE_T_MAX) // MobsUnion-object
-//  {
-//    if (mlist.size() == 1)
-//      return mlist.front().obj;
-//  }
-//  else
-    for (auto i:mlist)
-    {
-      if (i.obj and ctok == i.obj->cAltName())
-        return i.obj;
-    }
-  return nullptr;
-}
 
-MemBaseVector *ObjectBase::getVecInfo(size_t ctok) const
-{
-  for (auto i:mlist)
-  {
-    if (i.vec and ctok == i.vec->cAltName())
-      return i.vec;
-  }
-  return nullptr;
-}
-
-MemberBase &ObjectBase::get(const string& name)
-{
-  for (auto m:mlist)
-  {
-    if (m.mem && name == m.mem->name())
-      return *m.mem;
-  }
-  throw runtime_error(u8"ObjectBase::get: element not found");
-}
 
 
 void ObjectBase::traverse(ObjTravConst &trav) const
 {
   bool inNull = trav.inNull;
-  
+
   if (trav.doObjBeg(*this))
   {
     size_t arrayIndex = trav.arrayIndex;
@@ -502,7 +483,7 @@ void ObjectBase::doCopy(const ObjectBase &other)
     src++;
   }
   if (src != other.mlist.end())
-      throw runtime_error(u8"ObjectBase::doCopy: invalid Element (num2)");
+    throw runtime_error(u8"ObjectBase::doCopy: invalid Element (num2)");
 }
 
 /////////////////////////////////////////////////
@@ -542,7 +523,7 @@ bool ObjectBase::setVariable(const std::string &path, const std::string &value) 
   MemberBase *m = on.member();
   if (not m)
     return false;
-  
+
   return m->fromStr(value, ConvFromStrHint::convFromStrHintDflt);
 }
 
@@ -552,16 +533,16 @@ std::string ObjectBase::getVariable(const std::string &path, bool *found, bool c
   on.pushObject(*const_cast<ObjectBase *>(this));
   if (found)
     *found = false;
-  
+
   if (not on.find(path))
     return std::string();
   MemberBase *m = on.member();
   if (not m)
     return std::string();
-  
+
   if (found)
     *found = true;
-  
+
   return m->toStr(ConvToStrHint(compact));
 }
 
@@ -664,37 +645,29 @@ bool ObjectNavigator::setNull() {
   }
   return false;
 }
-  
+
 bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
   TRACE(PARAM(element) << PARAM(index));
 //  LOG(LM_INFO, "enter " << element << " " << index)
   path.push(element);
-  
+
   if (objekte.empty())
     throw std::runtime_error(u8"ObjectNavigator: Fatal: no object");
-  
+
   if (memBase)  // War bereits im Member -> als Dummy-Objekt tarnen
     objekte.push(ObjectNavigator::Objekt(nullptr, memName));
-  
+
   memVec = nullptr;
   memName = objekte.top().objName;
   memBase = nullptr;
-  list<MemVarCfg> altNamTok; // alle Config-Ids die zum Namen passen
 //  LOG(LM_DEBUG, "Im Object " << memName);
+  std::string elementFind = element;
+  if (cfs.caseinsesitive())
+    elementFind = mobs::toLower(element);
   if (objekte.top().obj)
   {
-    if (cfs.acceptAltNames())
-      altNamTok = objekte.top().obj->findConfToken(AltNameBase, element, cfs);
-    MemBaseVector *v = nullptr;
-    for (auto c:altNamTok)
-      if ((v = objekte.top().obj->getVecInfo(c)))
-        break;
-    if (v == nullptr)
-    {
-      v = objekte.top().obj->getVecInfo(element);
-      if (v and not cfs.acceptOriNames() and v->cAltName() != Unset)
-        v = nullptr;
-    }
+    mobs::MemBaseVector *v = objekte.top().obj->getVecInfo(elementFind, cfs);
+
     if (v)
     {
       size_t s = v->size();
@@ -714,7 +687,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
           s = index;
         v->resize(s+1);
       }
-//      LOG(LM_INFO, element << " ist ein Vector " << s);
+//      LOG(LM_INFO, ele << " ist ein Vector " << s);
       memName += ".";
       memName += v->name();
       memName += "[";
@@ -743,37 +716,16 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
 //      objekte.push(ObjectNavigator::Objekt(nullptr, memName));
 //      return false;
     }
-    if (index >= MemBaseVector::nextpos)
-    {
-      ObjectBase *o = nullptr;
-      for (auto c:altNamTok)
-        if ((o = objekte.top().obj->getObjInfo(c)))
-          break;
-      if (o == nullptr)
-      {
-        o = objekte.top().obj->getObjInfo(element);
-        if (o and not cfs.acceptOriNames() and o->cAltName() != Unset)
-          o = nullptr;
-      }
-      if (o)
-      {
-//        LOG(LM_INFO, element << " ist ein Objekt");
+    if (index >= MemBaseVector::nextpos) {
+      mobs::ObjectBase *o = objekte.top().obj->getObjInfo(elementFind, cfs);
+      if (o) {
+//        LOG(LM_INFO, ele << " ist ein Objekt");
         memName += "." + o->name();
         objekte.push(ObjectNavigator::Objekt(o, memName));
         return true;
       }
-      MemberBase *m = nullptr;
-      for (auto c:altNamTok)
-        if ((m = objekte.top().obj->getMemInfo(c)))
-          break;
-      if (m == nullptr)
-      {
-        m = objekte.top().obj->getMemInfo(element);
-        if (m and not cfs.acceptOriNames() and m->cAltName() != Unset)
-          m = nullptr;
-      }
-      if (m)
-      {
+      mobs::MemberBase *m = objekte.top().obj->getMemInfo(elementFind, cfs);
+      if (m) {
         memName += "." + m->name();
         memBase = m;
         //        LOG(LM_INFO, "Member: " << memName);
@@ -781,6 +733,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
       }
     }
   }
+
   memName += ".";
   memName += element;
   objekte.push(ObjectNavigator::Objekt(nullptr, memName));
@@ -806,7 +759,7 @@ void ObjectNavigator::leave(const std::string &element) {
 }
 
 void ObjectNavigator::pushObject(ObjectBase &obj, const std::string &name) {
-   objekte.push(ObjectNavigator::Objekt(&obj, name));
+  objekte.push(ObjectNavigator::Objekt(&obj, name));
 }
 
 
@@ -949,4 +902,3 @@ std::string ObjectBase::to_string(const ConvObjToString& cth) const
 
 }
 
-#pragma clang diagnostic pop

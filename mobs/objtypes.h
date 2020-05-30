@@ -419,14 +419,20 @@ public:
   /// Konstruktor
   /// @param print_compact führt bei einigen Typen zur vereinfachten Ausgabe
   /// @param altNames verwende alternative Namen wenn Vorhanden
-  explicit ConvToStrHint(bool print_compact, bool altNames = false) : comp(print_compact), altnam(altNames) {}
+  /// @param pfix verwende den Prefix vor dem Namen, falls vorhanden
+  explicit ConvToStrHint(bool print_compact, bool altNames = false, bool pfix = false, bool lowercase = false) : comp(print_compact),
+                         altnam(altNames), prefix(pfix), toLower(lowercase) {}
   virtual ~ConvToStrHint() = default;
   /// \private
   virtual bool compact() const { return comp; }
   /// \private
   virtual bool useAltNames() const { return altnam; }
   /// \private
+  virtual bool usePrefix() const { return prefix; }
+  /// \private
   bool withIndentation() const { return indent; }
+  /// \private
+  bool toLowercase() const { return toLower; }
 
 protected:
   /// \private
@@ -435,6 +441,10 @@ protected:
   bool altnam = false;
   /// \private
   bool indent = false;
+  /// \private
+  bool prefix = false;
+  /// \private
+  bool toLower = false;
 };
 
 /// Hilfsklasse für Konvertierungsklasse - Basisklasse
@@ -477,6 +487,10 @@ public:
   ConvObjToString doIndent() const { ConvObjToString c(*this); c.indent = true; return c; }
   /// Export ohne Einrückungen
   ConvObjToString noIndent() const { ConvObjToString c(*this); c.indent = false; return c; }
+  /// Elementbezeichner in Kleinbuchstaben
+  ConvObjToString exportLowercase() const { ConvObjToString c(*this); c.toLower = true; return c; }
+  /// Verwende den Prefix zum Namen
+  ConvObjToString exportPrefix() const { ConvObjToString c(*this); c.prefix = true; return c; }
   /// Verwende native Bezeichnmer von enums und Zeiten
   ConvObjToString exportCompact() const { ConvObjToString c(*this); c.comp = true; return c; }
   /// Ausgabe im Klartext von enums und Uhrzeit
@@ -512,6 +526,8 @@ public:
   virtual bool shrinkArray() const { return shrink; };
   /// werfe eine Exception bei unbekannter Variable
   virtual bool exceptionIfUnknown() const { return exceptUnk; };
+  /// Groß-/Kleinschreibung ignorieren
+  virtual bool caseinsesitive() const { return ignCase; };
   /// Null-Werte behandeln
   virtual enum Nulls nullHandling() const { return null; };
   /// Verwenden den XML-Parser
@@ -540,6 +556,8 @@ public:
   ConvObjFromStr useForceNull() const {  ConvObjFromStr c(*this); c.null = force; return c; }
   /// wird versucht eine unbekannte Variable einzulesen, wird eine exception geworfen
   ConvObjFromStr useExceptUnknown() const {  ConvObjFromStr c(*this); c.exceptUnk = true; return c; }
+  /// ignoriere beim Einlesen die Groß-/Kleinschreibung der Elemntnamen
+  ConvObjFromStr useIgnoreCase() const {  ConvObjFromStr c(*this); c.ignCase = true; return c; }
 protected:
   /// \private
   bool xml = false;
@@ -556,7 +574,10 @@ protected:
   /// \private
   bool exceptUnk = false;
   /// \private
+  bool ignCase = false;
+  /// \private
   enum Nulls null = ignore;
+
 };
 
 ///Template für Hilfsfunktion zum Konvertieren eines Datentyps in einen unsigned int

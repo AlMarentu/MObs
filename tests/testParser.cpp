@@ -36,7 +36,7 @@ namespace {
 class JParser: public mobs::JsonParser {
 public:
   explicit JParser(const string &i) : mobs::JsonParser(i) {};
-  void Key(const std::string &value) override { LOG(LM_INFO, "KEY " << value) };
+  void Key(const std::string &value) override { LOG(LM_INFO, "KEY " << value); };
   void Value(const std::string &value, bool charType) override { LOG(LM_INFO, "VALUE " << value); }
   void StartArray() override { LOG(LM_INFO, "START ARRAY"); }
   void EndArray() override { LOG(LM_INFO, "END ARRAY"); }

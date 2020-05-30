@@ -77,7 +77,7 @@ void logMessage(loglevel l, const std::string &message);
 
 
 /// \brief Erzeugt eine Logmeldung aud stderr.
-#define LOG(l,x) { std::stringstream ___s___; ___s___ << __FILE_NAME__ << ':' << __LINE__ << " " << std::boolalpha << x; logging::logMessage(l, ___s___.str()); }
+#define LOG(l,x) do { std::stringstream ___s___; ___s___ << __FILE_NAME__ << ':' << __LINE__ << " " << std::boolalpha << x; logging::logMessage(l, ___s___.str()); } while(false)
 
 
 /// \brief Hilfs-Makro für TRACE, stellt Parameternamen vor Inhalt.

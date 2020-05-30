@@ -35,6 +35,15 @@
 
 namespace mobs {
 
+/// \brief wandelt einen Text in Kleinbuchstaben anhand der Locale der Rechners
+std::wstring toLower(const std::wstring &);
+/// \brief wandelt einen Text in Großbuchstaben anhand der Locale der Rechners
+std::wstring toUpper(const std::wstring &);
+/// \brief wandelt einen Text in Kleinbuchstaben anhand der Locale der Rechners
+std::string toLower(const std::string &);
+/// \brief wandelt einen Text in Großbuchstaben anhand der Locale der Rechners
+std::string toUpper(const std::string &);
+
 /// wandelt einen Unicode-zeichen in ein ISO8859-1 Zeichen um; im Fehlerfall wird U+00bf INVERTED QUESTION MARK geliefert
 wchar_t to_iso_8859_1(wchar_t c);
 /// wandelt einen Unicode-zeichen in ein ISO8859-9 Zeichen um; im Fehlerfall wird U+00bf INVERTED QUESTION MARK geliefert

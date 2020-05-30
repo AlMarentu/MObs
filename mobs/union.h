@@ -132,7 +132,7 @@ public:
   /// const Zugriffsmethode auf die Basisklasse mit exception
   const T &operator() () const  { if (not m_obj) throw std::runtime_error("MobsUnion is empty"); return *m_obj; }
   /// \brief Überladenen Methode, die das gewünschte MobsUnion-Objekt \c name zuerst zu erzeugen versucht
-  ObjectBase *getObjInfo(const std::string &name) override { setType(name); return m_obj; }
+  ObjectBase *getObjInfo(const std::string &name, const ConvObjFromStr &cfh) override { setType(name); return m_obj; }
   /// \private
   void doCopy(const ObjectBase &other) override;
   /// \private
