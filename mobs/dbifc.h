@@ -47,6 +47,7 @@ namespace mobs {
     explicit operator bool() { return valid(); }
     /// Increment-Operator
     virtual void operator++() = 0;
+    void next() { operator++(); }
     /// Aktuelle Position, bei eof(), Anzahl der Datensätze
     size_t pos() const { return cnt; }
   protected:
@@ -68,9 +69,11 @@ namespace mobs {
     /// \private
     virtual bool destroy(DatabaseInterface &dbi, const ObjectBase &obj) = 0;
     /// \private
-    virtual std::shared_ptr<DbCursor> query(DatabaseInterface &dbi, ObjectBase &obj, const std::string &query) = 0;
+    virtual void dropAll(DatabaseInterface &dbi, const ObjectBase &obj) = 0;
     /// \private
-    virtual std::shared_ptr<DbCursor> qbe(DatabaseInterface &dbi, ObjectBase &obj) = 0;
+    virtual void structure(DatabaseInterface &dbi, const ObjectBase &obj) = 0;
+    /// \private
+    virtual std::shared_ptr<DbCursor> query(DatabaseInterface &dbi, ObjectBase &obj, const std::string &query, bool qbe) = 0;
     /// \private
     virtual void retrieve(DatabaseInterface &dbi, ObjectBase &obj, std::shared_ptr<mobs::DbCursor> cursor) = 0;
 
@@ -95,6 +98,8 @@ namespace mobs {
   class DatabaseInterface
   {
   public:
+    enum IsolationLevel { ReadUncommitted, ReadCommitted, CursorStability, RepeatableRead, Serializable };
+
     /// \private
     DatabaseInterface(std::shared_ptr<DatabaseConnection> dbi, std::string dbName);
 
@@ -106,12 +111,20 @@ namespace mobs {
 //    virtual bool load(std::list<ObjectBase> &result, std::string objType, std::string query) = 0;
     /// Speichern eines Objektes in die Datenbank 
     void save(const ObjectBase &obj);
-    /** Lösche ein Objekt anhand der vorbesetzten Key-Elemente
+
+    /** \brief Lösche ein Objekt anhand der vorbesetzten Key-Elemente
       * \return true, wenn das Objekt gelöscht werden konnte, false wenn kein passendes Objekt existiert
       * \throw runtime_error wenn ein Fehler auftrat
       */
     bool destroy(const ObjectBase &obj);
-
+    /** \brief Lösche die gesamte Tabelle/Collection zu diesem Objekt -- Vorsicht was weg ist ist weg
+      * \throw runtime_error wenn ein Fehler auftrat
+      */
+    void dropAll(const ObjectBase &obj);
+    /** \brief Lege die Struktur der Tabelle/Collection zu diesem Objekt an, falls noch nicht existent
+      * \throw runtime_error wenn ein Fehler auftrat
+      */
+    void structure(const ObjectBase &obj);
     /** \brief Datenbankabfrage über eine Bedingung als Text
      * 
      * Die Angabe der Bedingung ist datenbankabhänging
@@ -160,7 +173,8 @@ namespace mobs {
     DatabaseInterface withQueryLimit(size_t limitCnt) { DatabaseInterface d(*this); d.limit = limitCnt; return d; }
     /// Erzeuge ein Duplikat mit der Option, die Query nach limit Objekten abzubrechen
     DatabaseInterface withTimeout(std::chrono::milliseconds millisec) { DatabaseInterface d(*this); d.timeout = millisec; return d; }
-    /// Abfrage countCursor
+    DatabaseInterface withReadIsolation(IsolationLevel level) { DatabaseInterface d(*this); d.isolationLevel = level; return d; }
+/// Abfrage countCursor
     bool getCountCursor() const { return countCursor; }
     /// Abfrage Timeout
     std::chrono::milliseconds getTimeout() const { return timeout; }
@@ -168,11 +182,14 @@ namespace mobs {
     size_t getQuerySkip() const { return skip; }
     /// Abfrage Query-Limit
     size_t getQueryLimit() const { return limit; }
+    /// Abfrage Isolation-Level
+    IsolationLevel getIsolation() const { return isolationLevel; }
 
   private:
     std::shared_ptr<DatabaseConnection> dbCon;
     std::string databaseName;
     bool countCursor = false;
+    IsolationLevel isolationLevel = RepeatableRead;
     size_t skip = 0;
     size_t limit = 0;
     std::chrono::milliseconds timeout;

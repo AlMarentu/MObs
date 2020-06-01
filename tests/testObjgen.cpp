@@ -1,4 +1,3 @@
-#pragma clang diagnostic push
 //#pragma ide diagnostic ignored "cert-err58-cpp"
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
@@ -845,4 +844,3 @@ TEST(objgenTest, compare) {
 }
 
 
-#pragma clang diagnostic pop

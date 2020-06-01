@@ -32,10 +32,5 @@ endmacro()
 
 
 package_add_test(test1 testObjtypes.cpp testObjgen.cpp testUnion.cpp testBlob.cpp testParser.cpp
-        testUnixTime.cpp testObjpool.cpp testCharset.cpp)
+        testUnixTime.cpp testObjpool.cpp testCharset.cpp testHelper.cpp)
 
-set_property(TARGET test1 PROPERTY CXX_STANDARD 11)
-set_property(TARGET gtest PROPERTY CXX_STANDARD 11)
-set_property(TARGET gmock PROPERTY CXX_STANDARD 11)
-set_property(TARGET gtest_main PROPERTY CXX_STANDARD 11)
-set_property(TARGET gmock_main PROPERTY CXX_STANDARD 11)

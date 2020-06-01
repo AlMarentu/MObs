@@ -107,6 +107,7 @@ public: \
   static inline std::string c_to_string(const typ &t, const mobs::ConvToStrHint &cth) { return cth.compact() ? mobs::to_string(int(t)) : toStr(t); } \
   static inline std::wstring c_to_wstring(const typ &t, const mobs::ConvToStrHint &cth) { return cth.compact() ? mobs::to_wstring(int(t)) : mobs::to_wstring(toStr(t)); }; \
   static inline bool c_is_chartype(const mobs::ConvToStrHint &cth) { return not cth.compact(); } \
+  static inline bool c_is_mobsEnmum() { return true; } \
   static inline typ c_empty() { return mobsEnum_##typ##_define::toEnum(0); } \
 }
 
@@ -118,9 +119,13 @@ namespace mobs {
 /// @return Wert als u32string
 std::u32string to_u32string(std::string val);
 
-/// String in Anführungszeichen setzen mit escaping
+/// String in Anführungszeichen (") setzen mit escaping
 /// @param s Wert in utf8
 std::string to_quote(const std::string &s);
+
+/// String in einfache (') Anführungszeichen setzen mit escaping
+/// @param s Wert in utf8
+std::string to_squote(const std::string &s);
 
 //template <typename T>
 //std::string to_string(T t) { std::stringstream s; s << t; return s.str(); };
@@ -663,6 +668,8 @@ public:
   static inline bool c_is_specialized() { return false; }
   /// zeigt an, ob des Element ein binäres Datenobjekt ist
   static inline bool c_is_blob() { return false; }
+  /// zeigt an, ob des Element ein MOBSENUM ist
+  static inline bool c_is_mobsEnmum() { return false; }
   /// Körnung des Datentyps wenn es ein Date-Typ ist, \c 0 sonst
   static inline uint64_t c_time_granularity() { return 0; }
   /// \private

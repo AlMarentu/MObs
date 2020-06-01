@@ -57,6 +57,23 @@ std::string to_quote(const std::string &s) {
   return result;
 }
 
+std::string to_squote(const std::string &s) {
+  string result = "'";
+  if (s.length() > 1 or s[0] != 0)
+  {
+    size_t pos = 0;
+    size_t pos2 = 0;
+    while ((pos = s.find('\'', pos2)) != string::npos)
+    {
+      result += s.substr(pos2, pos - pos2) + "\\'";
+      pos2 = pos+1;
+    }
+    result += s.substr(pos2);
+  }
+  result += '\'';
+  return result;
+}
+
 template<>
 /// \private
 bool string2x(const std::string &str, char32_t &t) {

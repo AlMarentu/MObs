@@ -1,4 +1,3 @@
-#include <climits>
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
@@ -28,6 +27,7 @@
 #include <map>
 #include <list>
 #include <utility>
+#include <climits>
 
 using namespace std;
 

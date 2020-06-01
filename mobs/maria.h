@@ -18,37 +18,37 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/** \file mongo.h
- \brief Datenbank-Interface für Zugriff auf MongoDB
+/** \file maria.h
+ \brief Datenbank-Interface für Zugriff auf MariaDB
 
- Mongo and MongoDB are registered trademarks of MongoDB, Inc.
- \see www.mongodb.com
+ MariaDB is a registered trademarks of MariaDB.
+ \see www.mariadb.com
  */
 
-#ifndef MOBS_MONGO_H
-#define MOBS_MONGO_H
 
-#include <utility>
+#ifndef MOBS_MARIA_H
+#define MOBS_MARIA_H
 
 #include "dbifc.h"
-#include <mongocxx/client.hpp>
+
+#include <mysql.h>
+
 
 namespace mobs {
 
-
-  /** \brief Datenbank-Verbindung zu einer MongoDB.
+  /** \brief Datenbank-Verbindung zu einer MariaDB.
    *
-   * Mongo and MongoDB are registered trademarks of MongoDB, Inc.
-   * \see www.mongodb.com
+   * MariaDB is a registered trademarks of MariaDB.
+   * \see www.mariadb.com
    */
-  class mongoDatabaseConnection : virtual public DatabaseConnection, public ConnectionInformation {
+  class MariaDatabaseConnection : virtual public DatabaseConnection, public ConnectionInformation {
   public:
     /// \private
     friend DatabaseManagerData;
     /// \private
-    explicit mongoDatabaseConnection(const ConnectionInformation &connectionInformation) :
+    explicit MariaDatabaseConnection(const ConnectionInformation &connectionInformation) :
             DatabaseConnection(), ConnectionInformation(connectionInformation) { };
-    ~mongoDatabaseConnection() override = default;
+    ~MariaDatabaseConnection() override;
 
     /// \private
     void open();
@@ -69,23 +69,19 @@ namespace mobs {
 
     // ------------------------------
 
-    void create(DatabaseInterface &dbi, const ObjectBase &obj);
+//    void createPrimaryKey(DatabaseInterface &dbi, ObjectBase &obj);
 
-    /// private
-    static bool changedReadConcern(mongocxx::read_concern &rc, const DatabaseInterface &dbi);
+//    void create(DatabaseInterface &dbi, const ObjectBase &obj);
 
     /// Ermittle den Collection-Namen zu einem Objekt
-    static std::string collectionName(const ObjectBase &obj) ;
+    static std::string tableName(const ObjectBase &obj, const DatabaseInterface &dbi) ;
 
-    /// Direkt-Zugriff auf die MongoDb
-    mongocxx::database getDb(DatabaseInterface &dbi);
+    /// Direkt-Zugriff auf die MariaDB
+    MYSQL *getConnection();
 
   private:
-    mongocxx::client client;
-    bool connected = false;
-
+    MYSQL *connection = nullptr;
   };
+};
 
-}
-
-#endif //MOBS_MONGO_H
+#endif //MOBS_MARIA_H

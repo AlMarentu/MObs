@@ -1,242 +1,135 @@
-#include <iostream>
 
-//#define NDEBUG
 #include "mobs/logging.h"
-
-
-
 #include "mobs/objgen.h"
-#include "mobs/objpool.h"
-
-using namespace mobs;
-
-class DatabaseInterface
-{
-  public:
-    virtual ~DatabaseInterface() = default;;
-    virtual bool load(ObjectBase &obj) = 0;
-    virtual bool load(std::list<ObjectBase> &result, std::string objType, std::string query) = 0;
-    virtual bool save(const ObjectBase &obj) = 0;
-
-  protected:
-};
-
-class FileDatabase : public DatabaseInterface
-{
-  public:
-    explicit FileDatabase(std::string path);
-    virtual ~FileDatabase();
-    bool load(ObjectBase &obj) override;
-    bool load(std::list<ObjectBase> &result, std::string objType, std::string query) override;
-    bool save(const ObjectBase &obj) override;
-    //bool load(std::shared_ptr<NamedObject> &ptr) { return load(*obj); };
-
-  protected:
-    std::string base;
-};
-
-////////////////
-#include <sys/stat.h>
-
-#include "mobs/xmlout.h"
-#include "mobs/xmlwriter.h"
-#include "mobs/xmlread.h"
-#include <fstream>
-#include <sstream>
+#include "mobs/dbifc.h"
 
 using namespace std;
 
-#if 0
-class KeyString : virtual public ObjTravConst {
-  public:
-    virtual bool doObjBeg(ObjTravConst &ot, const ObjectBase &obj) { return true; };
-    virtual void doObjEnd(ObjTravConst &ot, const ObjectBase &obj) { };
-    virtual bool doArrayBeg(ObjTravConst &ot, const MemBaseVector &vec) { return false; }; // Keine Arrays im Key
-    virtual void doArrayEnd(ObjTravConst &ot, const MemBaseVector &vec) { };
-    virtual void doMem(ObjTravConst &ot, const MemberBase &mem)
-    {
-      TRACE("");
-      if (mem.key() > 0)
-      {
-        keystr += ".";
-        keystr += mem.toStr(false);
-        //cerr << "  Mem " << mem.name() << " = ";
-        //cerr << endl;
-      }
-    };
-    const string &key() const { return keystr; };
-  protected:
-    string keystr;
+namespace gespann {
+
+
+//Objektdefinitionen
+class Fahrzeug : virtual public mobs::ObjectBase
+{
+public:
+  ObjInit(Fahrzeug);
+
+  MemVar(string, typ);
+  MemVar(int, achsen, USENULL);
+  MemVar(bool, antrieb);
 };
-#endif
 
-FileDatabase::FileDatabase(string path) : base(path)
+
+class Gespann : virtual public mobs::ObjectBase
 {
-  TRACE(PARAM(path));
-}
-
-FileDatabase::~FileDatabase()
-{
-  TRACE("");
-}
-
-bool FileDatabase::load(ObjectBase &obj)
-{
-  TRACE(PARAM(obj.typeName()));
-  stringstream fname;
-  fname << base << "/" << obj.typeName() << "." << obj.keyStr();
-  cerr << "FileDatabase::load " << obj.typeName() << " name: " << obj.keyStr() << endl;
-  ifstream f(fname.str());
-  if (not f.is_open())
-    throw runtime_error(string("File open error ") + fname.str());
-  ostringstream data;
-  data << f.rdbuf();
-  cout << "DATA " << data.str() << endl;
-  string2Obj(data.str(), obj);
-
-  return true;
-}
-
-bool FileDatabase::load(list<ObjectBase> &result, string objType, string query)
-{
-  TRACE(PARAM(objType) << PARAM(query));
-  // TODO
-  return false;
-}
-
-bool FileDatabase::save(const ObjectBase &obj)
-{
-  TRACE(PARAM(obj.typeName()));
-  
-  stringstream fname;
-  fname << base << "/" << obj.typeName() << "." << obj.keyStr();
-  fstream f(fname.str(), std::fstream::trunc | std::fstream::out);
-  if (not f.is_open())
-    throw runtime_error(string("File open error ") + fname.str());
-  f << obj.to_string(ConvObjToString().exportJson()) << endl;
-  f.close();
-  if (f.fail())
-    throw runtime_error(string("File write error ") + fname.str());
-
-  cerr << "FileDatabase::save " << obj.typeName() << " name: " << obj.keyStr() << endl;
-  return true;
-}
-
-#include "mobs/objgen.h"
-#include "mobs/objpool.h"
-
-using namespace std;
-
-
-class Fahrzeug : virtual public NamedObject, virtual public ObjectBase
-{
-  public:
-    ObjInit1(Fahrzeug);
-    Fahrzeug(const Fahrzeug &that) : NamedObject(that), ObjectBase(that) {  /*ObjectBase::doCopy(that);*/ }
-
+public:
+  ObjInit(Gespann, COLNAME(vehicle));
 
   MemVar(int, id, KEYELEMENT1);
-    MemVar(string, typ);
-    MemVar(int, achsen, USENULL);
-
-    void init() override { TRACE(""); };
-    // ist das nötig=?
-    string objName() const { TRACE(""); return typeName() + "." + std::to_string(id()); };
+  MemVar(string, typ, ALTNAME(bezeichnug));
+  MemObj(Fahrzeug, zugmaschiene);
+  MemVector(Fahrzeug, haenger, COLNAME(vehicle_part));
 };
-ObjRegister(Fahrzeug);
+ObjRegister(Gespann);
 
-class XmlInput : public XmlReader {
-public:
-  explicit XmlInput(wistream &str) : XmlReader(str) { }
-  
-  void StartTag(const std::string &element) override {
-    LOG(LM_INFO, "start " << element);
-    if (elementRemovePrefix(element) == "Fahrzeug")
-      fill(new Fahrzeug);
-  }
-  void EndTag(const std::string &element) override {
-    LOG(LM_INFO, "end " << element);
-  }
-  void filled(ObjectBase *obj, const string &error) override {
-    LOG(LM_INFO, "filled " << obj->to_string() << (error.empty() ? " OK":" ERROR = ") << error);
-    delete obj;
-    stop();
-  }
-
-};
-
-int main(int argc, char* argv[])
-{
-  TRACE("");
-  mkdir("data", 0755);
-  ofstream init("data/Fahrzeug.2");
-  init << R"({\n  "id": 2,\n  "typ": "Rollschuh",\n  "achsen": 2\n}\n)";
-  init.close();
-
+void worker(mobs::DatabaseInterface &dbi) {
   try {
-    shared_ptr<NamedObjPool> pool = make_shared<NamedObjPool>();
+    Gespann f1, f2;
 
-    NamedObjRef<Fahrzeug> f1(pool, "1");
-    f1.create();
-    f1->id(1);
-    f1->typ("Traktor");
-    f1->achsen(2);
-    cout << "Fahrzeug[" << f1->id() << "] hat " << f1->achsen() << " Achsen und ist ein " << f1->typ() << endl;
+    f1.id(1);
+    f1.typ("Brauereigespann");
+    f1.zugmaschiene.typ("Sechsspänner");
+    f1.zugmaschiene.achsen(0);
+    f1.zugmaschiene.antrieb(true);
+    f1.haenger[0].typ("Bräuwagen");
+    f1.haenger[0].achsen(2);
 
-    FileDatabase db("data");
-    db.save(*f1);
+    f2.id(2);
+    f2.typ("Schlepper mit 2 Anhängern");
+    f2.zugmaschiene.typ("Traktor");
+    f2.zugmaschiene.achsen(2);
+    f2.zugmaschiene.antrieb(true);
+    f2.haenger[0].typ("Anhänger");
+    f2.haenger[0].achsen(2);
 
-    NamedObjRef<Fahrzeug> f2(pool, "2");
-    if (not f2.exists())
-    {
-      f2.create();
-      f2->id(2);
-//      logging::Trace::traceOn = true;
+    // Tabelle/Collection löschen !!!
+    dbi.dropAll(f1);
+    // Strukturen neu anlegem
+    dbi.structure(f1);
 
-      db.load(*f2);
-    }
-    cout << "Fahrzeug[" << f2->id() << "] hat " << f2->achsen() << " Achsen und ist ein " << f2->typ() << endl;
+    dbi.save(f1);
+    dbi.save(f2);
 
+    f2.haenger[1].typ("Anhänger");
+    f2.haenger[1].achsen(2);
+    dbi.save(f2);
 
-    list<ObjectBase> result;
-    db.load(result, "Fahrzeug", "id = 2");
-    
-
-    // Ausgabe XML
-
-    ConvObjToString cth;
-    wofstream xout("test.xml", ios::trunc);
-    if (not xout.is_open())
-      throw runtime_error("File not open");
-    XmlWriter xf(xout, XmlWriter::CS_utf16_le, true);
-    xf.setPrefix(L"m:");
-    XmlOut xo(&xf, cth);
-    xf.writeHead();
-    xf.writeTagBegin(L"list");
-    f2->traverse(xo);
-    xf.writeComment(L"und noch einer");
-    f2->typ("Mähdrescher");
-    f2->traverse(xo);
-    xf.writeTagEnd();
-    xout.close();
-
-    wifstream xin("test.xml");
-    if (not xin.is_open())
-      throw runtime_error("in File not open");
-    XmlInput xr(xin);
-    xr.setPrefix("m:");
-    while (not xr.eof()) {
-      xr.parse();
-      LOG(LM_INFO, "Zwischenpause")
+    vector<string> objs {
+            R"({ id:3, typ:"PKW", zugmaschiene:{ typ:"PKW", achsen:2, antrieb:true}})",
+            R"({ id:4, typ:"Mutter mit Kind", zugmaschiene:{ typ:"Fahhrad", achsen:2, antrieb:true}, haenger:[
+                 { "typ" : "Fahrradanhänger", "achsen" : 1 } ]})",
+            R"({ id:5, typ:"Dankplokomotive", zugmaschiene:{ typ:"Lokomotive", achsen:10, antrieb:true}, haenger:[
+                 { "typ" : "Tender", "achsen" : 4 } ]})",
+    };
+    for (auto const &j:objs) {
+      f2.clear();
+      mobs::string2Obj(j, f2);
+      dbi.save(f2);
     }
 
-    xin.close();
+    // Query By Example
+    f2.clearModified();
+    f2.haenger[0].achsen(2);
+    for (auto cursor = dbi.qbe(f2); not cursor->eof(); cursor->next()) {
+      dbi.retrieve(f2, cursor);
+      LOG(LM_INFO, "QBE result: pos=" << cursor->pos() << " id=" << f2.id() << " " << f2.typ());
+    }
 
+    // Count
+    auto cursor = dbi.withCountCursor().query(f2, "");
+    LOG(LM_INFO, "Anzahl " << cursor->pos());
+
+
+    Gespann f3;
+    f3.id(2);
+    if (dbi.load(f3))
+      LOG(LM_INFO, "Gespann 2 hat " << f3.haenger.size() << " Anhänger");
+    else
+      LOG(LM_ERROR, "Gesapann 2 exisitiert nicht");
+
+    f3.id(12);
+    if (not dbi.load(f3))
+      LOG(LM_INFO, "Gesapann 12 exisitiert nicht");
 
   }
   catch (exception &e)
   {
-    cerr << "Exception " << e.what() << endl;
+    LOG(LM_ERROR, "Exception " << e.what());
+  }
+}
+}
+
+
+int main(int argc, char* argv[])
+{
+  TRACE("");
+  try {
+    // Datenbank Verbindung einrichten
+    mobs::DatabaseManager dbMgr;  // singleton, darf nur einmalig eingerichtet werden und muss bis zum letzten Verwenden einer Datenbank bestehen bleiben
+
+    // Datenbank-Verbindungen
+    dbMgr.addConnection("my_mongo", mobs::ConnectionInformation("mongodb://localhost:27017", "mobs"));
+    dbMgr.addConnection("my_maria", mobs::ConnectionInformation("mariadb://localhost", "mobs"));
+
+//    mobs::DatabaseInterface dbi = dbMgr.getDbIfc("my_mongo");
+    mobs::DatabaseInterface dbi = dbMgr.getDbIfc("my_maria");
+
+    gespann::worker(dbi);
+
+  }
+  catch (exception &e)
+  {
+    LOG(LM_ERROR, "Exception " << e.what());
     return 1;
   }
   return 0; 

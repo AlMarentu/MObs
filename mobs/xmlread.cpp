@@ -41,9 +41,9 @@ static std::wstring stow(const string &s, bool dontConvert) {
                                                      
   class XmlReadData : public ObjectNavigator, public XmlParserW  {
   public:
-    XmlReadData(XmlReader *p, wistream &s) : XmlParserW(s), parent(p) {}
-    XmlReadData(XmlReader *p, const wstring &s) : XmlParserW(str), parent(p), str(s) {}
-    XmlReadData(XmlReader *p, const string &s, bool charsetUnknown = false) : XmlParserW(str), parent(p),
+    XmlReadData(XmlReader *p, wistream &s, const ConvObjFromStr &c) : ObjectNavigator(c), XmlParserW(s), parent(p) {}
+    XmlReadData(XmlReader *p, const wstring &s, const ConvObjFromStr &c) : ObjectNavigator(c), XmlParserW(str), parent(p), str(s) {}
+    XmlReadData(XmlReader *p, const string &s, const ConvObjFromStr &c, bool charsetUnknown = false) : ObjectNavigator(c), XmlParserW(str), parent(p),
                 str(stow(s, charsetUnknown)), doConversion(charsetUnknown) { }
 
     std::string elementRemovePrefix(const std::string &element) const {
@@ -174,18 +174,15 @@ static std::wstring stow(const string &s, bool dontConvert) {
 
 
 XmlReader::XmlReader(const std::string &input, const ConvObjFromStr &c, bool charsetUnknown) {
-  data = new XmlReadData(this, input, charsetUnknown);
-  data->cfs = c;
+  data = new XmlReadData(this, input, c, charsetUnknown);
 }
 
 XmlReader::XmlReader(const std::wstring &input, const ConvObjFromStr &c) {
-  data = new XmlReadData(this, input);
-  data->cfs = c;
+  data = new XmlReadData(this, input, c);
 }
 
 XmlReader::XmlReader(std::wistream &str, const ConvObjFromStr &c) {
-  data = new XmlReadData(this, str);
-  data->cfs = c;
+  data = new XmlReadData(this, str, c);
 }
 
 XmlReader::~XmlReader() {

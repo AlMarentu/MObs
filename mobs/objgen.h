@@ -144,8 +144,11 @@ namespace mobs {
 #define MemMobsVar(typ, name, converter, ...) MemMobsVarType(typ, converter) name = MemMobsVarType(typ, converter) (#name, this, { __VA_ARGS__ })
 
 /// \private
-enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Embedded, Key1, Key2, Key3, Key4, Key5, AltNameBase = 1000,
-                 AltNameEnd = 1999, ColNameBase = 2000, ColNameEnd = 3999, PrefixBase = 4000, PrefixEnd = 4999 };
+enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Embedded, DbCompact, DbDetail,
+                 Key1, Key2, Key3, Key4, Key5,
+                 AltNameBase = 1000, AltNameEnd = 1999,
+                 ColNameBase = 2000, ColNameEnd = 3999,
+                 PrefixBase = 4000, PrefixEnd = 4999 };
 /// \private
 enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confToken, const std::string &s);
 
@@ -153,6 +156,8 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 #define USEVECNULL mobs::VectorNull, ///< Bei Vektoren wird der Vector selbst mit \c null vorinitialisiert
 #define XMLATTR mobs::XmlAsAttr, ///< Bei XML-Ausgabe als Attribute ausgeben (nur MemberVariable, nur von erstem Element fortlaufend)
 #define EMBEDDED mobs::Embedded, ///< Bei Ausgabe als Attribute/Traversierung werden die Member des Objektes direkt, auf ser selben Ebene, serialisiert
+#define DBCOMPACT mobs::DbCompact, ///< In der Datenbank wird der MOBSENUM numerisch gespeichert
+#define DBDETAIL mobs::DbDetail, ///< In der Datenbank wird dieses Subelement in einer Detail Table abgelegt
 #define KEYELEMENT1 mobs::Key1, ///<  Schlüsselelement der Priorität 1 (erstes Element)
 #define KEYELEMENT2 mobs::Key2, ///< Schlüsselelement der Priorität 2
 #define KEYELEMENT3 mobs::Key3, ///< Schlüsselelement der Priorität 3
@@ -307,7 +312,7 @@ public:
   /// @return Position im Schlüssel oder \c 0 wenn kein Schlüsselelement
   int key() const { return m_key; }
   /// Zeiger auf Vater-Objekt
-  ObjectBase *parent() const { return m_parent; }
+  const ObjectBase *parent() const { return m_parent; }
   /// Objekt wurde beschrieben
   void activate();
   /// Abfrage gesetzter  Attribute
@@ -330,6 +335,8 @@ private:
 
 // ------------------ VectorBase ------------------
 
+template <class T>
+class MemberVector;
 
 /// \brief Basisklasse für Vektoren auf Membervariablen oder Objekten innerhalb von von \c ObjectBase angeleiteten Klasse
 ///
@@ -339,6 +346,8 @@ private:
 class MemBaseVector : public NullValue {
 public:
   friend class ObjectBase;
+  template <class T>
+  friend class MemberVector;
   /// Konstatnte, die auf das nächste Element eines MenBaseVectors verweist, das dann automatisch erzeugt wird
   static const size_t nextpos = INT_MAX;
   /// \private
@@ -349,6 +358,8 @@ public:
   virtual void traverse(ObjTrav &trav) = 0;
   /// Starte Traversierung  const
   virtual void traverse(ObjTravConst &trav) const = 0;
+  /// \private
+  void traverseKey(ObjTravConst &trav) const;
   /// liefert die Anzahl der Elemente
   virtual size_t size() const = 0;
   /// Vergrößert/verkleinert die Elementzahl des Vektors
@@ -365,6 +376,8 @@ public:
   virtual MemberBase *getMemInfo(size_t i) = 0;
   /// liefert einen Zeiger auf das entsprechende Element, falls es eine \c MemObj ist
   virtual ObjectBase *getObjInfo(size_t i) = 0;
+  /// \private
+  virtual ObjectBase *createNewObj() const = 0;
   /// Setze Inhalt auf leer; äquivalent zu \c resize(0)
   void clear() { resize(0); }
   /// Setze Inhalt auf null
@@ -374,7 +387,7 @@ public:
   /// Objekt wurde beschrieben
   void activate();
   /// Zeiger auf Vater-Objekt
-  inline ObjectBase *parent() const { return m_parent; }
+  inline const ObjectBase *parent() const { return m_parent; }
   /// Abfrage gesetzter  Attribute
   MemVarCfg hasFeature(MemVarCfg c) const;
 
@@ -726,6 +739,7 @@ public:
   void traverse(ObjTravConst &trav) const override;
   MemberBase *getMemInfo(size_t i) override { if (i >= size()) return nullptr; return dynamic_cast<MemberBase *>(werte[i]); }
   ObjectBase *getObjInfo(size_t i) override { if (i >= size()) return nullptr; return dynamic_cast<ObjectBase *>(werte[i]); }
+  ObjectBase *createNewObj() const override;
 
 //  void push_back(const T &t) { operator[](size()) = t; }
 //  benötigt Member::operator= und Member::Member(const T &t)
@@ -782,9 +796,21 @@ void MemberVector<T>::resize(size_t s)
   {
     werte.resize(s);
     for (size_t i = old; i < s; i++)
-      werte[i] = new T(this, parent(), m_c);
+      werte[i] = new T(this, m_parent, m_c);
     activate();
   }
+}
+
+template<class T>
+ObjectBase *MemberVector<T>::createNewObj() const {
+  if (std::is_base_of<ObjectBase, T>::value) {
+    T *o = new T(const_cast<MemberVector<T> *>(this), m_parent, m_c);
+    ObjectBase *obj = dynamic_cast<ObjectBase *>(o);
+    if (not obj)
+      throw std::runtime_error("invalid cast");
+    return obj;
+  }
+  return nullptr;
 }
 
 template<typename T, class C>
@@ -854,6 +880,8 @@ public:
   bool inNull = false;
   /// ist true, wenn ein \c traversKey durchgeführt wird
   bool keyMode = false;
+  /// traversiere rückwärts über parent()
+  bool parentMode = false;
   /// Ist das Element Teil eines Vektors, wird die Index-Position angezeigt, ansonsten ist der Wert \c SIZE_MAX
   size_t arrayIndex = SIZE_MAX;
 };
@@ -861,6 +889,7 @@ public:
 /// Basisklasse zum sequentiellen Einfügen von Daten in ein Objekt
 class ObjectNavigator  {
 public:
+  ObjectNavigator(ConvObjFromStr c = ConvObjFromStr()) : cfs(std::move(c)) { }
   /// Zeiger auf die aktuelle MemberVariable oder nullptr, falls es keine Variable ist
   inline MemberBase *member() const { return memBase; };
   /// Name der aktuellen MemberVariablen, oder leer, falls es keine Variable ist
@@ -901,6 +930,7 @@ public:
   /// Objekt zurücksetzen
   void reset() { while (not objekte.empty()) objekte.pop(); while (not path.empty()) path.pop(); memBase = nullptr; memVec = nullptr; memName = ""; }
 
+protected:
   /// Import-Konfiguration
   ConvObjFromStr cfs;
 
@@ -937,7 +967,15 @@ void MemberVector<T>::traverse(ObjTrav &trav)
 template<class T>
 void MemberVector<T>::traverse(ObjTravConst &trav) const
 {
+  bool wasParentMode = trav.parentMode;
+  if (trav.parentMode) {
+    if (parent())
+      parent()->traverseKey(trav);
+    trav.parentMode = false;
+  }
+
   bool inNull = trav.inNull;
+  trav.keyMode = false;
   if (trav.doArrayBeg(*this))
   {
     size_t i = 0;
@@ -969,6 +1007,7 @@ void MemberVector<T>::doCopy(const MemBaseVector &other)
     throw std::runtime_error("MemberVector::doCopy invalid");
   doCopy(*t);
 }
+
 
 
 /// Ausgabe eines Objektes im kompakten JSON-Format, Keys unquoted

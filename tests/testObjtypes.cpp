@@ -61,6 +61,14 @@ TEST(objtypeTest, to_quote) {
   EXPECT_EQ(u8"\"ab\\\"cd\\\"ef\"", mobs::to_quote("ab\"cd\"ef"));
 }
 
+TEST(objtypeTest, to_squote) {
+  EXPECT_EQ(u8"''", mobs::to_squote(""));
+  EXPECT_EQ(u8"'a'", mobs::to_squote("a"));
+  EXPECT_EQ(u8"''", mobs::to_squote("\0"));
+  EXPECT_EQ(u8"'abc'", mobs::to_squote("abc"));
+  EXPECT_EQ(u8"'ab\\'cd\\'ef'", mobs::to_squote("ab'cd'ef"));
+}
+
 TEST(objtypeTest, string2x) {
 
   char32_t c32;

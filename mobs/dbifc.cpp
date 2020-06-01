@@ -22,134 +22,162 @@
 #include "dbifc.h"
 
 #include <utility>
-#include "mongo.h"
 
+#ifdef USE_MONGO
+#include "mongo.h"
+#endif
+#ifdef USE_MARIA
+#include "maria.h"
+#endif
 
 namespace mobs {
 namespace {
 
-  class Database {
-  public:
+class Database {
+public:
 //    ConnectionInformation connectionInformation;
-    std::shared_ptr<DatabaseConnection> connection;
-    std::string database;
-  };
+  std::shared_ptr<DatabaseConnection> connection;
+  std::string database;
+};
 }
 
 
 
 
-  class DatabaseManagerData {
-  public:
-    void addConnection(const std::string &connectionName, const ConnectionInformation &connectionInformation);
-    void copyConnection(const std::string &connectionName, const std::string &oldConnectionName, const std::string &database);
+class DatabaseManagerData {
+public:
+  void addConnection(const std::string &connectionName, const ConnectionInformation &connectionInformation);
+  void copyConnection(const std::string &connectionName, const std::string &oldConnectionName, const std::string &database);
 
-    DatabaseInterface getDbIfc(const std::string &connectionName);
+  DatabaseInterface getDbIfc(const std::string &connectionName);
 
-    std::map<std::string, Database> connections;
-  };
+  std::map<std::string, Database> connections;
+};
 
-  void DatabaseManagerData::addConnection(const std::string &connectionName,
-                                          const ConnectionInformation &connectionInformation) {
-    // zuständiges Datenbankmodul ermitteln
-    size_t pos = connectionInformation.m_url.find(':');
-    if (pos == std::string::npos)
-      throw std::runtime_error(u8"invalid URL");
-    std::string db = connectionInformation.m_url.substr(0, pos);
-    if (db == "mongodb")
-    {
-      Database &dbCon = connections[connectionName];
-      auto dbi = std::make_shared<mongoDatabaseConnection>(connectionInformation);
-      dbCon.database = connectionInformation.m_database;
-      dbCon.connection = dbi;
-    } else
-      throw std::runtime_error(db + u8" is not a supported database");
-  }
-
-  void DatabaseManagerData::copyConnection(const std::string &connectionName, const std::string &oldConnectionName,
-                                           const std::string &database) {
-    auto i = connections.find(oldConnectionName);
-    if (i == connections.end())
-      throw std::runtime_error(oldConnectionName + u8" is not a valid connection");
+void DatabaseManagerData::addConnection(const std::string &connectionName,
+                                        const ConnectionInformation &connectionInformation) {
+  // zuständiges Datenbankmodul ermitteln
+  size_t pos = connectionInformation.m_url.find(':');
+  if (pos == std::string::npos)
+    throw std::runtime_error(u8"invalid URL");
+  std::string db = connectionInformation.m_url.substr(0, pos);
+#ifdef USE_MONGO
+  if (db == "mongodb")
+  {
     Database &dbCon = connections[connectionName];
-    dbCon.connection = i->second.connection;
-    dbCon.database = database;
+    auto dbi = std::make_shared<mongoDatabaseConnection>(connectionInformation);
+    dbCon.database = connectionInformation.m_database;
+    dbCon.connection = dbi;
+    return;
   }
-
-  DatabaseInterface DatabaseManagerData::getDbIfc(const std::string &connectionName) {
-    auto i = connections.find(connectionName);
-    if (i == connections.end())
-      throw std::runtime_error(connectionName + u8" is not a valid connection");
-    Database &dbCon = i->second;
-
-    return DatabaseInterface(dbCon.connection, dbCon.database);
+#endif
+#ifdef USE_MARIA
+  if (db == "mariadb")
+  {
+    Database &dbCon = connections[connectionName];
+    auto dbi = std::make_shared<MariaDatabaseConnection>(connectionInformation);
+    dbCon.database = connectionInformation.m_database;
+    dbCon.connection = dbi;
+    return;
   }
+#endif
+  throw std::runtime_error(db + u8" is not a supported database");
+}
+
+void DatabaseManagerData::copyConnection(const std::string &connectionName, const std::string &oldConnectionName,
+                                         const std::string &database) {
+  auto i = connections.find(oldConnectionName);
+  if (i == connections.end())
+    throw std::runtime_error(oldConnectionName + u8" is not a valid connection");
+  Database &dbCon = connections[connectionName];
+  dbCon.connection = i->second.connection;
+  dbCon.database = database;
+}
+
+DatabaseInterface DatabaseManagerData::getDbIfc(const std::string &connectionName) {
+  auto i = connections.find(connectionName);
+  if (i == connections.end())
+    throw std::runtime_error(connectionName + u8" is not a valid connection");
+  Database &dbCon = i->second;
+
+  return DatabaseInterface(dbCon.connection, dbCon.database);
+}
 
 
 
 
 
 
-  //////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  DatabaseManager::DatabaseManager() {
-    if (manager)
-      throw std::runtime_error(u8"DatabaseManager already exists");
-    manager = this;
-    data = new DatabaseManagerData;
-  }
+DatabaseManager::DatabaseManager() {
+  if (manager)
+    throw std::runtime_error(u8"DatabaseManager already exists");
+  manager = this;
+  data = new DatabaseManagerData;
+}
 
-  DatabaseManager::~DatabaseManager() {
-    delete data;
-    manager = nullptr;
-  }
-
-
-  DatabaseManager *DatabaseManager::manager = nullptr;
-
-  void DatabaseManager::addConnection(const std::string &connectionName,
-                                      const ConnectionInformation &connectionInformation) {
-    data->addConnection(connectionName, connectionInformation);
-  }
-
-  DatabaseInterface DatabaseManager::getDbIfc(const std::string &connectionName) {
-    return data->getDbIfc(connectionName);
-  }
-
-  void DatabaseManager::copyConnection(const std::string &connectionName, const std::string &oldConnectionName,
-                                       const std::string &database) {
-
-  }
+DatabaseManager::~DatabaseManager() {
+  delete data;
+  manager = nullptr;
+}
 
 
-  //////////////////////////////////////////////////////////////////////////////////////////////////////
+DatabaseManager *DatabaseManager::manager = nullptr;
 
-  DatabaseInterface::DatabaseInterface(std::shared_ptr<DatabaseConnection> dbi, std::string dbName)
-          : dbCon(std::move(dbi)), databaseName(std::move(dbName)), timeout(0) {  }
+void DatabaseManager::addConnection(const std::string &connectionName,
+                                    const ConnectionInformation &connectionInformation) {
+  data->addConnection(connectionName, connectionInformation);
+}
 
-  bool DatabaseInterface::load(ObjectBase &obj) {
-    return dbCon->load(*this, obj);
-  }
+DatabaseInterface DatabaseManager::getDbIfc(const std::string &connectionName) {
+  return data->getDbIfc(connectionName);
+}
 
-  void DatabaseInterface::save(const ObjectBase &obj) {
-    dbCon->save(*this, obj);
-  }
+void DatabaseManager::copyConnection(const std::string &connectionName, const std::string &oldConnectionName,
+                                     const std::string &database) {
 
-  bool DatabaseInterface::destroy(const ObjectBase &obj) {
-    return dbCon->destroy(*this, obj);
-  }
+}
 
-  std::shared_ptr<DbCursor> DatabaseInterface::query(ObjectBase &obj, const std::string &query) {
-    return dbCon->query(*this, obj, query);
-  }
 
-  std::shared_ptr<DbCursor> DatabaseInterface::qbe(ObjectBase &obj) {
-    return dbCon->qbe(*this, obj);
-  }
+//////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  void DatabaseInterface::retrieve(ObjectBase &obj, std::shared_ptr<mobs::DbCursor> cursor) {
-    dbCon->retrieve(*this, obj, cursor);
-  }
+DatabaseInterface::DatabaseInterface(std::shared_ptr<DatabaseConnection> dbi, std::string dbName)
+        : dbCon(std::move(dbi)), databaseName(std::move(dbName)), timeout(0) {  }
+
+bool DatabaseInterface::load(ObjectBase &obj) {
+  return dbCon->load(*this, obj);
+}
+
+void DatabaseInterface::save(const ObjectBase &obj) {
+  dbCon->save(*this, obj);
+}
+
+bool DatabaseInterface::destroy(const ObjectBase &obj) {
+  return dbCon->destroy(*this, obj);
+}
+
+std::shared_ptr<DbCursor> DatabaseInterface::query(ObjectBase &obj, const std::string &query) {
+  return dbCon->query(*this, obj, query, false);
+}
+
+std::shared_ptr<DbCursor> DatabaseInterface::qbe(ObjectBase &obj) {
+  return dbCon->query(*this, obj, "", true);
+}
+
+void DatabaseInterface::retrieve(ObjectBase &obj, std::shared_ptr<mobs::DbCursor> cursor) {
+  if (not cursor->valid())
+    throw std::runtime_error("DatabaseInterface: cursor is not valid");
+  dbCon->retrieve(*this, obj, cursor);
+}
+
+void DatabaseInterface::dropAll(const ObjectBase &obj) {
+  dbCon->dropAll(*this, obj);
+}
+
+void DatabaseInterface::structure(const ObjectBase &obj) {
+  dbCon->structure(*this, obj);
+}
 
 
 }

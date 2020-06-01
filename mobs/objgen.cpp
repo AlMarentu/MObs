@@ -37,6 +37,21 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
   return MemVarCfg(confToken.size() + base -1);
 }
 
+static mobs::MemVarCfg hatFeatureAllg(mobs::MemVarCfg c, const std::vector<mobs::MemVarCfg> &config)
+{
+  for (auto i:config) {
+    if (i == c)
+      return i;
+    else if (c == AltNameBase and i >= AltNameBase and i <= AltNameEnd)
+      return i;
+    else if (c == ColNameBase and i >= ColNameBase and i <= ColNameEnd)
+      return i;
+    else if (c == PrefixBase and i >= PrefixBase and i <= PrefixEnd)
+      return i;
+  }
+    return Unset;
+}
+
 /////////////////////////////////////////////////
 /// MemberBase
 /////////////////////////////////////////////////
@@ -44,24 +59,23 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 void MemberBase::doConfig(MemVarCfg c)
 {
   switch(c) {
-    case Unset: break;
-    case Embedded: break;
+    case DbCompact:
+    case XmlAsAttr: m_config.push_back(c); break;
     case InitialNull: nullAllowed(true); break;
     case Key1 ... Key5: m_key = c - Key1 + 1; break;
     case AltNameBase ... AltNameEnd: m_altName = c; break;
-    case ColNameBase ... ColNameEnd: break;
-    case PrefixBase ... PrefixEnd: break;
-    case XmlAsAttr: m_config.push_back(c); break;
+    case Unset:
+    case Embedded:
+    case DbDetail:
+    case ColNameBase ... ColNameEnd:
+    case PrefixBase ... PrefixEnd:
     case VectorNull: break;
   }
 }
 
 MemVarCfg MemberBase::hasFeature(MemVarCfg c) const
 {
-  for (auto i:m_config)
-    if (i == c)
-      return i;
-  return Unset;
+  return hatFeatureAllg(c, m_config);
 }
 
 
@@ -113,37 +127,35 @@ void MemBaseVector::activate()
 {
 //  LOG(LM_INFO, "ACTIVATE MemberBaseVector " << m_name);
   setNull(false);
-  if (parent()) parent()->activate();
+  if (m_parent) m_parent->activate();
 }
 
 void MemBaseVector::doConfig(MemVarCfg c)
 {
   switch(c) {
-    case Unset: break;
-    case Embedded: break;
-    case XmlAsAttr: break;
+    case PrefixBase ... PrefixEnd:
+    case ColNameBase ... ColNameEnd:
+    case DbDetail: m_config.push_back(c); break; // für Vector selbst
+    case DbCompact:
+    case InitialNull: m_c.push_back(c); break; // für Member-Elemente
     case VectorNull: nullAllowed(true); break;
-    case Key1 ... Key5: break;
     case AltNameBase ... AltNameEnd: m_altName = c; break;
-    case ColNameBase ... ColNameEnd: break;
-    case PrefixBase ... PrefixEnd: break;
-    case InitialNull: m_c.push_back(c); break;
+    case Unset:
+    case Key1 ... Key5:
+    case Embedded:
+    case XmlAsAttr: break;
   }
 
 }
 
 MemVarCfg MemBaseVector::hasFeature(MemVarCfg c) const
 {
-  for (auto i:m_config)
-    if (i == c)
-      return i;
-  return Unset;
+  return hatFeatureAllg(c, m_config);
 }
 
 std::string MemBaseVector::getName(const ConvToStrHint &cth) const {
   return getNameAll(m_parent, name(), m_altName, cth);
 }
-
 
 /////////////////////////////////////////////////
 /// ObjectBase
@@ -180,14 +192,16 @@ void ObjectBase::clearModified() {
 void ObjectBase::doConfig(MemVarCfg c)
 {
   switch(c) {
-    case Unset: break;
-    case XmlAsAttr: break;
+    case DbDetail:
     case PrefixBase ... PrefixEnd:
     case Embedded: m_config.push_back(c); break;
     case InitialNull: nullAllowed(true); break;
     case Key1 ... Key5: m_key = c - Key1 + 1; break;
     case AltNameBase ... AltNameEnd: m_altName = c; break;
-    case ColNameBase ... ColNameEnd: break;
+    case Unset:
+    case XmlAsAttr:
+    case ColNameBase ... ColNameEnd:
+    case DbCompact:
     case VectorNull: break;
   }
 }
@@ -203,6 +217,8 @@ void ObjectBase::doConfigObj(MemVarCfg c)
     case AltNameBase ... AltNameEnd: break;
     case PrefixBase ... PrefixEnd: break;
     case ColNameBase ... ColNameEnd: m_config.push_back(c); break;
+    case DbCompact:
+    case DbDetail:
     case VectorNull: break;
   }
 }
@@ -224,17 +240,7 @@ const std::string &ObjectBase::getConf(MemVarCfg c) const
 
 MemVarCfg ObjectBase::hasFeature(MemVarCfg c) const
 {
-  for (auto i:m_config) {
-    if (i == c)
-      return i;
-    else if (c == AltNameBase and i >= AltNameBase and i <= AltNameEnd)
-      return i;
-    else if (c == ColNameBase and i >= ColNameBase and i <= ColNameEnd)
-      return i;
-    else if (c == PrefixBase and i >= PrefixBase and i <= PrefixEnd)
-      return i;
-  }
-  return Unset;
+  return hatFeatureAllg(c, m_config);
 }
 
 void ObjectBase::regMem(MemberBase *mem)
@@ -323,82 +329,6 @@ MemberBase *ObjectBase::getMemInfo(const std::string &name, const ConvObjFromStr
 }
 
 
-
-
-void ObjectBase::traverse(ObjTravConst &trav) const
-{
-  bool inNull = trav.inNull;
-
-  if (trav.doObjBeg(*this))
-  {
-    size_t arrayIndex = trav.arrayIndex;
-    for (auto const &m:mlist)
-    {
-      trav.arrayIndex = SIZE_MAX;
-      trav.inNull = inNull or isNull();
-      if (m.mem)
-        m.mem->traverse(trav);
-      if (m.vec)
-        m.vec->traverse(trav);
-      if (m.obj)
-        m.obj->traverse(trav);
-    }
-    trav.inNull = inNull;
-    trav.arrayIndex = arrayIndex;
-    trav.doObjEnd(*this);
-  }
-}
-
-void ObjectBase::traverse(ObjTrav &trav)
-{
-  if (trav.doObjBeg(*this))
-  {
-    size_t arrayIndex = trav.arrayIndex;
-    for (auto const &m:mlist)
-    {
-      trav.arrayIndex = SIZE_MAX;
-      if (m.mem)
-        m.mem->traverse(trav);
-      if (m.vec)
-        m.vec->traverse(trav);
-      if (m.obj)
-      {
-        //cerr << "ooo " << m.obj->varName()  << endl;
-        m.obj->traverse(trav);
-      }
-    }
-    trav.arrayIndex = arrayIndex;
-    trav.doObjEnd(*this);
-  }
-}
-
-void ObjectBase::traverseKey(ObjTravConst &trav) const
-{
-  // Element-Liste nach Key-Nummer sortieren
-  multimap<int, const MlistInfo *> tmp;
-  for (auto const &m:mlist)
-  {
-    if (m.mem and m.mem->key() > 0)
-      tmp.insert(make_pair(m.mem->key(), &m));
-    if (m.obj and m.obj->key() > 0)
-      tmp.insert(make_pair(m.obj->key(), &m));
-  }
-  // Key-Elemente jetzt in richtiger Reihenfolge durchgehen
-  bool inNull = trav.inNull;
-  trav.keyMode = true;
-  trav.doObjBeg(*this);
-  for (auto const &i:tmp)
-  {
-    auto &m = *i.second;
-    trav.inNull = inNull or isNull();
-    if (m.mem)
-      trav.doMem(*m.mem);
-    if (m.obj)
-      m.obj->traverseKey(trav);
-  }
-  trav.inNull = inNull;
-  trav.doObjEnd(*this);
-}
 
 std::string ObjectBase::keyStr() const
 {
@@ -509,14 +439,123 @@ void ObjectBase::clear()
 }
 
 
+/////////////////////////////////////////////////
+/// traverse
+/////////////////////////////////////////////////
+
+
+void ObjectBase::traverse(ObjTravConst &trav) const
+{
+  bool wasParentMode = trav.parentMode;
+  if (trav.parentMode) {
+    if (m_parent)
+      m_parent->traverseKey(trav);
+    else if (m_parVec)
+      m_parVec->traverseKey(trav);
+    trav.parentMode = false;
+  }
+
+  bool inNull = trav.inNull;
+  trav.keyMode = false;
+  if (trav.doObjBeg(*this))
+  {
+    size_t arrayIndex = trav.arrayIndex;
+    for (auto const &m:mlist)
+    {
+      trav.arrayIndex = SIZE_MAX;
+      trav.inNull = inNull or isNull();
+      if (m.mem)
+        m.mem->traverse(trav);
+      if (m.vec)
+        m.vec->traverse(trav);
+      if (m.obj)
+        m.obj->traverse(trav);
+    }
+    trav.inNull = inNull;
+    trav.arrayIndex = arrayIndex;
+    trav.doObjEnd(*this);
+  }
+}
+
+void ObjectBase::traverse(ObjTrav &trav)
+{
+  if (trav.doObjBeg(*this))
+  {
+    size_t arrayIndex = trav.arrayIndex;
+    for (auto const &m:mlist)
+    {
+      trav.arrayIndex = SIZE_MAX;
+      if (m.mem)
+        m.mem->traverse(trav);
+      if (m.vec)
+        m.vec->traverse(trav);
+      if (m.obj)
+      {
+        //cerr << "ooo " << m.obj->varName()  << endl;
+        m.obj->traverse(trav);
+      }
+    }
+    trav.arrayIndex = arrayIndex;
+    trav.doObjEnd(*this);
+  }
+}
+
+void ObjectBase::traverseKey(ObjTravConst &trav) const
+{
+  bool wasParentMode = trav.parentMode;
+  if (trav.parentMode) {
+    if (m_parent)
+      m_parent->traverseKey(trav);
+    else if (m_parVec)
+      m_parVec->traverseKey(trav);
+    trav.parentMode = false;
+  }
+  // Element-Liste nach Key-Nummer sortieren
+  multimap<int, const MlistInfo *> tmp;
+  for (auto const &m:mlist)
+  {
+    if (m.mem and m.mem->key() > 0)
+      tmp.insert(make_pair(m.mem->key(), &m));
+    if (m.obj and m.obj->key() > 0)
+      tmp.insert(make_pair(m.obj->key(), &m));
+  }
+  // Key-Elemente jetzt in richtiger Reihenfolge durchgehen
+  bool inNull = trav.inNull;
+  trav.keyMode = true;
+  if (not wasParentMode and not trav.doObjBeg(*this))
+    return;
+  for (auto const &i:tmp)
+  {
+    auto &m = *i.second;
+    trav.inNull = inNull or isNull();
+    if (m.mem)
+      trav.doMem(*m.mem);
+    if (m.obj)
+      m.obj->traverseKey(trav);
+  }
+  trav.inNull = inNull;
+  trav.doObjEnd(*this);
+}
+
+
+void MemBaseVector::traverseKey(ObjTravConst &trav) const {
+  if (trav.parentMode) {
+    if (m_parent)
+      m_parent->traverseKey(trav);
+    trav.parentMode = false;
+  }
+}
+
+
+
+
 
 /////////////////////////////////////////////////
 /// ObjectBase::get/set/Variable
 /////////////////////////////////////////////////
 
 bool ObjectBase::setVariable(const std::string &path, const std::string &value) {
-  ObjectNavigator on;
-  on.cfs = on.cfs.useDontShrink();
+  ObjectNavigator on(ConvObjFromStr().useDontShrink());
   on.pushObject(*this);
   if (not on.find(path))
     return false;
@@ -528,8 +567,7 @@ bool ObjectBase::setVariable(const std::string &path, const std::string &value) 
 }
 
 std::string ObjectBase::getVariable(const std::string &path, bool *found, bool compact) const {
-  ObjectNavigator on;
-  on.cfs = on.cfs.useDontShrink();
+  ObjectNavigator on(ConvObjFromStr().useDontShrink());
   on.pushObject(*const_cast<ObjectBase *>(this));
   if (found)
     *found = false;
