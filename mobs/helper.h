@@ -35,7 +35,6 @@ public:
   explicit ElementNames(ConvObjToString c) : cth(std::move(c)) { names.push(""); };
 
   virtual void valueStmt(const std::string &name, const MemberBase &mem, bool compact) = 0;
-  // Todo Arrays auf mind. Size 1
 
   /// \private
   bool doObjBeg(const ObjectBase &obj) final
@@ -45,6 +44,8 @@ public:
     if (obj.isNull() and cth.omitNull())
       return false;
     if (not obj.isModified() and cth.modOnly())
+      return false;
+    if (inArray() and arrayIndex() > 0)
       return false;
     std::string name = obj.getName(cth);
     if (not name.empty())
@@ -81,7 +82,8 @@ public:
       return;
     if (not mem.isModified() and cth.modOnly())
       return;
-//    if (not inArray())
+    if (inArray() and arrayIndex() > 0)
+      return;
     bool compact = cth.compact();
     if (mem.is_chartype(cth) and mem.hasFeature(mobs::DbCompact))
       compact = true;
@@ -108,7 +110,10 @@ private:
 class GenerateSql : virtual public ObjTravConst {
 public:
   enum Mode { Fields, Keys, Query, Values, Update, Create, Join, UpdateValues, UpdateFields };
-  explicit GenerateSql(Mode m, ConvObjToString c) : mode(m), cth(std::move(c)) { };
+  explicit GenerateSql(Mode m, ConvObjToString c) : mode(m), cth(std::move(c)) {
+    if (mode == Create)
+      arrayStructureMode = true;
+  };
 
   virtual std::string createStmt(const MemberBase &mem, bool compact) {
     std::stringstream res;
@@ -162,7 +167,7 @@ public:
       return false;
     if (not obj.isModified() and cth.modOnly())
       return false;
-    if (inArray() and arrayIndex > 0)
+    if (inArray() and arrayIndex() > 0)
       return false;
     level++;
     return true;
@@ -197,7 +202,7 @@ public:
       if (mode == Fields or mode == Keys or mode == UpdateFields)
         return true;
 
-      res << arrayIndex;
+      res << arrayIndex();
       return true;
     }
 //    if (vec.hasFeature(mobs::DbDetail)) {

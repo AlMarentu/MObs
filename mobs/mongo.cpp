@@ -176,7 +176,7 @@ public:
     if (not obj.isModified() and cth.modOnly())
       return false;
     if (inArray() and noArrays)
-      return arrayIndex == 0;
+      return arrayIndex() == 0;
     level.push(Level(level.empty() or (obj.key() and level.top().isKey)));
     return true;
   };
@@ -271,7 +271,7 @@ public:
       return;
     if (not mem.isModified() and cth.modOnly())
       return;
-    if (inArray() and noArrays and arrayIndex != 0)
+    if (inArray() and noArrays and arrayIndex() != 0)
       return;
 
     std::string name = mem.getName(cth);
@@ -717,6 +717,7 @@ std::shared_ptr<DbCursor> mongoDatabaseConnection::query(DatabaseInterface &dbi,
   // Projektion macht hier keinen Sinn
   if (not dbi.getCountCursor()) {
     BsonElements bo(mobs::ConvObjToString().exportWoNull());
+    bo.arrayStructureMode = true;
     bo.index = true;
     obj.traverse(bo);
     LOG(LM_DEBUG, "Projection " << collectionName(obj) << " " << bo.result());

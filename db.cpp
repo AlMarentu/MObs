@@ -101,6 +101,9 @@ void worker(mobs::DatabaseInterface &dbi) {
     if (not dbi.load(f3))
       LOG(LM_INFO, "Gesapann 12 exisitiert nicht");
 
+    f3.id(4);
+    if (dbi.destroy(f3))
+      LOG(LM_INFO, "Gespann 4 gelöscht");
   }
   catch (exception &e)
   {

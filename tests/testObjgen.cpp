@@ -563,7 +563,7 @@ public:
     fst = false;
     
     res << quoteKeys << name << quoteKeys << ":";
-    if (inNull or mem.isNull())
+    if (inNull() or mem.isNull())
       res << "null";
     else if (mem.is_chartype(cth))
       res << mobs::to_quote(mem.toStr(cth));

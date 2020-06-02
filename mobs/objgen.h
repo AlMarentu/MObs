@@ -208,7 +208,8 @@ objname(const std::string &name, ObjectBase *t, const std::vector<mobs::MemVarCf
   { if (t) t->regObj(this); doInit(); objname::init(); setModified(false); } \
 objname &operator=(const objname &rhs) { if (this != &rhs) { doCopy(rhs); } return *this; } \
 static ObjectBase *createMe(ObjectBase *parent = nullptr) { if (parent) return new objname(#objname, parent, { }); else return new objname(); } \
-std::string typeName() const override { return #objname; }
+std::string typeName() const override { return #objname; } \
+static std::string objName() { return #objname; }
 
 /*! \brief Makro um eine Objektklasse am Objekt-Generator anzumelden
  @param name Name des Objektes
@@ -225,6 +226,8 @@ RegMe##name RegMe##name::regme; \
 }
 
 
+template <class T>
+class MemberVector;
 class ObjTrav;
 class ObjTravConst;
 
@@ -317,6 +320,8 @@ public:
   void activate();
   /// Abfrage gesetzter  Attribute
   MemVarCfg hasFeature(MemVarCfg c) const;
+  /// \private
+  static std::string objName() { return ""; }
 
 
 protected:
@@ -335,8 +340,6 @@ private:
 
 // ------------------ VectorBase ------------------
 
-template <class T>
-class MemberVector;
 
 /// \brief Basisklasse für Vektoren auf Membervariablen oder Objekten innerhalb von von \c ObjectBase angeleiteten Klasse
 ///
@@ -364,6 +367,8 @@ public:
   virtual size_t size() const = 0;
   /// Vergrößert/verkleinert die Elementzahl des Vektors
   virtual void resize(size_t s) = 0;
+  /// liefert den Namen des Elementes des Vektor Variablen falls diese ein Mobs-Objekt ist
+  virtual std::string contentObjName() const = 0;
   /// liefert den Namen der Vektor variablen
   inline std::string name() const { return m_name; }
   /// Config-Token alternativer Name oder \c SIZE_T_MAX
@@ -376,8 +381,6 @@ public:
   virtual MemberBase *getMemInfo(size_t i) = 0;
   /// liefert einen Zeiger auf das entsprechende Element, falls es eine \c MemObj ist
   virtual ObjectBase *getObjInfo(size_t i) = 0;
-  /// \private
-  virtual ObjectBase *createNewObj() const = 0;
   /// Setze Inhalt auf leer; äquivalent zu \c resize(0)
   void clear() { resize(0); }
   /// Setze Inhalt auf null
@@ -739,7 +742,8 @@ public:
   void traverse(ObjTravConst &trav) const override;
   MemberBase *getMemInfo(size_t i) override { if (i >= size()) return nullptr; return dynamic_cast<MemberBase *>(werte[i]); }
   ObjectBase *getObjInfo(size_t i) override { if (i >= size()) return nullptr; return dynamic_cast<ObjectBase *>(werte[i]); }
-  ObjectBase *createNewObj() const override;
+  std::string contentObjName() const override { return T::objName(); }
+
 
 //  void push_back(const T &t) { operator[](size()) = t; }
 //  benötigt Member::operator= und Member::Member(const T &t)
@@ -801,17 +805,17 @@ void MemberVector<T>::resize(size_t s)
   }
 }
 
-template<class T>
-ObjectBase *MemberVector<T>::createNewObj() const {
-  if (std::is_base_of<ObjectBase, T>::value) {
-    T *o = new T(const_cast<MemberVector<T> *>(this), m_parent, m_c);
-    ObjectBase *obj = dynamic_cast<ObjectBase *>(o);
-    if (not obj)
-      throw std::runtime_error("invalid cast");
-    return obj;
-  }
-  return nullptr;
-}
+//template<class T>
+//ObjectBase *MemberVector<T>::createNewObj() const {
+//  if (std::is_base_of<ObjectBase, T>::value) {
+//    T *o = new T(const_cast<MemberVector<T> *>(this), m_parent, m_c);
+//    ObjectBase *obj = dynamic_cast<ObjectBase *>(o);
+//    if (not obj)
+//      throw std::runtime_error("invalid cast");
+//    return obj;
+//  }
+//  return nullptr;
+//}
 
 template<typename T, class C>
 void Member<T, C>::memInfo(MobsMemberInfo &i) const
@@ -839,6 +843,10 @@ void Member<T, C>::memInfo(MobsMemberInfo &i) const
 /// Basisklasse zum rekursiven Durchlauf über eine Objektstruktur
 class ObjTrav {
 public:
+  template <class T>
+  friend class MemberVector;
+  friend class ObjectBase;
+  friend class MemBaseVector;
   virtual ~ObjTrav() = default;
   /// Callbackfunktion, die bei Betreten eines Objektes aufgerufen wird
   /// \return wenn false zurückgeliefert wird, das gesamte Objekt übersprungen
@@ -853,14 +861,21 @@ public:
   /// Callbackfunktion, die bei einer Varieblen aufgerufen wird
   virtual void doMem(MemberBase &mem) = 0;
   /// Zeigt an, ob gerade ein Array durchlaufen wird
-  bool inArray() const { return arrayIndex != SIZE_MAX; }
+  bool inArray() const { return m_arrayIndex != SIZE_MAX; }
   /// Ist das Element Teil eines Vektors, wird die Index-Position angezeigt, ansonsten ist der Wert \c SIZE_MAX
-  size_t arrayIndex = SIZE_MAX;
+  size_t arrayIndex() const { return m_arrayIndex; }
+
+private:
+    size_t m_arrayIndex = SIZE_MAX;
 };
 
 /// Basisklasse zum rekursiven Durchlauf über eine  \c const  Objektstruktur
 class ObjTravConst {
 public:
+  template <class T>
+  friend class MemberVector;
+  friend class ObjectBase;
+  friend class MemBaseVector;
   virtual ~ObjTravConst() = default;
   /// Callbackfunktion, die bei Betreten eines Objektes aufgerufen wird
   /// \return wenn false zurückgeliefert wird, das gesamte Objekt übersprungen
@@ -875,15 +890,21 @@ public:
   /// Callbackfunktion, die bei einer Varieblen aufgerufen wird
   virtual void doMem(const MemberBase &mem) = 0;
   /// Zeigt an, ob gerade ein Array durchlaufen wird
-  bool inArray() const { return arrayIndex != SIZE_MAX; }
+  bool inArray() const { return m_arrayIndex != SIZE_MAX; }
   /// Zeigt an, dass bereits ein Vaterobjekt \c null ist
-  bool inNull = false;
+  bool inNull() const { return m_inNull; }
   /// ist true, wenn ein \c traversKey durchgeführt wird
-  bool keyMode = false;
-  /// traversiere rückwärts über parent()
-  bool parentMode = false;
+  bool inKeyMode() const { return m_keyMode; }
   /// Ist das Element Teil eines Vektors, wird die Index-Position angezeigt, ansonsten ist der Wert \c SIZE_MAX
-  size_t arrayIndex = SIZE_MAX;
+  size_t arrayIndex() const { return m_arrayIndex; }
+  /// traversiere zusätzlich die Schlüsselelement vom Start über parent()
+  bool parentMode = false;
+  /// traversiere bei Arrays genau ein leeres Dummy-Element
+  bool arrayStructureMode = false;
+private:
+  bool m_inNull = false;
+  size_t m_arrayIndex = SIZE_MAX;
+  bool m_keyMode = false;
 };
 
 /// Basisklasse zum sequentiellen Einfügen von Daten in ein Objekt
@@ -956,10 +977,10 @@ void MemberVector<T>::traverse(ObjTrav &trav)
   {
     size_t i = 0;
     for (auto w:werte) {
-      trav.arrayIndex = i++;
+      trav.m_arrayIndex = i++;
       w->traverse(trav);
     }
-    trav.arrayIndex = SIZE_MAX;
+    trav.m_arrayIndex = SIZE_MAX;
     trav.doArrayEnd(*this);
   }
 }
@@ -974,18 +995,24 @@ void MemberVector<T>::traverse(ObjTravConst &trav) const
     trav.parentMode = false;
   }
 
-  bool inNull = trav.inNull;
-  trav.keyMode = false;
-  if (trav.doArrayBeg(*this))
-  {
-    size_t i = 0;
-    for (auto w:werte) {
-      trav.inNull = inNull or isNull();
-      trav.arrayIndex = i++;
-      w->traverse(trav);
+  bool inNull = trav.m_inNull;
+  trav.m_keyMode = false;
+  if (trav.doArrayBeg(*this)) {
+    if (trav.arrayStructureMode) {
+      T temp(const_cast<MemberVector<T> *>(this), m_parent, m_c);
+      trav.m_inNull = inNull or isNull();
+      trav.m_arrayIndex = 0;
+      temp.traverse(trav);
+    } else {
+      size_t i = 0;
+      for (auto w:werte) {
+        trav.m_inNull = inNull or isNull();
+        trav.m_arrayIndex = i++;
+        w->traverse(trav);
+      }
     }
-    trav.inNull = inNull;
-    trav.arrayIndex = SIZE_MAX;
+    trav.m_inNull = inNull;
+    trav.m_arrayIndex = SIZE_MAX;
     trav.doArrayEnd(*this);
   }
 }

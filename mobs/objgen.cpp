@@ -343,7 +343,7 @@ std::string ObjectBase::keyStr() const
       if (not fst)
         res << ",";
       fst = false;
-      if (inNull or mem.isNull())
+      if (inNull() or mem.isNull())
         ;
       else if (mem.is_chartype(cth))
         res << mobs::to_quote(mem.toStr(cth));
@@ -455,15 +455,15 @@ void ObjectBase::traverse(ObjTravConst &trav) const
     trav.parentMode = false;
   }
 
-  bool inNull = trav.inNull;
-  trav.keyMode = false;
+  bool inNull = trav.m_inNull;
+  trav.m_keyMode = false;
   if (trav.doObjBeg(*this))
   {
-    size_t arrayIndex = trav.arrayIndex;
+    size_t arrayIndex = trav.m_arrayIndex;
     for (auto const &m:mlist)
     {
-      trav.arrayIndex = SIZE_MAX;
-      trav.inNull = inNull or isNull();
+      trav.m_arrayIndex = SIZE_MAX;
+      trav.m_inNull = inNull or isNull();
       if (m.mem)
         m.mem->traverse(trav);
       if (m.vec)
@@ -471,8 +471,8 @@ void ObjectBase::traverse(ObjTravConst &trav) const
       if (m.obj)
         m.obj->traverse(trav);
     }
-    trav.inNull = inNull;
-    trav.arrayIndex = arrayIndex;
+    trav.m_inNull = inNull;
+    trav.m_arrayIndex = arrayIndex;
     trav.doObjEnd(*this);
   }
 }
@@ -481,10 +481,10 @@ void ObjectBase::traverse(ObjTrav &trav)
 {
   if (trav.doObjBeg(*this))
   {
-    size_t arrayIndex = trav.arrayIndex;
+    size_t arrayIndex = trav.m_arrayIndex;
     for (auto const &m:mlist)
     {
-      trav.arrayIndex = SIZE_MAX;
+      trav.m_arrayIndex = SIZE_MAX;
       if (m.mem)
         m.mem->traverse(trav);
       if (m.vec)
@@ -495,7 +495,7 @@ void ObjectBase::traverse(ObjTrav &trav)
         m.obj->traverse(trav);
       }
     }
-    trav.arrayIndex = arrayIndex;
+    trav.m_arrayIndex = arrayIndex;
     trav.doObjEnd(*this);
   }
 }
@@ -520,20 +520,20 @@ void ObjectBase::traverseKey(ObjTravConst &trav) const
       tmp.insert(make_pair(m.obj->key(), &m));
   }
   // Key-Elemente jetzt in richtiger Reihenfolge durchgehen
-  bool inNull = trav.inNull;
-  trav.keyMode = true;
+  bool inNull = trav.m_inNull;
+  trav.m_keyMode = true;
   if (not wasParentMode and not trav.doObjBeg(*this))
     return;
   for (auto const &i:tmp)
   {
     auto &m = *i.second;
-    trav.inNull = inNull or isNull();
+    trav.m_inNull = inNull or isNull();
     if (m.mem)
       trav.doMem(*m.mem);
     if (m.obj)
       m.obj->traverseKey(trav);
   }
-  trav.inNull = inNull;
+  trav.m_inNull = inNull;
   trav.doObjEnd(*this);
 }
 

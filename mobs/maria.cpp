@@ -204,14 +204,8 @@ static std::string vecTableName(const MemBaseVector &vec, const DatabaseInterfac
   MemVarCfg c = vec.hasFeature(ColNameBase);
   if (c and vec.parent())
     return dbi.database() + "." + vec.parent()->getConf(c);
-  else {
-    ObjectBase *vecContent = vec.createNewObj();
-    if (not vecContent)
-      throw runtime_error("mysql invalid vector type");
-    std::string dbn = MariaDatabaseConnection::tableName(*vecContent, dbi); // TODO ist nicht der klassische aus der Objektdef.
-    delete vecContent;
-    return dbn;
-  }
+  else
+    return dbi.database() + "." + vec.contentObjName();
 }
 
 void MariaDatabaseConnection::open() {
@@ -388,7 +382,53 @@ void MariaDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj
 }
 
 bool MariaDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase &obj) {
-  return false;
+  open();
+  std::list<const MemBaseVector *> detailVec;
+  GenSql gs(GenerateSql::Fields, ConvObjToString());
+  gs.arrayStructureMode = true;
+  obj.traverse(gs);
+  GenSql gk(GenerateSql::Query, ConvObjToString());
+  obj.traverseKey(gk);
+
+  string q = "delete from ";
+  q += tableName(obj, dbi);
+  q += " where ";
+  q += gk.result();
+  q += ";";
+  LOG(LM_INFO, "SQL: " << q);
+  if (mysql_real_query(connection, q.c_str(), q.length()))
+    throw mysql_exception(u8"load failed", connection);
+
+  bool found = (mysql_affected_rows(connection) > 0);
+
+  detailVec.splice(detailVec.end(), gs.detailVec, gs.detailVec.begin(), gs.detailVec.end());
+  for (auto v:detailVec) {
+    GenSql gf(GenerateSql::Fields, ConvObjToString());
+    GenSql gk(GenerateSql::Values, ConvObjToString());
+    gf.parentMode = true;
+    gf.startVec = v;
+    gf.arrayStructureMode = true;
+    v->traverse(gf);
+    gk.parentMode = true;
+    gk.startVec = v;
+    v->traverseKey(gk);
+    detailVec.splice(detailVec.end(), gf.detailVec, gf.detailVec.begin(), gf.detailVec.end());
+    string dbn = vecTableName(*v, dbi);
+
+    GenSql gq(GenerateSql::Query, ConvObjToString());
+    gq.parentMode = true;
+    gq.startVec = v;
+    v->traverseKey(gq);
+    string s = "delete from ";
+    s += dbn;
+    s += " where ";
+    s += gq.result();
+    s += ";";
+    LOG(LM_DEBUG, "SQL " << s);
+    if (mysql_real_query(connection, s.c_str(), s.length()))
+      throw mysql_exception(u8"create failed", connection);
+  }
+  return found;
 }
 
 std::shared_ptr<DbCursor>
@@ -519,18 +559,16 @@ MariaDatabaseConnection::retrieve(DatabaseInterface &dbi, ObjectBase &obj, std::
 
   for (auto v:detailVec) {
     string dbn = vecTableName(*v, dbi);
-    ObjectBase *vecContent = v->createNewObj();
-    if (not vecContent)
-      throw runtime_error("mysql invalid vector type");
     GenSql gs(GenerateSql::Fields, ConvObjToString());
-    vecContent->traverse(gs);
-    delete vecContent;
+    gs.arrayStructureMode = true;
+    gs.startVec = v;
+    v->traverse(gs);
 
     GenSql gq(GenerateSql::Query, ConvObjToString());
     gq.parentMode = true;
     gq.startVec = v;
     v->traverseKey(gq);
-    string s = "select a_idx,";
+    string s = "select ";
     s += gs.result();
     s += " from ";
     s += dbn;
@@ -581,6 +619,7 @@ void MariaDatabaseConnection::dropAll(DatabaseInterface &dbi, const ObjectBase &
   for (auto v:detailVec) {
     GenSql gs(GenerateSql::Create, ConvObjToString());
     gs.parentMode = true;
+    gs.arrayStructureMode = true;
     gs.startVec = v;
     v->traverse(gs);
     detailVec.splice(detailVec.end(), gs.detailVec, gs.detailVec.begin(), gs.detailVec.end());
