@@ -48,6 +48,8 @@ static mobs::MemVarCfg hatFeatureAllg(mobs::MemVarCfg c, const std::vector<mobs:
       return i;
     else if (c == PrefixBase and i >= PrefixBase and i <= PrefixEnd)
       return i;
+    else if (c == LengthBase and i >= LengthBase and i <= LengthEnd)
+      return i;
   }
     return Unset;
 }
@@ -60,6 +62,7 @@ void MemberBase::doConfig(MemVarCfg c)
 {
   switch(c) {
     case DbCompact:
+    case LengthBase ... LengthEnd:
     case XmlAsAttr: m_config.push_back(c); break;
     case InitialNull: nullAllowed(true); break;
     case Key1 ... Key5: m_key = c - Key1 + 1; break;
@@ -135,6 +138,7 @@ void MemBaseVector::doConfig(MemVarCfg c)
   switch(c) {
     case PrefixBase ... PrefixEnd:
     case ColNameBase ... ColNameEnd:
+    case LengthBase ... LengthEnd:
     case DbDetail: m_config.push_back(c); break; // für Vector selbst
     case DbCompact:
     case InitialNull: m_c.push_back(c); break; // für Member-Elemente
@@ -194,6 +198,7 @@ void ObjectBase::doConfig(MemVarCfg c)
   switch(c) {
     case DbDetail:
     case PrefixBase ... PrefixEnd:
+    case LengthBase ... LengthEnd:
     case Embedded: m_config.push_back(c); break;
     case InitialNull: nullAllowed(true); break;
     case Key1 ... Key5: m_key = c - Key1 + 1; break;
@@ -217,6 +222,7 @@ void ObjectBase::doConfigObj(MemVarCfg c)
     case AltNameBase ... AltNameEnd: break;
     case PrefixBase ... PrefixEnd: break;
     case ColNameBase ... ColNameEnd: m_config.push_back(c); break;
+    case LengthBase ... LengthEnd:
     case DbCompact:
     case DbDetail:
     case VectorNull: break;

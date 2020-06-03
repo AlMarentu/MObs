@@ -76,6 +76,11 @@ namespace mobs {
     /// Ermittle den Collection-Namen zu einem Objekt
     static std::string tableName(const ObjectBase &obj, const DatabaseInterface &dbi) ;
 
+    /// führe ein SQL-Statement auf der DB-Connection aus
+    /// \return Anzahl betroffener Zeilen
+    /// \throw mysql_exception
+    size_t doSql(const std::string &sql);
+
     /// Direkt-Zugriff auf die MariaDB
     MYSQL *getConnection();
 

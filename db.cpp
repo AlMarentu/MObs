@@ -14,7 +14,7 @@ class Fahrzeug : virtual public mobs::ObjectBase
 public:
   ObjInit(Fahrzeug);
 
-  MemVar(string, typ);
+  MemVar(string, typ, LENGTH(40));
   MemVar(int, achsen, USENULL);
   MemVar(bool, antrieb);
 };
@@ -26,7 +26,7 @@ public:
   ObjInit(Gespann, COLNAME(vehicle));
 
   MemVar(int, id, KEYELEMENT1);
-  MemVar(string, typ, ALTNAME(bezeichnug));
+  MemVar(string, typ, ALTNAME(bezeichnug) LENGTH(50));
   MemObj(Fahrzeug, zugmaschiene);
   MemVector(Fahrzeug, haenger, COLNAME(vehicle_part));
 };

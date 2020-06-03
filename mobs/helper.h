@@ -126,8 +126,11 @@ public:
       res << "DATETIME";
     else if (mem.toDouble(d))
       res << "FLOAT";
-    else if (mem.is_chartype(mobs::ConvToStrHint(compact)))
-      res << "VARCHAR";
+    else if (mem.is_chartype(mobs::ConvToStrHint(compact))) {
+      MemVarCfg c = mem.hasFeature(LengthBase);
+      size_t n = c ? (c - LengthBase) : 30;
+      res << "VARCHAR(" << n << ")";
+    }
     else if (mi.isSigned and mi.max <= 32767)
       res << "SMALLINT";
     else if (mi.isSigned)

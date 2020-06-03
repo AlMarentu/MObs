@@ -61,8 +61,14 @@ public:
       res << "TINYINT";
     else if (mem.toDouble(d))
       res << "FLOAT";
-    else if (mem.is_chartype(mobs::ConvToStrHint(compact)))
-      res << "VARCHAR(30)";
+    else if (mem.is_chartype(mobs::ConvToStrHint(compact))) {
+      MemVarCfg c = mem.hasFeature(LengthBase);
+      size_t n = c ? (c - LengthBase): 30;
+      if (n <= 4)
+        res << "CHAR(" << n << ")";
+      else
+        res << "VARCHAR(" << n << ")";
+    }
     else if (mi.isSigned and mi.max <= 32767)
       res << "SMALLINT";
     else if (mi.isSigned)
@@ -294,6 +300,16 @@ bool MariaDatabaseConnection::load(DatabaseInterface &dbi, ObjectBase &obj) {
 
 void MariaDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj) {
   open();
+  string s = "BEGIN WORK;";
+  LOG(LM_DEBUG, "SQL " << s);
+  if (mysql_real_query(connection, s.c_str(), s.length()))
+    throw mysql_exception(u8"Transaction failed", connection);
+
+  s = "SAVEPOINT MOBS;";
+  LOG(LM_DEBUG, "SQL " << s);
+  if (mysql_real_query(connection, s.c_str(), s.length()))
+    throw mysql_exception(u8"Transaction failed", connection);
+
   std::list<const MemBaseVector *> detailVec;
   GenSql gf(GenerateSql::Fields, ConvObjToString());
   GenSql gv(GenerateSql::Values, ConvObjToString());
@@ -301,7 +317,7 @@ void MariaDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj
 //  obj.traverseKey(gk);
   obj.traverse(gf);
   obj.traverse(gv);
-  string s = "replace ";
+   s = "replace ";
   s += tableName(obj, dbi);
   s += "(";
   s += gf.result();
@@ -369,16 +385,28 @@ void MariaDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj
     s += dbn;
     s += " where ";
     s += gq.result();
-    s += " and (a_idx >";
-    s += to_string(sz-1);
-    if (not delIdx.empty())
-      s += string(" or a_idx in (") + delIdx + ")";
-    s += ");";
+    if (sz > 0) {
+      s += " and (a_idx >";
+      s += to_string(sz - 1);
+      if (not delIdx.empty())
+        s += string(" or a_idx in (") + delIdx + ")";
+      s += ")";
+    }
+    s += ";";
     LOG(LM_DEBUG, "SQL " << s);
     if (mysql_real_query(connection, s.c_str(), s.length()))
       throw mysql_exception(u8"create failed", connection);
-
   }
+
+  s = "RELEASE SAVEPOINT MOBS;";
+  LOG(LM_DEBUG, "SQL " << s);
+  if (mysql_real_query(connection, s.c_str(), s.length()))
+    throw mysql_exception(u8"Transaction failed", connection);
+
+  s = "COMMIT WORK;";
+  LOG(LM_DEBUG, "SQL " << s);
+  if (mysql_real_query(connection, s.c_str(), s.length()))
+    throw mysql_exception(u8"Transaction failed", connection);
 }
 
 bool MariaDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase &obj) {
@@ -494,6 +522,7 @@ MariaDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, const st
 
   if (not where.empty())
     q += string(" where ") + where;
+// TODO  q += " LOCK IN SHARE MODE WAIT 10 "; / NOWAIT
   q += ";";
   LOG(LM_INFO, "SQL: " << q);
 //  throw runtime_error("weg");
@@ -698,6 +727,13 @@ void MariaDatabaseConnection::structure(DatabaseInterface &dbi, const ObjectBase
 MYSQL *MariaDatabaseConnection::getConnection() {
   open();
   return connection;
+}
+
+size_t MariaDatabaseConnection::doSql(const string &sql)
+{
+  if (mysql_real_query(connection, sql.c_str(), sql.length()))
+    throw mysql_exception(u8"SQL failed", connection);
+  return mysql_affected_rows(connection);
 }
 
 

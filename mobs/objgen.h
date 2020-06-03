@@ -148,7 +148,8 @@ enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Embedded, DbComp
                  Key1, Key2, Key3, Key4, Key5,
                  AltNameBase = 1000, AltNameEnd = 1999,
                  ColNameBase = 2000, ColNameEnd = 3999,
-                 PrefixBase = 4000, PrefixEnd = 4999 };
+                 PrefixBase = 4000, PrefixEnd = 4999,
+                 LengthBase = 10000, LengthEnd = 19999 };
 /// \private
 enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confToken, const std::string &s);
 
@@ -166,7 +167,8 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 #define ALTNAME(name) ::mobs::mobsToken(::mobs::AltNameBase,m_confToken,#name), ///< Definition eines Alternativen Namens für die Ein-/Ausgabe
 #define COLNAME(name) ::mobs::mobsToken(::mobs::ColNameBase,m_confToken,#name), ///< Definition eines Alternativen Namens für den Collection-Namen (oder Tabellennamen) der Datenbank
 #define PREFIX(name) ::mobs::mobsToken(::mobs::PrefixBase,m_confToken,#name), ///< Definition eines Prefix für den Export-Namen, wenn in eine flache Struktur exportiert wird \see EMBEDDED
-
+/// Angabe der max. Länge des Strings; [1..9999] möglich
+#define LENGTH(len)  mobs::MemVarCfg((len > 0 and mobs::LengthBase +len <= mobs::LengthEnd)?mobs::LengthBase +len: mobs::LengthEnd),
 
 
 
