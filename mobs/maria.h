@@ -66,12 +66,14 @@ namespace mobs {
     std::shared_ptr<DbCursor> query(DatabaseInterface &dbi, ObjectBase &obj, const std::string &query, bool qbe) override;
     /// \private
     void retrieve(DatabaseInterface &dbi, ObjectBase &obj, std::shared_ptr<mobs::DbCursor> cursor) override;
-
+    /// \private
+    void startTransaction(DatabaseInterface &dbi, DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) override;
+    /// \private
+    void endTransaction(DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) override;
+    /// \private
+    void rollbackTransaction(DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) override;
     // ------------------------------
 
-//    void createPrimaryKey(DatabaseInterface &dbi, ObjectBase &obj);
-
-//    void create(DatabaseInterface &dbi, const ObjectBase &obj);
 
     /// Ermittle den Collection-Namen zu einem Objekt
     static std::string tableName(const ObjectBase &obj, const DatabaseInterface &dbi) ;
@@ -86,6 +88,7 @@ namespace mobs {
 
   private:
     MYSQL *connection = nullptr;
+    DbTransaction * currentTransaction = nullptr;
   };
 };
 

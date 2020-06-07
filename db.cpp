@@ -102,8 +102,20 @@ void worker(mobs::DatabaseInterface &dbi) {
       LOG(LM_INFO, "Gesapann 12 exisitiert nicht");
 
     f3.id(4);
-    if (dbi.destroy(f3))
-      LOG(LM_INFO, "Gespann 4 gelöscht");
+
+    string conName = dbi.connectionName();
+    // Transaktion als Lambda Funktion; wird dort eine Exception geworfen, wird automatisch ein Rollback ausgeführt
+    mobs::DatabaseManager::transaction_callback transCb = [&f3, conName](mobs::DbTransaction *trans) {
+      LOG(LM_INFO, "Transaktion mit " << conName);
+      mobs::DatabaseInterface t_dbi = trans->getDbIfc(conName);
+      if (t_dbi.destroy(f3))
+        LOG(LM_INFO, "Gespann 4 gelöscht");
+    };
+
+    // Transaktion ausführen
+    mobs::DatabaseManager::execute(transCb);
+
+
   }
   catch (exception &e)
   {

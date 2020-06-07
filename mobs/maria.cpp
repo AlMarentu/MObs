@@ -18,6 +18,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// TODO dirtyRead, TransaktionsLevel
 
 #include "maria.h"
 
@@ -215,6 +216,7 @@ static std::string vecTableName(const MemBaseVector &vec, const DatabaseInterfac
 }
 
 void MariaDatabaseConnection::open() {
+  LOG(LM_DEBUG, "MariaDb open " << PARAM(connection));
   if (connection)
     return;
 
@@ -259,6 +261,7 @@ void MariaDatabaseConnection::open() {
 }
 
 MariaDatabaseConnection::~MariaDatabaseConnection() {
+  LOG(LM_DEBUG, "MariaDb close");
   if (connection)
     mysql_close(connection);
   connection = nullptr;
@@ -300,162 +303,220 @@ bool MariaDatabaseConnection::load(DatabaseInterface &dbi, ObjectBase &obj) {
 
 void MariaDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj) {
   open();
-  string s = "BEGIN WORK;";
-  LOG(LM_DEBUG, "SQL " << s);
-  if (mysql_real_query(connection, s.c_str(), s.length()))
-    throw mysql_exception(u8"Transaction failed", connection);
+  // Transaktion benutzen zwecks Atomizität
+  if (currentTransaction == nullptr) {
+    string s = "BEGIN WORK;";
+    LOG(LM_DEBUG, "SQL " << s);
+    if (mysql_real_query(connection, s.c_str(), s.length()))
+      throw mysql_exception(u8"Transaction failed", connection);
+    // Wenn DBI mit Transaktion, dann in Transaktion bleiben
+  }
+  else if (currentTransaction != dbi.getTransaction())
+    throw std::runtime_error("transaction mismatch");
+  else {
+    string s = "SAVEPOINT MOBS;";
+    LOG(LM_DEBUG, "SQL " << s);
+    if (mysql_real_query(connection, s.c_str(), s.length()))
+      throw mysql_exception(u8"Transaction failed", connection);
+  }
 
-  s = "SAVEPOINT MOBS;";
-  LOG(LM_DEBUG, "SQL " << s);
-  if (mysql_real_query(connection, s.c_str(), s.length()))
-    throw mysql_exception(u8"Transaction failed", connection);
-
-  std::list<const MemBaseVector *> detailVec;
-  GenSql gf(GenerateSql::Fields, ConvObjToString());
-  GenSql gv(GenerateSql::Values, ConvObjToString());
+  try {
+    std::list<const MemBaseVector *> detailVec;
+    GenSql gf(GenerateSql::Fields, ConvObjToString());
+    GenSql gv(GenerateSql::Values, ConvObjToString());
 //  GenSql gk(GenerateSql::Query, ConvObjToString());
 //  obj.traverseKey(gk);
-  obj.traverse(gf);
-  obj.traverse(gv);
-   s = "replace ";
-  s += tableName(obj, dbi);
-  s += "(";
-  s += gf.result();
-  s += ") values (";
-  s += gv.result();
-  s += ");";
-//  s += gk.result();
-//  s += ";";
-  LOG(LM_DEBUG, "SQL " << s);
-  if (mysql_real_query(connection, s.c_str(), s.length()))
-    throw mysql_exception(u8"create failed", connection);
-
-  detailVec.splice(detailVec.end(), gf.detailVec, gf.detailVec.begin(), gf.detailVec.end());
-  for (auto v:detailVec) {
-    GenSql gf(GenerateSql::Fields, ConvObjToString());
-    GenSql gk(GenerateSql::Values, ConvObjToString());
-    gf.parentMode = true;
-    gf.startVec = v;
-    v->traverse(gf);
-    gk.parentMode = true;
-    gk.startVec = v;
-    v->traverseKey(gk);
-    detailVec.splice(detailVec.end(), gf.detailVec, gf.detailVec.begin(), gf.detailVec.end());
-    string dbn = vecTableName(*v, dbi);
-
+    obj.traverse(gf);
+    obj.traverse(gv);
     string s = "replace ";
-    s += dbn;
+    s += tableName(obj, dbi);
     s += "(";
     s += gf.result();
-    s += ") values ";
-    size_t sz = v->size();
-    string delIdx;
-    for (size_t i = 0; i < sz; i++) {
-      const ObjectBase *vobj = const_cast<MemBaseVector *>(v)->getObjInfo(i);
-      if (vobj->isNull()) {
-        if (not delIdx.empty())
-          delIdx += ",";
-        delIdx += to_string(i);
-        continue;
-      }
-      GenSql gv(GenerateSql::Values, ConvObjToString());
-      vobj->traverse(gv);
-      if (i > 0)
-        s += ",";
+    s += ") values (";
+    s += gv.result();
+    s += ");";
+//  s += gk.result();
+//  s += ";";
+    LOG(LM_DEBUG, "SQL " << s);
+    if (mysql_real_query(connection, s.c_str(), s.length()))
+      throw mysql_exception(u8"create failed", connection);
+
+    detailVec.splice(detailVec.end(), gf.detailVec, gf.detailVec.begin(), gf.detailVec.end());
+    for (auto v:detailVec) {
+      GenSql gf(GenerateSql::Fields, ConvObjToString());
+      GenSql gk(GenerateSql::Values, ConvObjToString());
+      gf.parentMode = true;
+      gf.startVec = v;
+      v->traverse(gf);
+      gk.parentMode = true;
+      gk.startVec = v;
+      v->traverseKey(gk);
+      detailVec.splice(detailVec.end(), gf.detailVec, gf.detailVec.begin(), gf.detailVec.end());
+      string dbn = vecTableName(*v, dbi);
+
+      string s = "replace ";
+      s += dbn;
       s += "(";
-      s += gk.result();
-      s += ",";
-      s += to_string(i);
-      s += ",";
-      s += gv.result();
-      s += ")";
-    }
-    s += ";";
-    if (sz > 0) {
+      s += gf.result();
+      s += ") values ";
+      size_t sz = v->size();
+      string delIdx;
+      for (size_t i = 0; i < sz; i++) {
+        const ObjectBase *vobj = const_cast<MemBaseVector *>(v)->getObjInfo(i);
+        if (vobj->isNull()) {
+          if (not delIdx.empty())
+            delIdx += ",";
+          delIdx += to_string(i);
+          continue;
+        }
+        GenSql gv(GenerateSql::Values, ConvObjToString());
+        vobj->traverse(gv);
+        if (i > 0)
+          s += ",";
+        s += "(";
+        s += gk.result();
+        s += ",";
+        s += to_string(i);
+        s += ",";
+        s += gv.result();
+        s += ")";
+      }
+      s += ";";
+      if (sz > 0) {
+        LOG(LM_DEBUG, "SQL " << s);
+        if (mysql_real_query(connection, s.c_str(), s.length()))
+          throw mysql_exception(u8"create failed", connection);
+      }
+
+      GenSql gq(GenerateSql::Query, ConvObjToString());
+      gq.parentMode = true;
+      gq.startVec = v;
+      v->traverseKey(gq);
+      s = "delete from ";
+      s += dbn;
+      s += " where ";
+      s += gq.result();
+      if (sz > 0) {
+        s += " and (a_idx >";
+        s += to_string(sz - 1);
+        if (not delIdx.empty())
+          s += string(" or a_idx in (") + delIdx + ")";
+        s += ")";
+      }
+      s += ";";
       LOG(LM_DEBUG, "SQL " << s);
       if (mysql_real_query(connection, s.c_str(), s.length()))
         throw mysql_exception(u8"create failed", connection);
     }
-
-    GenSql gq(GenerateSql::Query, ConvObjToString());
-    gq.parentMode = true;
-    gq.startVec = v;
-    v->traverseKey(gq);
-    s = "delete from ";
-    s += dbn;
-    s += " where ";
-    s += gq.result();
-    if (sz > 0) {
-      s += " and (a_idx >";
-      s += to_string(sz - 1);
-      if (not delIdx.empty())
-        s += string(" or a_idx in (") + delIdx + ")";
-      s += ")";
-    }
+  } catch (exception &e) {
+    string s = "ROLLBACK WORK";
+    if (currentTransaction)
+      s += " TO SAVEPOINT MOBS";
     s += ";";
     LOG(LM_DEBUG, "SQL " << s);
     if (mysql_real_query(connection, s.c_str(), s.length()))
-      throw mysql_exception(u8"create failed", connection);
+      throw mysql_exception(u8"Transaction failed", connection);
+    throw e;
   }
 
-  s = "RELEASE SAVEPOINT MOBS;";
-  LOG(LM_DEBUG, "SQL " << s);
-  if (mysql_real_query(connection, s.c_str(), s.length()))
-    throw mysql_exception(u8"Transaction failed", connection);
-
-  s = "COMMIT WORK;";
+  string s;
+  if (currentTransaction)
+    s = "RELEASE SAVEPOINT MOBS;";
+  else
+    s = "COMMIT WORK;";
   LOG(LM_DEBUG, "SQL " << s);
   if (mysql_real_query(connection, s.c_str(), s.length()))
     throw mysql_exception(u8"Transaction failed", connection);
 }
 
+
+
 bool MariaDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase &obj) {
   open();
-  std::list<const MemBaseVector *> detailVec;
-  GenSql gs(GenerateSql::Fields, ConvObjToString());
-  gs.arrayStructureMode = true;
-  obj.traverse(gs);
-  GenSql gk(GenerateSql::Query, ConvObjToString());
-  obj.traverseKey(gk);
+  // Transaktion benutzen zwecks Atomizität
+  if (currentTransaction == nullptr) {
+    string s = "BEGIN WORK;";
+    LOG(LM_DEBUG, "SQL " << s);
+    if (mysql_real_query(connection, s.c_str(), s.length()))
+      throw mysql_exception(u8"Transaction failed", connection);
+    // Wenn DBI mit Transaktion, dann in Transaktion bleiben
+  }
+  else if (currentTransaction != dbi.getTransaction())
+    throw std::runtime_error("transaction mismatch");
+  else {
+    string s = "SAVEPOINT MOBS;";
+    LOG(LM_DEBUG, "SQL " << s);
+    if (mysql_real_query(connection, s.c_str(), s.length()))
+      throw mysql_exception(u8"Transaction failed", connection);
+  }
 
-  string q = "delete from ";
-  q += tableName(obj, dbi);
-  q += " where ";
-  q += gk.result();
-  q += ";";
-  LOG(LM_INFO, "SQL: " << q);
-  if (mysql_real_query(connection, q.c_str(), q.length()))
-    throw mysql_exception(u8"load failed", connection);
+  bool found = false;
+  try {
+    std::list<const MemBaseVector *> detailVec;
+    GenSql gs(GenerateSql::Fields, ConvObjToString());
+    gs.arrayStructureMode = true;
+    obj.traverse(gs);
+    GenSql gk(GenerateSql::Query, ConvObjToString());
+    obj.traverseKey(gk);
 
-  bool found = (mysql_affected_rows(connection) > 0);
+    string q = "delete from ";
+    q += tableName(obj, dbi);
+    q += " where ";
+    q += gk.result();
+    q += ";";
+    LOG(LM_INFO, "SQL: " << q);
+    if (mysql_real_query(connection, q.c_str(), q.length()))
+      throw mysql_exception(u8"delete failed", connection);
 
-  detailVec.splice(detailVec.end(), gs.detailVec, gs.detailVec.begin(), gs.detailVec.end());
-  for (auto v:detailVec) {
-    GenSql gf(GenerateSql::Fields, ConvObjToString());
-    GenSql gk(GenerateSql::Values, ConvObjToString());
-    gf.parentMode = true;
-    gf.startVec = v;
-    gf.arrayStructureMode = true;
-    v->traverse(gf);
-    gk.parentMode = true;
-    gk.startVec = v;
-    v->traverseKey(gk);
-    detailVec.splice(detailVec.end(), gf.detailVec, gf.detailVec.begin(), gf.detailVec.end());
-    string dbn = vecTableName(*v, dbi);
+    found = (mysql_affected_rows(connection) > 0);
 
-    GenSql gq(GenerateSql::Query, ConvObjToString());
-    gq.parentMode = true;
-    gq.startVec = v;
-    v->traverseKey(gq);
-    string s = "delete from ";
-    s += dbn;
-    s += " where ";
-    s += gq.result();
+    detailVec.splice(detailVec.end(), gs.detailVec, gs.detailVec.begin(), gs.detailVec.end());
+    for (auto v:detailVec) {
+      GenSql gf(GenerateSql::Fields, ConvObjToString());
+      GenSql gk(GenerateSql::Values, ConvObjToString());
+      gf.parentMode = true;
+      gf.startVec = v;
+      gf.arrayStructureMode = true;
+      v->traverse(gf);
+      gk.parentMode = true;
+      gk.startVec = v;
+      v->traverseKey(gk);
+      detailVec.splice(detailVec.end(), gf.detailVec, gf.detailVec.begin(), gf.detailVec.end());
+      string dbn = vecTableName(*v, dbi);
+
+      GenSql gq(GenerateSql::Query, ConvObjToString());
+      gq.parentMode = true;
+      gq.startVec = v;
+      v->traverseKey(gq);
+      string s = "delete from ";
+      s += dbn;
+      s += " where ";
+      s += gq.result();
+      s += ";";
+      LOG(LM_DEBUG, "SQL " << s);
+      if (mysql_real_query(connection, s.c_str(), s.length()))
+        throw mysql_exception(u8"create failed", connection);
+    }
+  } catch (exception &e) {
+    string s = "ROLLBACK WORK";
+    if (currentTransaction)
+      s += " TO SAVEPOINT MOBS";
     s += ";";
     LOG(LM_DEBUG, "SQL " << s);
     if (mysql_real_query(connection, s.c_str(), s.length()))
-      throw mysql_exception(u8"create failed", connection);
+      throw mysql_exception(u8"Transaction failed", connection);
+    throw e;
   }
+
+  string s;
+  if (currentTransaction)
+    s = "RELEASE SAVEPOINT MOBS;";
+  else
+    s = "COMMIT WORK;";
+  LOG(LM_DEBUG, "SQL " << s);
+  if (mysql_real_query(connection, s.c_str(), s.length()))
+    throw mysql_exception(u8"Transaction failed", connection);
+
   return found;
 }
 
@@ -701,15 +762,7 @@ void MariaDatabaseConnection::structure(DatabaseInterface &dbi, const ObjectBase
     v->traverse(gs);
     detailVec.splice(detailVec.end(), gs.detailVec, gs.detailVec.begin(), gs.detailVec.end());
     string s = "create table ";
-    if (v->size() > 0) {
-      MemVarCfg c = v->hasFeature(ColNameBase);
-      if (c and v->parent())
-        s += dbi.database() + "." + v->parent()->getConf(c);
-      else
-        s += MariaDatabaseConnection::tableName(*const_cast<MemBaseVector *>(v)->getObjInfo(0), dbi);
-    }
-    else
-      throw runtime_error("TODO");
+    s += vecTableName(*v, dbi);
     s += "(";
     s += gs.result();
     s += ", unique(";
@@ -734,6 +787,43 @@ size_t MariaDatabaseConnection::doSql(const string &sql)
   if (mysql_real_query(connection, sql.c_str(), sql.length()))
     throw mysql_exception(u8"SQL failed", connection);
   return mysql_affected_rows(connection);
+}
+
+void MariaDatabaseConnection::startTransaction(DatabaseInterface &dbi, DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) {
+  open();
+  if (currentTransaction == nullptr) {
+    // SET SESSION idle_transaction_timeout=2;
+    // SET SESSION idle_transaction_timeout=2, SESSION idle_readonly_transaction_timeout=10;
+    string s = "BEGIN WORK;";
+    LOG(LM_DEBUG, "SQL " << s);
+    if (mysql_real_query(connection, s.c_str(), s.length()))
+      throw mysql_exception(u8"Transaction failed", connection);
+    currentTransaction = transaction;
+  }
+  else if (currentTransaction != transaction)
+    throw std::runtime_error("transaction mismatch"); // hier geht nur eine Transaktion gleichzeitig
+}
+
+void MariaDatabaseConnection::endTransaction(DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) {
+  if (currentTransaction == nullptr)
+    return;
+  else if (currentTransaction != transaction)
+    throw std::runtime_error("transaction mismatch");
+  string s = "COMMIT WORK;";
+  LOG(LM_DEBUG, "SQL " << s);
+  if (mysql_real_query(connection, s.c_str(), s.length()))
+    throw mysql_exception(u8"Transaction failed", connection);
+  currentTransaction = nullptr;
+}
+
+void MariaDatabaseConnection::rollbackTransaction(DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) {
+  if (currentTransaction == nullptr)
+    return;
+  string s = "ROLLBACK WORK;";
+  LOG(LM_DEBUG, "SQL " << s);
+  if (mysql_real_query(connection, s.c_str(), s.length()))
+    throw mysql_exception(u8"Transaction failed", connection);
+  currentTransaction = nullptr;
 }
 
 

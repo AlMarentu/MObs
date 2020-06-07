@@ -41,14 +41,14 @@ namespace mobs {
    * Mongo and MongoDB are registered trademarks of MongoDB, Inc.
    * \see www.mongodb.com
    */
-  class mongoDatabaseConnection : virtual public DatabaseConnection, public ConnectionInformation {
+  class MongoDatabaseConnection : virtual public DatabaseConnection, public ConnectionInformation {
   public:
     /// \private
     friend DatabaseManagerData;
     /// \private
-    explicit mongoDatabaseConnection(const ConnectionInformation &connectionInformation) :
+    explicit MongoDatabaseConnection(const ConnectionInformation &connectionInformation) :
             DatabaseConnection(), ConnectionInformation(connectionInformation) { };
-    ~mongoDatabaseConnection() override = default;
+    ~MongoDatabaseConnection() override = default;
 
     /// \private
     void open();
@@ -66,7 +66,12 @@ namespace mobs {
     std::shared_ptr<DbCursor> query(DatabaseInterface &dbi, ObjectBase &obj, const std::string &query, bool qbe) override;
     /// \private
     void retrieve(DatabaseInterface &dbi, ObjectBase &obj, std::shared_ptr<mobs::DbCursor> cursor) override;
-
+    /// \private
+    void startTransaction(DatabaseInterface &dbi, DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) override;
+    /// \private
+    void endTransaction(DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) override;
+    /// \private
+    void rollbackTransaction(DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) override;
     // ------------------------------
 
     void create(DatabaseInterface &dbi, const ObjectBase &obj);

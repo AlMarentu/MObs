@@ -18,6 +18,10 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// TODO dirtyRead, TransaktionsLevel
+// TODO Transaktionen (benötigt sharded Installation)
+// TODO Erkennung ob Datanbank shardet (also über mongos)
+// TODO Passwort und User aus ConnectionObjekt übernehmen
 
 #include "mongo.h"
 
@@ -551,7 +555,7 @@ public:
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
 class Cursor : public virtual mobs::DbCursor {
-  friend class mobs::mongoDatabaseConnection;
+  friend class mobs::MongoDatabaseConnection;
 public:
   explicit Cursor(mongocxx::cursor &&c, std::shared_ptr<DatabaseConnection> dbi, std::string dbName) :
           cursor(std::move(c)), it(cursor.begin()), dbCon(std::move(dbi)), databaseName(std::move(dbName)) { }
@@ -568,7 +572,7 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 class CountCursor : public virtual mobs::DbCursor {
-  friend class mobs::mongoDatabaseConnection;
+  friend class mobs::MongoDatabaseConnection;
 public:
   explicit CountCursor(size_t size) { cnt = size; }
   ~CountCursor() override = default;;
@@ -577,7 +581,13 @@ public:
   void operator++() override { }
 };
 
+using mongocxx::v_noabi::client_session;
 
+class MongoTransactionDbInfo : public TransactionDbInfo {
+public:
+  MongoTransactionDbInfo(client_session &&cs) : session(std::move(cs)) {}
+  client_session session;
+};
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -587,7 +597,7 @@ public:
 
 namespace mobs {
 
-std::string mongoDatabaseConnection::collectionName(const ObjectBase &obj) {
+std::string MongoDatabaseConnection::collectionName(const ObjectBase &obj) {
   MemVarCfg c = obj.hasFeature(ColNameBase);
   if (c)
     return obj.getConf(c);
@@ -595,16 +605,17 @@ std::string mongoDatabaseConnection::collectionName(const ObjectBase &obj) {
 }
 
 
-void mongoDatabaseConnection::open() {
+void MongoDatabaseConnection::open() {
   if (not connected) {
     mongocxx::uri u(m_url);
+    // "mongodb://my_user:password@localhost:27017/my_database?ssl=true"
     mongocxx::client c(u);
     client = std::move(c);
     connected = true;
   }
 }
 
-bool mongoDatabaseConnection::load(DatabaseInterface &dbi, ObjectBase &obj) {
+bool MongoDatabaseConnection::load(DatabaseInterface &dbi, ObjectBase &obj) {
   open();
   BsonOut bo(mobs::ConvObjToString().exportExtendet());
   obj.traverseKey(bo);
@@ -623,7 +634,7 @@ bool mongoDatabaseConnection::load(DatabaseInterface &dbi, ObjectBase &obj) {
   return true;
 }
 
-void mongoDatabaseConnection::create(DatabaseInterface &dbi, const ObjectBase &obj) {
+void MongoDatabaseConnection::create(DatabaseInterface &dbi, const ObjectBase &obj) {
   open();
   BsonOut bo(mobs::ConvObjToString().exportExtendet().exportWoNull());
   obj.traverse(bo);
@@ -639,8 +650,9 @@ void mongoDatabaseConnection::create(DatabaseInterface &dbi, const ObjectBase &o
   LOG(LM_DEBUG, "OID " << oid.get_oid().value.to_string());
 }
 
-void mongoDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj) {
+void MongoDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj) {
   open();
+  auto mtdb = static_cast<MongoTransactionDbInfo *>(dbi.transactionDbInfo());
 
   // TODO create overwrite update
   BsonOut bk(mobs::ConvObjToString().exportExtendet());
@@ -665,20 +677,32 @@ void mongoDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj
     LOG(LM_DEBUG, "UPSERTED " << oid->get_oid().value.to_string());
 }
 
-bool mongoDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase &obj) {
+bool MongoDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase &obj) {
   open();
+//  DbTransaction *tdb = dbi.getTransaction();
+//  if (tdb) {
+//    auto mtdb = static_cast<MongoTransactionDbInfo *>(tdb->transactionDbInfo(dbi));
+  auto mtdb = static_cast<MongoTransactionDbInfo *>(dbi.transactionDbInfo());
+
   BsonOut bo(mobs::ConvObjToString().exportExtendet());
   obj.traverseKey(bo);
   LOG(LM_DEBUG, "DESTROY " << dbi.database() << "." << collectionName(obj) << " " <<  bo.result());
 
   mongocxx::database db = client[dbi.database()];
+  if (mtdb) {
+    LOG(LM_DEBUG, "drop with session");
+    auto result = db[collectionName(obj)].delete_one(mtdb->session, bo.value());
+    if (not result)
+      throw runtime_error(u8"destroy returns with error");
+    return result->deleted_count() != 0;
+  }
   auto result = db[collectionName(obj)].delete_one(bo.value());
   if (not result)
     throw runtime_error(u8"destroy returns with error");
   return result->deleted_count() != 0;
 }
 
-void mongoDatabaseConnection::dropAll(DatabaseInterface &dbi, const ObjectBase &obj) {
+void MongoDatabaseConnection::dropAll(DatabaseInterface &dbi, const ObjectBase &obj) {
   open();
   LOG(LM_DEBUG, "DROP COLLECTOION " << dbi.database() << "." << collectionName(obj));
 
@@ -686,7 +710,7 @@ void mongoDatabaseConnection::dropAll(DatabaseInterface &dbi, const ObjectBase &
   db[collectionName(obj)].drop();
 }
 
-void mongoDatabaseConnection::structure(DatabaseInterface &dbi, const ObjectBase &obj) {
+void MongoDatabaseConnection::structure(DatabaseInterface &dbi, const ObjectBase &obj) {
   open();
   mongocxx::database db = client[dbi.database()];
   // db.test.createIndex({ id: 1 }, { unique: true })
@@ -699,15 +723,17 @@ void mongoDatabaseConnection::structure(DatabaseInterface &dbi, const ObjectBase
   db[collectionName(obj)].create_index(bo.value(), idx.extract());
 }
 
-std::shared_ptr<DbCursor> mongoDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, const std::string& query, bool qbe) {
+std::shared_ptr<DbCursor> MongoDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, const std::string& query, bool qbe) {
   open();
   mongocxx::database db = client[dbi.database()];
   mongocxx::collection col = db[collectionName(obj)];
 
-  // Read concern nur für replica sets
-//    mongocxx::read_concern rc = col.read_concern();
-//    if (changedReadConcern(rc, dbi))
-//      col.read_concern(rc);
+  auto mtdb = static_cast<MongoTransactionDbInfo *>(dbi.transactionDbInfo());
+  if (mtdb) {
+    mongocxx::read_concern rc = col.read_concern();
+    if (changedReadConcern(rc, dbi))
+      col.read_concern(rc);
+  }
 
   mongocxx::options::find f_opt = mongocxx::options::find().skip(dbi.getQuerySkip()).limit(dbi.getQueryLimit());
   mongocxx::options::count c_opt = mongocxx::options::count().skip(dbi.getQuerySkip());
@@ -750,7 +776,7 @@ std::shared_ptr<DbCursor> mongoDatabaseConnection::query(DatabaseInterface &dbi,
 }
 
 void
-mongoDatabaseConnection::retrieve(DatabaseInterface &dbi, ObjectBase &obj, std::shared_ptr<mobs::DbCursor> cursor) {
+MongoDatabaseConnection::retrieve(DatabaseInterface &dbi, ObjectBase &obj, std::shared_ptr<mobs::DbCursor> cursor) {
   auto curs = std::dynamic_pointer_cast<Cursor>(cursor);
   if (not curs)
     throw runtime_error("invalid cursor");
@@ -763,31 +789,68 @@ mongoDatabaseConnection::retrieve(DatabaseInterface &dbi, ObjectBase &obj, std::
 }
 
 
-mongocxx::database mongoDatabaseConnection::getDb(DatabaseInterface &dbi) {
+mongocxx::database MongoDatabaseConnection::getDb(DatabaseInterface &dbi) {
   open();
   return client[dbi.database()];
 }
 
-bool mongoDatabaseConnection::changedReadConcern(mongocxx::read_concern &rc, const DatabaseInterface &dbi) {
+bool MongoDatabaseConnection::changedReadConcern(mongocxx::read_concern &rc, const DatabaseInterface &dbi) {
+  auto trans = dbi.getTransaction();
+  if (not trans)
+    return false;
   auto lv = mongocxx::v_noabi::read_concern::level::k_unknown;
-  switch (dbi.getIsolation()) {
-    case DatabaseInterface::ReadUncommitted:
+  switch (trans->getIsolation()) {
+    case DbTransaction::ReadUncommitted:
       lv = mongocxx::v_noabi::read_concern::level::k_local; break;
-    case DatabaseInterface::ReadCommitted:
+    case DbTransaction::ReadCommitted:
       lv = mongocxx::v_noabi::read_concern::level::k_majority; break;
-    case DatabaseInterface::RepeatableRead:
+    case DbTransaction::RepeatableRead:
       lv = mongocxx::v_noabi::read_concern::level::k_linearizable; break;
-    case DatabaseInterface::CursorStability:
-    case DatabaseInterface::Serializable:
+    case DbTransaction::CursorStability:
+    case DbTransaction::Serializable:
       lv = mongocxx::v_noabi::read_concern::level::k_snapshot; break;
   }
 
   if (rc.acknowledge_level() == lv)
     return false;
   rc.acknowledge_level(lv);
-  LOG(LM_DEBUG, "changing isolation level " << int(dbi.getIsolation()));
+  LOG(LM_DEBUG, "changing isolation level " << int(trans->getIsolation()));
   return true;
 }
 
+
+void MongoDatabaseConnection::startTransaction(DatabaseInterface &dbi, DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) {
+  open();
+//  if (not tdb) {
+//    LOG(LM_DEBUG, "MongoDB startTransaction");
+//    auto mtdb = make_shared<MongoTransactionDbInfo>(client.start_session());
+//    tdb = mtdb;
+//    mtdb->session.start_transaction();
+//  }
+}
+
+void MongoDatabaseConnection::endTransaction(DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) {
+  if ((tdb)) {
+    LOG(LM_DEBUG, "MongoDB endTransaction");
+    auto mtdb = static_pointer_cast<MongoTransactionDbInfo>(tdb);
+    if ((mtdb)) {
+      mtdb->session.commit_transaction();
+      return;
+    }
+  }
+//  throw std::runtime_error("endTransaction missing TransactinInfo");
+}
+
+void MongoDatabaseConnection::rollbackTransaction(DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) {
+  if ((tdb)) {
+    LOG(LM_DEBUG, "MongoDB rollbackTransaction");
+    auto mtdb = static_pointer_cast<MongoTransactionDbInfo>(tdb);
+    if ((mtdb)) {
+      mtdb->session.abort_transaction();
+      return;
+    }
+  }
+//  throw std::runtime_error("rollbackTransaction missing TransactinInfo");
+}
 
 }

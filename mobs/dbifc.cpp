@@ -50,6 +50,7 @@ public:
   void copyConnection(const std::string &connectionName, const std::string &oldConnectionName, const std::string &database);
 
   DatabaseInterface getDbIfc(const std::string &connectionName);
+  std::string connectionName(std::shared_ptr<mobs::DatabaseConnection> dbCon, const std::string &dbName) const;
 
   std::map<std::string, Database> connections;
 };
@@ -65,7 +66,7 @@ void DatabaseManagerData::addConnection(const std::string &connectionName,
   if (db == "mongodb")
   {
     Database &dbCon = connections[connectionName];
-    auto dbi = std::make_shared<mongoDatabaseConnection>(connectionInformation);
+    auto dbi = std::make_shared<MongoDatabaseConnection>(connectionInformation);
     dbCon.database = connectionInformation.m_database;
     dbCon.connection = dbi;
     return;
@@ -103,6 +104,13 @@ DatabaseInterface DatabaseManagerData::getDbIfc(const std::string &connectionNam
   return DatabaseInterface(dbCon.connection, dbCon.database);
 }
 
+std::string DatabaseManagerData::connectionName(std::shared_ptr<mobs::DatabaseConnection> dbCon, const std::string &dbName) const {
+  for (auto &i:connections) {
+    if (i.second.connection == dbCon and i.second.database == dbName)
+      return i.first;
+  }
+  return std::string();
+}
 
 
 
@@ -136,7 +144,117 @@ DatabaseInterface DatabaseManager::getDbIfc(const std::string &connectionName) {
 
 void DatabaseManager::copyConnection(const std::string &connectionName, const std::string &oldConnectionName,
                                      const std::string &database) {
+  data->copyConnection(connectionName, oldConnectionName, database);
+}
 
+
+void DatabaseManager::execute(DatabaseManager::transaction_callback &cb) {
+  LOG(LM_DEBUG, "TRANSACTION STARTING");
+
+  DbTransaction transaction{};
+
+  try {
+    cb(&transaction);
+  } catch (std::exception &e) {
+    LOG(LM_DEBUG, "TRANSACTION FAILED " << e.what());
+    transaction.finish(false);
+    throw std::runtime_error(std::string(u8"DbTransaction error: ") + e.what());
+  } catch (...) {
+    LOG(LM_DEBUG, "TRANSACTION FAILED ...");
+    transaction.finish(false);
+    throw std::runtime_error(u8"DbTransaction error: unknown exception");
+  }
+   transaction.finish(true);
+
+
+  LOG(LM_DEBUG, "TRANSACTION FINISHED");
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+class DbTransactionData {
+public:
+  class DTI {
+  public:
+    std::shared_ptr<TransactionDbInfo> tdb{};
+    std::shared_ptr<DatabaseConnection> dbCon{};
+  };
+  std::map<const DatabaseConnection *, DTI> connections;
+  DbTransaction::IsolationLevel isolationLevel = DbTransaction::RepeatableRead;
+
+};
+
+
+
+DbTransaction::DbTransaction() : data(new DbTransactionData) {
+}
+
+DbTransaction::~DbTransaction() {
+  delete data;
+}
+
+DatabaseInterface DbTransaction::getDbIfc(const std::string &connectionName) {
+  DatabaseManager *dbm = DatabaseManager::instance();
+  if (not dbm)
+    throw std::runtime_error("DatabaseManager invalid");
+  DatabaseInterface dbi = dbm->getDbIfc(connectionName);
+
+  DbTransactionData::DTI &dti = data->connections[&*dbi.dbCon];
+  if (not dti.dbCon)
+    dti.dbCon = dbi.dbCon;
+  dbi.dbCon->startTransaction(dbi, this, dti.tdb);
+  dbi.transaction = this;
+  return dbi;
+}
+
+void DbTransaction::finish(bool good) {
+  bool error = false;
+  std::string msg;
+  for (auto &i:data->connections) {
+    auto dti = i.second;
+    try {
+      if (good)
+        dti.dbCon->endTransaction(this, dti.tdb);
+      else
+        dti.dbCon->rollbackTransaction(this, dti.tdb);
+    } catch (std::exception &e) {
+      error = true;
+      if (good) {
+        LOG(LM_ERROR, "TRANSACTION FINISH FAILED " << e.what());
+        msg += " ";
+        msg += e.what();
+      }
+      else
+        LOG(LM_DEBUG, "Transaction rollback " << e.what());
+    } catch (...) {
+      error = true;
+      if (good) {
+        LOG(LM_ERROR, "TRANSACTION FINISH FAILED Unknown exception");
+        msg += " unknown exception";
+      }
+      else
+        LOG(LM_DEBUG, "Transaction rollback unknown exception");
+    }
+  }
+  if (error and good)
+    throw std::runtime_error(std::string(u8"DbTransaction Commit error: ") + msg);
+}
+
+TransactionDbInfo *DbTransaction::transactionDbInfo(const DatabaseInterface &dbi) {
+  auto it = data->connections.find(&*dbi.dbCon);
+  if (it != data->connections.end())
+    return it->second.tdb.get();
+  else
+    LOG(LM_ERROR, "TransactionDbInfo not found");
+  return nullptr;
+}
+
+DbTransaction::IsolationLevel DbTransaction::getIsolation() const {
+  return data->isolationLevel;
+}
+
+void DbTransaction::setIsolation(DbTransaction::IsolationLevel level) {
+  data->isolationLevel = level;
 }
 
 
@@ -177,6 +295,20 @@ void DatabaseInterface::dropAll(const ObjectBase &obj) {
 
 void DatabaseInterface::structure(const ObjectBase &obj) {
   dbCon->structure(*this, obj);
+}
+
+std::string DatabaseInterface::connectionName() const {
+  DatabaseManager *dbm = DatabaseManager::instance();
+  if (not dbm)
+    throw std::runtime_error("DatabaseManager invalid");
+
+  return dbm->data->connectionName(dbCon, databaseName);
+}
+
+TransactionDbInfo *DatabaseInterface::transactionDbInfo() const {
+  if (transaction)
+    return transaction->transactionDbInfo(*this);
+  return nullptr;
 }
 
 
