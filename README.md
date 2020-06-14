@@ -18,8 +18,9 @@ hierarchische Definitionen.
 MObs versucht hier die typische C++-Klassenstruktur in die gewünschten Zielstrukturen abzubilden, indem
 - Datei Im- und Exportschnittstellen für XML (in den Zeichensätzen UTF-8, ISO8859-1,9,15, UTF1-6)
 - Konvertierroutinen von und nach JSON
-- Datenbankoperationen (MongoDb[^1] bzw. MariaDb[^1] in Arbeit)
+- Datenbankoperationen (MongoDb[^1] bzw. MariaDb[^1])
 angeboten werden.
+In SQL-Datenbanken werden automatisch Master-Detail-Tabellen angelegt, um Arrays von Subobjekten ablegen zu können.
 
 Mobs vereint hier eine Vereinfachung der Deklaration über Basisklassen und Definitionsmakros. So lässt sich sehr einfach 
 eine Struktur abbilden, die dann entsprechend
@@ -29,6 +30,8 @@ Navigation sowie textbasierte Zugriffe auf die Elemente.
 Weitere Features sind die
 - Behandlung von NULL-values
 - Möglichkeit der Definition von primär-Schlüsseln aus mehreren Elementen
+- Versionierung von Datensätzen, um Veränderungen zwischen Lesen und Speichern zu erkennen
+- Transaktionen bei Datenbankoperationen
 - Markierung von geänderten Elementen
 - Verwaltung von enum-Tags im Klartext
 - Ablage verschiedener Objekte in einer Liste (MobsUnion)
@@ -235,7 +238,6 @@ Konfiguriert werden kann:
 Als binäres Objekt kann eine MemVar vom Typ std::vector<u_char> verwendet werden. Es ist ratsam, keine zu großen Objekte
 zu speichern, da bei einigen Operationen, wie auch der Zuweisung, der Inhalt umkopiert werden muss. 
 
-
 Bei der Serialisierung wird automatisch in Base64 gewandelt
 
 ### Traversierung
@@ -252,14 +254,121 @@ ausgelöste werden.
 Über den ObjectNavaigator könne Objekte-Teile gezielt angesprochen werden.
 
 
+## Datenbank-Interface
+
+### Datenbank Manager
+Alle Datenbanken werden im DatabaseManager zusammengefasst. Dort werden alle Datenbanken die verwendet werden registriert.
+Der DatabaseManager kann nur einmal instanziiert werden. Dies muss nach main() erfolgen. Das Objekt ist so anzulegen,
+dass es beim Verlassen des Scopes von main() auch wieder vernichtet wird, um korrekt aufzuräumen. (Siehe CERT-ERR58-CPP)
+
+~~~~~~~~~~cpp
+main() {
+  mobs::DatabaseManager dbMgr;
+  dbMgr.addConnection("my_mongo_db", mobs::ConnectionInformation("mongodb://localhost:27017", "mobs"));
+  dbMgr.addConnection("my_maria_db", mobs::ConnectionInformation("mariadb://localhost:", "mobs"));
+~~~~~~~~~~
+Über eine static Member kann global darauf zugegriffen werden.
+Vom DatabaseManager werden Kopien vom DatabaseInterface abgerufen.
+~~~~~~~~~~cpp
+  mobs::DatabaseInterface dbi = dbMgr.getDbIfc("my_mongo_db");
+~~~~~~~~~~
+
+### DatabaseInterface
+Das DatabaseInterface dient als Schnittstelle für alle Datenbankoperationen. Dazu muss in den den Objektdefinitionen
+ein oder mehrer Schlüsselelemente definiert werden, die als Primary-Key dienen. 
+Es können noch weitere Optionsfelder wie abweichende Datenbankbezeichner oder Versionierungs-Informationen
+angegeben werden.
+~~~~~~~~~~cpp
+ class MobObject : virtual public mobs::ObjectBase
+ {
+ public:
+   ObjInit(MobObject, COLNAME(vehicle));  // COLNAME übergibt einen vom Klassennamen abweichenden Tabellennamen an
+ 
+   MemVar(int, id, KEYELEMENT1);          // KEYELEMENT definiert die Schlüsselelemente
+   MemVar(int, version, VERSIONFIELD);    // VERSIONFIELD definiert das Versionsfeld, falls Versionierung erwünscht
+   MemVar(string, typ, ALTNAME(bezeichnug) LENGTH(50));
+                                          // Weiterer Inhalt, mit alternativen Spaltennamen und Angabe einer optionalen Feldlänge
+~~~~~~~~~~
+Der Zugriff auf Objekte erfolgt dann, indem die Schlüsselelemente des Objektes gesetzt und im
+Anschluss das Objekt vom DatabaseInterface angefordert wird.
+~~~~~~~~~~cpp
+   MobsObjetct f3;
+    f3.id(2);
+    if (dbi.load(f3))
+      ...
+~~~~~~~~~~
+Zum Speichern wird einfach das gefüllte Objekt mittels save an das DatabaseInterface übergeben.
+
+Für Die Suche kann entweder die Bedingung als String übergeben werden. Diese Bedingung muss aber
+entsprechend der Datenbank formuliert werden.
+
+Einfacher ist die Query By Example. Hier wird anhand beliebig vorbesetzter Felder eines Objektes
+gesucht:
+~~~~~~~~~~cpp
+  f2.clearModified();
+  f2.haenger[0].achsen(2);
+  for (auto cursor = dbi.qbe(f2); not cursor->eof(); cursor->next()) {
+    dbi.retrieve(f2, cursor);
+    ...
+  }
+~~~~~~~~~~
+Wird über den Inhalt eines Sub-Arrays gesucht, darf nur das erste Element eines Vektors benutz werden.
+Werden mehrere Felder gesetzt, so müssen alle Bedingungen zutreffen.
+
+### Atomizität
+Alle Operationen auf das DatabaseInterface werden atomar ausgeführt, oweit von der Datenbank unterstützt.
+Dies gilt auch, wenn bei SQL die Subelemente eines Arrays in Master-Detail-Tabellen gespeichert werden.
+
+Für zusammenhängende Operationen mehrerer beteiligter Objekte, steht eine Transaktion zur Verfügung.
+
+Hier wird die Gesamt-Operation als Lambda-Funktion definiert, und dann komplett vom DatabaseManager
+ausgeführt.
+~~~~~~~~~~cpp
+   mobs::DatabaseManager::transaction_callback transCb = 
+           [&f1,&f2](mobs::DbTransaction *trans) {
+
+       mobs::DatabaseInterface t_dbi = trans->getDbIfc("my_database");
+       t_dbi.save(f2);
+       t_dbi.destroy(f1);
+       ...
+   };
+ 
+   mobs::DatabaseManager::execute(transCb);
+~~~~~~~~~~
+Dabei muss das DatabaseInterface erneut, vom Transaktionsinterface, geholt werden.
+
+Wird innerhalb der Callback-Funktion eine Exception geworfen, so wird ein Rollback ausgeführt.
+Der Inhalt aller involvierten Speicher-Objekte ist dann inkonsistent.
+
+Die Atomizität bei Operationen über verschiedenen Datenbanken wird hier nur insoweit geleistet,
+als dass der finale Commit für alle Datenbanken am Enden der Transaktion nacheinander abläuft.
+ 
+### Objekt-Versionierung
+Wird über das Token VERSIONFIELD eine Versions-Variable definiert, wird dort automatisch die
+Version des Datensatzes verwaltet. Je Objekt darf nur eine Versionsvariable existieren. Sie muss 
+im selben Ebenenbereich ligen, wie Schlüsselelemente.
+
+Version 0 bedeutet, dass dieses Objekt noch nicht in der Datenbank existiert.
+
+Bei jedem Speichern wird die Version automatisch hochgezählt. Bei allen Operationen wird geprüft,
+ob die Objekt-Version mit der Datenbank-Version übereinstimmt. Im fehlerfall wird die Operation 
+abgebrochen.
+
+Bei den SQL-Feature mit automatischen Master-Detail-Tabellen, Wird die Version nur in der 
+Mater-Tabelle verwaltet.
+
+
 ## Objektverwaltung NamedPool
-Über ein extra Modul können beliebige Objekte in einen Pool abgelegt werden. Der Zugriff erfogt nur
+Über ein extra Modul können beliebige Objekte in einen Pool abgelegt werden. Der Zugriff erfolgt nur
 über den Objekt-Namen.
+
+Die Verwendung der einzelnen Objekte kommt dann globalen Variablen gleich und führt zu analogen Nebeneffekten.
+Einer Verwendung als globalen Object-Cache wird, aus langjähriger Erfahrung, dringend abgeraten. 
 
 Darüber lassen sich
 * einfache Caches
 * Objekt-Referenzen,
-* On-Demand Datenbakkzugriffe
+* On-Demand Datenbakzugriffe
 * in-Memory Datenbanken
 usw. realisieren
 
@@ -268,6 +377,13 @@ Zum Übersetzen wird ein c++11 Compiler inkl. STL benötigt. Für die Test-Suite
 Die Entwicklung erfolgt mit clang version 11.0.3
 
 Build und Installation erfolgen über cmake
+Folgende Defines können angegeben werden:
+- BUILD_MARIA_INTERFACE
+- BUILD_MONGO_INTERFACE
+- BUILD_DOC
+- PACKAGE_TESTS
+
+Für die jeweiligen Optionen werden die entsprenden Zusatzpakete benötigt.
 
 ## Module
 * objtypes.h Typ-Deklarationen
