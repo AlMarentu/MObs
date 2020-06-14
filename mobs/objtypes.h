@@ -482,6 +482,8 @@ public:
   bool omitNull() const { return onull; }
   /// \private
   bool modOnly() const { return modified; }
+  /// \private
+  bool skipVersion() const { return skipVers; }
   /// Ausgabe als XML-Datei
   ConvObjToString exportXml() const { ConvObjToString c(*this); c.xml = true; return c; }
   /// Ausgabe als JSON
@@ -504,11 +506,14 @@ public:
   ConvObjToString exportWoNull() const { ConvObjToString c(*this); c.onull = true; return c; }
   /// Ausgabe von Elementen mit Modified-Flag
   ConvObjToString exportModified() const { ConvObjToString c(*this); c.modified = true; return c; }
+  /// Überspringe Versions-Elemente
+  ConvObjToString exportSkipVersion() const { ConvObjToString c(*this); c.skipVers = true; return c; }
 private:
   bool xml = false;
   bool quotes = false;
   bool onull = false;
   bool modified = false;
+  bool skipVers = false;
 
 };
 
@@ -655,7 +660,10 @@ public:
   bool isTime = false; ///< Wert ist Millsekunde seit Unix-Epoche i64 ist gesetzt
   bool is_spezialized = false; ///< is_spezialized aus std::numeric_limits
   bool isBlob = false; ///< Binär-Daten-Objekt
-
+  /// fülle ein Time-Struct mit local time (nur wenn isTime == true)
+  void toLocalTime(struct ::tm &ts) const;
+  /// fülle ein Time-Struct mit gmt (nur wenn isTime == true)
+  void toGMTime(struct ::tm &ts) const;
 
 };
 

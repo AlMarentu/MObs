@@ -64,8 +64,9 @@ void MemberBase::doConfig(MemVarCfg c)
     case DbCompact:
     case LengthBase ... LengthEnd:
     case XmlAsAttr: m_config.push_back(c); break;
-    case InitialNull: nullAllowed(true); break;
+    case InitialNull: nullAllowed(true); m_null = true; break;
     case Key1 ... Key5: m_key = c - Key1 + 1; break;
+    case DbVersionField: m_key = INT_MAX; break;
     case AltNameBase ... AltNameEnd: m_altName = c; break;
     case Unset:
     case Embedded:
@@ -147,7 +148,9 @@ void MemBaseVector::doConfig(MemVarCfg c)
     case Unset:
     case Key1 ... Key5:
     case Embedded:
-    case XmlAsAttr: break;
+    case XmlAsAttr:
+    case DbVersionField:
+      break;
   }
 
 }
@@ -185,8 +188,8 @@ void ObjectBase::clearModified() {
   public:
     bool doObjBeg(ObjectBase &obj) override { obj.setModified(false); return true; }
     void doObjEnd(ObjectBase &obj) override {  }
-    bool doArrayBeg(MemBaseVector &vec) override { vec.setModified(false); return true; }
-    void doArrayEnd(MemBaseVector &vec) override { }
+    bool doArrayBeg(MemBaseVector &vec) override {  return true; }
+    void doArrayEnd(MemBaseVector &vec) override { vec.setModified(false); }
     void doMem(MemberBase &mem) override { mem.setModified(false); }
   };
   ClearModified cm;
@@ -207,7 +210,9 @@ void ObjectBase::doConfig(MemVarCfg c)
     case XmlAsAttr:
     case ColNameBase ... ColNameEnd:
     case DbCompact:
-    case VectorNull: break;
+    case VectorNull:
+    case DbVersionField:
+      break;
   }
 }
 
@@ -225,7 +230,9 @@ void ObjectBase::doConfigObj(MemVarCfg c)
     case LengthBase ... LengthEnd:
     case DbCompact:
     case DbDetail:
-    case VectorNull: break;
+    case VectorNull:
+    case DbVersionField:
+      break;
   }
 }
 
@@ -452,14 +459,17 @@ void ObjectBase::clear()
 
 void ObjectBase::traverse(ObjTravConst &trav) const
 {
-  bool wasParentMode = trav.parentMode;
-  if (trav.parentMode) {
-    if (m_parent)
-      m_parent->traverseKey(trav);
-    else if (m_parVec)
-      m_parVec->traverseKey(trav);
-    trav.parentMode = false;
-  }
+//  /// traversiere zusätzlich die Schlüsselelement vom Start über parent()
+//  // in ObjTravConst: inbool parentMode = false;
+//
+//  bool wasParentMode = trav.parentMode;
+//  if (trav.parentMode) {
+//    if (m_parent)
+//      m_parent->traverseKey(trav);
+//    else if (m_parVec)
+//      m_parVec->traverseKey(trav);
+//    trav.parentMode = false;
+//  }
 
   bool inNull = trav.m_inNull;
   trav.m_keyMode = false;
@@ -508,14 +518,16 @@ void ObjectBase::traverse(ObjTrav &trav)
 
 void ObjectBase::traverseKey(ObjTravConst &trav) const
 {
-  bool wasParentMode = trav.parentMode;
-  if (trav.parentMode) {
-    if (m_parent)
-      m_parent->traverseKey(trav);
-    else if (m_parVec)
-      m_parVec->traverseKey(trav);
-    trav.parentMode = false;
-  }
+  trav.m_keyMode = true;
+//  bool wasParentMode = trav.parentMode;
+//  if (trav.parentMode) {
+//    if (m_parent)
+//      m_parent->traverseKey(trav);
+//    else if (m_parVec)
+//      m_parVec->traverseKey(trav);
+//    trav.parentMode = false;
+//  }
+
   // Element-Liste nach Key-Nummer sortieren
   multimap<int, const MlistInfo *> tmp;
   for (auto const &m:mlist)
@@ -528,13 +540,14 @@ void ObjectBase::traverseKey(ObjTravConst &trav) const
   // Key-Elemente jetzt in richtiger Reihenfolge durchgehen
   bool inNull = trav.m_inNull;
   trav.m_keyMode = true;
-  if (not wasParentMode and not trav.doObjBeg(*this))
+//  if (not wasParentMode and not trav.doObjBeg(*this))
+  if (not trav.doObjBeg(*this))
     return;
   for (auto const &i:tmp)
   {
     auto &m = *i.second;
     trav.m_inNull = inNull or isNull();
-    if (m.mem)
+    if (m.mem and (trav.withVersionField or not m.mem->isVersionField()))
       trav.doMem(*m.mem);
     if (m.obj)
       m.obj->traverseKey(trav);
@@ -545,11 +558,11 @@ void ObjectBase::traverseKey(ObjTravConst &trav) const
 
 
 void MemBaseVector::traverseKey(ObjTravConst &trav) const {
-  if (trav.parentMode) {
-    if (m_parent)
-      m_parent->traverseKey(trav);
-    trav.parentMode = false;
-  }
+//  if (trav.parentMode) {
+//    if (m_parent)
+//      m_parent->traverseKey(trav);
+//    trav.parentMode = false;
+//  }
 }
 
 

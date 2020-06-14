@@ -27,6 +27,7 @@
 
 #include <stdio.h>
 #include <sstream>
+#include <iomanip>
 #include <gtest/gtest.h>
 
 
@@ -253,5 +254,53 @@ TEST(objtypeTest, tobase64) {
 
   
 }
+
+
+TEST(objtypeTest, times) {
+  mobs::MobsMemberInfo mi;
+  mi.i64 = 1577199660000;
+  mi.isTime = true;
+
+  {
+    std::stringstream s;
+    struct tm ts{};
+    mi.toLocalTime(ts);
+    s << std::put_time(&ts, "%FT%T%z");
+    EXPECT_EQ(u8"2019-12-24T16:01:00+0100", s.str());
+  }
+  {
+    std::stringstream s;
+    struct tm ts{};
+    mi.toGMTime(ts);
+    s << std::put_time(&ts, "%FT%TZ");
+    EXPECT_EQ(u8"2019-12-24T15:01:00Z", s.str());
+  }
+
+}
+
+
+
+TEST(objtypeTest, historic) {
+  mobs::MobsMemberInfo mi;
+  mi.i64 = -1577199660000;
+  mi.isTime = true;
+
+  {
+    std::stringstream s;
+    struct tm ts{};
+    mi.toLocalTime(ts);
+    s << std::put_time(&ts, "%FT%T%z");
+    EXPECT_EQ(u8"1920-01-09T09:59:00+0100", s.str());
+  }
+  {
+    std::stringstream s;
+    struct tm ts{};
+    mi.toGMTime(ts);
+    s << std::put_time(&ts, "%FT%TZ");
+    EXPECT_EQ(u8"1920-01-09T08:59:00Z", s.str());
+  }
+
+}
+
 }
 

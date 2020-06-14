@@ -152,14 +152,35 @@ public:
    */
   bool load(ObjectBase &obj);
 
-//    virtual bool load(std::list<ObjectBase> &result, std::string objType, std::string query) = 0;
-  /// Speichern eines Objektes in die Datenbank
+  /** \brief Speichert ein Objekt in die Datenbank
+   *
+   * die Modified-Flags werden dabei zurückgesetzt und, falls vorhanden, das Versions-Feld hochgezählt.
+   * Ist, falls vorhanden, das Versions die Objektes nicht identisch mit dem der Datenbank, wird eine
+   * Exception geworfen
+   * @param obj
+   * \throw exception, bei Datenbankfehler oder Versions-mismatch
+   */
+  void save(ObjectBase &obj);
+
+  /** \brief Speichert ein Objekt in die Datenbank (const)
+   *
+   * Modified-Flags und das Versions-Feld bleiben unverändert.
+   * Ist, falls vorhanden, die Versions des Objektes nicht identisch mit dem der Datenbank, wird eine
+   * Exception geworfen
+   * @param obj
+   * \throw exception, bei Datenbankfehler oder Versions-mismatch
+   */
   void save(const ObjectBase &obj);
 
   /** \brief Lösche ein Objekt anhand der vorbesetzten Key-Elemente
-    * \return true, wenn das Objekt gelöscht werden konnte, false wenn kein passendes Objekt existiert
-    * \throw runtime_error wenn ein Fehler auftrat
-    */
+   *
+   * Modified-Flags und das Versions-Feld bleiben unverändert.
+   * Ist, falls vorhanden, die Versions des Objektes nicht identisch mit dem der Datenbank, wird eine
+   * Exception geworfen.
+   * Hat das Objekt ein VersionsFeld, so muss dieses explizit zurückgesetzt (=0) werden, um wieder gespeichert werden zu können
+   * \return true, wenn das Objekt gelöscht werden konnte, false wenn kein passendes Objekt (ohne VersionsFeld) existiert
+   * \throw runtime_error wenn ein Fehler auftrat oder die Versionsinformation nicht passt, falls vorhanden
+   */
   bool destroy(const ObjectBase &obj);
 
   /** \brief Lösche die gesamte Tabelle/Collection zu diesem Objekt -- Vorsicht was weg ist ist weg

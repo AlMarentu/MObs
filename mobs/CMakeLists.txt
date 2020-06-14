@@ -1,6 +1,6 @@
 
 set(libSrcs objgen.cpp objtypes.cpp logging.cpp strtoobj.cpp objpool.cpp xmlwriter.cpp
-        xmlout.cpp xmlread.cpp converter.cpp unixtime.cpp dbifc.cpp helper.h)
+        xmlout.cpp xmlread.cpp converter.cpp unixtime.cpp dbifc.cpp helper.cpp helper.h)
 
 
 

@@ -26,6 +26,7 @@ public:
   ObjInit(Gespann, COLNAME(vehicle));
 
   MemVar(int, id, KEYELEMENT1);
+  MemVar(int, version, VERSIONFIELD);
   MemVar(string, typ, ALTNAME(bezeichnug) LENGTH(50));
   MemObj(Fahrzeug, zugmaschiene);
   MemVector(Fahrzeug, haenger, COLNAME(vehicle_part));
@@ -45,7 +46,7 @@ void worker(mobs::DatabaseInterface &dbi) {
     f1.haenger[0].achsen(2);
 
     f2.id(2);
-    f2.typ("Schlepper mit 2 Anhängern");
+    f2.typ("Schlepper mit 1 Anhänger");
     f2.zugmaschiene.typ("Traktor");
     f2.zugmaschiene.achsen(2);
     f2.zugmaschiene.antrieb(true);
@@ -60,6 +61,7 @@ void worker(mobs::DatabaseInterface &dbi) {
     dbi.save(f1);
     dbi.save(f2);
 
+    f2.typ("Schlepper mit 2 Anhängern");
     f2.haenger[1].typ("Anhänger");
     f2.haenger[1].achsen(2);
     dbi.save(f2);
@@ -68,7 +70,7 @@ void worker(mobs::DatabaseInterface &dbi) {
             R"({ id:3, typ:"PKW", zugmaschiene:{ typ:"PKW", achsen:2, antrieb:true}})",
             R"({ id:4, typ:"Mutter mit Kind", zugmaschiene:{ typ:"Fahhrad", achsen:2, antrieb:true}, haenger:[
                  { "typ" : "Fahrradanhänger", "achsen" : 1 } ]})",
-            R"({ id:5, typ:"Dankplokomotive", zugmaschiene:{ typ:"Lokomotive", achsen:10, antrieb:true}, haenger:[
+            R"({ id:5, typ:"Damfplokomotive", zugmaschiene:{ typ:"Lokomotive", achsen:10, antrieb:true}, haenger:[
                  { "typ" : "Tender", "achsen" : 4 } ]})",
     };
     for (auto const &j:objs) {
@@ -108,6 +110,10 @@ void worker(mobs::DatabaseInterface &dbi) {
     mobs::DatabaseManager::transaction_callback transCb = [&f3, conName](mobs::DbTransaction *trans) {
       LOG(LM_INFO, "Transaktion mit " << conName);
       mobs::DatabaseInterface t_dbi = trans->getDbIfc(conName);
+      // Mit Objektversionierung muss das Objekt vorher geladen werden um die Version zu ermitteln
+      if (not t_dbi.load(f3))
+        LOG(LM_INFO, "Gespann 4 existiert nicht");
+
       if (t_dbi.destroy(f3))
         LOG(LM_INFO, "Gespann 4 gelöscht");
     };

@@ -83,7 +83,7 @@ UxTime::UxTime(const std::string& s) {
 
 
   std::string UxTime::toISO8601() const {
-  struct tm ts{};
+  struct ::tm ts{};
   ::localtime_r(&m_time, &ts);
 
   // 2007-04-05T12:30:00+02:00

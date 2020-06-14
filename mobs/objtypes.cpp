@@ -22,6 +22,7 @@
 #include <codecvt>
 #include <locale>
 #include <algorithm>
+#include <ctime>
 
 //#include <iostream>
 
@@ -399,6 +400,20 @@ public:
 
 const ConvFromStrHint &ConvFromStrHint::convFromStrHintDflt = ConvFromStrHintDefault();
 const ConvFromStrHint &ConvFromStrHint::convFromStrHintExplizit = ConvFromStrHintExplizit();
+
+void MobsMemberInfo::toLocalTime(struct ::tm &ts) const {
+  std::chrono::system_clock::time_point tp{};
+  tp += std::chrono::milliseconds(i64);
+  time_t time = std::chrono::system_clock::to_time_t(tp);
+  ::localtime_r(&time, &ts);
+}
+
+void MobsMemberInfo::toGMTime(struct ::tm &ts) const {
+  std::chrono::system_clock::time_point tp{};
+  tp += std::chrono::milliseconds(i64);
+  time_t time = std::chrono::system_clock::to_time_t(tp);
+  ::gmtime_r(&time, &ts);
+}
 
 
 }

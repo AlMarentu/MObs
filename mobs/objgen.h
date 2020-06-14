@@ -144,7 +144,7 @@ namespace mobs {
 #define MemMobsVar(typ, name, converter, ...) MemMobsVarType(typ, converter) name = MemMobsVarType(typ, converter) (#name, this, { __VA_ARGS__ })
 
 /// \private
-enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Embedded, DbCompact, DbDetail,
+enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Embedded, DbCompact, DbDetail, DbVersionField,
                  Key1, Key2, Key3, Key4, Key5,
                  AltNameBase = 1000, AltNameEnd = 1999,
                  ColNameBase = 2000, ColNameEnd = 3999,
@@ -159,6 +159,7 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 #define EMBEDDED mobs::Embedded, ///< Bei Ausgabe als Attribute/Traversierung werden die Member des Objektes direkt, auf ser selben Ebene, serialisiert
 #define DBCOMPACT mobs::DbCompact, ///< In der Datenbank wird der MOBSENUM numerisch gespeichert
 #define DBDETAIL mobs::DbDetail, ///< In der Datenbank wird dieses Subelement in einer Detail Table abgelegt
+#define VERSIONFIELD mobs::DbVersionField, ///< In diesem Feld wird die Objektversion gespeichert, 0 entspricht noch nicht gespeichert
 #define KEYELEMENT1 mobs::Key1, ///<  Schlüsselelement der Priorität 1 (erstes Element)
 #define KEYELEMENT2 mobs::Key2, ///< Schlüsselelement der Priorität 2
 #define KEYELEMENT3 mobs::Key3, ///< Schlüsselelement der Priorität 3
@@ -232,10 +233,12 @@ template <class T>
 class MemberVector;
 class ObjTrav;
 class ObjTravConst;
+class MemberBase;
 
 /// Interne Klasse zur Behandlung von \c NULL \c -Werten
 class NullValue {
 public:
+  friend class MemberBase;
   /// Abfrage, ob eine Variable den Wet \c NULL hat (nur möglich, wenn \c nullAllowed gesetzt ist.
   bool isNull() const { return m_null; }
   /// Abfrage ob \c NULL -Werte erlaubt sind
@@ -313,9 +316,11 @@ public:
   void traverse(ObjTravConst &trav) const;
   /// private
   void key(int k) { m_key = k; }
-  /// \brief Abfrage ob Memvervariable ein Key-Element ist
-  /// @return Position im Schlüssel oder \c 0 wenn kein Schlüsselelement
+  /// \brief Abfrage ob Memvervariable ein Key-Element oder eine Versionsvariable ist
+  /// @return Position im Schlüssel oder \c 0 wenn kein Schlüsselelement, INT_MAX, bei Versionsvariablen
   int key() const { return m_key; }
+  /// Abfrage ob Versionselement
+  bool isVersionField() const { return m_key == INT_MAX; }
   /// Zeiger auf Vater-Objekt
   const ObjectBase *parent() const { return m_parent; }
   /// Objekt wurde beschrieben
@@ -363,6 +368,8 @@ public:
   virtual void traverse(ObjTrav &trav) = 0;
   /// Starte Traversierung  const
   virtual void traverse(ObjTravConst &trav) const = 0;
+  /// Starte Traversierung eines einzelnen Elementes
+  virtual void traverseSingle(ObjTravConst &trav, size_t index) const = 0;
   /// \private
   void traverseKey(ObjTravConst &trav) const;
   /// liefert die Anzahl der Elemente
@@ -381,8 +388,12 @@ public:
   virtual void doCopy(const MemBaseVector &other) = 0;
   /// liefert einen Zeiger auf das entsprechende Element, falls es eine \c MemVar ist
   virtual MemberBase *getMemInfo(size_t i) = 0;
+  /// liefert einen Zeiger auf das entsprechende Element, falls es eine \c MemVar ist
+  virtual const MemberBase *getMemInfo(size_t i) const = 0;
   /// liefert einen Zeiger auf das entsprechende Element, falls es eine \c MemObj ist
   virtual ObjectBase *getObjInfo(size_t i) = 0;
+  /// liefert einen const Zeiger auf das entsprechende Element, falls es eine \c MemObj ist
+  virtual const ObjectBase *getObjInfo(size_t i) const = 0;
   /// Setze Inhalt auf leer; äquivalent zu \c resize(0)
   void clear() { resize(0); }
   /// Setze Inhalt auf null
@@ -607,13 +618,13 @@ public:
 //  /// Konstruktor für impliziten Cast
 //  Member(const T &t) : MemberBase("", nullptr) { TRACE(""); clear(); operator()(t); }  // Konstruktor Solo mit zZuweisung -> Cast
 //  /// \private
-//  Member() : MemberBase("", nullptr, {}) { TRACE(""); clear(); setModified(false); }  // Konstruktor Solo
+//  Member() : MemberBase("", nullptr, {}) { TRACE(""); doClear(); }  // Konstruktor Solo
   Member() = delete;
   /// \private
   Member(const std::string& n, ObjectBase *o, const std::vector<MemVarCfg>& cv) : MemberBase(n, o, cv), wert(T())
-        { TRACE(PARAM(n) << PARAM(this)); if (o) o->regMem(this); Member<T, C>::clear(); setModified(false); } // Konstruktor innerhalb  Objekt nur intern
+        { TRACE(PARAM(n) << PARAM(this)); if (o) o->regMem(this); doClear(); } // Konstruktor innerhalb  Objekt nur intern
   /// \private
-  Member(MemBaseVector *m, ObjectBase *o, const std::vector<MemVarCfg>& cv) : MemberBase(m, o, cv) { setModified(false); } // Konstruktor f. Array nur intern
+  Member(MemBaseVector *m, ObjectBase *o, const std::vector<MemVarCfg>& cv) : MemberBase(m, o, cv) { doClear(); } // Konstruktor f. Array nur intern
   /// \private
   Member(const Member &) = default; // für Zuweisung in MemVar-Macro, move constructor unnötig
   /// move constructor
@@ -645,7 +656,7 @@ public:
   bool is_chartype(const ConvToStrHint &cth) const override { return this->c_is_chartype(cth); }
   /// Einlesen der Variable aus einem \c std::string im Format UTF-8
   bool fromStr(const std::string &sin, const ConvFromStrHint &cfh) override { if (this->c_string2x(sin, wert, cfh)) { activate(); return true; } return false; }
-  /// Einlesen der Variable aus einem \c std::wstring im Format UTF-8
+  /// Einlesen der Variable aus einem \c std::wstring
   bool fromStr(const std::wstring &sin, const ConvFromStrHint &cfh) override { if (this->c_wstring2x(sin, wert, cfh)) { activate(); return true; } return false; }
   bool toDouble(double &d) const override { return to_double(wert, d); }
   void memInfo(MobsMemberInfo &i) const override;
@@ -659,7 +670,9 @@ public:
   bool doCopy(const MemberBase *other) override { auto t = dynamic_cast<const Member<T, C> *>(other); if (t) doCopy(*t); return t != nullptr; }
   /// \private
   void inline doCopy(const Member<T, C> &other) { if (other.isNull()) forceNull(); else operator()(other()); }
+
 private:
+  void doClear()  { wert = this->c_empty(); }
   T wert;
 };
 
@@ -742,8 +755,11 @@ public:
   void resize(size_t s) override;
   void traverse(ObjTrav &trav) override;
   void traverse(ObjTravConst &trav) const override;
+  void traverseSingle(ObjTravConst &trav, size_t index) const override;
   MemberBase *getMemInfo(size_t i) override { if (i >= size()) return nullptr; return dynamic_cast<MemberBase *>(werte[i]); }
+  const MemberBase *getMemInfo(size_t i) const override { if (i >= size()) return nullptr; return dynamic_cast<const MemberBase *>(werte[i]); }
   ObjectBase *getObjInfo(size_t i) override { if (i >= size()) return nullptr; return dynamic_cast<ObjectBase *>(werte[i]); }
+  const ObjectBase *getObjInfo(size_t i) const override { if (i >= size()) return nullptr; return dynamic_cast<const ObjectBase *>(werte[i]); }
   std::string contentObjName() const override { return T::objName(); }
 
 
@@ -899,20 +915,20 @@ public:
   bool inKeyMode() const { return m_keyMode; }
   /// Ist das Element Teil eines Vektors, wird die Index-Position angezeigt, ansonsten ist der Wert \c SIZE_MAX
   size_t arrayIndex() const { return m_arrayIndex; }
-  /// traversiere zusätzlich die Schlüsselelement vom Start über parent()
-  bool parentMode = false;
   /// traversiere bei Arrays genau ein leeres Dummy-Element
   bool arrayStructureMode = false;
+  /// Traversiere im key-Mode(traverseKeys) auch die Versionselemente
+  bool withVersionField = false;
 private:
   bool m_inNull = false;
-  size_t m_arrayIndex = SIZE_MAX;
   bool m_keyMode = false;
+  size_t m_arrayIndex = SIZE_MAX;
 };
 
 /// Basisklasse zum sequentiellen Einfügen von Daten in ein Objekt
 class ObjectNavigator  {
 public:
-  ObjectNavigator(ConvObjFromStr c = ConvObjFromStr()) : cfs(std::move(c)) { }
+  explicit ObjectNavigator(ConvObjFromStr c = ConvObjFromStr()) : cfs(std::move(c)) { }
   /// Zeiger auf die aktuelle MemberVariable oder nullptr, falls es keine Variable ist
   inline MemberBase *member() const { return memBase; };
   /// Name der aktuellen MemberVariablen, oder leer, falls es keine Variable ist
@@ -990,12 +1006,12 @@ void MemberVector<T>::traverse(ObjTrav &trav)
 template<class T>
 void MemberVector<T>::traverse(ObjTravConst &trav) const
 {
-  bool wasParentMode = trav.parentMode;
-  if (trav.parentMode) {
-    if (parent())
-      parent()->traverseKey(trav);
-    trav.parentMode = false;
-  }
+//  bool wasParentMode = trav.parentMode;
+//  if (trav.parentMode) {
+//    if (parent())
+//      parent()->traverseKey(trav);
+//    trav.parentMode = false;
+//  }
 
   bool inNull = trav.m_inNull;
   trav.m_keyMode = false;
@@ -1017,6 +1033,22 @@ void MemberVector<T>::traverse(ObjTravConst &trav) const
     trav.m_arrayIndex = SIZE_MAX;
     trav.doArrayEnd(*this);
   }
+}
+
+template<class T>
+void MemberVector<T>::traverseSingle(ObjTravConst &trav, size_t index) const
+{
+  trav.m_inNull = false;
+  trav.m_keyMode = false;
+  if (trav.doArrayBeg(*this)) {
+      if (index < size()) {
+        trav.m_arrayIndex = index;
+        operator[](index).traverse(trav);
+      }
+    }
+  trav.m_inNull = false;
+  trav.m_arrayIndex = SIZE_MAX;
+  trav.doArrayEnd(*this);
 }
 
 template<class T>

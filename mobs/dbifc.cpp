@@ -260,6 +260,48 @@ void DbTransaction::setIsolation(DbTransaction::IsolationLevel level) {
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
+namespace {
+class ObjectSaved : virtual public ObjTrav {
+public:
+  bool doObjBeg(ObjectBase &obj) override {
+    if (obj.hasFeature(mobs::DbDetail))
+      return false;
+    obj.setModified(false);
+    return true;
+  }
+
+  void doObjEnd(ObjectBase &obj) override {}
+
+  bool doArrayBeg(MemBaseVector &vec) override {
+    if (vec.hasFeature(mobs::DbDetail))
+      return false;
+    vec.setModified(false);
+    return true;
+  }
+
+  void doArrayEnd(MemBaseVector &vec) override {}
+
+  void doMem(MemberBase &mem) override {
+    if (mem.isVersionField()) {
+      MobsMemberInfo mi;
+      mem.memInfo(mi);
+      if (mi.isUnsigned) {
+        if (not mem.fromUInt64(mi.u64 + 1))
+          throw std::runtime_error(u8"VersionVariable can't assign");
+      } else if (mi.isSigned) {
+        if (not mem.fromInt64(mi.i64 + 1))
+          throw std::runtime_error(u8"VersionVariable can't assign");
+      } else
+        throw std::runtime_error("VersionElement is not int");
+    }
+
+    mem.setModified(false);
+  }
+};
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+
 DatabaseInterface::DatabaseInterface(std::shared_ptr<DatabaseConnection> dbi, std::string dbName)
         : dbCon(std::move(dbi)), databaseName(std::move(dbName)), timeout(0) {  }
 
@@ -269,6 +311,12 @@ bool DatabaseInterface::load(ObjectBase &obj) {
 
 void DatabaseInterface::save(const ObjectBase &obj) {
   dbCon->save(*this, obj);
+}
+
+void DatabaseInterface::save(ObjectBase &obj) {
+  dbCon->save(*this, obj);
+  ObjectSaved os;
+  obj.traverse(os);
 }
 
 bool DatabaseInterface::destroy(const ObjectBase &obj) {

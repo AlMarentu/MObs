@@ -171,7 +171,7 @@ public:
     bsoncxx::builder::basic::array arr;
   };
 
-  explicit BsonOut(mobs::ConvObjToString c) : cth(std::move(c.exportAltNames())) {  };
+  explicit BsonOut(mobs::ConvObjToString c) : cth(std::move(c.exportAltNames())) { };
 
   bool doObjBeg(const ObjectBase &obj) override
   {
@@ -301,6 +301,17 @@ public:
     bool use128 = false;
     if (mi.isSigned)
     {
+      if (inKeyMode() and mem.isVersionField()) {
+        if (version == -1)
+          version = i64;
+        else
+          throw runtime_error("VersionInfo duplicate");
+      }
+      if (increment and mem.isVersionField()) {
+        if (i64 == mi.max)
+          throw std::runtime_error("VersionElement overflow");
+        i64++;
+      }
       if (mi.max <= std::numeric_limits<int32_t>::max() and mi.min >= std::numeric_limits<int32_t>::min())
       {
         i32 = (int32_t)i64;
@@ -311,6 +322,20 @@ public:
     }
     else if (mi.isUnsigned)
     {
+      if (inKeyMode() and mem.isVersionField()) {
+        LOG(LM_DEBUG, "FOUND Version " << mi.u64);
+        if (mi.u64 >= INT64_MAX)
+          throw runtime_error("VersionInfo overflow");
+        else if (version == -1)
+          version = mi.u64;
+        else
+          throw runtime_error("VersionInfo duplicate");
+      }
+      if (increment and mem.isVersionField()) {
+        if (mi.u64 == mi.max or mi.max == 1)
+          throw std::runtime_error("VersionElement overflow");
+        mi.u64++;
+      }
       if (mi.max == 1) {
         i64 = (int64_t)mi.u64;
         useBool = true;
@@ -329,6 +354,8 @@ public:
         use128 = true;
       }
     }
+    else if (increment and mem.isVersionField())
+      throw std::runtime_error("VersionElement is not int");
     else if (mi.isTime)
     {
 //        tp = std::chrono::system_clock::from_time_t(0);
@@ -410,6 +437,8 @@ public:
   bool noKeys = false;
   bool noArrays = false;
   bool index = false; // erzeuge den Primär-Schlüssel (alle Member = 1)
+  bool increment = false; // VersionsVariable um 1 erhöhen
+  int64_t version = -1;
 private:
   stack<Level> level;
   ConvObjToString cth;
@@ -637,6 +666,7 @@ bool MongoDatabaseConnection::load(DatabaseInterface &dbi, ObjectBase &obj) {
 void MongoDatabaseConnection::create(DatabaseInterface &dbi, const ObjectBase &obj) {
   open();
   BsonOut bo(mobs::ConvObjToString().exportExtendet().exportWoNull());
+  bo.increment = true;
   obj.traverse(bo);
   LOG(LM_DEBUG, "CREATE " << dbi.database() << "." << collectionName(obj) << " " << bo.result());
 
@@ -656,8 +686,11 @@ void MongoDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj
 
   // TODO create overwrite update
   BsonOut bk(mobs::ConvObjToString().exportExtendet());
+  bk.withVersionField = true;
   obj.traverseKey(bk);
+  LOG(LM_DEBUG, "VERSION IS " << bk.version);
   BsonOut bo(mobs::ConvObjToString().exportWoNull().exportExtendet());
+  bo.increment = true;
 //    bo.noKeys = true;
   obj.traverse(bo);
   LOG(LM_DEBUG, "UPDATE " << dbi.database() << "." << collectionName(obj) << " " << bk.result() <<  " TO "
@@ -667,14 +700,22 @@ void MongoDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj
 //    auto result = db[colName(obj)].update_one(bk.value(), bo.setValue());
 //    mongocxx::options::update u;
 //    u.upsert(create);
-  auto r_opt = mongocxx::options::replace().upsert(true);
-  auto result = db[collectionName(obj)].replace_one(bk.value(), bo.value(), r_opt);
-  if (not result)
-    throw runtime_error(u8"save failed");
-  LOG(LM_DEBUG, "MATCHED " << result->matched_count());
-  auto oid = result->upserted_id();
-  if (oid)
-    LOG(LM_DEBUG, "UPSERTED " << oid->get_oid().value.to_string());
+  if (bk.version == 0) { // initiale version
+    auto result = db[collectionName(obj)].insert_one(bo.value());
+    if (not result)
+      throw runtime_error(u8"save failed");
+    auto oid = result->inserted_id();
+    LOG(LM_DEBUG, "INSERTED " << oid.get_oid().value.to_string());
+  } else { // ohne Versionsfeld (-1) auch upsert erlauben
+    auto r_opt = mongocxx::options::replace().upsert(bk.version < 0);
+    auto result = db[collectionName(obj)].replace_one(bk.value(), bo.value(), r_opt);
+    if (not result)
+      throw runtime_error(u8"save failed");
+    LOG(LM_DEBUG, "MATCHED " << result->matched_count());
+    auto oid = result->upserted_id();
+    if (oid)
+      LOG(LM_DEBUG, "UPSERTED " << oid->get_oid().value.to_string());
+  }
 }
 
 bool MongoDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase &obj) {
@@ -685,21 +726,31 @@ bool MongoDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase &
   auto mtdb = static_cast<MongoTransactionDbInfo *>(dbi.transactionDbInfo());
 
   BsonOut bo(mobs::ConvObjToString().exportExtendet());
+  bo.withVersionField = true;
   obj.traverseKey(bo);
+  LOG(LM_INFO, "VERSION IS " << bo.version);
+  if (bo.version == 0)
+    throw runtime_error(u8"destroy Object version = 0 cannot destroy");
   LOG(LM_DEBUG, "DESTROY " << dbi.database() << "." << collectionName(obj) << " " <<  bo.result());
 
+  bool found;
   mongocxx::database db = client[dbi.database()];
   if (mtdb) {
     LOG(LM_DEBUG, "drop with session");
     auto result = db[collectionName(obj)].delete_one(mtdb->session, bo.value());
     if (not result)
       throw runtime_error(u8"destroy returns with error");
-    return result->deleted_count() != 0;
+    found = result->deleted_count() != 0;
+  } else {
+    auto result = db[collectionName(obj)].delete_one(bo.value());
+    if (not result)
+      throw runtime_error(u8"destroy returns with error");
+    found = result->deleted_count() != 0;
   }
-  auto result = db[collectionName(obj)].delete_one(bo.value());
-  if (not result)
-    throw runtime_error(u8"destroy returns with error");
-  return result->deleted_count() != 0;
+  if (bo.version > 0 and not found)
+    throw runtime_error(u8"destroy: Object with appropriate version not found");
+
+  return found;
 }
 
 void MongoDatabaseConnection::dropAll(DatabaseInterface &dbi, const ObjectBase &obj) {
