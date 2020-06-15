@@ -198,8 +198,8 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
  @param objname Name der Klasse (muss von ObjectBase abgeleitet sein)
  */
 #define ObjInit(objname, ...) \
-objname(const objname &that) : ObjectBase() { ObjectBase::doCopy(that); } \
-ObjInit1(objname, __VA_ARGS__ )
+objname(const objname &that) : ObjectBase() { std::vector<mobs::MemVarCfg> cv = { __VA_ARGS__ }; for (auto c:cv) doConfigObj(c); \
+ObjectBase::doCopy(that); }  ObjInit1(objname, __VA_ARGS__ )
 /*! \brief Makro für Definitionen im Objekt das von ObjectBase abgeleitet ist ohne copy constructor
  @param objname Name der Klasse (muss von ObjectBase abgeleitet sein)
  */
