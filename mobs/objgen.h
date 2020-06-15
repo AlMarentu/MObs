@@ -314,8 +314,6 @@ public:
   void traverse(ObjTrav &trav);
   /// Starte Traversierung  const
   void traverse(ObjTravConst &trav) const;
-  /// private
-  void key(int k) { m_key = k; }
   /// \brief Abfrage ob Memvervariable ein Key-Element oder eine Versionsvariable ist
   /// @return Position im Schlüssel oder \c 0 wenn kein Schlüsselelement, INT_MAX, bei Versionsvariablen
   int key() const { return m_key; }
@@ -331,14 +329,12 @@ public:
   static std::string objName() { return ""; }
 
 
-protected:
-  /// \private
-  int m_key = 0;
-  /// \private
-  MemVarCfg m_altName = Unset;
-
 private:
   void doConfig(MemVarCfg c);
+  void key(int k) { m_key = k; }
+
+  int m_key = 0;
+  MemVarCfg m_altName = Unset;
   std::string m_name;
   std::vector<MemVarCfg> m_config;
   ObjectBase *m_parent = nullptr;
@@ -384,8 +380,6 @@ public:
   MemVarCfg cAltName() const { return m_altName; }
   /// Abfrage des originalen oder des alternativen Namens des Vektors
   std::string getName(const ConvToStrHint &) const;
-  /// \private
-  virtual void doCopy(const MemBaseVector &other) = 0;
   /// liefert einen Zeiger auf das entsprechende Element, falls es eine \c MemVar ist
   virtual MemberBase *getMemInfo(size_t i) = 0;
   /// liefert einen Zeiger auf das entsprechende Element, falls es eine \c MemVar ist
@@ -407,15 +401,12 @@ public:
   /// Abfrage gesetzter  Attribute
   MemVarCfg hasFeature(MemVarCfg c) const;
 
-protected:
-  /// \private
-  std::string m_name;
-  /// \private
-  std::vector<MemVarCfg> m_c; // config für Member
-  /// \private
-  MemVarCfg m_altName = Unset;
-
 private:
+  virtual void doCopy(const MemBaseVector &other) = 0;
+
+  std::string m_name;
+  std::vector<MemVarCfg> m_c; // config für Member
+  MemVarCfg m_altName = Unset;
   void doConfig(MemVarCfg c);
   std::vector<MemVarCfg> m_config;
   ObjectBase *m_parent = nullptr;
