@@ -664,6 +664,10 @@ public:
   void toLocalTime(struct ::tm &ts) const;
   /// fülle ein Time-Struct mit gmt (nur wenn isTime == true)
   void toGMTime(struct ::tm &ts) const;
+  /// setze i64 aus einem Time-Struct mit local time (nur wenn isTime == true)
+  void fromLocalTime(struct ::tm &ts);
+  /// setze i64 aus einem Time-Struct mit gmt (nur wenn isTime == true)
+  void fromGMTime(struct ::tm &ts);
 
 };
 

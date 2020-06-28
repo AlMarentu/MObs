@@ -70,8 +70,10 @@ public:
     double d;
     if (mi.isTime and mi.granularity >= 86400000)
       res << "DATE";
-    else if (mi.isTime)
+    else if (mi.isTime and mi.granularity >= 1000)
       res << "DATETIME";
+    else if (mi.isTime)
+      res << "DATETIME(3)";
     else if (mi.isUnsigned and mi.max == 1)
       res << "TINYINT";
     else if (mem.toDouble(d))
@@ -82,7 +84,7 @@ public:
       if (n <= 4)
         res << "CHAR(" << n << ")";
       else
-        res << "VARCHAR(" << n << ")";
+        res << "VARCHAR(" << n << ") CHARACTER SET utf8";
     }
     else if (mi.isSigned and mi.max <= 32767)
       res << "SMALLINT";
@@ -129,7 +131,8 @@ public:
       struct tm ts{};
       mi.toLocalTime(ts);
       s << std::put_time(&ts, "%F %T");
-      // TODO Millisekunden, wenn granularity < 1000
+      if (mi.granularity < 1000)
+        s << '.' << setfill('0') << setw(3) << (mi.i64 % 1000);
       return s.str();
     }
     else if (mi.isUnsigned and mi.max == 1) // bool
@@ -148,17 +151,37 @@ public:
       MobsMemberInfo mi;
       mem.memInfo(mi);
       bool ok = true;
-      if (mi.isTime and mi.granularity >= 86400000)
-        ok = false;
-      else if (mi.isTime)
-        ok = false;
-      else if (mi.isUnsigned and mi.max == 1) // bool
+      if (mi.isTime and mi.granularity >= 86400000) {
+        std::istringstream s(value);
+        std::tm t = {};
+        s >> std::get_time(&t, "%F");
+        ok = s.fail();
+        if (ok)
+          mi.fromLocalTime(t);
+      } else if (mi.isTime) {
+        std::istringstream s(value);
+        std::tm t = {};
+        s >> std::get_time(&t, "%F %T");
+        ok = not s.fail();
+        if (ok)
+          mi.fromLocalTime(t);
+        if (ok and mi.granularity < 1000) {
+          unsigned int i;
+          char c;
+          s.get(c);
+          if (not s.fail()) {
+            s >> i;
+            ok = not s.fail() and c == '.' and i < 1000;
+            mi.i64 += i;
+          }
+        }
+      }  else if (mi.isUnsigned and mi.max == 1) // bool
         ok = mem.fromUInt64(value == "0" ? 0 : 1);
       else //if (mem.is_chartype(mobs::ConvToStrHint(compact)))
         ok = mem.fromStr(value, not compact ? ConvFromStrHint::convFromStrHintExplizit : ConvFromStrHint::convFromStrHintDflt);
 
       if (not ok)
-        throw runtime_error("conversion error");
+        throw runtime_error(u8"conversion error in " + mem.name() + " Value=" + value);
     } else
       mem.forceNull();
     pos++;

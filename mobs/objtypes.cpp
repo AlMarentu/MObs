@@ -19,6 +19,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "objgen.h"
+#include "objtypes.h"
+
 #include <codecvt>
 #include <locale>
 #include <algorithm>
@@ -413,6 +415,19 @@ void MobsMemberInfo::toGMTime(struct ::tm &ts) const {
   tp += std::chrono::milliseconds(i64);
   time_t time = std::chrono::system_clock::to_time_t(tp);
   ::gmtime_r(&time, &ts);
+}
+
+void MobsMemberInfo::fromLocalTime(tm &ts) {
+  ts.tm_isdst = -1;
+  std::time_t t = ::timelocal(&ts);
+  std::chrono::system_clock::time_point tp = std::chrono::system_clock::from_time_t(t);
+  i64 = std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()).count();
+}
+
+void MobsMemberInfo::fromGMTime(tm &ts) {
+  std::time_t t = ::timegm(&ts);
+  std::chrono::system_clock::time_point tp = std::chrono::system_clock::from_time_t(t);
+  i64 = std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()).count();
 }
 
 

@@ -276,6 +276,52 @@ TEST(objtypeTest, times) {
     EXPECT_EQ(u8"2019-12-24T15:01:00Z", s.str());
   }
 
+  {
+    std::istringstream s("2020-12-24");
+    std::tm t = {};
+    s >> std::get_time(&t, "%F");
+    mi.fromLocalTime(t);
+    time_t ti = mi.i64 / 1000;
+    EXPECT_STREQ("Thu Dec 24 00:00:00 2020\n", ctime(&ti));
+  }
+
+  {
+    std::istringstream s("2020-12-24 17:02:01");
+    std::tm t = {};
+    s >> std::get_time(&t, "%F %T");
+    EXPECT_FALSE(s.fail());
+    mi.fromLocalTime(t);
+    time_t ti = mi.i64 / 1000;
+    EXPECT_STREQ("Thu Dec 24 17:02:01 2020\n", ctime(&ti));
+  }
+
+  {
+    std::istringstream s("2020-12-24 16:02:01");
+    std::tm t = {};
+    s >> std::get_time(&t, "%F %T");
+    EXPECT_FALSE(s.fail());
+    mi.fromGMTime(t);
+    time_t ti = mi.i64 / 1000;
+    EXPECT_STREQ("Thu Dec 24 17:02:01 2020\n", ctime(&ti));
+  }
+
+  {
+    std::istringstream s("2020-12-24 16:02:01.123");
+    std::tm t = {};
+    s >> std::get_time(&t, "%F %T");
+    EXPECT_FALSE(s.fail());
+    int i;
+    char c;
+    s.get(c);
+    EXPECT_FALSE(s.fail());
+    EXPECT_EQ('.', c);
+    s >> i;
+    EXPECT_FALSE(s.fail());
+    EXPECT_EQ(123, i);
+    mi.fromGMTime(t);
+    time_t ti = mi.i64 / 1000;
+    EXPECT_STREQ("Thu Dec 24 17:02:01 2020\n", ctime(&ti));
+  }
 }
 
 
