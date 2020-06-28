@@ -807,7 +807,8 @@ string SqlGenerator::doCreate(SqlGenerator::DetailInfo &di) {
   GenerateSql gs(GenerateSql::Create, sqldb, mobs::ConvObjToString());
   gs.current = di;
   gs.addText("create table ");
-  gs.addText("if not exists "); // TODO ist DB-Abhängig
+  if (sqldb.createWith_IfNotExists)
+    gs.addText("if not exists ");
   if (di.vec)
     gs.addText(sqldb.tableName(vecTableName(di.vec, di.tableName)));
   else

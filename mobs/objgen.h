@@ -340,26 +340,16 @@ public:
   std::string auditValue() const;
 
 
-<<<<<<< HEAD
 protected:
-  /// \private
-  int m_key = 0;
-  /// \private
+   /// \private
   void doAudit();
-  /// \private
-  MemVarCfg m_altName = Unset;
 
 private:
   void doConfig(MemVarCfg c);
   void doStartAudit() { m_oldVal.clear(); m_saveOld = true; setModified(false); };
-=======
-private:
-  void doConfig(MemVarCfg c);
-  void key(int k) { m_key = k; }
 
   int m_key = 0;
   MemVarCfg m_altName = Unset;
->>>>>>> c5220a4a6f21204b676de07f12fd8f88125188eb
   std::string m_name;
   std::vector<MemVarCfg> m_config;
   ObjectBase *m_parent = nullptr;
@@ -436,13 +426,10 @@ private:
   std::string m_name;
   std::vector<MemVarCfg> m_c; // config für Member
   MemVarCfg m_altName = Unset;
-<<<<<<< HEAD
   size_t m_oldSize = SIZE_MAX;
   size_t m_size = 0;
 
 private:
-=======
->>>>>>> c5220a4a6f21204b676de07f12fd8f88125188eb
   void doConfig(MemVarCfg c);
   void doStartAudit() { m_oldSize = size(); setModified(false); };
   std::vector<MemVarCfg> m_config;

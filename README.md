@@ -31,6 +31,7 @@ Weitere Features sind die
 - Behandlung von NULL-values
 - Möglichkeit der Definition von primär-Schlüsseln aus mehreren Elementen
 - Versionierung von Datensätzen, um Veränderungen zwischen Lesen und Speichern zu erkennen
+- Audit Trail Unterstützung, jede Änderung kann protokolliert werden
 - Transaktionen bei Datenbankoperationen
 - Markierung von geänderten Elementen
 - Verwaltung von enum-Tags im Klartext
@@ -251,7 +252,7 @@ Bei der Serialisierung wird automatisch in Base64 gewandelt
 ausgelöste werden.
 
 ### Dynamische Navigation innerhalb eines Objektes
-Über den ObjectNavaigator könne Objekte-Teile gezielt angesprochen werden.
+Über den ObjectNavigator könne Objekte-Teile gezielt angesprochen werden.
 
 
 ## Datenbank-Interface
@@ -357,6 +358,18 @@ abgebrochen.
 Bei den SQL-Feature mit automatischen Master-Detail-Tabellen, Wird die Version nur in der 
 Mater-Tabelle verwaltet.
 
+### Audit Trail
+Für jedes Objekt kan definiert werden, ob eine automatische Audit Trail überwachung aktiviert
+werden soll.
+Dazu muss nur Das Token  "AUDITTRAIL" angegeben werden. 
+Danach werden Erzeugung, alle Änderungen sowie die Löschung protokolliert. So lässt sich der Zustand des Objektes zu 
+jedem beliebigen Zeitpunkt ermitteln.
+Die Änderungsaktivitäten, werden pro Transaktion zusammengefasst und im Datenpool des jeweiligen
+Objektes abgelegt. Werden einzelne Objekte gespeichert, so werden die Änderungsdaten zusammen mit dem Objekt
+ implizit in einer Transaktion gespeichert. Zu jeder Transaktion kann auch ein Begründungstext mit angegeben werden.
+Zusätzlich werden Zeit und User (Id) mitprotokolliert.
+
+Idealerweise sollte dazu auch Objekt-Versionierung aktiviert werden. 
 
 ## Objektverwaltung NamedPool
 Über ein extra Modul können beliebige Objekte in einen Pool abgelegt werden. Der Zugriff erfolgt nur

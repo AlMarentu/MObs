@@ -51,7 +51,9 @@ public:
 
 class SQLMariaDBdescription : public mobs::SQLDBdescription {
 public:
-  explicit SQLMariaDBdescription(const string &dbName) : dbPrefix(dbName + ".") {}
+  explicit SQLMariaDBdescription(const string &dbName) : dbPrefix(dbName + ".") {
+    createWith_IfNotExists = true;
+  }
 
   std::string tableName(const std::string &tabnam) override { return dbPrefix + tabnam;  }
 
