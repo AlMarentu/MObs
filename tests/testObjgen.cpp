@@ -825,6 +825,41 @@ TEST(objgenTest, ignoreCase) {
 
 }
 
+class ObjE5 : virtual public mobs::ObjectBase {
+public:
+  ObjInit(ObjE5, COLNAME(AAA));
+
+  MemVar(int, Xx);
+  MemVar(int, zz, ALTNAME(BBB));
+};
+ObjRegister(ObjE5);
+
+TEST(objgenTest, copyBug) {
+  ObjE5 e5;
+
+  EXPECT_EQ("AAA", e5.getConf(e5.hasFeature(mobs::MemVarCfg::ColNameBase)));
+  EXPECT_EQ("BBB", e5.getConf(e5.zz.cAltName()));
+
+  auto x = [&e5]() {
+    EXPECT_EQ("AAA", e5.getConf(e5.hasFeature(mobs::MemVarCfg::ColNameBase)));
+    EXPECT_EQ("BBB", e5.getConf(e5.zz.cAltName()));
+  };
+  auto y = [e5]() {
+    // COLNAME geht verloren  im Copy-Construktor
+    EXPECT_EQ("AAA", e5.getConf(e5.hasFeature(mobs::MemVarCfg::ColNameBase)));
+    EXPECT_EQ("BBB", e5.getConf(e5.zz.cAltName()));
+  };
+  x();
+  y();
+
+  mobs::ObjectBase *e5p = mobs::ObjectBase::createObj("ObjE5");
+  ASSERT_TRUE((e5p));
+  EXPECT_EQ("AAA", e5p->getConf(e5p->hasFeature(mobs::MemVarCfg::ColNameBase)));
+
+}
+
+
+
 
 
 #if 0

@@ -383,7 +383,7 @@ Folgende Defines können angegeben werden:
 - BUILD_DOC
 - PACKAGE_TESTS
 
-Für die jeweiligen Optionen werden die entsprenden Zusatzpakete benötigt.
+Für die jeweiligen Optionen werden die entsprechenden Zusatzpakete benötigt.
 
 ## Module
 * objtypes.h Typ-Deklarationen
@@ -396,6 +396,7 @@ Für die jeweiligen Optionen werden die entsprenden Zusatzpakete benötigt.
 * xmlwriter.h	Klasse zur Ausgabe von XML in Dateien oder als String in verschiedenen Zeichensätzen
 * xmlout.h  Klasse zur Ausgabe von Mobs-Objekte im XML-Format
 * objpool.h  Klassen für Named Objects 
+* dbifc.h Datenbank Interface
 * logging.h Makros und Klassen für Logging und Tracing auf stderr 
 * unixtime.h Wrapper Klasse für Datum-Zeit auf Basis von Unix-time_t
 

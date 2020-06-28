@@ -199,8 +199,8 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
  @param objname Name der Klasse (muss von ObjectBase abgeleitet sein)
  */
 #define ObjInit(objname, ...) \
-objname(const objname &that) : ObjectBase() { ObjectBase::doCopy(that); } \
-ObjInit1(objname, __VA_ARGS__ )
+objname(const objname &that) : ObjectBase() { std::vector<mobs::MemVarCfg> cv = { __VA_ARGS__ }; for (auto c:cv) doConfigObj(c); \
+ObjectBase::doCopy(that); }  ObjInit1(objname, __VA_ARGS__ )
 /*! \brief Makro für Definitionen im Objekt das von ObjectBase abgeleitet ist ohne copy constructor
  @param objname Name der Klasse (muss von ObjectBase abgeleitet sein)
  */
@@ -319,8 +319,6 @@ public:
   void traverse(ObjTrav &trav);
   /// Starte Traversierung  const
   void traverse(ObjTravConst &trav) const;
-  /// private
-  void key(int k) { m_key = k; }
   /// \brief Abfrage ob Memvervariable ein Key-Element oder eine Versionsvariable ist
   /// @return Position im Schlüssel oder \c 0 wenn kein Schlüsselelement, INT_MAX, bei Versionsvariablen
   int key() const { return m_key; }
@@ -342,6 +340,7 @@ public:
   std::string auditValue() const;
 
 
+<<<<<<< HEAD
 protected:
   /// \private
   int m_key = 0;
@@ -353,6 +352,14 @@ protected:
 private:
   void doConfig(MemVarCfg c);
   void doStartAudit() { m_oldVal.clear(); m_saveOld = true; setModified(false); };
+=======
+private:
+  void doConfig(MemVarCfg c);
+  void key(int k) { m_key = k; }
+
+  int m_key = 0;
+  MemVarCfg m_altName = Unset;
+>>>>>>> c5220a4a6f21204b676de07f12fd8f88125188eb
   std::string m_name;
   std::vector<MemVarCfg> m_config;
   ObjectBase *m_parent = nullptr;
@@ -400,8 +407,6 @@ public:
   MemVarCfg cAltName() const { return m_altName; }
   /// Abfrage des originalen oder des alternativen Namens des Vektors
   std::string getName(const ConvToStrHint &) const;
-  /// \private
-  virtual void doCopy(const MemBaseVector &other) = 0;
   /// liefert einen Zeiger auf das entsprechende Element, falls es eine \c MemVar ist
   virtual MemberBase *getMemInfo(size_t i) = 0;
   /// liefert einen Zeiger auf das entsprechende Element, falls es eine \c MemVar ist
@@ -425,17 +430,19 @@ public:
   /// Abfrage der ursrünglichen Vectorsize (Audit Trail)
   size_t initialSize() const { return m_oldSize; }
 
-protected:
-  /// \private
+private:
+  virtual void doCopy(const MemBaseVector &other) = 0;
+
   std::string m_name;
-  /// \private
   std::vector<MemVarCfg> m_c; // config für Member
-  /// \private
   MemVarCfg m_altName = Unset;
+<<<<<<< HEAD
   size_t m_oldSize = SIZE_MAX;
   size_t m_size = 0;
 
 private:
+=======
+>>>>>>> c5220a4a6f21204b676de07f12fd8f88125188eb
   void doConfig(MemVarCfg c);
   void doStartAudit() { m_oldSize = size(); setModified(false); };
   std::vector<MemVarCfg> m_config;
