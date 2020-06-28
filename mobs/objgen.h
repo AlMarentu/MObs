@@ -144,7 +144,7 @@ namespace mobs {
 #define MemMobsVar(typ, name, converter, ...) MemMobsVarType(typ, converter) name = MemMobsVarType(typ, converter) (#name, this, { __VA_ARGS__ })
 
 /// \private
-enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Embedded, DbCompact, DbDetail, DbVersionField,
+enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Embedded, DbCompact, DbDetail, DbVersionField, DbAuditTrail,
                  Key1, Key2, Key3, Key4, Key5,
                  AltNameBase = 1000, AltNameEnd = 1999,
                  ColNameBase = 2000, ColNameEnd = 3999,
@@ -158,8 +158,9 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 #define XMLATTR mobs::XmlAsAttr, ///< Bei XML-Ausgabe als Attribute ausgeben (nur MemberVariable, nur von erstem Element fortlaufend)
 #define EMBEDDED mobs::Embedded, ///< Bei Ausgabe als Attribute/Traversierung werden die Member des Objektes direkt, auf ser selben Ebene, serialisiert
 #define DBCOMPACT mobs::DbCompact, ///< In der Datenbank wird der MOBSENUM numerisch gespeichert
-#define DBDETAIL mobs::DbDetail, ///< In der Datenbank wird dieses Subelement in einer Detail Table abgelegt
+#define DBDETAIL mobs::DbDetail, ///< In der Datenbank wird dieses Subelement in einer Detail Table abgelegt, muss also seperat gespeichert werden
 #define VERSIONFIELD mobs::DbVersionField, ///< In diesem Feld wird die Objektversion gespeichert, 0 entspricht noch nicht gespeichert
+#define AUDITTRAIL mobs::DbAuditTrail, ///< für dieses Objekt wird automatisch ein Audit Trail mitgeführt
 #define KEYELEMENT1 mobs::Key1, ///<  Schlüsselelement der Priorität 1 (erstes Element)
 #define KEYELEMENT2 mobs::Key2, ///< Schlüsselelement der Priorität 2
 #define KEYELEMENT3 mobs::Key3, ///< Schlüsselelement der Priorität 3
@@ -211,6 +212,7 @@ objname(const std::string &name, ObjectBase *t, const std::vector<mobs::MemVarCf
   { if (t) t->regObj(this); doInit(); objname::init(); setModified(false); } \
 objname &operator=(const objname &rhs) { if (this != &rhs) { doCopy(rhs); } return *this; } \
 static ObjectBase *createMe(ObjectBase *parent = nullptr) { if (parent) return new objname(#objname, parent, { }); else return new objname(); } \
+ObjectBase *createNew() const override {return new objname(); } \
 std::string typeName() const override { return #objname; } \
 static std::string objName() { return #objname; }
 
@@ -256,6 +258,7 @@ private:
   bool m_null = false;
   bool m_nullAllowed = false;
   bool m_modified = false;
+  bool m_saveOld = false; // copy für Audit Trail
 };
 
 class ObjectBase;
@@ -272,6 +275,8 @@ protected:
   MemberBase(mobs::MemBaseVector *m, mobs::ObjectBase *o, const std::vector<MemVarCfg>& cv) : m_name(""), m_parent(o), m_parVec(m) { for (auto c:cv) doConfig(c); }
 public:
   friend class ObjectBase;
+  template <class T>
+  friend class MemberVector;
   virtual ~MemberBase() = default;
   /// Abfrage des Namen der Membervariablen
   std::string name() const { return m_name; }
@@ -307,9 +312,9 @@ public:
   /// \return true, wenn kopieren erfolgreich (Typ-Gleichheit beider Elemente)
   virtual bool doCopy(const MemberBase *other) = 0;
   /// Setze Inhalt auf null
-  void forceNull() { clear(); setNull(true);}
+  void forceNull() { doAudit(); clear(); setNull(true);}
   /// Setze Inhalt auf leer,
-  void setEmpty() { clear(); setNull(false);}
+  void setEmpty() { doAudit(); clear(); setNull(false);}
   /// Starte Traversierung nicht const
   void traverse(ObjTrav &trav);
   /// Starte Traversierung  const
@@ -329,20 +334,31 @@ public:
   MemVarCfg hasFeature(MemVarCfg c) const;
   /// \private
   static std::string objName() { return ""; }
+  /// ursprünglicher Wert für Audit Trail
+  void initialValue(std::string &old, bool &null) const;
+  /// leerer Wert für Audit Trail
+  virtual std::string auditEmpty() const = 0;
+  /// Ausgabe Wert im Format wie initialValue
+  std::string auditValue() const;
 
 
 protected:
   /// \private
   int m_key = 0;
   /// \private
+  void doAudit();
+  /// \private
   MemVarCfg m_altName = Unset;
 
 private:
   void doConfig(MemVarCfg c);
+  void doStartAudit() { m_oldVal.clear(); m_saveOld = true; setModified(false); };
   std::string m_name;
   std::vector<MemVarCfg> m_config;
   ObjectBase *m_parent = nullptr;
   MemBaseVector *m_parVec = nullptr;
+  std::string m_oldVal;  // Originalversion für Audit Trail
+  bool m_oldNull; // Originalversion für Audit Trail
 };
 
 // ------------------ VectorBase ------------------
@@ -373,7 +389,7 @@ public:
   /// \private
   void traverseKey(ObjTravConst &trav) const;
   /// liefert die Anzahl der Elemente
-  virtual size_t size() const = 0;
+  size_t size() const { return m_size; }
   /// Vergrößert/verkleinert die Elementzahl des Vektors
   virtual void resize(size_t s) = 0;
   /// liefert den Namen des Elementes des Vektor Variablen falls diese ein Mobs-Objekt ist
@@ -406,6 +422,8 @@ public:
   inline const ObjectBase *parent() const { return m_parent; }
   /// Abfrage gesetzter  Attribute
   MemVarCfg hasFeature(MemVarCfg c) const;
+  /// Abfrage der ursrünglichen Vectorsize (Audit Trail)
+  size_t initialSize() const { return m_oldSize; }
 
 protected:
   /// \private
@@ -414,9 +432,12 @@ protected:
   std::vector<MemVarCfg> m_c; // config für Member
   /// \private
   MemVarCfg m_altName = Unset;
+  size_t m_oldSize = SIZE_MAX;
+  size_t m_size = 0;
 
 private:
   void doConfig(MemVarCfg c);
+  void doStartAudit() { m_oldSize = size(); setModified(false); };
   std::vector<MemVarCfg> m_config;
   ObjectBase *m_parent = nullptr;
 };
@@ -445,7 +466,9 @@ public:
   ObjectBase(std::string n, ObjectBase *obj, const std::vector<MemVarCfg>& cv ) : m_varNam(std::move(n)), m_parent(obj) { for (auto c:cv) doConfig(c); } // Konstruktor for MemObj
   /// \private
   ObjectBase(MemBaseVector *m, ObjectBase *o, const std::vector<MemVarCfg>& cv) : m_varNam(""), m_parent(o), m_parVec(m) { for (auto c:cv) doConfig(c); } // Konstruktor for Vector
-  virtual ~ObjectBase() = default;;
+  virtual ~ObjectBase() = default;
+  /// erzeuge leeres Duplikat;
+  virtual ObjectBase *createNew() const { return nullptr; }
   /// \private
   ObjectBase &operator=(const ObjectBase &rhs) { if (this != &rhs) doCopy(rhs); return *this; }
   /// \private
@@ -511,6 +534,8 @@ public:
   void setEmpty() { clear(); setNull(false);}
   /// lösche alle Modified-Flags
   void clearModified();
+  /// lösche alle Modified-Flags und aktiviert den Audit Trail Modus
+  void startAudit();
   /// Setzt eine Variable mit dem angegebene Inhalt
   /// @param path Pfad der Variable z.B.: kontakt[3].number
   /// @param value Inhalt, der geschrieben werden soll
@@ -522,8 +547,12 @@ public:
   /// @param compact opt. Angabe, ob ausgabe \e kompakt erfolgen soll (bei enum als \c int statt als Text
   /// \return Inhalt der variable als string in UTF-8, oder leer, wenn nicht gefunden
   std::string getVariable(const std::string &path, bool *found = nullptr, bool compact = false) const;
-  /// liefert einen \c std::string aus den Key-Elementen
-  std::string keyStr() const;
+  /** \brief liefert einen \c std::string aus den Key-Elementen sowie die Versionsnummer oder -1 bei fehlender Version
+    *
+   * @param version Zeiger auf Variable, die, falls != nullptr, die Version des Objektes zurückliefert
+   * \return Zeichenkette, die den kompletten Schlüssel des Objektes repräsentiert
+   */
+  std::string keyStr(int64_t *version = nullptr) const;
   /// \brief Kopiere ein Objekt aus einem bereits vorhandenen.
   /// @param other zu Kopierendes Objekt
   /// \throw runtime_error Sind die Strukturen nicht identisch, wird eine Exception erzeugt
@@ -546,6 +575,7 @@ protected:
   std::vector<std::string> m_confToken; // Liste der Konfigurationstoken
   /// \private
   void doConfigObj(MemVarCfg c);
+
 
 private:
   std::string m_varNam;
@@ -638,16 +668,16 @@ public:
   /// Zugriff auf Inhalt
   inline T operator() () const { return wert; }
   /// Zuweisung eines Wertes
-  inline void operator() (const T &t) { wert = t; activate(); }
+  inline void operator() (const T &t) { doAudit(); wert = t; activate(); }
   /// \brief Zuweisung eines Wertes mit move
   /// sinnvoll für für zB. Byte-Arrays, um nicht doppelten Speicherplatz zu verbrauchen
   /// \code
   /// x.emplace(vector<u_char>(cp, cp + size));
   /// \endcode
-  void emplace(const T &&t) { TRACE(PARAM(this)); wert = std::move(t); activate(); }
+  void emplace(const T &&t) { TRACE(PARAM(this)); doAudit(); wert = std::move(t); activate(); }
 
   /// Setze Inhalt auf leer
-  void clear() override  { wert = this->c_empty(); if (nullAllowed()) setNull(true); else activate(); }
+  void clear() override  { doAudit(); wert = this->c_empty(); if (nullAllowed()) setNull(true); else activate(); }
   /// Abfragemethode mit Ausgabe als \c std::string
   std::string toStr(const ConvToStrHint &cth) const override { return this->c_to_string(wert, cth); }
   /// Abfragemethode mit Ausgabe als \c std::wstring
@@ -655,19 +685,20 @@ public:
   /// Abfrage, ob der Inhalt textbasiert ist (zb. in JSON in Hochkommata gesetzt wird)
   bool is_chartype(const ConvToStrHint &cth) const override { return this->c_is_chartype(cth); }
   /// Einlesen der Variable aus einem \c std::string im Format UTF-8
-  bool fromStr(const std::string &sin, const ConvFromStrHint &cfh) override { if (this->c_string2x(sin, wert, cfh)) { activate(); return true; } return false; }
+  bool fromStr(const std::string &sin, const ConvFromStrHint &cfh) override { doAudit(); if (this->c_string2x(sin, wert, cfh)) { activate(); return true; } return false; }
   /// Einlesen der Variable aus einem \c std::wstring
-  bool fromStr(const std::wstring &sin, const ConvFromStrHint &cfh) override { if (this->c_wstring2x(sin, wert, cfh)) { activate(); return true; } return false; }
+  bool fromStr(const std::wstring &sin, const ConvFromStrHint &cfh) override { doAudit(); if (this->c_wstring2x(sin, wert, cfh)) { activate(); return true; } return false; }
   bool toDouble(double &d) const override { return to_double(wert, d); }
   void memInfo(MobsMemberInfo &i) const override;
   /// Versuch, die  Variable aus einem \c uint64_t einzulesen
-  bool fromUInt64(uint64_t u) override { if (from_number(u, wert)) { activate(); return true; } return false; }
+  bool fromUInt64(uint64_t u) override { doAudit(); if (from_number(u, wert)) { activate(); return true; } return false; }
   /// Versuch, die Variable aus einem \c int64_t einzulesen
-  bool fromInt64(int64_t i) override { if (from_number(i, wert)) { activate(); return true; } return false; }
+  bool fromInt64(int64_t i) override { doAudit(); if (from_number(i, wert)) { activate(); return true; } return false; }
   /// Versuch, die Variable aus einem \c double einzulesen
-  bool fromDouble(double d) override { if (from_number(d, wert)) { activate(); return true; } return false; }
+  bool fromDouble(double d) override { doAudit(); if (from_number(d, wert)) { activate(); return true; } return false; }
   /// Versuche ein Member nativ zu kopieren
   bool doCopy(const MemberBase *other) override { auto t = dynamic_cast<const Member<T, C> *>(other); if (t) doCopy(*t); return t != nullptr; }
+  std::string auditEmpty() const override { return this->c_to_string(T(), ConvToStrHint(hasFeature(mobs::DbCompact))); }
   /// \private
   void inline doCopy(const Member<T, C> &other) { if (other.isNull()) forceNull(); else operator()(other()); }
 
@@ -751,7 +782,6 @@ public:
   /// Zugriff auf das letzte Vector-Element
   T &back() { if (not size()) throw std::runtime_error("MemberVector is empty"); return *werte[size()-1]; }
 
-  size_t size() const override { return werte.size(); }
   void resize(size_t s) override;
   void traverse(ObjTrav &trav) override;
   void traverse(ObjTravConst &trav) const override;
@@ -778,17 +808,17 @@ public:
   /// Start-Iterator
   iterator begin() noexcept { return werte.begin(); }
   /// Ende-Iterator
-  iterator end() noexcept { return werte.end(); }
+  iterator end() noexcept { if (werte.size() <= size()) return werte.end(); return werte.begin()+size(); }
   /// Start-Iterator
-  reverse_iterator rbegin() { return werte.rbegin(); }
+  reverse_iterator rbegin() { if (werte.size() <= size()) return werte.rbegin(); return werte.rend()-size(); }
   /// Ende-Iterator
   reverse_iterator rend() { return werte.rend(); }
   /// Start-Iterator
   const_iterator cbegin() noexcept { return werte.cbegin(); }
   /// Ende-Iterator
-  const_iterator cend() noexcept { return werte.cend(); }
+  const_iterator cend() noexcept { if (werte.size() <= size()) return werte.cend(); return werte.cbegin()+size(); }
   /// Start-Iterator
-  const_reverse_iterator crbegin() { return werte.crbegin(); }
+  const_reverse_iterator crbegin() { if (werte.size() <= size()) return werte.crbegin(); return werte.crend()-size(); }
   /// Ende-Iterator
   const_reverse_iterator crend() { return werte.crend(); }
 
@@ -806,21 +836,33 @@ template<class T>
 void MemberVector<T>::resize(size_t s)
 {
   TRACE(PARAM(s));
-  size_t old = size();
+  if (s == m_size)
+    return;
+  size_t old = m_size;
+  m_size = s;
   if (old > s)
   {
+    // Wenn in Audit-Trail-Modus, dann mind. alle originalen Elemente behalten
+    if (m_oldSize != SIZE_MAX and m_oldSize > s)
+      s = m_oldSize;
     for (size_t i = s; i < old; i++)
       delete werte[i];
     werte.resize(s);
-    activate();
   }
   else if (old < s)
   {
+    // Wenn in Audit-Trail-Modus, dann mind. alle originalen Elemente behalten
+    if (m_oldSize != SIZE_MAX and m_oldSize > s)
+      s = m_oldSize;
     werte.resize(s);
-    for (size_t i = old; i < s; i++)
-      werte[i] = new T(this, m_parent, m_c);
-    activate();
+    for (size_t i = old; i < s; i++) {
+      if (m_oldSize != SIZE_MAX and i < m_oldSize)
+        werte[i]->clear();  // recycelte Werte löschen
+      else
+        werte[i] = new T(this, m_parent, m_c);
+    }
   }
+  activate();
 }
 
 //template<class T>
@@ -913,15 +955,20 @@ public:
   bool inNull() const { return m_inNull; }
   /// ist true, wenn ein \c traversKey durchgeführt wird
   bool inKeyMode() const { return m_keyMode; }
+  /// ist true, wenn im \c auditMode in bereits gelöschten Elementen travesiert wird
+  bool inDelAudit() const { return m_delMode; }
   /// Ist das Element Teil eines Vektors, wird die Index-Position angezeigt, ansonsten ist der Wert \c SIZE_MAX
   size_t arrayIndex() const { return m_arrayIndex; }
   /// traversiere bei Arrays genau ein leeres Dummy-Element
   bool arrayStructureMode = false;
   /// Traversiere im key-Mode(traverseKeys) auch die Versionselemente
   bool withVersionField = false;
+  /// Traversiere auch Elemente, die mittlerweile gelöscht wurden
+  bool m_auditMode = false;
 private:
   bool m_inNull = false;
   bool m_keyMode = false;
+  bool m_delMode = false;
   size_t m_arrayIndex = SIZE_MAX;
 };
 
@@ -996,6 +1043,8 @@ void MemberVector<T>::traverse(ObjTrav &trav)
     size_t i = 0;
     for (auto w:werte) {
       trav.m_arrayIndex = i++;
+      if (i > m_size)
+        break;
       w->traverse(trav);
     }
     trav.m_arrayIndex = SIZE_MAX;
@@ -1023,11 +1072,18 @@ void MemberVector<T>::traverse(ObjTravConst &trav) const
       temp.traverse(trav);
     } else {
       size_t i = 0;
+      bool delMode = trav.m_delMode;
       for (auto w:werte) {
         trav.m_inNull = inNull or isNull();
         trav.m_arrayIndex = i++;
+        if (i > m_size) {
+          if (not trav.m_auditMode)
+            break;
+          trav.m_delMode = true;
+        }
         w->traverse(trav);
       }
+      trav.m_delMode = delMode;
     }
     trav.m_inNull = inNull;
     trav.m_arrayIndex = SIZE_MAX;

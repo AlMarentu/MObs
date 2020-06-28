@@ -78,6 +78,7 @@ public:
   };
   SqlGenerator(const mobs::ObjectBase &object, SQLDBdescription &sqldBdescription) : obj(object),
                                                                                      sqldb(sqldBdescription) {}
+  ~SqlGenerator();
   /// Tabellenname (Master) ohne DB-Spezifische Erweiterung
   std::string tableName() const;
 
@@ -105,6 +106,8 @@ public:
   bool eof() { return detailVec.empty(); }
   /// hatte letztes Query-Statement einenJoin ?
   bool queryWithJoin() const { return querywJoin; }
+  /// löscht temporäre objekte im Destruktor
+  void deleteLater(ObjectBase *o) { m_deleteLater.push_back(o); }
 
 private:
   std::string doCreate(DetailInfo &);
@@ -117,8 +120,8 @@ private:
   const mobs::ObjectBase &obj;
   SQLDBdescription &sqldb;
   std::list<DetailInfo> detailVec{};
-  int64_t version = -1;
   bool querywJoin = false;
+  std::list<ObjectBase *> m_deleteLater;
 };
 
 
@@ -143,6 +146,88 @@ public:
 private:
   ConvObjToString cth;
   std::stack<std::string> names{};
+};
+
+/// Traversier-Klasse: Setzt alle Vektoren eines Objektes auf Größe 1
+class SetArrayStructure  : virtual public mobs::ObjTrav {
+public:
+  /// \private
+  bool doObjBeg(mobs::ObjectBase &obj) final { return true; }
+  /// \private
+  void doObjEnd(mobs::ObjectBase &obj) final {  }
+  /// \private
+  bool doArrayBeg(mobs::MemBaseVector &vec) final { vec.resize(1); return true; }
+  /// \private
+  void doArrayEnd(mobs::MemBaseVector &vec) final { }
+  /// \private
+  void doMem(mobs::MemberBase &mem) final { }
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////   Audit Trail   //////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+class AuditChanges : public mobs::ObjectBase {
+public:
+  ObjInit(AuditChanges);
+  MemVar(std::string, field, LENGTH(100));
+  MemVar(std::string, value, LENGTH(200));
+  MemVar(bool,        nullVal);
+
+};
+
+class AuditObjects : public mobs::ObjectBase {
+public:
+  ObjInit(AuditObjects);
+  
+  MemVar(int, initialVersion); // wenn 0, dann Startwerte, sonst alte Werte
+  MemVar(bool, destroy);  // wenn true, letzter Wert
+  MemVar(std::string, objectName, LENGTH(20));
+  MemVar(std::string, objectKey, LENGTH(80));
+  MemVector(AuditChanges, changes, COLNAME(auditChanges));
+
+};
+
+class AuditActivity : public mobs::ObjectBase {
+public:
+  ObjInit(AuditActivity);
+  
+  MemVar(long long, time, KEYELEMENT1);
+  MemVar(int, userId, KEYELEMENT2);
+  MemVar(std::string, comment, USENULL LENGTH(200));
+  MemVector(AuditObjects, objects, COLNAME(auditObjects));
+  
+};
+
+
+/// Ermittle Elementnamen in mit kompletten Pfad zB.: a.b.c
+class AuditTrail : virtual public ObjTravConst {
+public:
+  explicit AuditTrail(AuditActivity &at);
+  /// Objekt soll gelöscht werden
+  void destroyObj();
+
+  /// \private
+  bool doObjBeg(const ObjectBase &obj) final;
+  /// \private
+  void doObjEnd(const ObjectBase &obj) final;
+  /// \private
+  bool doArrayBeg(const MemBaseVector &vec) final;
+  /// \private
+  void doArrayEnd(const MemBaseVector &vec) final;
+  /// \private
+  void doMem(const MemberBase &mem) final;
+
+  /// Wenn Startwerte nicht gespeichert werden sollen (sind eigentlich redundant) auf false setzen
+  static bool s_saveInitialValues;
+  
+private:
+  AuditActivity &act;
+  ConvObjToString cth;
+  std::stack<std::string> names{};
+  std::stack<bool> key{};
+  bool initial = false;
+  bool destroyMode = false;
 };
 
 

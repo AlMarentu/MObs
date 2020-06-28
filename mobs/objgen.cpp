@@ -71,6 +71,7 @@ void MemberBase::doConfig(MemVarCfg c)
     case Unset:
     case Embedded:
     case DbDetail:
+    case DbAuditTrail:
     case ColNameBase ... ColNameEnd:
     case PrefixBase ... PrefixEnd:
     case VectorNull: break;
@@ -147,6 +148,7 @@ void MemBaseVector::doConfig(MemVarCfg c)
     case AltNameBase ... AltNameEnd: m_altName = c; break;
     case Unset:
     case Key1 ... Key5:
+    case DbAuditTrail:
     case Embedded:
     case XmlAsAttr:
     case DbVersionField:
@@ -183,6 +185,19 @@ void ObjectBase::activate()
     m_parent->activate();
 }
 
+void ObjectBase::startAudit() {
+  class ClearModified  : virtual public ObjTrav {
+  public:
+    bool doObjBeg(ObjectBase &obj) override { obj.setModified(false); return true; }
+    void doObjEnd(ObjectBase &obj) override {  }
+    bool doArrayBeg(MemBaseVector &vec) override {  return true; }
+    void doArrayEnd(MemBaseVector &vec) override { vec.doStartAudit(); }
+    void doMem(MemberBase &mem) override { mem.doStartAudit(); }
+  };
+  ClearModified cm;
+  traverse(cm);
+}
+
 void ObjectBase::clearModified() {
   class ClearModified  : virtual public ObjTrav {
   public:
@@ -209,6 +224,7 @@ void ObjectBase::doConfig(MemVarCfg c)
     case Unset:
     case XmlAsAttr:
     case ColNameBase ... ColNameEnd:
+    case DbAuditTrail:
     case DbCompact:
     case VectorNull:
     case DbVersionField:
@@ -226,6 +242,7 @@ void ObjectBase::doConfigObj(MemVarCfg c)
     case Key1 ... Key5: break;
     case AltNameBase ... AltNameEnd: break;
     case PrefixBase ... PrefixEnd: break;
+    case DbAuditTrail:
     case ColNameBase ... ColNameEnd: m_config.push_back(c); break;
     case LengthBase ... LengthEnd:
     case DbCompact:
@@ -343,28 +360,40 @@ MemberBase *ObjectBase::getMemInfo(const std::string &name, const ConvObjFromStr
 
 
 
-std::string ObjectBase::keyStr() const
+std::string ObjectBase::keyStr(int64_t *ver) const
 {
   class KeyDump : virtual public mobs::ObjTravConst {
   public:
-    explicit KeyDump(const mobs::ConvToStrHint &c) : cth(c) { };
+    explicit KeyDump(const mobs::ConvToStrHint &c) : cth(c) { withVersionField = true; };
     bool doObjBeg(const mobs::ObjectBase &obj) override { return true; };
     void doObjEnd(const mobs::ObjectBase &obj) override { };
     bool doArrayBeg(const mobs::MemBaseVector &vec) override { return false; }
     void doArrayEnd(const mobs::MemBaseVector &vec) override { }
     void doMem(const mobs::MemberBase &mem) override {
+      if (mem.isVersionField()) {
+        if (version < 0 ) {
+          MobsMemberInfo mi;
+          mem.memInfo(mi);
+          if (mi.isUnsigned) {
+            if (mi.u64 > mi.max)
+              throw std::runtime_error("VersionElement overflow");
+            version = mi.u64;
+          } else if (mi.isSigned) {
+            version = mi.i64;
+          }
+        }
+        return;
+      }
       if (not fst)
-        res << ",";
+        res << ":";
       fst = false;
       if (inNull() or mem.isNull())
         ;
-      else if (mem.is_chartype(cth))
-        res << mobs::to_quote(mem.toStr(cth));
       else
-        res << mem.toStr(cth);
+        res << mem.auditValue();
     };
     std::string result() { return res.str(); };
-  private:
+    int64_t version = -1;
     bool fst = true;
     stringstream res;
     mobs::ConvToStrHint cth;
@@ -374,6 +403,8 @@ std::string ObjectBase::keyStr() const
   ConvToStrHint cth(false);
   KeyDump kd(cth);
   traverseKey(kd);
+  if (ver)
+    *ver = kd.version;
   return kd.result();
 }
 
@@ -428,6 +459,36 @@ void ObjectBase::doCopy(const ObjectBase &other)
   if (src != other.mlist.end())
     throw runtime_error(u8"ObjectBase::doCopy: invalid Element (num2)");
 }
+
+
+
+void MemberBase::doAudit() {
+  if (m_saveOld) {
+    m_saveOld = false;
+    m_oldVal = auditValue();
+    m_oldNull = isNull();
+  }
+}
+
+std::string MemberBase::auditValue() const {
+  if (isNull())
+    return "";
+  bool compact = hasFeature(mobs::DbCompact);
+  return toStr(ConvToStrHint(compact));
+}
+
+void MemberBase::initialValue(std::string &old, bool &null) const {
+  if (m_saveOld) {
+    old = auditValue();
+    null = isNull();
+  } else {
+    old = m_oldVal;
+    null = m_oldNull;
+  }
+}
+
+
+
 
 /////////////////////////////////////////////////
 /// ObjectBase::clear

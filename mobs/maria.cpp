@@ -41,8 +41,11 @@ using namespace std;
 
 class mysql_exception : public std::runtime_error {
 public:
-  mysql_exception(const std::string &e, MYSQL *con) : std::runtime_error(string("mysql ") + e + ": " + mysql_error(con)) {  }
-//  mysql_exception(const char *e, MYSQL *con) : std::runtime_error(string("mysql ") + e + ": " + mysql_error(con)) {  }
+  mysql_exception(const std::string &e, MYSQL *con) : std::runtime_error(string("mysql ") + e + ": " + mysql_error(con)) {
+    LOG(LM_DEBUG, "mysql: Error " << mysql_error(con)); }
+//  const char* what() const noexcept override { return error.c_str(); }
+//private:
+//  std::string error;
 };
 
 
@@ -81,10 +84,12 @@ public:
     }
     else if (mi.isSigned and mi.max <= 32767)
       res << "SMALLINT";
+    else if (mi.isSigned and mi.max <= INT32_MAX)
+      res << "INT";
     else if (mi.isSigned)
-      res << "INT";
+      res << "BIGINT";
     else if (mi.isUnsigned)
-      res << "INT";
+      res << "BIGINT UNSIGNED";
     else
       res << "SMALLINT";
     if (not mem.nullAllowed())
@@ -302,7 +307,6 @@ bool MariaDatabaseConnection::load(DatabaseInterface &dbi, ObjectBase &obj) {
   LOG(LM_DEBUG, "SQL: " << s);
   if (mysql_real_query(connection, s.c_str(), s.length()))
     throw mysql_exception(u8"load failed", connection);
-  bool found = false;
   MYSQL_RES *result = mysql_store_result(connection);
   if (result == nullptr)
     throw mysql_exception(u8"load store failed", connection);
@@ -365,6 +369,15 @@ void MariaDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj
       if (mysql_real_query(connection, s.c_str(), s.length()))
         throw mysql_exception(u8"save failed", connection);
     }
+  } catch (runtime_error &e) {
+    string s = "ROLLBACK WORK";
+    if (currentTransaction)
+      s += " TO SAVEPOINT MOBS";
+    s += ";";
+    LOG(LM_DEBUG, "SQL " << s);
+    if (mysql_real_query(connection, s.c_str(), s.length()))
+      throw mysql_exception(u8"Transaction failed", connection);
+    throw e;
   } catch (exception &e) {
     string s = "ROLLBACK WORK";
     if (currentTransaction)
@@ -428,6 +441,15 @@ bool MariaDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase &
           throw runtime_error(u8"destroy: Object with appropriate version not found");
       }
     }
+  } catch (runtime_error &e) {
+    string s = "ROLLBACK WORK";
+    if (currentTransaction)
+      s += " TO SAVEPOINT MOBS";
+    s += ";";
+    LOG(LM_DEBUG, "SQL " << s);
+    if (mysql_real_query(connection, s.c_str(), s.length()))
+      throw mysql_exception(u8"Transaction failed", connection);
+    throw e;
   } catch (exception &e) {
     string s = "ROLLBACK WORK";
     if (currentTransaction)
@@ -527,6 +549,8 @@ MariaDatabaseConnection::retrieve(DatabaseInterface &dbi, ObjectBase &obj, std::
     try {
       if (sd.result == nullptr)
         throw mysql_exception(u8"load detail failed", connection);
+      // Vektor auf leer setzten (wurde wegen Struktur zuvor erweitert)
+      di.vecNc->resize(0);
       for (;;) {
         MYSQL_ROW row = mysql_fetch_row(sd.result);
         if (row == nullptr)
@@ -534,8 +558,10 @@ MariaDatabaseConnection::retrieve(DatabaseInterface &dbi, ObjectBase &obj, std::
         sd.row = &row;
         gsql.readObject(di);
       }
-    }
-    catch (exception &e) {
+    }  catch (runtime_error &e) {
+      mysql_free_result(sd.result);
+      throw e;
+    }  catch (exception &e) {
       mysql_free_result(sd.result);
       throw e;
     }

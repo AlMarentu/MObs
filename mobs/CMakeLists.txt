@@ -1,6 +1,8 @@
 
 set(libSrcs objgen.cpp objtypes.cpp logging.cpp strtoobj.cpp objpool.cpp xmlwriter.cpp
-        xmlout.cpp xmlread.cpp converter.cpp unixtime.cpp dbifc.cpp helper.cpp helper.h)
+        xmlout.cpp xmlread.cpp converter.cpp unixtime.cpp dbifc.cpp helper.cpp
+        converter.h logging.h objpool.h objtypes.h unixtime.h xmlparser.h xmlwriter.h
+        jsonparser.h objgen.h objstore.h union.h xmlout.h xmlread.h dbifc.h helper.h)
 
 
 
@@ -47,3 +49,4 @@ install(TARGETS mobs
         ARCHIVE DESTINATION lib
         RUNTIME DESTINATION bin
         PUBLIC_HEADER DESTINATION include/mobs)
+

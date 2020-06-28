@@ -43,7 +43,7 @@ class GenerateSqlJoin : virtual public ObjTravConst {
 public:
 
   explicit GenerateSqlJoin(ConvObjToString c, SQLDBdescription &sqldBdescription) :
-          cth(move(c.exportPrefix().exportAltNames())), sqldb(sqldBdescription)  {}
+          cth(c.exportPrefix().exportAltNames()), sqldb(sqldBdescription)  {}
 
 
 
@@ -245,8 +245,8 @@ private:
 
 class ExtractSql : virtual public ObjTrav {
 public:
-  explicit ExtractSql(SQLDBdescription &s, ConvObjToString c) : cth(move(c.exportPrefix().exportAltNames())),
-                                                                sqldb(s), current(nullptr, "", {}) { }
+  explicit ExtractSql(SQLDBdescription &s, ConvObjToString c) : current(nullptr, "", {}), cth(move(c.exportPrefix().exportAltNames())),
+                                                                sqldb(s) { }
 
   bool doObjBeg(ObjectBase &obj) final
   {
@@ -280,6 +280,8 @@ public:
     size_t index = SIZE_T_MAX;
     k.emplace_back(make_pair(vec.getName(cth), index));
     detailVec.emplace_back(&vec, current.tableName + "_" + vec.name(), k);
+    // übergeordete Vektoren auf Size=1 setzten, damit die Struktur für das nächste Statement vorhanden ist
+    vec.resize(1);
     return false;
   };
 
@@ -309,7 +311,6 @@ public:
 private:
   ConvObjToString cth;
   SQLDBdescription &sqldb;
-  bool fst = true;
   int level = 0;
 };
 
@@ -320,8 +321,8 @@ private:
 class GenerateSql : virtual public ObjTravConst {
 public:
   enum Mode { Where, Fields, Values, Update, Create };
-  explicit GenerateSql(Mode m, SQLDBdescription &s, ConvObjToString c) : mode(m), sqldb(s),
-                                                                         cth(move(c.exportPrefix().exportAltNames())), current(nullptr, "", {}) { }
+  explicit GenerateSql(Mode m, SQLDBdescription &s, ConvObjToString c) : current(nullptr, "", {}), mode(m),
+  cth(c.exportPrefix().exportAltNames()), sqldb(s) { }
 
   string delimiter() noexcept {  if (not fst) return mode == Where ? " and ": ","; fst = false; return string(); }
 
@@ -538,13 +539,13 @@ namespace mobs {
 
 SqlGenerator::DetailInfo::DetailInfo(const MemBaseVector *v, std::string t,
                                      std::vector<std::pair<std::string, size_t>> k, bool c) :
-        vec(v), tableName(move(t)), arrayKeys(move(k)), cleaning(c), vecNc(nullptr) {}
+        vec(v), vecNc(nullptr), tableName(move(t)), arrayKeys(move(k)), cleaning(c) {}
 
 SqlGenerator::DetailInfo::DetailInfo(mobs::MemBaseVector *v, std::string t,
                                      std::vector<std::pair<std::string, size_t>> k) :
-        vec(v), tableName(move(t)), arrayKeys(move(k)), cleaning(false), vecNc(v) {}
+        vec(v), vecNc(v), tableName(move(t)), arrayKeys(move(k)), cleaning(false) {}
 
-SqlGenerator::DetailInfo::DetailInfo() : vec(nullptr), tableName(move(string())), arrayKeys({}), cleaning(false), vecNc(nullptr) {}
+SqlGenerator::DetailInfo::DetailInfo() : vec(nullptr), vecNc(nullptr), tableName(string()), arrayKeys({}), cleaning(false) {}
 
 string SqlGenerator::tableName() const {
   mobs::MemVarCfg c = obj.hasFeature(mobs::ColNameBase);
@@ -558,8 +559,6 @@ string SqlGenerator::doDelete(SqlGenerator::DetailInfo &di) {
   GenerateSql gs(GenerateSql::Where, sqldb, mobs::ConvObjToString());
   gs.current = di;
   gs.withCleaner = not di.cleaning; // nicht doppelt cleanen
-  gs.arrayStructureMode = true;
-
   gs.addText("delete from ");
 
   if (di.vec) {
@@ -577,19 +576,29 @@ string SqlGenerator::doDelete(SqlGenerator::DetailInfo &di) {
   }
   gs.addText(";");
   string s = gs.result();
-
+ 
   gs.setMode(GenerateSql::Fields);
   gs.detailVec.clear();
   if (di.vec) {
     gs.current.vec->traverse(gs);
   }
-  else
-    obj.traverse(gs);
+  else {
+    // Auf Schattenobjekt arbeiten, um all Vektoren auf Size=1 zu setzen
+    // Objekt muss wärend der Verarbeitung stabil bleiben (C-Pointer)
+    ObjectBase *o2 = obj.createNew();
+    deleteLater(o2);
+    SetArrayStructure sas;
+    o2->traverse(sas);
+    o2->traverse(gs);
+  }
   detailVec.splice(detailVec.end(), gs.detailVec);
   return s;
 }
 
-
+SqlGenerator::~SqlGenerator() {
+  for (auto o:m_deleteLater)
+    delete o;
+}
 
 string SqlGenerator::doUpdate(SqlGenerator::DetailInfo &di) {
   if (di.cleaning)
@@ -797,8 +806,8 @@ string SqlGenerator::dropStatement(bool first) {
 string SqlGenerator::doCreate(SqlGenerator::DetailInfo &di) {
   GenerateSql gs(GenerateSql::Create, sqldb, mobs::ConvObjToString());
   gs.current = di;
-  gs.arrayStructureMode = true;
   gs.addText("create table ");
+  gs.addText("if not exists "); // TODO ist DB-Abhängig
   if (di.vec)
     gs.addText(sqldb.tableName(vecTableName(di.vec, di.tableName)));
   else
@@ -810,8 +819,15 @@ string SqlGenerator::doCreate(SqlGenerator::DetailInfo &di) {
   gs.detailVec.clear();
   if (di.vec)
     di.vec->traverse(gs);
-  else
-    obj.traverse(gs);
+  else {
+    // Auf Schattenobjekt arbeiten, um all Vektoren auf Size=1 zu setzen
+    // Objekt muss wärend der Verarbeitung stabil bleiben (C-Pointer)
+    ObjectBase *o2 = obj.createNew();
+    deleteLater(o2);
+    SetArrayStructure sas;
+    o2->traverse(sas);
+    o2->traverse(gs);
+  }
   detailVec.splice(detailVec.end(), gs.detailVec);
 
   gs.addText(", unique(");
@@ -864,7 +880,7 @@ string SqlGenerator::doSelect(SqlGenerator::DetailInfo &di) {
   if (not di.vec)
     throw runtime_error("error in doSelect");
   GenerateSql gs(GenerateSql::Fields, sqldb, mobs::ConvObjToString());
-  gs.arrayStructureMode = true;
+  // In ExtractSql wurden die Verkoren der nächsten Ebene auf Size=1 gesetzt
   gs.withCleaner = false;
   gs.current = di;
   gs.addText("select ");
@@ -873,9 +889,8 @@ string SqlGenerator::doSelect(SqlGenerator::DetailInfo &di) {
   gs.addText(sqldb.tableName(vecTableName(di.vec, di.tableName)));
   gs.addText(" where ");
   gs.setMode(GenerateSql::Where);
-  gs.arrayStructureMode = true;
   obj.traverseKey(gs);
-    di.vec->traverse(gs);
+  di.vec->traverse(gs);
   gs.detailVec.clear();
   gs.addText(";");
   return gs.result();
@@ -892,7 +907,7 @@ void SqlGenerator::readObject(const DetailInfo &di) {
   size_t index = sqldb.readIndexValue();
   if (index >= INT_MAX)
     throw runtime_error("no index position in readObject");
-   vec->resize(index+1);
+  vec->resize(index+1);
   ObjectBase *vobj = vec->getObjInfo(index);
   if (not vobj)
     throw runtime_error("Object missing in readObject");
@@ -1028,6 +1043,143 @@ void ElementNames::doMem(const MemberBase &mem) {
 
   valueStmt(names.top() + mem.getName(cth), mem, compact);
 }
+
+
+
+
+
+
+//////////////////////////////// AuditTrail ////////////////////////////////
+
+AuditTrail::AuditTrail(AuditActivity &at) : act(at), cth(ConvObjToString().exportAltNames()) { names.push(""); m_auditMode = true; }
+
+bool AuditTrail::s_saveInitialValues = false;
+
+void AuditTrail::destroyObj() { destroyMode = true; initial = true; }
+
+bool AuditTrail::doObjBeg(const ObjectBase &obj) {
+  if (key.empty()) { // Neues Objekt
+    int64_t version;
+    std::string objKey = obj.keyStr(&version);
+    act.objects[MemBaseVector::nextpos].objectKey(objKey);
+    MemVarCfg c = obj.hasFeature(ColNameBase);
+    act.objects.back().objectName(c ? obj.getConf(c) : obj.typeName());
+    if (version < 0)
+      act.objects.back().initialVersion.forceNull();
+    else
+      act.objects.back().initialVersion(version);
+    if (destroyMode)
+      act.objects.back().destroy(true);
+    else if (version == 0) {
+      initial = true;
+      if (not s_saveInitialValues)
+        return false;
+    }
+  }
+  else if (obj.hasFeature(mobs::DbDetail))
+    return false;
+  if (obj.isNull() and cth.omitNull())
+    return false;
+  if (not inDelAudit() and not initial and not obj.isModified())
+    return false;
+  std::string name = names.top();
+  if (inArray()) {
+    name += u8"[";
+    name += to_string(arrayIndex());
+    name += "]";
+  }
+  else {
+    if (not name.empty())
+      name += ".";
+    name += obj.getName(cth);
+  }
+  names.push(name);
+  key.push(key.empty() or (key.top() and obj.key()));
+  return true;
+}
+
+void AuditTrail::doObjEnd(const ObjectBase &obj) {
+  names.pop();
+  key.pop();
+}
+
+bool AuditTrail::doArrayBeg(const MemBaseVector &vec) {
+  if (vec.hasFeature(mobs::DbDetail))
+    return false;
+  if (vec.isNull() and cth.omitNull())
+    return false;
+  if (not inDelAudit() and not initial and not vec.isModified())
+    return false;
+  std::string name = names.top();
+  if (not name.empty())
+    name += ".";
+  name += vec.getName(cth);
+  names.push(name);
+  key.push(false);
+  return true;
+}
+
+void AuditTrail::doArrayEnd(const MemBaseVector &vec) {
+  size_t old = vec.initialSize();
+  if (old != vec.size()) {
+    act.objects.back().changes[MemBaseVector::nextpos].field(names.top());
+    string val;
+    bool null = false;
+    if (initial or inDelAudit())
+      val = std::to_string(vec.size());
+    else
+      val = std::to_string(old);
+    
+    act.objects.back().changes.back().value(val);
+    act.objects.back().changes.back().nullVal(null);
+  }
+  names.pop();
+  key.pop();
+}
+
+void AuditTrail::doMem(const MemberBase &mem) {
+  if (mem.isNull() and cth.omitNull())
+    return;
+  if (not inDelAudit() and not initial and not mem.isModified())
+    return;
+  if ((mem.key() or mem.isVersionField()) and key.top())
+    return;
+  std::string name = names.top();
+  if (inArray()) {
+    name += u8"[";
+    name += to_string(arrayIndex());
+    name += "]";
+  }
+  else {
+    if (not name.empty())
+      name += ".";
+    name += mem.getName(cth);
+  }
+  string val;
+  bool null = false;
+  if (initial or inDelAudit()) {
+    null = mem.isNull();
+    if (not null) {
+      val = mem.auditValue();
+      if (val == mem.auditEmpty() and not mem.hasFeature(mobs::InitialNull))
+        return;
+    }
+    else if (mem.hasFeature(mobs::InitialNull))
+      return;
+  } else {
+    mem.initialValue(val, null);
+    if (null and mem.isNull())
+      return;
+    if (not null and not mem.isNull() and val == mem.auditValue())
+      return;
+  }
+  
+  act.objects.back().changes[MemBaseVector::nextpos].field(name);
+  act.objects.back().changes.back().value(val);
+  act.objects.back().changes.back().nullVal(null);
+}
+
+  
 
 
 }

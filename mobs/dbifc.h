@@ -396,6 +396,8 @@ class DbTransactionData;
 class DbTransaction {
 public:
   friend class DatabaseManager;
+  friend class DbTransaction;
+  friend class DatabaseInterface;
 
   enum IsolationLevel {
     ReadUncommitted, ReadCommitted, CursorStability, RepeatableRead, Serializable
@@ -411,18 +413,28 @@ public:
 
   /// Abfrage TransactionDbInfo
   TransactionDbInfo *transactionDbInfo(const DatabaseInterface &dbi);
-
+  /// Startzeitpunkt der Transaktion
+  std::chrono::steady_clock::time_point startTime() const;
   /// Abfrage Isolation-Level
   IsolationLevel getIsolation() const;
 
   /// Setzen des Isolation-Levels
   void setIsolation(IsolationLevel level);
+  /// Setzen einer uid für Audit Trail; standarsmäßig mit UserId des Systems vorbesetzt
+  static void setUid(int id);
+  /// setze Kommentar für Audit Trail
+  void setComment(const std::string &comment);
 
 
 private:
   DbTransaction();
   ~DbTransaction();
+  DatabaseInterface getDbIfc(DatabaseInterface &dbi);
   void finish(bool good);
+  void doAuditSave(const ObjectBase &obj, const DatabaseInterface &dbi);
+  void doAuditDestroy(const ObjectBase &obj, const DatabaseInterface &dbi);
+  void writeAuditTrail();
+
   DbTransactionData *data = nullptr;
 
 };

@@ -30,6 +30,9 @@
 #include "maria.h"
 #endif
 
+#include "helper.h"
+#include <unistd.h> // getuid
+
 namespace mobs {
 namespace {
 
@@ -149,14 +152,19 @@ void DatabaseManager::copyConnection(const std::string &connectionName, const st
 
 
 void DatabaseManager::execute(DatabaseManager::transaction_callback &cb) {
-  LOG(LM_DEBUG, "TRANSACTION STARTING");
-
   DbTransaction transaction{};
+  auto s = std::chrono::duration_cast<std::chrono::microseconds>(transaction.startTime().time_since_epoch()).count();
+  LOG(LM_DEBUG, "TRANSACTION STARTING " << s);
 
   try {
     cb(&transaction);
+    transaction.writeAuditTrail();
+  } catch (std::runtime_error &e) {
+    LOG(LM_DEBUG, "TRANSACTION FAILED runtime " << e.what());
+    transaction.finish(false);
+    throw std::runtime_error(std::string(u8"DbTransaction error: ") + e.what());
   } catch (std::exception &e) {
-    LOG(LM_DEBUG, "TRANSACTION FAILED " << e.what());
+    LOG(LM_DEBUG, "TRANSACTION FAILED 2 " << e.what());
     transaction.finish(false);
     throw std::runtime_error(std::string(u8"DbTransaction error: ") + e.what());
   } catch (...) {
@@ -164,10 +172,10 @@ void DatabaseManager::execute(DatabaseManager::transaction_callback &cb) {
     transaction.finish(false);
     throw std::runtime_error(u8"DbTransaction error: unknown exception");
   }
-   transaction.finish(true);
-
-
-  LOG(LM_DEBUG, "TRANSACTION FINISHED");
+  transaction.finish(true);
+  std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - transaction.startTime()).count();
+  LOG(LM_DEBUG, "TRANSACTION FINISHED " << duration << " µs");
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -178,19 +186,82 @@ public:
   public:
     std::shared_ptr<TransactionDbInfo> tdb{};
     std::shared_ptr<DatabaseConnection> dbCon{};
+    // je Database eigenen AuditTrail-Buffer
+    std::map<std::string, AuditActivity> audit;
   };
   std::map<const DatabaseConnection *, DTI> connections;
   DbTransaction::IsolationLevel isolationLevel = DbTransaction::RepeatableRead;
-
+  std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+  std::string comment;
+  static int s_uid;
 };
 
+int DbTransactionData::s_uid = getuid();
 
-
-DbTransaction::DbTransaction() : data(new DbTransactionData) {
+void DbTransaction::setUid(int i) {
+  DbTransactionData::s_uid = 0;
 }
+
+void DbTransaction::setComment(const std::string &comment) {
+  data->comment = comment;
+}
+
+std::chrono::steady_clock::time_point DbTransaction::startTime() const {
+  return data->start;
+}
+
+void DbTransaction::doAuditSave(const ObjectBase &obj, const DatabaseInterface &dbi) {
+  auto s = data->connections.find(&*dbi.getConnection());
+  if (s == data->connections.end())
+    return;
+  
+  AuditTrail at(s->second.audit[dbi.database()]);
+  obj.traverse(at);
+}
+
+void DbTransaction::doAuditDestroy(const ObjectBase &obj, const DatabaseInterface &dbi) {
+  auto s = data->connections.find(&*dbi.getConnection());
+  if (s == data->connections.end())
+    return;
+
+  AuditTrail at(s->second.audit[dbi.database()]);
+  at.destroyObj();
+  obj.traverse(at);
+}
+
+void DbTransaction::writeAuditTrail() {
+  for (auto &i:data->connections) {
+    auto dti = i.second;
+    for (auto a:dti.audit) {
+      LOG(LM_DEBUG, "Writing audit");
+      long long t = std::chrono::duration_cast<std::chrono::microseconds>(startTime().time_since_epoch()).count();
+      a.second.time(t);
+      a.second.userId(data->s_uid);
+      if (not data->comment.empty())
+        a.second.comment(data->comment);
+      DatabaseInterface dbi_t(dti.dbCon, a.first);
+      dbi_t.transaction = this;
+      dti.dbCon->save(dbi_t, a.second);
+    }
+  }
+}
+
+DbTransaction::DbTransaction() : data(new DbTransactionData) { }
 
 DbTransaction::~DbTransaction() {
   delete data;
+}
+
+
+DatabaseInterface DbTransaction::getDbIfc(DatabaseInterface &dbiIn) {
+  DatabaseInterface dbi = DatabaseInterface(dbiIn.dbCon, dbiIn.databaseName);
+ 
+  DbTransactionData::DTI &dti = data->connections[&*dbi.dbCon];
+  if (not dti.dbCon)
+    dti.dbCon = dbi.dbCon;
+  dbi.dbCon->startTransaction(dbi, this, dti.tdb);
+  dbi.transaction = this;
+  return dbi;
 }
 
 DatabaseInterface DbTransaction::getDbIfc(const std::string &connectionName) {
@@ -306,22 +377,58 @@ DatabaseInterface::DatabaseInterface(std::shared_ptr<DatabaseConnection> dbi, st
         : dbCon(std::move(dbi)), databaseName(std::move(dbName)), timeout(0) {  }
 
 bool DatabaseInterface::load(ObjectBase &obj) {
-  return dbCon->load(*this, obj);
+  if (not dbCon->load(*this, obj))
+    return false;
+  if (obj.hasFeature(DbAuditTrail))
+    obj.startAudit();
+  return true;
 }
 
 void DatabaseInterface::save(const ObjectBase &obj) {
-  dbCon->save(*this, obj);
+  if (transaction) {
+    if (obj.hasFeature(DbAuditTrail))
+      transaction->doAuditSave(obj, *this);
+    dbCon->save(*this, obj);
+    return;
+  }
+  if (not obj.hasFeature(DbAuditTrail)) {
+    dbCon->save(*this, obj);
+    return;
+  }
+
+  DatabaseManager::transaction_callback tcb = [this, &obj](mobs::DbTransaction *trans) {
+    DatabaseInterface t_dbi = trans->getDbIfc(*this);
+    trans->doAuditSave(obj, t_dbi);
+    dbCon->save(t_dbi, obj);
+  };
+  DatabaseManager::execute(tcb);
 }
 
 void DatabaseInterface::save(ObjectBase &obj) {
-  dbCon->save(*this, obj);
+  save((const ObjectBase &)obj);
   ObjectSaved os;
   obj.traverse(os);
 }
 
 bool DatabaseInterface::destroy(const ObjectBase &obj) {
-  return dbCon->destroy(*this, obj);
+  if (transaction) {
+    if (obj.hasFeature(DbAuditTrail))
+      transaction->doAuditDestroy(obj, *this);
+    return dbCon->destroy(*this, obj);
+  }
+  if (not obj.hasFeature(DbAuditTrail))
+    return dbCon->destroy(*this, obj);
+
+  bool ok = true;
+    DatabaseManager::transaction_callback tcb = [this, &ok, &obj](mobs::DbTransaction *trans) {
+      DatabaseInterface t_dbi = trans->getDbIfc(*this);
+      trans->doAuditDestroy(obj, t_dbi);
+      ok = dbCon->destroy(t_dbi, obj);
+    };
+    DatabaseManager::execute(tcb);
+  return ok;
 }
+
 
 std::shared_ptr<DbCursor> DatabaseInterface::query(ObjectBase &obj, const std::string &query) {
   return dbCon->query(*this, obj, query, false);
@@ -335,6 +442,8 @@ void DatabaseInterface::retrieve(ObjectBase &obj, std::shared_ptr<mobs::DbCursor
   if (not cursor->valid())
     throw std::runtime_error("DatabaseInterface: cursor is not valid");
   dbCon->retrieve(*this, obj, cursor);
+  if (obj.hasFeature(DbAuditTrail))
+    obj.startAudit();
 }
 
 void DatabaseInterface::dropAll(const ObjectBase &obj) {
@@ -343,6 +452,10 @@ void DatabaseInterface::dropAll(const ObjectBase &obj) {
 
 void DatabaseInterface::structure(const ObjectBase &obj) {
   dbCon->structure(*this, obj);
+  if (obj.hasFeature(DbAuditTrail)) {
+    AuditActivity aa;
+    dbCon->structure(*this, aa);
+  }
 }
 
 std::string DatabaseInterface::connectionName() const {

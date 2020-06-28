@@ -593,16 +593,16 @@ TEST(objgenTest, keys) {
   EXPECT_EQ(2, o.oo.key());
   EXPECT_EQ(3, o.yy.key());
   EXPECT_EQ(1, o.id.key());
-  EXPECT_EQ("0,,,,", o.keyStr());
+  EXPECT_EQ("0::::", o.keyStr());
   o.oo.bb(7);
-  EXPECT_EQ("0,0,0,0,", o.keyStr());
+  EXPECT_EQ("0:0:0:0:", o.keyStr());
   o.oo.cc(211);
   o.oo.dd(212);
   o.oo.aa(220);
   o.id(1);
   o.yy(3);
-  EXPECT_EQ("1,211,212,220,3", o.keyStr());
-  EXPECT_EQ("1,211,212,220,3", o.keyStr());
+  EXPECT_EQ("1:211:212:220:3", o.keyStr());
+  EXPECT_EQ("1:211:212:220:3", o.keyStr());
   // traversKey
   EXPECT_EQ("id:1,oo.cc:211,oo.dd:212,oo.aa:220,yy:3", showKey(o));
   o.oo.forceNull();

@@ -23,7 +23,7 @@ public:
 class Gespann : virtual public mobs::ObjectBase
 {
 public:
-  ObjInit(Gespann, COLNAME(vehicle));
+  ObjInit(Gespann, COLNAME(vehicle) AUDITTRAIL);
 
   MemVar(int, id, KEYELEMENT1);
   MemVar(int, version, VERSIONFIELD);

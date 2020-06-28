@@ -278,32 +278,67 @@ TEST(helperTest, fields) {
             gsql.replaceStatement(false));
   EXPECT_TRUE(gsql.eof());
   a3.oa3.o2oo.resize(1);
-int c = 10;
 
+  EXPECT_EQ("update D.ObjA3 set p3p='',o_k2kk=0,o_s2s='' where k3kk=0 and version=0;", gsql.updateStatement(true));
+  EXPECT_FALSE(gsql.eof());
+  EXPECT_EQ("update D.ObjA3_o2oo set a1bc='XX',c1de=0,f1gh=0 where k3kk=0 and o_oo_ix= 0;", gsql.updateStatement(false));
+  EXPECT_FALSE(gsql.eof());
+  EXPECT_EQ("delete from D.ObjA3_o2oo where k3kk=0 and o_oo_ix> 0;", gsql.updateStatement(false));
+  EXPECT_TRUE(gsql.eof());
 
-  for (bool first = true; first or (not gsql.eof() and --c); first = false)
-    LOG(LM_INFO, "UPDATE " << gsql.updateStatement(first));
-  LOG(LM_INFO, "a3.oa3.o2oo MODIFIED = " << boolalpha << a3.oa3.o2oo.isModified());
-  for (bool first = true; first or (not gsql.eof() and --c); first = false)
-    LOG(LM_INFO, "DELETE " << gsql.deleteStatement(first));
-
-  LOG(LM_INFO, "SELECT K " << gsql.selectStatementFirst(true));
-  LOG(LM_INFO, "SELECT S " << gsql.selectStatementFirst());
+  EXPECT_EQ("delete from D.ObjA3 where k3kk=0 and version=0;", gsql.deleteStatement(true));
+  EXPECT_FALSE(gsql.eof());
+  EXPECT_EQ("delete from D.ObjA3_o2oo where k3kk=0;", gsql.deleteStatement(false));
+  EXPECT_TRUE(gsql.eof());
+ 
+  EXPECT_EQ("select k3kk from D.ObjA3 where k3kk=0;", gsql.selectStatementFirst(true));
+  EXPECT_EQ("select k3kk,version,p3p,o_k2kk,o_s2s from D.ObjA3 where k3kk=0;", gsql.selectStatementFirst());
+    
   ObjA3 a3r;
   gsql.readObject(a3r);
+  
+  mobs::SqlGenerator::DetailInfo di;
+  EXPECT_FALSE(gsql.eof());
+  EXPECT_EQ("select o_oo_ix,a1bc,c1de,f1gh from D.ObjA3_o2oo where k3kk=0;", gsql.selectStatementArray(di));
+  EXPECT_TRUE(gsql.eof());
 
-  c = 10;
-  while (not gsql.eof() and --c) {
-    mobs::SqlGenerator::DetailInfo di;
-    LOG(LM_INFO, "SELECT A " << gsql.selectStatementArray(di));
-    gsql.readObject(di);
-
-  }
   a3.k3kk.forceNull();
-  LOG(LM_INFO, "SELECT N " << gsql.selectStatementFirst());
+  EXPECT_EQ("select k3kk,version,p3p,o_k2kk,o_s2s from D.ObjA3 where k3kk is null;", gsql.selectStatementFirst());
 
 }
 
+
+
+TEST(helperTest, auditTrail) {
+  
+  ObjA3 a3;
+  a3.version(0);
+  a3.oa3.o2oo[2].c1de(4);
+  a3.p3p.forceNull();
+  a3.startAudit();
+  
+  SetModified sm;
+//a3.traverse(sm);
+  a3.oa3.o2oo.resize(1);
+  a3.oa3.o2oo[1].c1de(5);
+  a3.p3p("abc");
+
+  
+  mobs::AuditActivity act;
+  mobs::AuditTrail at(act);
+//  at.destroyObj();
+  a3.traverse(at);
+  // TODO
+  cerr << act.to_string(mobs::ConvObjToString().doIndent()) << endl;
+ 
+  
+  SQLDBTestDesc sd;
+  mobs::SqlGenerator gsql(act, sd);
+  for (bool first = true; first or not gsql.eof(); first = false)
+    LOG(LM_INFO, "CR " << gsql.createStatement(first));
+
+
+}
 
 
 }
