@@ -9,6 +9,13 @@ endif()
 include_directories(${CMAKE_SOURCE_DIR}/mobs)
 
 option(PACKAGE_TESTS "Build the tests" OFF)
+option(BUILD_DOC "Build Documentation" ON)
+option(BUILD_MONGO_INTERFACE "Build the Mongo database modules" ON)
+option(BUILD_MARIA_INTERFACE "Build the Maria database modules" ON)
+option(BUILD_INFORMIX_INTERFACE "Build the Informix database modules" ON)
+
+
+
 if(PACKAGE_TESTS)
     enable_testing()
     include(GoogleTest)
@@ -29,8 +36,6 @@ target_link_libraries(fileio mobs)
 
 
 # Doxygen Build
-option(BUILD_DOC "Build Documentation" ON)
-
 if(BUILD_DOC)
     find_package(Doxygen)
     if(DOXYGEN_FOUND)
@@ -57,7 +62,6 @@ endif()
 
 
 
-option(BUILD_MONGO_INTERFACE "Build the Mongo database modules" ON)
 
 if(BUILD_MONGO_INTERFACE)
     find_package(libmongocxx REQUIRED)
@@ -74,14 +78,21 @@ if(BUILD_MONGO_INTERFACE)
     target_link_libraries(db ${LIBBSONCXX_LIBRARIES})
 endif()
 
-option(BUILD_MARIA_INTERFACE "Build the Maria database modules" ON)
 
 if(BUILD_MARIA_INTERFACE)
     find_library(mariadb mariadb)
-#    MESSAGE(FATAL_ERROR "BOOM ${mariadb}")
-    include_directories("/usr/local/lib")
-
     target_link_libraries(db ${mariadb})
-
 endif()
+
+if(BUILD_INFORMIX_INTERFACE)
+#    find_library(informix informix)
+#        MESSAGE(FATAL_ERROR "BOOM ${informix}")
+    set(INFORMIXDIR /opt/IBM/Informix_Software_Bundle)
+    set(INFX_LIBS ixsql ixasf ixgen ixos ixgls ${INFORMIXDIR}/lib/esql/checkapi.o)
+
+#    add_link_options("LINKER:-rpath,${INFORMIXDIR}/lib/esql")
+    target_link_directories(db PUBLIC ${INFORMIXDIR}/lib ${INFORMIXDIR}/lib/esql)
+    target_link_libraries(db  ${INFX_LIBS})
+endif()
+
 

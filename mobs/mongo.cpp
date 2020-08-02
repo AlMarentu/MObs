@@ -30,6 +30,7 @@
 #include "objgen.h"
 #include "unixtime.h"
 #include "helper.h"
+#include "mchrono.h"
 
 #include <cstdint>
 #include <iostream>
@@ -70,7 +71,7 @@ public:
     int32_t i32;
     int64_t i64 = mi.i64;
     bsoncxx::decimal128 i128;
-    std::chrono::system_clock::time_point tp{}; // sollte genau auf "epoch" stehen
+    std::chrono::system_clock::time_point tp{};
     types::b_binary bin{};
     bin.size = 0;
     bin.bytes = nullptr;
@@ -111,8 +112,7 @@ public:
     }
     else if (mi.isTime)
     {
-//        tp = std::chrono::system_clock::from_time_t(0);
-      tp += std::chrono::milliseconds(i64);
+      tp += std::chrono::microseconds(i64);
     }
     else if (mi.isBlob)
     {
@@ -290,7 +290,7 @@ public:
     int32_t i32;
     int64_t i64 = mi.i64;
     bsoncxx::decimal128 i128;
-    std::chrono::system_clock::time_point tp{}; // sollte genau auf "epoch" stehen
+    std::chrono::system_clock::time_point tp{};
     types::b_binary bin{};
     bin.size = 0;
     bin.bytes = nullptr;
@@ -358,8 +358,7 @@ public:
       throw std::runtime_error("VersionElement is not int");
     else if (mi.isTime)
     {
-//        tp = std::chrono::system_clock::from_time_t(0);
-      tp += std::chrono::milliseconds(i64);
+      tp += std::chrono::microseconds(i64);
     }
     else if (mi.isBlob)
     {
@@ -534,11 +533,11 @@ public:
                   (not member()->fromInt64(e.get_decimal128().value.low()) and not member()->fromUInt64(e.get_decimal128().value.low())))
                 throw runtime_error(u8"mongodb: invalid type in variable " + showName() + " can't assign");
               break;
-            case bsoncxx::type::k_date: cerr << "date" << endl;
+            case bsoncxx::type::k_date:
               {
                 MobsMemberInfo mi;
                 member()->memInfo(mi);
-                if (not mi.isTime or not member()->fromInt64(e.get_date().to_int64()))
+                if (not mi.isTime or not member()->fromInt64(e.get_date().to_int64() * 1000))
                   throw runtime_error(u8"mongodb: invalid type in variable " + showName() + " can't assign");
                 break;
               }
@@ -794,9 +793,10 @@ std::shared_ptr<DbCursor> MongoDatabaseConnection::query(DatabaseInterface &dbi,
   // Projektion macht hier keinen Sinn
   if (not dbi.getCountCursor()) {
     BsonElements bo(mobs::ConvObjToString().exportWoNull());
-    bo.arrayStructureMode = true;
     bo.index = true;
-    obj.traverse(bo);
+    ObjectBase *o2 = obj.createNew();
+    o2.traverse(bo);
+    delete o2;
     LOG(LM_DEBUG, "Projection " << collectionName(obj) << " " << bo.result());
     f_opt = f_opt.projection(bo.value());
   }

@@ -57,7 +57,7 @@ public:
   bool createWith_IfNotExists = false;
 };
 
-/// Generator-Klasse für SQL-Statements für Leesen und Schreiben, benötigt ein SQL-Beschreibungs-Objeht \c SQLDBdescription
+/// Generator-Klasse für SQL-Statements für Leesen und Schreiben, benötigt ein SQL-Beschreibungs-Objekt \c SQLDBdescription
 class SqlGenerator {
 public:
   /// Handle für selectStatementArray - readObject-Paare
@@ -93,6 +93,7 @@ public:
   std::string insertStatement(bool first);
   std::string replaceStatement(bool first);
   std::string updateStatement(bool first);
+  std::string insertUpdStatement(bool first, std::string &upd);
   std::string deleteStatement(bool first);
 
   std::string selectStatementFirst(bool keys = false);
@@ -116,6 +117,8 @@ private:
   std::string doDrop(DetailInfo &);
   std::string doDelete(DetailInfo &);
   std::string doUpdate(DetailInfo &);
+  std::string doInsertUpd(DetailInfo &di, std::string &upd);
+
   std::string doInsert(DetailInfo &, bool replace);
   std::string doSelect(DetailInfo &);
 

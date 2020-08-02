@@ -18,7 +18,7 @@ hierarchische Definitionen.
 MObs versucht hier die typische C++-Klassenstruktur in die gewünschten Zielstrukturen abzubilden, indem
 - Datei Im- und Exportschnittstellen für XML (in den Zeichensätzen UTF-8, ISO8859-1,9,15, UTF1-6)
 - Konvertierroutinen von und nach JSON
-- Datenbankoperationen (MongoDb[^1] bzw. MariaDb[^1])
+- Datenbankoperationen (MongoDb[^1], MariaDb[^1], Informix[^2])
 angeboten werden.
 In SQL-Datenbanken werden automatisch Master-Detail-Tabellen angelegt, um Arrays von Subobjekten ablegen zu können.
 
@@ -54,7 +54,7 @@ Die Zugriffsmethoden für einfache Variablen erzeugt das Makro MemVar<type>, <va
 #include "mobs/objgen.h"
 
 class Fahrzeug : virtual public mobs::ObjectBase
- {
+{
    public:
      ObjInit(Fahrzeug);                     // Makro zum Initialisieren, Name muss mit Klassennamen übereinstimmen
 
@@ -93,6 +93,7 @@ Als Basistypen für Variablen sid folgende erlaubt:
 * std::wstring
 * std::u16string
 * std::u32string
+* std::chrono::time_point mit Tagen (mobs::MDate) oder Mikrocekunden (mobs::MTimw)
 
 Die Klasse UxTime steht als Wrapper für den Typ time_t zur Verfügung, um Zeitpunkte in den Objekten verwenden zu können
 
@@ -267,6 +268,7 @@ main() {
   mobs::DatabaseManager dbMgr;
   dbMgr.addConnection("my_mongo_db", mobs::ConnectionInformation("mongodb://localhost:27017", "mobs"));
   dbMgr.addConnection("my_maria_db", mobs::ConnectionInformation("mariadb://localhost:", "mobs"));
+  dbMgr.addConnection("my_informix", mobs::ConnectionInformation("informix://ol_informix1210", "mobs", user, passwd));
 ~~~~~~~~~~
 Über eine static Member kann global darauf zugegriffen werden.
 Vom DatabaseManager werden Kopien vom DatabaseInterface abgerufen.
@@ -416,3 +418,4 @@ Für die jeweiligen Optionen werden die entsprechenden Zusatzpakete benötigt.
 
 
 [^1]: MongoDb und MariaDB sind eingetragene Markenzeichen der jeweiligen Firmen
+[^2]: IBM Informix ist ein eingetragene Markenzeichen der IBM Corp.

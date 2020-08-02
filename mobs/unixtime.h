@@ -109,7 +109,7 @@ public:
   /// \private
   static inline bool c_is_chartype(const ConvToStrHint &cth) { return not cth.compact(); }
   /// \private
-  static inline uint64_t c_time_granularity() { return 1000; } // returning Seconds
+  static inline uint64_t c_time_granularity() { return 1000000; } // returning Seconds
   /// \private
   static inline UxTime c_empty() { return UxTime(); }
 };

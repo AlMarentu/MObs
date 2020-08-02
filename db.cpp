@@ -2,8 +2,12 @@
 #include "mobs/logging.h"
 #include "mobs/objgen.h"
 #include "mobs/dbifc.h"
+#include "mobs/unixtime.h"
+#include "mobs/mchrono.h"
 
 using namespace std;
+
+
 
 namespace gespann {
 
@@ -116,16 +120,69 @@ void worker(mobs::DatabaseInterface &dbi) {
 
       if (t_dbi.destroy(f3))
         LOG(LM_INFO, "Gespann 4 gelöscht");
+
+      Gespann f;
+      f.id(1);
+      if (t_dbi.load(f))
+        t_dbi.save(f);
+
     };
 
     // Transaktion ausführen
     mobs::DatabaseManager::execute(transCb);
 
 
+    class Data : virtual public mobs::ObjectBase
+    {
+    public:
+      ObjInit(Data);
+
+      MemVar(int, id, KEYELEMENT1);
+      MemVar(string, text, USENULL LENGTH(2000));
+      MemVar(mobs::MDate, datum, USENULL);
+      MemVar(mobs::UxTime, utime, USENULL);
+      MemVar(mobs::MTime, time, USENULL);
+      MemVar(double, flkz, USENULL);
+      MemVar(bool, an, USENULL);
+      MemVar(bool, aus, USENULL);
+      MemVar(char, ch, USENULL);
+      MemVar(unsigned long long , ulolo, USENULL);
+    };
+
+
+    Data d,e;
+    d.id(1);
+    e.id(2);
+    d.text("Ottos Möpse kotzen");
+    d.datum.fromStrExplizit("1966-05-18");
+    d.utime.fromStrExplizit("2001-02-03T12:01:02+01:00");
+    d.time.fromStrExplizit("2001-02-03T12:01:02.678129");
+    d.flkz(3.14);
+    d.an(true);
+    d.aus(false);
+    d.ch('X');
+    d.ulolo(1234567890123456L);
+
+    LOG(LM_INFO, "D " << d.to_string());
+    try {
+      dbi.dropAll(d);
+    } catch(...) {}
+    dbi.structure(d);
+    dbi.save(d);
+    dbi.save(e);
+
+    Data r;
+    for (int i = 1; i <= 2; i++) {
+      r.id(i);
+      if (dbi.load(r))
+        LOG(LM_INFO, "R " << r.to_string());
+    }
+
   }
   catch (exception &e)
   {
     LOG(LM_ERROR, "Exception " << e.what());
+    exit(2);
   }
 }
 }
@@ -141,9 +198,10 @@ int main(int argc, char* argv[])
     // Datenbank-Verbindungen
     dbMgr.addConnection("my_mongo", mobs::ConnectionInformation("mongodb://localhost:27017", "mobs"));
     dbMgr.addConnection("my_maria", mobs::ConnectionInformation("mariadb://localhost", "mobs"));
+    dbMgr.addConnection("my_informix", mobs::ConnectionInformation("informix://ol_informix1210", "mobs", "informix", "db"));
 
-//    mobs::DatabaseInterface dbi = dbMgr.getDbIfc("my_mongo");
-    mobs::DatabaseInterface dbi = dbMgr.getDbIfc("my_maria");
+    mobs::DatabaseInterface dbi = dbMgr.getDbIfc("my_mongo");
+//    mobs::DatabaseInterface dbi = dbMgr.getDbIfc("my_informix");
 
     gespann::worker(dbi);
 

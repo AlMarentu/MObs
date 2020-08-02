@@ -132,7 +132,7 @@ std::string to_squote(const std::string &s);
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(std::string t) { return t; }
+inline std::string to_string(const std::string &t) { return t; }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
@@ -241,7 +241,7 @@ std::string to_string(long double t);
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-std::wstring to_wstring(std::string t);
+std::wstring to_wstring(const std::string &t);
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
@@ -253,7 +253,7 @@ std::wstring to_wstring(const std::u16string &t);
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(std::wstring t) { return t; }
+inline std::wstring to_wstring(const std::wstring &t) { return t; }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
@@ -498,7 +498,7 @@ public:
   ConvObjToString exportLowercase() const { ConvObjToString c(*this); c.toLower = true; return c; }
   /// Verwende den Prefix zum Namen
   ConvObjToString exportPrefix() const { ConvObjToString c(*this); c.prefix = true; return c; }
-  /// Verwende native Bezeichnmer von enums und Zeiten
+  /// Verwende native Bezeichner von enums und Zeiten
   ConvObjToString exportCompact() const { ConvObjToString c(*this); c.comp = true; return c; }
   /// Ausgabe im Klartext von enums und Uhrzeit
   ConvObjToString exportExtendet() const { ConvObjToString c(*this); c.comp = false; return c; }
@@ -645,20 +645,21 @@ template<> bool from_number(double, double &t);
 
 /// Infos zum aktuellen Wert, wenn dieser als Zahl darstellbar ist.
 ///
-/// Der Inhalt ist unabhängig vo Zusatand \c isNull und hängt nur vom defierten Datentyp ab
-/// bei \c bool ist \c isUnsigned gestzt und max = 1
+/// Der Inhalt ist unabhängig vo Zustand \c isNull und hängt nur vom definierten Datentyp ab
+/// bei \c bool ist \c isUnsigned gesetzt und max = 1
 class MobsMemberInfo {
 public:
   bool isUnsigned = false; ///< hat Wert von typ \c signed, i64, min und max sind gesetzt
   bool isSigned = false; ///< wht Wert vom Typ \c unsigned, u64 und max sind gesetzt
-  int64_t i64 = 0; ///< Inhalt des Wertes wenn signed (unabhängrig von \c isNull)
-  uint64_t u64 = 0; ///< Inhalt des Wertes wenn unsigned (unabhängrig von \c isNull)
+  int64_t i64 = 0; ///< Inhalt des Wertes wenn signed (unabhängig von \c isNull)
+  uint64_t u64 = 0; ///< Inhalt des Wertes wenn unsigned (unabhängig von \c isNull)
   int64_t min = 0; ///< Miniimalwert des Datentyps
   uint64_t max = 0; ///< Maximalwert des Datentyps
-  uint64_t granularity = 0; ///< Körnung des Datentyps nur bei \c isTime
-  bool isEnum = false; ///<  Wert ist ein enum -> besser als Klartext darstellen \see acceptExtented
-  bool isTime = false; ///< Wert ist Millsekunde seit Unix-Epoche i64 ist gesetzt
-  bool is_spezialized = false; ///< is_spezialized aus std::numeric_limits
+  uint64_t granularity = 0; ///< Körnung des Datentyps nur bei \c isTime; 1 = microsekunden
+  unsigned int size = 0; ///< sizeof wenn is_spezialized
+  bool isEnum = false; ///<  Wert ist ein enum -> besser als Klartext darstellen \see acceptExtended
+  bool isTime = false; ///< Wert ist Millisekunde seit Unix-Epoche i64 ist gesetzt
+  bool is_specialized = false; ///< is_specialized aus std::numeric_limits
   bool isBlob = false; ///< Binär-Daten-Objekt
   /// fülle ein Time-Struct mit local time (nur wenn isTime == true)
   void toLocalTime(struct ::tm &ts) const;
@@ -707,7 +708,7 @@ public:
   static inline bool c_is_chartype(const ConvToStrHint &) { return mobschar(T()); }
   /// zeigt an, ob spezialisierter Typ vorliegt (\c \<limits>)
   static inline bool c_is_specialized() { return std::numeric_limits<T>::is_specialized; }
-  /// liefert eine \e leere Variable die zum löschen oder Initialisieren einer Membervarieblen verwendet wird
+  /// liefert eine \e leere Variable die zum löschen oder Initialisieren einer Membervariablen verwendet wird
   /// \see clear()
   static inline T c_empty() { return T(); }
 
@@ -732,7 +733,7 @@ public:
 };
 
 template <typename T>
-/// Konvertiertungs-Klasse für enums mit Ein-/Ausgabe als \c int
+/// Konvertierungs-Klasse für enums mit Ein-/Ausgabe als \c int
 class StrIntConv : public StrConvBase {
 public:
   /// \private
@@ -746,7 +747,7 @@ public:
   /// \private
   static inline bool c_is_chartype(const ConvToStrHint &) { return false; }
   /// \private
-  static inline bool c_is_specialized() { return std::numeric_limits<T>::is_specialized; }
+  static inline bool c_is_specialized() { return false; }
   /// \private
   static inline uint64_t c_max() { return std::numeric_limits<unsigned short int>::max(); }
   /// \private

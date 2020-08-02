@@ -30,6 +30,8 @@
 #include <limits>
 #include <chrono>
 #include <utility>
+#include <functional>
+#include <memory>
 
 
 namespace mobs {
@@ -195,7 +197,7 @@ public:
 
   /** \brief Datenbankabfrage über eine Bedingung als Text
    *
-   * Die Angabe der Bedingung ist datenbankabhänging
+   * Die Angabe der Bedingung ist datenbankabhängig
    * @param obj Objekt zur Generierung der Abfrage
    * @param query Bedingung/Filter der Abfrage, ein leerer String sucht alle Objekte
    * @return Shared-Pointer auf einen Ergebnis-Cursor
@@ -396,8 +398,8 @@ class DbTransactionData;
 class DbTransaction {
 public:
   friend class DatabaseManager;
-  friend class DbTransaction;
   friend class DatabaseInterface;
+  using MTime = std::chrono::time_point<std::chrono::system_clock, std::chrono::microseconds>;
 
   enum IsolationLevel {
     ReadUncommitted, ReadCommitted, CursorStability, RepeatableRead, Serializable
@@ -414,7 +416,7 @@ public:
   /// Abfrage TransactionDbInfo
   TransactionDbInfo *transactionDbInfo(const DatabaseInterface &dbi);
   /// Startzeitpunkt der Transaktion
-  std::chrono::steady_clock::time_point startTime() const;
+  MTime startTime() const;
   /// Abfrage Isolation-Level
   IsolationLevel getIsolation() const;
 

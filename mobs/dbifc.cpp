@@ -29,8 +29,12 @@
 #ifdef USE_MARIA
 #include "maria.h"
 #endif
+#ifdef USE_INFORMIX
+#include "informix.h"
+#endif
 
 #include "helper.h"
+#include "mchrono.h"
 #include <unistd.h> // getuid
 
 namespace mobs {
@@ -80,6 +84,16 @@ void DatabaseManagerData::addConnection(const std::string &connectionName,
   {
     Database &dbCon = connections[connectionName];
     auto dbi = std::make_shared<MariaDatabaseConnection>(connectionInformation);
+    dbCon.database = connectionInformation.m_database;
+    dbCon.connection = dbi;
+    return;
+  }
+#endif
+#ifdef USE_INFORMIX
+  if (db == "informix")
+  {
+    Database &dbCon = connections[connectionName];
+    auto dbi = std::make_shared<InformixDatabaseConnection>(connectionInformation);
     dbCon.database = connectionInformation.m_database;
     dbCon.connection = dbi;
     return;
@@ -153,8 +167,8 @@ void DatabaseManager::copyConnection(const std::string &connectionName, const st
 
 void DatabaseManager::execute(DatabaseManager::transaction_callback &cb) {
   DbTransaction transaction{};
-  auto s = std::chrono::duration_cast<std::chrono::microseconds>(transaction.startTime().time_since_epoch()).count();
-  LOG(LM_DEBUG, "TRANSACTION STARTING " << s);
+  DbTransaction::MTime s = std::chrono::system_clock::now();
+  LOG(LM_DEBUG, "TRANSACTION STARTING " << to_string(s));
 
   try {
     cb(&transaction);
@@ -173,7 +187,7 @@ void DatabaseManager::execute(DatabaseManager::transaction_callback &cb) {
     throw std::runtime_error(u8"DbTransaction error: unknown exception");
   }
   transaction.finish(true);
-  std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+  DbTransaction::MTime end = std::chrono::system_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - transaction.startTime()).count();
   LOG(LM_DEBUG, "TRANSACTION FINISHED " << duration << " µs");
 }
@@ -191,22 +205,23 @@ public:
   };
   std::map<const DatabaseConnection *, DTI> connections;
   DbTransaction::IsolationLevel isolationLevel = DbTransaction::RepeatableRead;
-  std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+  DbTransaction::MTime start = std::chrono::system_clock::now();
   std::string comment;
   static int s_uid;
 };
 
-int DbTransactionData::s_uid = getuid();
+int DbTransactionData::s_uid = -1;
 
 void DbTransaction::setUid(int i) {
-  DbTransactionData::s_uid = 0;
+  if (i >= 0)
+    DbTransactionData::s_uid = i;
 }
 
 void DbTransaction::setComment(const std::string &comment) {
   data->comment = comment;
 }
 
-std::chrono::steady_clock::time_point DbTransaction::startTime() const {
+DbTransaction::MTime DbTransaction::startTime() const {
   return data->start;
 }
 
@@ -234,9 +249,12 @@ void DbTransaction::writeAuditTrail() {
     auto dti = i.second;
     for (auto a:dti.audit) {
       LOG(LM_DEBUG, "Writing audit");
-      long long t = std::chrono::duration_cast<std::chrono::microseconds>(startTime().time_since_epoch()).count();
+      // time as microseconds since epoch
+      int64_t t = startTime().time_since_epoch().count();
       a.second.time(t);
-      a.second.userId(data->s_uid);
+      if (DbTransactionData::s_uid < 0)
+        DbTransactionData::s_uid = getuid();
+      a.second.userId(DbTransactionData::s_uid);
       if (not data->comment.empty())
         a.second.comment(data->comment);
       DatabaseInterface dbi_t(dti.dbCon, a.first);

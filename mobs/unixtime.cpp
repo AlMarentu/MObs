@@ -72,7 +72,7 @@ UxTime::UxTime(const std::string& s) {
     parseOff(off, cp);
     if (*cp)
       throw std::runtime_error(u8"extra characters at end");
-    m_time = ::timegm(&ts) + off;
+    m_time = ::timegm(&ts) - off;
   }
   else
   {
@@ -174,7 +174,7 @@ template <> bool string2x(const std::string &str, UxTime &t)
 /// \private
 template<> bool to_int64(UxTime t, int64_t &i, int64_t &min, uint64_t &max)
 {
-  i = t.toUxTime() * 1000;
+  i = t.toUxTime() * 1000000;
   min = 0;
   max = std::numeric_limits<time_t>::max();
   return true;
@@ -183,7 +183,7 @@ template<> bool to_int64(UxTime t, int64_t &i, int64_t &min, uint64_t &max)
 /// \private
 template<> bool from_number(int64_t i, UxTime &t)
 {
-  i /= 1000;
+  i /= 1000000;
   if (i > std::numeric_limits<time_t>::min() and i < std::numeric_limits<time_t>::max())
   {
     t = UxTime(i);

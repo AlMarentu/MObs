@@ -680,6 +680,9 @@ public:
   bool is_chartype(const ConvToStrHint &cth) const override { return this->c_is_chartype(cth); }
   /// Einlesen der Variable aus einem \c std::string im Format UTF-8
   bool fromStr(const std::string &sin, const ConvFromStrHint &cfh) override { doAudit(); if (this->c_string2x(sin, wert, cfh)) { activate(); return true; } return false; }
+  /// Einlesenen der Variablen aus einem String im erweiterten Modus
+  /// \throw runtime_error bei Konvertierungsfehler
+  void fromStrExplizit(const std::string &sin)  { if (not fromStr(sin, ConvFromStrHint::convFromStrHintExplizit)) throw std::runtime_error("fromStrExplizit input error"); }
   /// Einlesen der Variable aus einem \c std::wstring
   bool fromStr(const std::wstring &sin, const ConvFromStrHint &cfh) override { doAudit(); if (this->c_wstring2x(sin, wert, cfh)) { activate(); return true; } return false; }
   bool toDouble(double &d) const override { return to_double(wert, d); }
@@ -877,7 +880,9 @@ void Member<T, C>::memInfo(MobsMemberInfo &i) const
   i = MobsMemberInfo();
   i.isSigned = to_int64(wert, i.i64, i.min, i.max);
   i.isUnsigned = to_uint64(wert, i.u64, i.max);
-  i.is_spezialized = this->c_is_specialized();
+  i.is_specialized = this->c_is_specialized();
+  if (i.is_specialized)
+    i.size = sizeof(T);
   i.isBlob = this->c_is_blob();
   i.isEnum = false;
   i.isTime = false;
@@ -953,8 +958,8 @@ public:
   bool inDelAudit() const { return m_delMode; }
   /// Ist das Element Teil eines Vektors, wird die Index-Position angezeigt, ansonsten ist der Wert \c SIZE_MAX
   size_t arrayIndex() const { return m_arrayIndex; }
-  /// traversiere bei Arrays genau ein leeres Dummy-Element
-  bool arrayStructureMode = false;
+//  /// traversiere bei Arrays genau ein leeres Dummy-Element
+//  bool arrayStructureMode = false;
   /// Traversiere im key-Mode(traverseKeys) auch die Versionselemente
   bool withVersionField = false;
   /// Traversiere auch Elemente, die mittlerweile gelöscht wurden
@@ -1059,12 +1064,12 @@ void MemberVector<T>::traverse(ObjTravConst &trav) const
   bool inNull = trav.m_inNull;
   trav.m_keyMode = false;
   if (trav.doArrayBeg(*this)) {
-    if (trav.arrayStructureMode) {
-      T temp(const_cast<MemberVector<T> *>(this), m_parent, m_c);
-      trav.m_inNull = inNull or isNull();
-      trav.m_arrayIndex = 0;
-      temp.traverse(trav);
-    } else {
+//    if (trav.arrayStructureMode) {
+//      T temp(const_cast<MemberVector<T> *>(this), m_parent, m_c);
+//      trav.m_inNull = inNull or isNull();
+//      trav.m_arrayIndex = 0;
+//      temp.traverse(trav);
+//    } else {
       size_t i = 0;
       bool delMode = trav.m_delMode;
       for (auto w:werte) {
@@ -1078,7 +1083,7 @@ void MemberVector<T>::traverse(ObjTravConst &trav) const
         w->traverse(trav);
       }
       trav.m_delMode = delMode;
-    }
+//    }
     trav.m_inNull = inNull;
     trav.m_arrayIndex = SIZE_MAX;
     trav.doArrayEnd(*this);

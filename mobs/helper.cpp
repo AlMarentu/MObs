@@ -320,7 +320,7 @@ private:
 
 class GenerateSql : virtual public ObjTravConst {
 public:
-  enum Mode { Where, Fields, Values, Update, Create };
+  enum Mode { Where, Fields, Values, Update, Create, FldVal, FldVal2 };
   explicit GenerateSql(Mode m, SQLDBdescription &s, ConvObjToString c) : current(nullptr, "", {}), mode(m),
   cth(c.exportPrefix().exportAltNames()), sqldb(s) { }
 
@@ -341,7 +341,7 @@ public:
       return false;
     if (not obj.isModified() and cth.modOnly())
       return false;
-    if (mode != Values and inArray() and arrayIndex() > 0)
+    if (mode != Values and mode != FldVal and inArray() and arrayIndex() > 0)
       return false;
     level++;
     key.push((obj.key()));
@@ -366,8 +366,17 @@ public:
         string name = i.first;
         if (mode == Values) {
           res << delimiter() << sqldb.valueStmtIndex(i.second);
-        } else if (mode == Update) {
-          // Keinen Key ausgeben
+        } else if (mode == FldVal2) {
+          size_t index = i.second;
+          if (index != SIZE_T_MAX) {
+            string d = delimiter();
+            res << d << name;
+            if (not d.empty())
+              d = " and ";
+            res2 << d << name << "=?";
+            sqldb.valueStmtIndex(index);
+            fields++;
+          }
         } else if (mode == Where) {
           size_t index = i.second;
           if (current.cleaning) {
@@ -388,6 +397,8 @@ public:
         }
         else if (mode == Fields) {
           res << delimiter() << name;
+//        } else if (mode == Update) {
+          // Keinen Key ausgeben
         }
 //        if (mode = Values) {
 //          size_t index = SIZE_T_MAX;
@@ -399,7 +410,7 @@ public:
       }
 
       bool cleaning = current.cleaning;
-      if (not k.empty() and (mode == Values or mode == Update)) {
+      if (not k.empty() and (mode == Values or mode == Update or mode == FldVal)) {
         size_t &currentIndex = k.back().second;
         LOG(LM_DEBUG, "IN ARRAY " << currentIndex);
         if (currentIndex == SIZE_T_MAX)
@@ -429,7 +440,7 @@ public:
         detailVec.emplace_back(&vec, current.tableName, k, cleaning);
       }
 
-      if (mode == Where)
+      if (mode == Where or mode == FldVal2)
         return false;     // Nur keys machen
       level++;
       return true;
@@ -442,7 +453,7 @@ public:
 
     size_t index = SIZE_T_MAX;
     bool cleaning = current.cleaning;
-    if (mode == Values or mode == Update) {
+    if (mode == Values or mode == Update or mode == FldVal) {
       // wenn Subarray elemente hat dann 0 zurück, ansonsten MAX für Aufräumer
       size_t sz = vec.size();
       if (sz == 0)
@@ -480,8 +491,6 @@ public:
       if (cth.skipVersion())
         return;
     }
-    if (mode == Update and mem.key() and key.top())
-      return;
     bool compact = cth.compact();
     if (mem.is_chartype(cth) and mem.hasFeature(mobs::DbCompact))
       compact = true;
@@ -489,8 +498,13 @@ public:
       res << delimiter() << sqldb.valueStmt(mem, compact, mem.isVersionField(), false);
       return;
     }
-
     string name = mem.getName(cth);
+    if ((mode == Update or mode == FldVal) and mem.key() and key.top()) { // Key or version element
+      if (mode == FldVal and mem.isVersionField())  // version increment
+        res2 << name << '=' << name << "+1,";
+      if (mode == FldVal or not mem.isVersionField())
+        return;
+    }
 
     if (mode == Where) {
       res << delimiter() << name;
@@ -501,9 +515,20 @@ public:
         res << "=";
       res << val;
     } else if (mode == Update) {
-      res << delimiter() << name << "=" << sqldb.valueStmt(mem, compact, mem.isVersionField(), false);
+        res << delimiter() << name << "=" << sqldb.valueStmt(mem, compact, mem.isVersionField(), false);
     } else if (mode == Fields) {
       res << delimiter() << name;
+    } else if (mode == FldVal or mode == FldVal2) {
+      string d = delimiter();
+      res << d << name;
+      if (mode == FldVal2 and not d.empty())
+        d = " and ";
+      if (mode == FldVal and mem.isVersionField())
+        res2 << d << name << "=?";
+      else
+        res2 << d << name << "=?";
+      fields++;
+      sqldb.valueStmt(mem, compact, mem.isVersionField(), false);
     } else if (mode == Create)  {
       if (dupl.find(name) != dupl.end())
         throw runtime_error(name + u8" is a duplicate id in SQL statement");
@@ -512,9 +537,16 @@ public:
     }
   };
 
+  void completeInsert() {
+    for (uint i = 0; i < fields; i++)
+      res << delimiter() << '?';
+  }
   string result() { return res.str(); }
+  string result2() { return res2.str(); }
   void setMode(Mode m) { mode = m; }
   void addText(const string &tx) { res << tx; fst = true; }
+  void addText2(const string &tx) { res2 << tx; fst = true; }
+  void addTextAll(const string &tx) { res << tx; res2 << tx; fst = true; }
   list<SqlGenerator::DetailInfo> detailVec;
 
   SqlGenerator::DetailInfo current;
@@ -529,7 +561,9 @@ private:
   bool fst = true;
   int level = 0;
   stringstream res;
+  stringstream res2;
   SQLDBdescription &sqldb;
+  uint fields = 0;
 };
 
 
@@ -636,6 +670,59 @@ string SqlGenerator::doUpdate(SqlGenerator::DetailInfo &di) {
   }
   gs.detailVec.clear();
   gs.addText(";");
+  return gs.result();
+}
+
+
+
+
+
+string SqlGenerator::doInsertUpd(SqlGenerator::DetailInfo &di, std::string &upd) {
+  upd = "";
+  if (di.cleaning)
+    return doDelete(di);
+
+  GenerateSql gs(GenerateSql::FldVal, sqldb, mobs::ConvObjToString());
+  gs.current = di;
+
+  gs.addText("insert into ");
+  gs.addText2("update ");
+
+  if (di.vec) {
+    gs.addTextAll(sqldb.tableName(vecTableName(di.vec, di.tableName)));
+  } else
+    gs.addTextAll(sqldb.tableName(di.tableName));
+  gs.addText("(");
+  gs.addText2(" set ");
+  gs.detailVec.clear();
+  if (di.vec) {
+    size_t index  = 0;
+    if (not di.arrayKeys.empty())
+      index = di.arrayKeys.back().second;
+    LOG(LM_INFO, "TRAVERSE CURRENT INDEX " << index);
+    gs.current.vec->traverseSingle(gs, index);
+  }
+  else
+    obj.traverse(gs);
+  detailVec.splice(detailVec.end(), gs.detailVec);
+
+  gs.setMode(GenerateSql::FldVal2);
+  gs.addText(",");
+  gs.addText2(" where ");
+  if (not di.vec)
+    gs.withVersionField = true;
+  obj.traverseKey(gs);
+  if (di.vec) {
+    di.vec->traverse(gs);
+  }
+  gs.detailVec.clear();
+
+  gs.addText(") values (");
+  gs.addText2(";");
+  gs.completeInsert();
+
+  gs.addText(");");
+  upd = gs.result2();
   return gs.result();
 }
 
@@ -976,8 +1063,7 @@ std::string SqlGenerator::query(QueryMode queryMode, const std::string &where, c
   gsjoin.noJoin = true;
   obj.traverse(gsjoin);
   gsjoin.selectJoin = join;
-  if (not where.empty())
-    gsjoin.addWhere(where);
+  gsjoin.selectWhere = where;
   querywJoin = not gsjoin.selectJoin.empty();
   return gsjoin.result(queryMode == Count, queryMode == Keys);
 }
@@ -989,6 +1075,22 @@ string SqlGenerator::queryBE(QueryMode queryMode, const std::string &where) {
     gsjoin.addWhere(where);
   querywJoin = not gsjoin.selectJoin.empty();
   return gsjoin.result(queryMode == Count, queryMode == Keys);
+}
+
+
+std::string SqlGenerator::insertUpdStatement(bool first, string &upd) {
+  string s;
+  if (first) {
+    detailVec.clear();
+    DetailInfo di(nullptr, tableName(), {});
+    s = doInsertUpd(di, upd);
+  } else if (eof())
+    return "";
+  else {
+    s = doInsertUpd(detailVec.front(), upd);
+    detailVec.erase(detailVec.begin());
+  }
+  return s;
 }
 
 

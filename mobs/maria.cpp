@@ -27,6 +27,7 @@
 #include "objgen.h"
 #include "unixtime.h"
 #include "helper.h"
+#include "mchrono.h"
 
 #include <cstdint>
 #include <iostream>
@@ -68,25 +69,39 @@ public:
     MobsMemberInfo mi;
     mem.memInfo(mi);
     double d;
-    if (mi.isTime and mi.granularity >= 86400000)
+    if (mi.isTime and mi.granularity >= 86400000000)
       res << "DATE";
-    else if (mi.isTime and mi.granularity >= 1000)
+    else if (mi.isTime and mi.granularity >= 1000000)
       res << "DATETIME";
-    else if (mi.isTime)
+    else if (mi.isTime and mi.granularity >= 100000)
+      res << "DATETIME(1)";
+    else if (mi.isTime and mi.granularity >= 10000)
+      res << "DATETIME(2)";
+    else if (mi.isTime and mi.granularity >= 1000)
       res << "DATETIME(3)";
+    else if (mi.isTime and mi.granularity >= 100)
+      res << "DATETIME(4)";
+    else if (mi.isTime and mi.granularity >= 10)
+      res << "DATETIME(5)";
+    else if (mi.isTime)
+      res << "DATETIME(6)";
     else if (mi.isUnsigned and mi.max == 1)
       res << "TINYINT";
     else if (mem.toDouble(d))
       res << "FLOAT";
     else if (mem.is_chartype(mobs::ConvToStrHint(compact))) {
-      MemVarCfg c = mem.hasFeature(LengthBase);
-      size_t n = c ? (c - LengthBase): 30;
-      if (n <= 4)
-        res << "CHAR(" << n << ")";
-      else
-        res << "VARCHAR(" << n << ") CHARACTER SET utf8";
+      if (mi.is_specialized and mi.size == 1)
+        res << "CHAR(1)";
+      else {
+        MemVarCfg c = mem.hasFeature(LengthBase);
+        size_t n = c ? (c - LengthBase) : 30;
+        if (n <= 4)
+          res << "CHAR(" << n << ")";
+        else
+          res << "VARCHAR(" << n << ") CHARACTER SET utf8";
+      }
     }
-    else if (mi.isSigned and mi.max <= 32767)
+    else if (mi.isSigned and mi.max <= INT16_MAX)
       res << "SMALLINT";
     else if (mi.isSigned and mi.max <= INT32_MAX)
       res << "INT";
@@ -119,21 +134,18 @@ public:
     }
     if (mem.isNull())
       return u8"null";
-    if (mi.isTime and mi.granularity >= 86400000) { // nur Datum
+    if (mi.isTime and mi.granularity >= 86400000000) { // nur Datum
       std::stringstream s;
       struct tm ts{};
       mi.toLocalTime(ts);
       s << std::put_time(&ts, "%F");
-      return s.str();
+      return mobs::to_squote(s.str());
     }
     else if (mi.isTime) {
-      std::stringstream s;
-      struct tm ts{};
-      mi.toLocalTime(ts);
-      s << std::put_time(&ts, "%F %T");
-      if (mi.granularity < 1000)
-        s << '.' << setfill('0') << setw(3) << (mi.i64 % 1000);
-      return s.str();
+      MTime t;
+      if (not from_number(mi.i64, t))
+        throw std::runtime_error("Time Conversion");
+      return mobs::to_squote(to_string_ansi(t));
     }
     else if (mi.isUnsigned and mi.max == 1) // bool
       return (mi.u64 ? "1" : "0");
@@ -155,17 +167,23 @@ public:
         std::istringstream s(value);
         std::tm t = {};
         s >> std::get_time(&t, "%F");
-        ok = s.fail();
-        if (ok)
+        ok = not s.fail();
+        if (ok) {
           mi.fromLocalTime(t);
+          ok = mem.fromInt64(mi.i64);
+        }
       } else if (mi.isTime) {
+        ok = mem.fromStr(value, not compact ? ConvFromStrHint::convFromStrHintExplizit : ConvFromStrHint::convFromStrHintDflt);
+#if 0
+        MTime t;
+        ok = string2x(value, t);
         std::istringstream s(value);
         std::tm t = {};
         s >> std::get_time(&t, "%F %T");
         ok = not s.fail();
         if (ok)
           mi.fromLocalTime(t);
-        if (ok and mi.granularity < 1000) {
+        if (ok and mi.granularity < 1000000) {
           unsigned int i;
           char c;
           s.get(c);
@@ -175,6 +193,9 @@ public:
             mi.i64 += i;
           }
         }
+        if (ok)
+          ok = mem.fromInt64(mi.i64);
+#endif
       }  else if (mi.isUnsigned and mi.max == 1) // bool
         ok = mem.fromUInt64(value == "0" ? 0 : 1);
       else //if (mem.is_chartype(mobs::ConvToStrHint(compact)))
@@ -384,9 +405,9 @@ void MariaDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj
     if (mysql_real_query(connection, s.c_str(), s.length()))
       throw mysql_exception(u8"save failed", connection);
     LOG(LM_DEBUG, "ROWS " << mysql_affected_rows(connection));
-//    // wenn sich, obwohl gefunden, nichts geändert hat wird hier auch 0 geliefert - TODO
-//    if (version > 0 and mysql_affected_rows(connection) != 1)
-//      throw runtime_error(u8"save nothing updatet");
+    // wenn sich, obwohl gefunden, nichts geändert hat wird hier auch 0 geliefert - die Version muss sich aber immer ändern
+    if (version > 0 and mysql_affected_rows(connection) != 1)
+      throw runtime_error(u8"number of processed rows is " + to_string(mysql_affected_rows(connection)) + " should be 1");
 
     while (not gsql.eof()) {
       s = gsql.replaceStatement(false);
@@ -504,8 +525,12 @@ MariaDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, const st
   SQLMariaDBdescription sd(dbi.database());
   mobs::SqlGenerator gsql(obj, sd);
 
-  string s = gsql.queryBE(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal);
-// TODO  s += " LOCK IN SHARE MODE WAIT 10 "; / NOWAIT
+  string s;
+  if (qbe)
+    s = gsql.queryBE(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal);
+  else
+    s = gsql.query(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, query);
+  // TODO  s += " LOCK IN SHARE MODE WAIT 10 "; / NOWAIT
 
   LOG(LM_INFO, "SQL: " << s);
   if (mysql_real_query(connection, s.c_str(), s.length()))
@@ -567,7 +592,7 @@ MariaDatabaseConnection::retrieve(DatabaseInterface &dbi, ObjectBase &obj, std::
     string s = gsql.selectStatementArray(di);
     LOG(LM_DEBUG, "SQL " << s);
     if (mysql_real_query(connection, s.c_str(), s.length()))
-      throw mysql_exception(u8"create failed", connection);
+      throw mysql_exception(u8"query detail failed", connection);
 
 //    unsigned int sz = mysql_field_count(connection);
     sd.result = mysql_store_result(connection);

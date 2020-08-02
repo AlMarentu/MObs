@@ -86,7 +86,7 @@ public:
       else if (mi.isSigned)
         return to_string(mi.i64 + 1);
       else
-        throw std::runtime_error("VersionElemem is not int");
+        throw std::runtime_error("VersionElememt is not int");
     }
     if (mem.isNull())
       return u8"null";
@@ -274,12 +274,23 @@ TEST(helperTest, fields) {
   EXPECT_EQ("replace D.ObjA3_o2oo(k3kk,o_oo_ix,a1bc,c1de,f1gh) VALUES (0, 2,'',4,0);",
             gsql.replaceStatement(false));
   EXPECT_FALSE(gsql.eof());
-  EXPECT_EQ("delete from D.ObjA3_o2oo where k3kk=0 and o_oo_ix> 2;",
-            gsql.replaceStatement(false));
+  EXPECT_EQ("delete from D.ObjA3_o2oo where k3kk=0 and o_oo_ix> 2;", gsql.replaceStatement(false));
   EXPECT_TRUE(gsql.eof());
   a3.oa3.o2oo.resize(1);
 
-  EXPECT_EQ("update D.ObjA3 set p3p='',o_k2kk=0,o_s2s='' where k3kk=0 and version=0;", gsql.updateStatement(true));
+  string upd;
+  EXPECT_EQ("insert into D.ObjA3(p3p,o_k2kk,o_s2s,k3kk,version) values (?,?,?,?,?);", gsql.insertUpdStatement(true, upd));
+  EXPECT_FALSE(gsql.eof());
+  EXPECT_EQ("update D.ObjA3 set version=version+1,p3p=?,o_k2kk=?,o_s2s=? where k3kk=? and version=?;", upd);
+  EXPECT_EQ("insert into D.ObjA3_o2oo(a1bc,c1de,f1gh,k3kk,o_oo_ix) values (?,?,?,?,?);", gsql.insertUpdStatement(false, upd));
+  EXPECT_FALSE(gsql.eof());
+  EXPECT_EQ("update D.ObjA3_o2oo set a1bc=?,c1de=?,f1gh=? where k3kk=? and o_oo_ix=?;", upd);
+  EXPECT_EQ("delete from D.ObjA3_o2oo where k3kk=0 and o_oo_ix> 0;", gsql.insertUpdStatement(false, upd));
+  EXPECT_EQ("", upd);
+  EXPECT_TRUE(gsql.eof());
+
+
+  EXPECT_EQ("update D.ObjA3 set version=1,p3p='',o_k2kk=0,o_s2s='' where k3kk=0 and version=0;", gsql.updateStatement(true));
   EXPECT_FALSE(gsql.eof());
   EXPECT_EQ("update D.ObjA3_o2oo set a1bc='XX',c1de=0,f1gh=0 where k3kk=0 and o_oo_ix= 0;", gsql.updateStatement(false));
   EXPECT_FALSE(gsql.eof());
