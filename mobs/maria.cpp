@@ -166,7 +166,7 @@ public:
       if (mi.isTime and mi.granularity >= 86400000) {
         std::istringstream s(value);
         std::tm t = {};
-        s >> std::get_time(&t, "%F");
+        s >> std::get_time(&t, "%Y-%m-%d");
         ok = not s.fail();
         if (ok) {
           mi.fromLocalTime(t);

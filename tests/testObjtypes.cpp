@@ -279,7 +279,7 @@ TEST(objtypeTest, times) {
   {
     std::istringstream s("2020-12-24");
     std::tm t = {};
-    s >> std::get_time(&t, "%F");
+    s >> std::get_time(&t, "%Y-%m-%d");
     mi.fromLocalTime(t);
     time_t ti = mi.i64 / 1000000;
     EXPECT_STREQ("Thu Dec 24 00:00:00 2020\n", ctime(&ti));
@@ -288,7 +288,7 @@ TEST(objtypeTest, times) {
   {
     std::istringstream s("2020-12-24 17:02:01");
     std::tm t = {};
-    s >> std::get_time(&t, "%F %T");
+    s >> std::get_time(&t, "%Y-%m-%d %H:%M:%S");
     EXPECT_FALSE(s.fail());
     mi.fromLocalTime(t);
     time_t ti = mi.i64 / 1000000;
@@ -298,7 +298,7 @@ TEST(objtypeTest, times) {
   {
     std::istringstream s("2020-12-24 16:02:01");
     std::tm t = {};
-    s >> std::get_time(&t, "%F %T");
+    s >> std::get_time(&t, "%Y-%m-%d %H:%M:%S");
     EXPECT_FALSE(s.fail());
     mi.fromGMTime(t);
     time_t ti = mi.i64 / 1000000;
@@ -308,7 +308,7 @@ TEST(objtypeTest, times) {
   {
     std::istringstream s("2020-12-24 16:02:01.123");
     std::tm t = {};
-    s >> std::get_time(&t, "%F %T");
+    s >> std::get_time(&t, "%Y-%m-%d %H:%M:%S");
     EXPECT_FALSE(s.fail());
     int i;
     char c;

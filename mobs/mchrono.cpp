@@ -23,7 +23,7 @@
 #include "objtypes.h"
 #include "logging.h"
 
-#include <strstream>
+#include <sstream>
 #include <iomanip>
 #include <ctime>
 
@@ -192,7 +192,7 @@ template<>
 bool string2x(const std::string &str, MDate &t) {
   std::istringstream s(str);
   std::tm ts = {};
-  s >> std::get_time(&ts, "%F");
+  s >> std::get_time(&ts, "%Y-%m-%d");
   if (s.fail())
     return false;
   ts.tm_isdst = -1;

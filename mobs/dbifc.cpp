@@ -167,8 +167,7 @@ void DatabaseManager::copyConnection(const std::string &connectionName, const st
 
 void DatabaseManager::execute(DatabaseManager::transaction_callback &cb) {
   DbTransaction transaction{};
-  DbTransaction::MTime s = std::chrono::system_clock::now();
-  LOG(LM_DEBUG, "TRANSACTION STARTING " << to_string(s));
+  LOG(LM_DEBUG, "TRANSACTION STARTING " << to_string(transaction.startTime()));
 
   try {
     cb(&transaction);
@@ -187,7 +186,7 @@ void DatabaseManager::execute(DatabaseManager::transaction_callback &cb) {
     throw std::runtime_error(u8"DbTransaction error: unknown exception");
   }
   transaction.finish(true);
-  DbTransaction::MTime end = std::chrono::system_clock::now();
+  DbTransaction::MTime end = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::system_clock::now());
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - transaction.startTime()).count();
   LOG(LM_DEBUG, "TRANSACTION FINISHED " << duration << " µs");
 }
@@ -205,7 +204,8 @@ public:
   };
   std::map<const DatabaseConnection *, DTI> connections;
   DbTransaction::IsolationLevel isolationLevel = DbTransaction::RepeatableRead;
-  DbTransaction::MTime start = std::chrono::system_clock::now();
+  DbTransaction::MTime start = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::system_clock::now());
+
   std::string comment;
   static int s_uid;
 };

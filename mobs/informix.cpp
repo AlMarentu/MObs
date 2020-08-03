@@ -25,9 +25,9 @@
 #include "helper.h"
 #include "infxtools.h"
 
-#include <public/sqlca.h>
-#include <public/sqlhdr.h>
-#include <public/sqltypes.h>
+#include <esql/sqlca.h>
+#include <esql/sqlhdr.h>
+#include <esql/sqltypes.h>
 
 #include <cstdint>
 #include <iostream>
@@ -35,6 +35,16 @@
 #include <utility>
 #include <vector>
 #include <chrono>
+
+#ifndef SQLINFXBIGINT
+#define SQLINFXBIGINT SQLBIGINT
+#endif
+
+#ifdef INFORMIX_DTFMT_BUG
+#define DTCVFMT "%Y-%m-%d %H:%M:%S%F5"
+#else
+#define DTCVFMT "%Y-%m-%d %H:%M:%S.%F5"
+#endif
 
 namespace {
 using namespace mobs;
@@ -220,7 +230,7 @@ public:
       else {
         auto dtp = (dtime_t *) sql_var.sqldata;
         dtp->dt_qual = TU_DTENCODE(TU_YEAR, TU_F5);
-        e = dtcvfmtasc(const_cast<char *>(s.c_str()), (char *) "%iY-%m-%d %H:%M:%S.%5F", dtp);
+        e = dtcvfmtasc(const_cast<char *>(s.c_str()), (char *) DTCVFMT, dtp);
       }
     } else if (mi.isUnsigned) {
       if (increment) {
@@ -232,15 +242,13 @@ public:
       }
       LOG(LM_DEBUG, "Informix SqlVar " << mem.name() << ": " << fldCnt - 1 << "=" << mi.u64);
       if (mi.max > INT32_MAX) {
-#ifdef SQLBIGINT
         if (mi.u64 > INT64_MAX)
-#endif
           throw std::runtime_error("Number to big");
-#ifdef SQLBIGINT
-        sql_var.sqltype = SQLBIGINT;
+        sql_var.sqltype = SQLINFXBIGINT;
+//        sql_var.sqltype = SQLINT8;
         setBuffer(sql_var);
         *(int64_t *) (sql_var.sqldata) = mi.u64;
-#endif
+//        biginttoifx_int8(mi.i64, (ifx_int8*)(sql_var.sqldata));
       } else {
         sql_var.sqltype = SQLINT;
         setBuffer(sql_var);
@@ -256,14 +264,11 @@ public:
           throw std::runtime_error("VersionElement is null");
         mi.i64++;
       }
+      LOG(LM_DEBUG, "Informix SqlVar " << mem.name() << ": " << fldCnt - 1 << "=" << mi.i64);
       if (mi.max > INT32_MAX) {
-#ifdef SQLBIGINT
-        sql_var.sqltype = SQLBIGINT;
+        sql_var.sqltype = SQLINFXBIGINT;
         setBuffer(sql_var);
-        *(bigint *) (sql_var.sqldata) = mi.i64;
-#else
-        throw std::runtime_error("infx: bigint not avilable");
-#endif
+        *(int64_t *) (sql_var.sqldata) = mi.i64;
       } else {
         sql_var.sqltype = SQLINT;
         setBuffer(sql_var);
@@ -272,8 +277,8 @@ public:
       if (mem.isNull())
         e = rsetnull(sql_var.sqltype, sql_var.sqldata);
 
-//      int e = bigintcvifx_int8((int64_t *)&mi.i64, (bigint *)sql_var.sqldata);
     } else if (mem.toDouble(d)) {
+      LOG(LM_DEBUG, "Informix SqlVar " << mem.name() << ": " << fldCnt - 1 << "=" << d);
       sql_var.sqltype = SQLFLOAT;
       setBuffer(sql_var);
       if (mem.isNull())
@@ -297,7 +302,7 @@ public:
       if (mem.isNull())
         e = rsetnull(sql_var.sqltype, sql_var.sqldata);
       else
-        stcopy(s.c_str(), sql_var.sqldata);
+        stcopy(const_cast<char *>(s.c_str()), sql_var.sqldata);
     }
     if (e)
       throw informix_exception("Conversion error Date", e);
@@ -352,7 +357,7 @@ public:
       }
       case SQLDTIME: {
         char timebuf[32];
-        e = dttofmtasc((dtime_t *) col.sqldata, timebuf, sizeof(timebuf), (char *) "%iY-%m-%d %H:%M:%S.%5F");
+        e = dttofmtasc((dtime_t *) col.sqldata, timebuf, sizeof(timebuf), (char *) DTCVFMT);
         if (e)
           throw informix_exception(u8"DateTime Conversion", e);
         LOG(LM_INFO, "DATETIME " << timebuf);
@@ -380,15 +385,25 @@ public:
         else
           mi.i64 = *(int32_t *) (col.sqldata);
         break;
-#ifdef SQLBIGINT
-      case SQLBIGINT:
-      case SQLSERIAL8:
+      case SQLINFXBIGINT:
+      case SQLBIGSERIAL:
         if (mi.isUnsigned)
           mi.u64 = *(int64_t *) (col.sqldata);
         else
           mi.i64 = *(int64_t *) (col.sqldata);
         break;
-#endif
+      case SQLSERIAL8:
+      case SQLINT8: {
+        bigint i;
+        e = bigintcvifx_int8((const ifx_int8_t *) (col.sqldata), &i);
+        if (mi.isUnsigned)
+          mi.u64 = i;
+        else
+          mi.i64 = i;
+        if (e)
+          throw informix_exception(u8"INT8 Conversion", e);
+        break;
+      }
       case SQLFLOAT:
       {
         double d;
@@ -400,7 +415,9 @@ public:
           ok = false;
         break;
       }
-       default:
+      case SQLTEXT:
+      case SQLBYTES:
+      default:
         throw runtime_error(u8"conversion error in " + mem.name() + " Type=" + to_string(col.sqltype));
     }
 //    if (mi.isUnsigned and mi.max == 1) // bool
@@ -433,10 +450,15 @@ public:
         return *(int16_t *) (col.sqldata);
       case SQLINT:
         return *(int32_t *) (col.sqldata);
-#ifdef SQLBIGINT
-      case SQLBIGINT:
+      case SQLINFXBIGINT:
         return *(int64_t *) (col.sqldata);
-#endif
+      case SQLINT8:
+      {
+        bigint i;
+        int e = bigintcvifx_int8((const ifx_int8_t *) (col.sqldata), &i);
+        if (e == 0)
+          throw informix_exception(u8"INT8 Conversion", e);
+      }
     }
     throw runtime_error(u8"index value is not integer");
   }

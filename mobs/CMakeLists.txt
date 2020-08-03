@@ -52,6 +52,7 @@ endif()
 
 if(BUILD_INFORMIX_INTERFACE)
     target_compile_definitions(mobs PUBLIC USE_INFORMIX)
+    #target_compile_definitions(mobs PUBLIC INFORMIX_DTFMT_BUG)  # bei Informix-ESQL Version 4.10.FC4DE  setzen
 endif()
 
 set_property(TARGET mobs PROPERTY CXX_STANDARD 11)
