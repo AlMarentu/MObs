@@ -74,6 +74,7 @@ namespace mobs {
     void rollbackTransaction(DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) override;
     // ------------------------------
 
+    /// private
     void create(DatabaseInterface &dbi, const ObjectBase &obj);
 
     /// private

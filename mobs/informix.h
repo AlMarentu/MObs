@@ -34,6 +34,11 @@
 
 namespace mobs {
 
+/** \brief Datenbank-Verbindung zu einer Informix DB.
+  *
+  * IBM Informix is a registered trademark of IBM Corp.
+  * \see www.ibm.com
+  */
 class InformixDatabaseConnection : virtual public DatabaseConnection, public ConnectionInformation {
 public:
   /// \private

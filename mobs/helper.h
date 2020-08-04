@@ -34,21 +34,30 @@ namespace mobs {
 class SQLDBdescription {
 public:
 
+  /// Aufbau des Tabellennamen
   virtual std::string tableName(const std::string &tabnam) = 0;
 
+  /// Erzeuge SQL-Fragment für einen Index-Wert
   virtual std::string valueStmtIndex(size_t i) = 0;
 
+  /// Erzeuge SQL-Fragment für einen Index Eintrag
   virtual std::string createStmtIndex(std::string name) = 0;
 
+  /// Erzeuge SQL-Create-Statement
   virtual std::string createStmt(const MemberBase &mem, bool compact) = 0;
 
+  /// Erzeuge SQL-Fragment für einen Wert Eintrag
   virtual std::string valueStmt(const MemberBase &mem, bool compact, bool increment, bool inWhere) = 0;
 
   /// Einlesen der Elemente, die Sequenz entspricht der Abfrage aus GenerateSql
   virtual void readValue(MemberBase &mem, bool compact) = 0;
 
+  /// Einlesen der Index-Elemente, die Sequenz entspricht der Abfrage aus GenerateSql
   virtual size_t readIndexValue() = 0;
+
+  /// Callback zum Start des Einlesens
   virtual void startReading() {};
+  /// Callback zum Ende des Einlesens
   virtual void finishReading() {};
 
   /// in einer Where-Bedingung wird bei Null-Werten ein "is" vorangestellt, statt "=", kann is \c valueStmt angepasst werden
@@ -57,7 +66,7 @@ public:
   bool createWith_IfNotExists = false;
 };
 
-/// Generator-Klasse für SQL-Statements für Leesen und Schreiben, benötigt ein SQL-Beschreibungs-Objekt \c SQLDBdescription
+/// Generator-Klasse für SQL-Statements für Lesen und Schreiben, benötigt ein SQL-Beschreibungs-Objekt \c SQLDBdescription
 class SqlGenerator {
 public:
   /// Handle für selectStatementArray - readObject-Paare
@@ -172,6 +181,7 @@ public:
 /////////////////////////////////////////////////////////   Audit Trail   ////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Datenbank-Objekt für Audit-Trail
 class AuditChanges : public mobs::ObjectBase {
 public:
   ObjInit(AuditChanges);
@@ -181,6 +191,7 @@ public:
 
 };
 
+/// Datenbank-Objekt für Audit-Trail
 class AuditObjects : public mobs::ObjectBase {
 public:
   ObjInit(AuditObjects);
@@ -193,6 +204,7 @@ public:
 
 };
 
+/// Datenbank-Objekt für Audit-Trail
 class AuditActivity : public mobs::ObjectBase {
 public:
   ObjInit(AuditActivity);

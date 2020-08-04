@@ -109,6 +109,7 @@ public:
   virtual void rollbackTransaction(DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) = 0;
 };
 
+/// Container für die Information zu einer Datenbankverbindung
 class ConnectionInformation {
 public:
   ConnectionInformation() = default;

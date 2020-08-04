@@ -35,6 +35,7 @@ using namespace std;
 namespace {
 
 MOBS_ENUM_DEF(Colour, Green, Blue, Red, Yellow, Orange, Cyan);
+
 MOBS_ENUM_VAL(Colour, "green", "blue", "red", "yellow", "orange", "cyan");
 
 

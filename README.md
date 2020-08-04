@@ -212,7 +212,7 @@ Zur Verfügung stehen:
 * doIndent() Ausgabe mit Pretty-Printer
 * noIndent() Export ohne Einrückung und Whitespace
 * exportCompact() Verwende native Ausgabe von enums und Zeiten 
-* exportExtendet() Ausgabe im Klartext von enums und Uhrzeit
+* exportExtended() Ausgabe im Klartext von enums und Uhrzeit
 * exportWoNull() Ausgabe von null-Werten überspringen
 
 Um ein Objekt aus einem std::string einzulesen wird  string2Obj verwendet
@@ -223,7 +223,7 @@ Im Fehlerfall wird ein std::runtime_error geworfen.
 
 Konfiguriert werden kann:
 * useCompactValues() Werte in Kurzform akzeptieren (zB. Zahl anstatt enum-Text)
-* useExtentedValues() Werte in Langform akzeptieren (zB. enum-Text, Datum)
+* useExtendedValues() Werte in Langform akzeptieren (zB. enum-Text, Datum)
 * useAutoValues() Werte in beliebiger Form akzeptieren
 * useOriginalNames() Nur Original-Namen akzeptieren
 * useAlternativeNames() Nur Alternativ-Namen akzeptieren
@@ -278,14 +278,14 @@ Vom DatabaseManager werden Kopien vom DatabaseInterface abgerufen.
 
 ### DatabaseInterface
 Das DatabaseInterface dient als Schnittstelle für alle Datenbankoperationen. Dazu muss in den den Objektdefinitionen
-ein oder mehrer Schlüsselelemente definiert werden, die als Primary-Key dienen. 
+ein oder mehrere Schlüsselelemente definiert werden, die als Primary-Key dienen. 
 Es können noch weitere Optionsfelder wie abweichende Datenbankbezeichner oder Versionierungs-Informationen
 angegeben werden.
 ~~~~~~~~~~cpp
- class MobObject : virtual public mobs::ObjectBase
+ class MobsObject : virtual public mobs::ObjectBase
  {
  public:
-   ObjInit(MobObject, COLNAME(vehicle));  // COLNAME übergibt einen vom Klassennamen abweichenden Tabellennamen an
+   ObjInit(MobsObject, COLNAME(vehicle));  // COLNAME übergibt einen vom Klassennamen abweichenden Tabellennamen an
  
    MemVar(int, id, KEYELEMENT1);          // KEYELEMENT definiert die Schlüsselelemente
    MemVar(int, version, VERSIONFIELD);    // VERSIONFIELD definiert das Versionsfeld, falls Versionierung erwünscht
@@ -319,7 +319,7 @@ Wird über den Inhalt eines Sub-Arrays gesucht, darf nur das erste Element eines
 Werden mehrere Felder gesetzt, so müssen alle Bedingungen zutreffen.
 
 ### Atomizität
-Alle Operationen auf das DatabaseInterface werden atomar ausgeführt, oweit von der Datenbank unterstützt.
+Alle Operationen auf das DatabaseInterface werden atomar ausgeführt, soweit von der Datenbank unterstützt.
 Dies gilt auch, wenn bei SQL die Subelemente eines Arrays in Master-Detail-Tabellen gespeichert werden.
 
 Für zusammenhängende Operationen mehrerer beteiligter Objekte, steht eine Transaktion zur Verfügung.
@@ -349,19 +349,19 @@ als dass der finale Commit für alle Datenbanken am Enden der Transaktion nachei
 ### Objekt-Versionierung
 Wird über das Token VERSIONFIELD eine Versions-Variable definiert, wird dort automatisch die
 Version des Datensatzes verwaltet. Je Objekt darf nur eine Versionsvariable existieren. Sie muss 
-im selben Ebenenbereich ligen, wie Schlüsselelemente.
+im selben Ebenenbereich liegen, wie Schlüsselelemente.
 
 Version 0 bedeutet, dass dieses Objekt noch nicht in der Datenbank existiert.
 
 Bei jedem Speichern wird die Version automatisch hochgezählt. Bei allen Operationen wird geprüft,
-ob die Objekt-Version mit der Datenbank-Version übereinstimmt. Im fehlerfall wird die Operation 
+ob die Objekt-Version mit der Datenbank-Version übereinstimmt. Im Fehlerfall wird die Operation 
 abgebrochen.
 
 Bei den SQL-Feature mit automatischen Master-Detail-Tabellen, Wird die Version nur in der 
 Mater-Tabelle verwaltet.
 
 ### Audit Trail
-Für jedes Objekt kan definiert werden, ob eine automatische Audit Trail überwachung aktiviert
+Für jedes Objekt kan definiert werden, ob eine automatische Audit Trail Überwachung aktiviert
 werden soll.
 Dazu muss nur Das Token  "AUDITTRAIL" angegeben werden. 
 Danach werden Erzeugung, alle Änderungen sowie die Löschung protokolliert. So lässt sich der Zustand des Objektes zu 
@@ -383,7 +383,7 @@ Einer Verwendung als globalen Object-Cache wird, aus langjähriger Erfahrung, dr
 Darüber lassen sich
 * einfache Caches
 * Objekt-Referenzen,
-* On-Demand Datenbakzugriffe
+* On-Demand Datenbankzugriffe
 * in-Memory Datenbanken
 usw. realisieren
 
@@ -395,10 +395,28 @@ Build und Installation erfolgen über cmake
 Folgende Defines können angegeben werden:
 - BUILD_MARIA_INTERFACE
 - BUILD_MONGO_INTERFACE
+- BUILD_INFORMIX_INTERFACE
 - BUILD_DOC
 - PACKAGE_TESTS
 
 Für die jeweiligen Optionen werden die entsprechenden Zusatzpakete benötigt.
+
+Bei Informix Connect-Client ab ca. 4.10.12 wurde ein BUG in der Datums-Konvertierung entfernt
+hier kann für ältere Versionen INFORMIX_DTFMT_BUG definiert werden
+
+## Datenbanken
+
+Unterstützte Funktionen
+
+| Datenbanken | MariaDB | MongoDB | Informix | 
+|-------------|---------|---------|----------|
+| uint64_t    | +       | +       | -        |
+| MTime Auflösung | 1 µs    | 1000 µs | 10 µs    |
+| Blob        | -       | -       | -        |
+| Transaktionen | +     | - *     | +        |
+
+* Bei MongoDB werden Transaktionen nur im Cluster-Mode unterstützt -> TODO 
+
 
 ## Module
 * objtypes.h Typ-Deklarationen
@@ -414,8 +432,13 @@ Für die jeweiligen Optionen werden die entsprechenden Zusatzpakete benötigt.
 * dbifc.h Datenbank Interface
 * logging.h Makros und Klassen für Logging und Tracing auf stderr 
 * unixtime.h Wrapper Klasse für Datum-Zeit auf Basis von Unix-time_t
+* mchrono.h Definitionen für Zeit und Datum aus std::chrono
+* maria.h Datenbankinterface 
+* mongo.h Datenbankinterface 
+* informix.h Datenbankinterface 
+* infxtools.h Hilfsfunktionen Informix
 
 
 
 [^1]: MongoDb und MariaDB sind eingetragene Markenzeichen der jeweiligen Firmen
-[^2]: IBM Informix ist ein eingetragene Markenzeichen der IBM Corp.
+[^2]: IBM Informix ist ein eingetragenes Markenzeichen der IBM Corp.

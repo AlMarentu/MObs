@@ -390,7 +390,7 @@ public:
   ConvFromStrHintDefault() {}
   virtual ~ConvFromStrHintDefault() {}
   virtual bool acceptCompact() const { return true; }
-  virtual bool acceptExtented() const { return true; }
+  virtual bool acceptExtended() const { return true; }
 };
 
 class ConvFromStrHintExplizit : virtual public ConvFromStrHint {
@@ -398,7 +398,7 @@ public:
   ConvFromStrHintExplizit() {}
   virtual ~ConvFromStrHintExplizit() {}
   virtual bool acceptCompact() const { return false; }
-  virtual bool acceptExtented() const { return true; }
+  virtual bool acceptExtended() const { return true; }
 };
 
 const ConvFromStrHint &ConvFromStrHint::convFromStrHintDflt = ConvFromStrHintDefault();

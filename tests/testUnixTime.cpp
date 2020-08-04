@@ -140,6 +140,9 @@ TEST(dateTimeTest, mtime) {
   EXPECT_EQ("1900-12", to_string_gmt(t, mobs::MMonth));
   EXPECT_EQ("1900", to_string_gmt(t, mobs::MYear));
 
+//  EXPECT_TRUE(string2x("1583-01-01T15:30:00Z", t));
+//  EXPECT_EQ("1583-01-01T15:30:00Z", to_string_gmt(t));
+
 
   cerr << to_string_ansi(std::chrono::system_clock::now());
 

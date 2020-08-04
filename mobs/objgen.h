@@ -974,6 +974,7 @@ private:
 /// Basisklasse zum sequentiellen Einfügen von Daten in ein Objekt
 class ObjectNavigator  {
 public:
+  /// Konstruktor
   explicit ObjectNavigator(ConvObjFromStr c = ConvObjFromStr()) : cfs(std::move(c)) { }
   /// Zeiger auf die aktuelle MemberVariable oder nullptr, falls es keine Variable ist
   inline MemberBase *member() const { return memBase; };

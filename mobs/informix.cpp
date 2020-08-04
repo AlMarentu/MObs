@@ -498,7 +498,7 @@ class InformixCursor : public virtual mobs::DbCursor {
 public:
   explicit InformixCursor(int conNr, std::shared_ptr<DatabaseConnection> dbi,
                        std::string dbName) :
-          m_conNr(conNr), dbCon(std::move(dbi)), databaseName(std::move(dbName)) {
+          dbCon(std::move(dbi)), databaseName(std::move(dbName)), m_conNr(conNr) {
     static int n = 0;
     m_cursNr = ++n;
   }
@@ -561,7 +561,7 @@ private:
       /* Determine size used by column data and increment buffer position */
       mint size = rtypmsize(col_ptr->sqltype, col_ptr->sqllen);
       pos += size;
-      if (pos > sizeof(buf))
+      if (pos > mint(sizeof(buf)))
         throw runtime_error(u8"informix Buffer overflow");
     }
     LOG(LM_DEBUG, "SQL open " << c);

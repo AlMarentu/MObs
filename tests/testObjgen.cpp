@@ -40,7 +40,8 @@ using namespace std;
 namespace {
 
 MOBS_ENUM_DEF(device, fax, sms, mobil, privat, arbeit );
-MOBS_ENUM_VAL(device, "fax", "sms", "mobil", "privat", "arbeit" );
+
+MOBS_ENUM_VAL(device, "fax", "sms", "mobil", "privat", "arbeit");
 
 
 class Kontakt : virtual public mobs::ObjectBase {
@@ -580,7 +581,7 @@ private:
 };
 
 std::string showKey(const mobs::ObjectBase &obj) {
-  KeyDump kd(mobs::ConvObjToString().exportExtendet());
+  KeyDump kd(mobs::ConvObjToString().exportExtended());
   obj.traverseKey(kd);
   return kd.result();
 }

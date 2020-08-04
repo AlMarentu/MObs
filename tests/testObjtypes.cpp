@@ -177,6 +177,7 @@ TEST(objtypeTest, string2x) {
 }
 
 MOBS_ENUM_DEF(direction, Dleft, Dright, Dup, Ddown);
+
 MOBS_ENUM_VAL(direction, "left", "right", "up", "down");
 
 directionStrEnumConv c;
@@ -218,6 +219,7 @@ TEST(objtypeTest, fromhtml) {
 }
 
 MOBS_ENUM_DEF(direction2, D2left, D2right, D2up, D2down, D2void);
+
 MOBS_ENUM_VAL(direction2, "left", "right", "up", "down");
 
 TEST(objtypeTest, mobsenum2) {
@@ -225,6 +227,7 @@ TEST(objtypeTest, mobsenum2) {
 }
 
 MOBS_ENUM_DEF(direction3, D3left, D3right, D3up, D3down);
+
 MOBS_ENUM_VAL(direction3, "left", "right", "up", "down", "void");
 
 TEST(objtypeTest, mobsenum3) {

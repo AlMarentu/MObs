@@ -85,8 +85,8 @@ using MTime = std::chrono::time_point<std::chrono::system_clock, std::chrono::mi
 
 /** \brief Konvertiere Zeit-String in Ansi/ISO8601 nach MTime
  *
- * ist keine Zeitzune angegeben, so wird dir lokale Zeit angenommen.
- * @param str zu konvertierene Zeichenkette
+ * ist keine Zeitzone angegeben, so wird dir lokale Zeit angenommen.
+ * @param str zu konvertierende Zeichenkette
  * @param t Rückgabe MTime
  * @return true, wenn Umwandlung fehlerfrei
  */

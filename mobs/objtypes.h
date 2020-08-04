@@ -100,7 +100,7 @@ public: \
   static std::string toStr(enum typ e) { return (toStr(mobsEnum_##typ##_define::numOf(e))); } \
   static size_t numOf(enum typ e) { return mobsEnum_##typ##_define::toEnum(e); } \
   static inline bool c_string2x(const std::string &str, typ &t, const mobs::ConvFromStrHint &cfh) { \
-    if (cfh.acceptExtented()) { try { t = fromStr(str); return true; } catch (...) { } } \
+    if (cfh.acceptExtended()) { try { t = fromStr(str); return true; } catch (...) { } } \
     if (not cfh.acceptCompact()) return false; \
     int i; if (not mobs::string2x(str, i)) return false; t = typ(i); return true; } \
   static inline bool c_wstring2x(const std::wstring &wstr, typ &t, const mobs::ConvFromStrHint &cfh) { return c_string2x(mobs::to_string(wstr), t, cfh); } \
@@ -425,6 +425,7 @@ public:
   /// @param print_compact führt bei einigen Typen zur vereinfachten Ausgabe
   /// @param altNames verwende alternative Namen wenn Vorhanden
   /// @param pfix verwende den Prefix vor dem Namen, falls vorhanden
+  /// @param lowercase wandelt den Namen in Kleinbuchstaben
   explicit ConvToStrHint(bool print_compact, bool altNames = false, bool pfix = false, bool lowercase = false) : comp(print_compact),
                          altnam(altNames), prefix(pfix), toLower(lowercase) {}
   virtual ~ConvToStrHint() = default;
@@ -457,7 +458,7 @@ class ConvFromStrHint {
 public:
   virtual ~ConvFromStrHint() = default;
   /// darf ein nicht-kompakter Wert als Eingabe fungieren
-  virtual bool acceptExtented() const = 0;
+  virtual bool acceptExtended() const = 0;
   /// darf ein kompakter Wert als Eingabe fungieren
   virtual bool acceptCompact() const = 0;
 
@@ -501,7 +502,7 @@ public:
   /// Verwende native Bezeichner von enums und Zeiten
   ConvObjToString exportCompact() const { ConvObjToString c(*this); c.comp = true; return c; }
   /// Ausgabe im Klartext von enums und Uhrzeit
-  ConvObjToString exportExtendet() const { ConvObjToString c(*this); c.comp = false; return c; }
+  ConvObjToString exportExtended() const { ConvObjToString c(*this); c.comp = false; return c; }
   /// Ausgabe von null-Werten überspringen
   ConvObjToString exportWoNull() const { ConvObjToString c(*this); c.onull = true; return c; }
   /// Ausgabe von Elementen mit Modified-Flag
@@ -527,7 +528,7 @@ public:
   /// darf ein kompakter Wert als Eingabe fungieren
   bool acceptCompact() const override { return compact; }
   /// darf ein nicht-kompakter Wert als Eingabe fungieren
-  bool acceptExtented() const override { return extented; };
+  bool acceptExtended() const override { return extended; };
   /// Verwende alternative Namen
   virtual bool acceptAltNames() const { return altNam; };
   /// Verwende original Namen
@@ -537,36 +538,36 @@ public:
   /// werfe eine Exception bei unbekannter Variable
   virtual bool exceptionIfUnknown() const { return exceptUnk; };
   /// Groß-/Kleinschreibung ignorieren
-  virtual bool caseinsesitive() const { return ignCase; };
+  virtual bool caseinsensitive() const { return ignCase; };
   /// Null-Werte behandeln
   virtual enum Nulls nullHandling() const { return null; };
   /// Verwenden den XML-Parser
   ConvObjFromStr useXml() const { ConvObjFromStr c(*this); c.xml = true; return c; }
   /// Werte in Kurzform akzeptieren (zB. Zahl anstatt enum-Text)
-  ConvObjFromStr useCompactValues() const { ConvObjFromStr c(*this); c.compact = true; c.extented = false; return c; }
+  ConvObjFromStr useCompactValues() const { ConvObjFromStr c(*this); c.compact = true; c.extended = false; return c; }
   /// Werte in Langform akzeptieren (zB. enum-Text, Datum)
-  ConvObjFromStr useExtentedValues() const { ConvObjFromStr c(*this); c.compact = false; c.extented = true; return c; }
+  ConvObjFromStr useExtendedValues() const { ConvObjFromStr c(*this); c.compact = false; c.extended = true; return c; }
   /// Werte in beliebiger Form akzeptieren
-  ConvObjFromStr useAutoValues() const { ConvObjFromStr c(*this); c.compact = true; c.extented = true; return c; }
+  ConvObjFromStr useAutoValues() const { ConvObjFromStr c(*this); c.compact = true; c.extended = true; return c; }
   /// Nur Original-Namen akzeptieren
   ConvObjFromStr useOriginalNames() const { ConvObjFromStr c(*this); c.oriNam = true; c.altNam = false; return c; }
   /// Nur Alternativ-Namen akzeptieren
   ConvObjFromStr useAlternativeNames() const { ConvObjFromStr c(*this); c.oriNam = false; c.altNam = true; return c; }
   /// Original oder Alternativ-Namen akzeptieren
   ConvObjFromStr useAutoNames() const {  ConvObjFromStr c(*this); c.oriNam = true; c.altNam = true; return c; }
-  /// Vektoren beim Schreiben entsprechens verkleinern
+  /// Vektoren beim Schreiben entsprechend verkleinern
   ConvObjFromStr useDontShrink() const {  ConvObjFromStr c(*this); c.shrink = false; return c; }
-  /// null-Elemente werden beim Einlesen abhängig von \c nullAlllowed  auf null gesetzt im anderen Fall wird statt den Fehler zu ignorieren, eine exception geworen
+  /// null-Elemente werden beim Einlesen abhängig von \c nullAllowed  auf null gesetzt im anderen Fall wird statt den Fehler zu ignorieren, eine exception geworfen
   ConvObjFromStr useExceptNull() const {  ConvObjFromStr c(*this); c.null = except; return c; }
-  /// null-Elemente werden beim Einlesen üblesen
+  /// null-Elemente werden beim Einlesen überlesen
   ConvObjFromStr useOmitNull() const {  ConvObjFromStr c(*this); c.null = omit; return c; }
-  /// null-Elemente werden beim Einlesen anhand \c nullAlllowed behandelt
+  /// null-Elemente werden beim Einlesen anhand \c nullAllowed behandelt
   ConvObjFromStr useClearNull() const {  ConvObjFromStr c(*this); c.null = clear; return c; }
-  /// null-Elemente werden beim Einlesen unabhängig von \c nullAlllowed  auf null gesetzt
+  /// null-Elemente werden beim Einlesen unabhängig von \c nullAllowed  auf null gesetzt
   ConvObjFromStr useForceNull() const {  ConvObjFromStr c(*this); c.null = force; return c; }
   /// wird versucht eine unbekannte Variable einzulesen, wird eine exception geworfen
   ConvObjFromStr useExceptUnknown() const {  ConvObjFromStr c(*this); c.exceptUnk = true; return c; }
-  /// ignoriere beim Einlesen die Groß-/Kleinschreibung der Elemntnamen
+  /// ignoriere beim Einlesen die Groß-/Kleinschreibung der Elementnamen
   ConvObjFromStr useIgnoreCase() const {  ConvObjFromStr c(*this); c.ignCase = true; return c; }
 protected:
   /// \private
@@ -574,7 +575,7 @@ protected:
   /// \private
   bool compact = true;
   /// \private
-  bool extented = true;
+  bool extended = true;
   /// \private
   bool oriNam = true;
   /// \private
@@ -653,10 +654,10 @@ public:
   bool isSigned = false; ///< wht Wert vom Typ \c unsigned, u64 und max sind gesetzt
   int64_t i64 = 0; ///< Inhalt des Wertes wenn signed (unabhängig von \c isNull)
   uint64_t u64 = 0; ///< Inhalt des Wertes wenn unsigned (unabhängig von \c isNull)
-  int64_t min = 0; ///< Miniimalwert des Datentyps
+  int64_t min = 0; ///< Minimalwert des Datentyps
   uint64_t max = 0; ///< Maximalwert des Datentyps
-  uint64_t granularity = 0; ///< Körnung des Datentyps nur bei \c isTime; 1 = microsekunden
-  unsigned int size = 0; ///< sizeof wenn is_spezialized
+  uint64_t granularity = 0; ///< Körnung des Datentyps nur bei \c isTime; 1 = Mikrosekunden
+  unsigned int size = 0; ///< sizeof wenn is_specialized
   bool isEnum = false; ///<  Wert ist ein enum -> besser als Klartext darstellen \see acceptExtended
   bool isTime = false; ///< Wert ist Millisekunde seit Unix-Epoche i64 ist gesetzt
   bool is_specialized = false; ///< is_specialized aus std::numeric_limits
@@ -682,7 +683,7 @@ public:
   /// zeigt an, ob des Element ein binäres Datenobjekt ist
   static inline bool c_is_blob() { return false; }
   /// zeigt an, ob des Element ein MOBSENUM ist
-  static inline bool c_is_mobsEnmum() { return false; }
+  static inline bool c_is_mobsEnum() { return false; }
   /// Körnung des Datentyps wenn es ein Date-Typ ist, \c 0 sonst
   static inline uint64_t c_time_granularity() { return 0; }
   /// \private

@@ -645,7 +645,7 @@ void MongoDatabaseConnection::open() {
 
 bool MongoDatabaseConnection::load(DatabaseInterface &dbi, ObjectBase &obj) {
   open();
-  BsonOut bo(mobs::ConvObjToString().exportExtendet());
+  BsonOut bo(mobs::ConvObjToString().exportExtended());
   obj.traverseKey(bo);
   LOG(LM_DEBUG, "LOAD " << dbi.database() << "." << collectionName(obj) << " " << bo.result());
 
@@ -664,7 +664,7 @@ bool MongoDatabaseConnection::load(DatabaseInterface &dbi, ObjectBase &obj) {
 
 void MongoDatabaseConnection::create(DatabaseInterface &dbi, const ObjectBase &obj) {
   open();
-  BsonOut bo(mobs::ConvObjToString().exportExtendet().exportWoNull());
+  BsonOut bo(mobs::ConvObjToString().exportExtended().exportExtended());
   bo.increment = true;
   obj.traverse(bo);
   LOG(LM_DEBUG, "CREATE " << dbi.database() << "." << collectionName(obj) << " " << bo.result());
@@ -684,11 +684,11 @@ void MongoDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj
   auto mtdb = static_cast<MongoTransactionDbInfo *>(dbi.transactionDbInfo());
 
   // TODO create overwrite update
-  BsonOut bk(mobs::ConvObjToString().exportExtendet());
+  BsonOut bk(mobs::ConvObjToString().exportExtended());
   bk.withVersionField = true;
   obj.traverseKey(bk);
   LOG(LM_DEBUG, "VERSION IS " << bk.version);
-  BsonOut bo(mobs::ConvObjToString().exportWoNull().exportExtendet());
+  BsonOut bo(mobs::ConvObjToString().exportWoNull().exportExtended());
   bo.increment = true;
 //    bo.noKeys = true;
   obj.traverse(bo);
@@ -724,7 +724,7 @@ bool MongoDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase &
 //    auto mtdb = static_cast<MongoTransactionDbInfo *>(tdb->transactionDbInfo(dbi));
   auto mtdb = static_cast<MongoTransactionDbInfo *>(dbi.transactionDbInfo());
 
-  BsonOut bo(mobs::ConvObjToString().exportExtendet());
+  BsonOut bo(mobs::ConvObjToString().exportExtended());
   bo.withVersionField = true;
   obj.traverseKey(bo);
   LOG(LM_INFO, "VERSION IS " << bo.version);

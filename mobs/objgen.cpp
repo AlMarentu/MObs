@@ -329,8 +329,8 @@ ObjectBase *ObjectBase::getObjInfo(const std::string &name, const ConvObjFromStr
 {
   for (auto i:mlist) {
     if (not i.obj) continue;
-    if ((cfh.acceptOriNames() and name == i.obj->getName(ConvToStrHint(false, false, false, cfh.caseinsesitive()))) or
-        (cfh.acceptAltNames() and name == i.obj->getName(ConvToStrHint(false, true, false, cfh.caseinsesitive()))))
+    if ((cfh.acceptOriNames() and name == i.obj->getName(ConvToStrHint(false, false, false, cfh.caseinsensitive()))) or
+        (cfh.acceptAltNames() and name == i.obj->getName(ConvToStrHint(false, true, false, cfh.caseinsensitive()))))
       return i.obj;
   }
   return nullptr;
@@ -340,8 +340,8 @@ MemBaseVector *ObjectBase::getVecInfo(const std::string &name, const ConvObjFrom
 {
   for (auto i:mlist) {
     if (not i.vec) continue;
-    if ((cfh.acceptOriNames() and name == i.vec->getName(ConvToStrHint(false, false, false, cfh.caseinsesitive()))) or
-        (cfh.acceptAltNames() and name == i.vec->getName(ConvToStrHint(false, true, false, cfh.caseinsesitive()))))
+    if ((cfh.acceptOriNames() and name == i.vec->getName(ConvToStrHint(false, false, false, cfh.caseinsensitive()))) or
+        (cfh.acceptAltNames() and name == i.vec->getName(ConvToStrHint(false, true, false, cfh.caseinsensitive()))))
       return i.vec;
   }
   return nullptr;
@@ -351,8 +351,8 @@ MemberBase *ObjectBase::getMemInfo(const std::string &name, const ConvObjFromStr
 {
   for (auto i:mlist) {
     if (not i.mem) continue;
-    if ((cfh.acceptOriNames() and name == i.mem->getName(ConvToStrHint(false, false, false, cfh.caseinsesitive()))) or
-        (cfh.acceptAltNames() and name == i.mem->getName(ConvToStrHint(false, true, false, cfh.caseinsesitive()))))
+    if ((cfh.acceptOriNames() and name == i.mem->getName(ConvToStrHint(false, false, false, cfh.caseinsensitive()))) or
+        (cfh.acceptAltNames() and name == i.mem->getName(ConvToStrHint(false, true, false, cfh.caseinsensitive()))))
       return i.mem;
   }
   return nullptr;
@@ -415,7 +415,7 @@ class ConvFromStrHintDoCopy : virtual public ConvFromStrHint {
 public:
   ~ConvFromStrHintDoCopy() override = default;
   bool acceptCompact() const override { return true; }
-  bool acceptExtented() const override { return false; }
+  bool acceptExtended() const override { return false; }
 };
 
 void ObjectBase::doCopy(const ObjectBase &other)
@@ -780,7 +780,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
   memBase = nullptr;
 //  LOG(LM_DEBUG, "Im Object " << memName);
   std::string elementFind = element;
-  if (cfs.caseinsesitive())
+  if (cfs.caseinsensitive())
     elementFind = mobs::toLower(element);
   if (objekte.top().obj)
   {
