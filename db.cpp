@@ -132,6 +132,15 @@ void worker(mobs::DatabaseInterface &dbi) {
     mobs::DatabaseManager::execute(transCb);
 
 
+
+    class Data2 : virtual public mobs::ObjectBase
+    {
+    public:
+      ObjInit(Data2);
+      MemVar(std::string, aa);
+      MemVarVector(int, zz);
+    };
+
     class Data : virtual public mobs::ObjectBase
     {
     public:
@@ -147,6 +156,7 @@ void worker(mobs::DatabaseInterface &dbi) {
       MemVar(bool, aus, USENULL);
       MemVar(char, ch, USENULL);
       MemVar(unsigned long long , ulolo, USENULL);
+      MemObj(Data2, d2, DBJSON LENGTH(100));
     };
 
 
@@ -162,6 +172,10 @@ void worker(mobs::DatabaseInterface &dbi) {
     d.aus(false);
     d.ch('X');
     d.ulolo(1234567890123456L);
+    d.d2.aa("abdc");
+    d.d2.zz[0](7);
+    d.d2.zz[1](5);
+    d.d2.zz[2](3);
 
     LOG(LM_INFO, "D " << d.to_string());
     try {

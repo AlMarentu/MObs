@@ -119,6 +119,13 @@ int infx_processed_rows();
  */
 const char *infx_error_msg2();
 
+/** \brief Prüft die Warnung1
+ *
+ * Warnung 1 ist gesetzt, wenn bei einem Fetch ein Feldinhalt abgeschnitten werden muss
+ * @return 1 wen Warnung 1 gesetzt, sonst 0
+ */
+int infx_check_warn1();
+
 #ifdef __cplusplus
 }
 #endif

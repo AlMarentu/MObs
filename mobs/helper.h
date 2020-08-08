@@ -43,6 +43,12 @@ public:
   /// Erzeuge SQL-Fragment für einen Index Eintrag
   virtual std::string createStmtIndex(std::string name) = 0;
 
+  /// Erzeuge SQL-Fragment für einen Index-Wert
+  virtual std::string valueStmtText(const std::string &t, bool isNull) = 0;
+
+  /// Erzeuge SQL-Fragment für einen DBJSON Eintrag
+  virtual std::string createStmtText(const std::string &name, size_t len) = 0;
+
   /// Erzeuge SQL-Create-Statement
   virtual std::string createStmt(const MemberBase &mem, bool compact) = 0;
 
@@ -52,8 +58,12 @@ public:
   /// Einlesen der Elemente, die Sequenz entspricht der Abfrage aus GenerateSql
   virtual void readValue(MemberBase &mem, bool compact) = 0;
 
+  /// Einlesen der DBJSON Elemente, die Sequenz entspricht der Abfrage aus GenerateSql
+  virtual void readValueText(const std::string &name, std::string &text, bool &null) = 0;
+
   /// Einlesen der Index-Elemente, die Sequenz entspricht der Abfrage aus GenerateSql
-  virtual size_t readIndexValue() = 0;
+  virtual size_t readIndexValue(const std::string &name) = 0;
+
 
   /// Callback zum Start des Einlesens
   virtual void startReading() {};
@@ -118,7 +128,7 @@ public:
   bool eof() { return detailVec.empty(); }
   /// hatte letztes Query-Statement einenJoin ?
   bool queryWithJoin() const { return querywJoin; }
-  /// löscht temporäre objekte im Destruktor
+  /// löscht temporäre Objekte im Destruktor
   void deleteLater(ObjectBase *o) { m_deleteLater.push_back(o); }
 
 private:

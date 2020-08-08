@@ -145,7 +145,7 @@ namespace mobs {
 
 /// \private
 enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Embedded, DbCompact, DbDetail, DbVersionField, DbAuditTrail,
-                 Key1, Key2, Key3, Key4, Key5,
+                 Key1, Key2, Key3, Key4, Key5, DbJson,
                  AltNameBase = 1000, AltNameEnd = 1999,
                  ColNameBase = 2000, ColNameEnd = 3999,
                  PrefixBase = 4000, PrefixEnd = 4999,
@@ -159,6 +159,7 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 #define EMBEDDED mobs::Embedded, ///< Bei Ausgabe als Attribute/Traversierung werden die Member des Objektes direkt, auf ser selben Ebene, serialisiert
 #define DBCOMPACT mobs::DbCompact, ///< In der Datenbank wird der MOBSENUM numerisch gespeichert
 #define DBDETAIL mobs::DbDetail, ///< In der Datenbank wird dieses Subelement in einer Detail Table abgelegt, muss also seperat gespeichert werden
+#define DBJSON mobs::DbJson, ///< In nicht dokumentbasierten Datenbanken wird das Unterobjekt als Text im JSON-Format abgelegt
 #define VERSIONFIELD mobs::DbVersionField, ///< In diesem Feld wird die Objektversion gespeichert, 0 entspricht noch nicht gespeichert
 #define AUDITTRAIL mobs::DbAuditTrail, ///< für dieses Objekt wird automatisch ein Audit Trail mitgeführt
 #define KEYELEMENT1 mobs::Key1, ///<  Schlüsselelement der Priorität 1 (erstes Element)
@@ -419,6 +420,8 @@ public:
   MemVarCfg hasFeature(MemVarCfg c) const;
   /// Abfrage der ursrünglichen Vectorsize (Audit Trail)
   size_t initialSize() const { return m_oldSize; }
+  /// Ausgabe der Vector-Elemente als String
+  std::string to_string(const ConvObjToString& cth) const;
 
 private:
   virtual void doCopy(const MemBaseVector &other) = 0;

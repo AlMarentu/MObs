@@ -83,11 +83,28 @@ public:
     else {
       if (obj.hasFeature(mobs::DbDetail))
         return false;
-      if (inArray() and arrayIndex() > 0)
-        return false;
       if (obj.isNull() and cth.omitNull())
         return false;
       if (not obj.isModified() and cth.modOnly())
+        return false;
+      if (obj.hasFeature(mobs::DbJson)) {
+        if (not obj.isNull())
+          throw runtime_error(u8"Query on DBJSON element not allowed");
+        if (not selectWhere.empty())
+          selectWhere += " and ";
+        fst = false;
+        size_t last = useName.size() -1;
+        selectWhere += useName[last] + "." + obj.getName(cth);
+        string val;
+        sqldb.valueStmtText("", true);
+        if (sqldb.changeTo_is_IfNull)
+          selectWhere += " is ";
+        else
+          selectWhere += "=";
+        selectWhere += val;
+        return false;
+      }
+      if (inArray() and arrayIndex() > 0)
         return false;
     }
     level++;
@@ -101,14 +118,34 @@ public:
   /// \private
   bool doArrayBeg(const MemBaseVector &vec) final
   {
-    if (noJoin)
-      return false;
-    if (inArray() and arrayIndex() > 0)
-      return false;
     if (vec.hasFeature(mobs::DbDetail))
       return false;
     if (not vec.isModified() and cth.modOnly())
       return false;
+    if (vec.isNull() and cth.omitNull())
+      return false;
+    if (vec.hasFeature(mobs::DbJson)) {
+      if (not vec.isNull())
+        throw runtime_error(u8"Query on DBJSON element not allowed");
+      if (not selectWhere.empty())
+        selectWhere += " and ";
+      fst = false;
+      size_t last = useName.size() -1;
+      selectWhere += useName[last] + "." + vec.getName(cth);
+      string val;
+      sqldb.valueStmtText("", true);
+      if (sqldb.changeTo_is_IfNull)
+        selectWhere += " is ";
+      else
+        selectWhere += "=";
+      selectWhere += val;
+      return false;
+    }
+    if (noJoin)
+      return false;
+    if (inArray() and arrayIndex() > 0)
+      return false;
+
     string name = tableName[tableName.size() -1];
     name += "_";
     name += vec.name();
@@ -256,7 +293,17 @@ public:
     }
     if (obj.hasFeature(mobs::DbDetail))
       return false;
-    level++;
+    if (obj.hasFeature(mobs::DbJson)) {
+      bool null;
+      std::string tx;
+      sqldb.readValueText(obj.getName(cth), tx, null);
+      if (null)
+        obj.forceNull();
+      else
+        string2Obj(tx, obj, ConvObjFromStr().useExceptUnknown());
+      return false;
+    }
+      level++;
     return true;
   };
 
@@ -274,6 +321,24 @@ public:
     }
     if (vec.hasFeature(mobs::DbDetail))
       return false;
+    if (vec.hasFeature(mobs::DbJson)) {
+      bool null;
+      std::string tx;
+      sqldb.readValueText(vec.getName(cth), tx, null);
+      if (null)
+        vec.forceNull();
+      else {  // Input und Vector zu einem Objekt umbauen
+        string t = "{";
+        t += vec.name();
+        t += ":";
+        t += tx;
+        t += "}";
+        ObjectBase dummy{};
+        dummy.regArray(&vec);
+        string2Obj(t, dummy, ConvObjFromStr().useExceptUnknown());
+      }
+      return false;
+    }
 
 //    LOG(LM_INFO, "VECTOR FOUND = " << vec.getName(cth));
     vector<pair<string, size_t>> k = current.arrayKeys;
@@ -292,10 +357,6 @@ public:
 
   void doMem(MemberBase &mem) final
   {
-    if (mem.isNull() and cth.omitNull())
-      return;
-    if (not mem.isModified() and cth.modOnly())
-      return;
     bool compact = cth.compact();
     if (mem.is_chartype(cth) and mem.hasFeature(mobs::DbCompact))
       compact = true;
@@ -339,6 +400,53 @@ public:
       return false;
     if (obj.isNull() and cth.omitNull())
       return false;
+    if (obj.hasFeature(mobs::DbJson)) {
+      string tx = obj.to_string(ConvObjToString().exportExtended().exportWoNull());
+      if (obj.key())
+        throw runtime_error("SQL: Key with DBJSON-element not allowed");
+      if (mode == Values) {
+        res << delimiter() << sqldb.valueStmtText(tx, obj.isNull());
+        mobs::MemVarCfg c = obj.hasFeature(mobs::LengthBase);
+        if (c and tx.length() > (c - mobs::LengthBase))
+          throw runtime_error("SQL: DBJSON-element to big für column");
+        return false;
+      }
+      string name = obj.getName(cth);
+      if (mode == Where) {
+        if (not obj.isNull())
+          throw runtime_error("SQL: Query with DBJSON-element not allowed");
+        res << delimiter() << name;
+        string val = sqldb.valueStmtText(tx, obj.isNull());
+        if (sqldb.changeTo_is_IfNull)
+          res << " is ";
+        else
+          res << "=";
+        res << val;
+      } else if (mode == Update) {
+        res << delimiter() << name << "=" << sqldb.valueStmtText(tx, obj.isNull());
+      } else if (mode == Fields) {
+        res << delimiter() << name;
+      } else if (mode == FldVal or mode == FldVal2) {
+        string d = delimiter();
+        res << d << name;
+        if (mode == FldVal2 and not d.empty())
+          d = " and ";
+        res2 << d << name << "=?";
+        fields++;
+        sqldb.valueStmtText(tx, obj.isNull());
+        mobs::MemVarCfg c = obj.hasFeature(mobs::LengthBase);
+        if (c and tx.length() > (c - mobs::LengthBase))
+          throw runtime_error("SQL: DBJSON-element to big für column");
+      } else if (mode == Create)  {
+        if (dupl.find(name) != dupl.end())
+          throw runtime_error(name + u8" is a duplicate id in SQL statement");
+        dupl.insert(name);
+        mobs::MemVarCfg c = obj.hasFeature(mobs::LengthBase);
+        size_t n = c ? (c - mobs::LengthBase) : 100;
+        res << delimiter() << name << " " << sqldb.createStmtText(name, n);
+      }
+      return false;
+    }
     if (not obj.isModified() and cth.modOnly())
       return false;
     if (mode != Values and mode != FldVal and inArray() and arrayIndex() > 0)
@@ -450,6 +558,45 @@ public:
       return false;
     if (mode == Update and optimize and not vec.isModified())
       return false;
+    if (vec.hasFeature(mobs::DbJson)) {
+      string tx = vec.to_string(ConvObjToString().exportExtended().exportWoNull());
+      if (mode == Values) {
+        res << delimiter() << sqldb.valueStmtText(tx, vec.isNull());
+        return false;
+      }
+      string name = vec.getName(cth);
+      if (mode == Where) {
+        if (not vec.isNull())
+          throw runtime_error("SQL: Query with DBJSON-element not allowed");
+        res << delimiter() << name;
+        string val = sqldb.valueStmtText(tx, vec.isNull());
+        if (sqldb.changeTo_is_IfNull)
+          res << " is ";
+        else
+          res << "=";
+        res << val;
+      } else if (mode == Update) {
+        res << delimiter() << name << "=" << sqldb.valueStmtText(tx, vec.isNull());
+      } else if (mode == Fields) {
+        res << delimiter() << name;
+      } else if (mode == FldVal or mode == FldVal2) {
+        string d = delimiter();
+        res << d << name;
+        if (mode == FldVal2 and not d.empty())
+          d = " and ";
+        res2 << d << name << "=?";
+        fields++;
+        sqldb.valueStmtText(tx, vec.isNull());
+      } else if (mode == Create)  {
+        if (dupl.find(name) != dupl.end())
+          throw runtime_error(name + u8" is a duplicate id in SQL statement");
+        dupl.insert(name);
+        mobs::MemVarCfg c = vec.hasFeature(mobs::LengthBase);
+        size_t n = c ? (c - mobs::LengthBase) : 100;
+        res << delimiter() << name << " " << sqldb.createStmtText(name, n);
+      }
+      return false;
+    }
 
     size_t index = SIZE_T_MAX;
     bool cleaning = current.cleaning;
@@ -992,7 +1139,7 @@ void SqlGenerator::readObject(const DetailInfo &di) {
     throw runtime_error("invalid DetailInfo in readObject");
 
   sqldb.startReading();
-  size_t index = sqldb.readIndexValue();
+  size_t index = sqldb.readIndexValue(vec->getName(mobs::ConvObjToString().exportPrefix().exportAltNames()));
   if (index >= INT_MAX)
     throw runtime_error("no index position in readObject");
   vec->resize(index+1);

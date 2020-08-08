@@ -93,7 +93,7 @@ Als Basistypen für Variablen sid folgende erlaubt:
 * std::wstring
 * std::u16string
 * std::u32string
-* std::chrono::time_point mit Tagen (mobs::MDate) oder Mikrocekunden (mobs::MTimw)
+* std::chrono::time_point mit Tagen (mobs::MDate) oder Mikrosekunden (mobs::MTime)
 
 Die Klasse UxTime steht als Wrapper für den Typ time_t zur Verfügung, um Zeitpunkte in den Objekten verwenden zu können
 
@@ -150,7 +150,7 @@ p.hobbies[2]("Tauchen");
 p.kontakt[3].number("+49 0000 00000");
 std::cout << p.adresse.ort() << " " << p.hobbies[2]();
 ~~~~~~~~~~
-DIe Vektoren werden bei Zugriffen automatisch vergrößert, so dass eine Überprüfung entfallen kann.
+Die Vektoren werden bei Zugriffen automatisch vergrößert, so dass eine Überprüfung entfallen kann.
 
 Werden alternative Namen Schlüsselelemente oder Behandlung von Null-Werten benötigt, existieren die Erweiterungen
 * KEYELEMENT 
@@ -172,6 +172,8 @@ class Obj1 : virtual public mobs::ObjectBase {
 Über das Token EMBEDDED bei einer Objektvariable werden alle Elemente dieser beim Serialisieren flach, also auf der Ebene 
 der Variable selbst eingebunden.
 
+Beim Token DBJSON wird das betroffene Objekt als JSON-Text abgelegt. Dies ist ausschließlich für spaltenbasierte Speicherung 
+vorgesehen. 
 
 ## Features
 ### Basisklasse
@@ -315,12 +317,20 @@ gesucht:
     ...
   }
 ~~~~~~~~~~
-Wird über den Inhalt eines Sub-Arrays gesucht, darf nur das erste Element eines Vektors benutz werden.
+Wird über den Inhalt eines Sub-Arrays gesucht, darf nur das erste Element eines Vektors benutzt werden.
 Werden mehrere Felder gesetzt, so müssen alle Bedingungen zutreffen.
+
+Um verschachtelte Objekte in eine SQL-Datenbank schreiben zu können stehen folgende Featuere-Token
+zur Verfügung:
+- DBJSON: Speichert das Unterobjekt als JSON-Text
+- PREFIX(xx): Setzt bei EMBEDDED Objekten vor jedem Namen ein Prefix
+- DBDETAIL: Markiert ein Unterobjekt als Detail-Tabelle; diese wird nicht bearbeitet und muss anwendungsseitig 
+  extra bearbeitet werden
+
 
 ### Atomizität
 Alle Operationen auf das DatabaseInterface werden atomar ausgeführt, soweit von der Datenbank unterstützt.
-Dies gilt auch, wenn bei SQL die Subelemente eines Arrays in Master-Detail-Tabellen gespeichert werden.
+Dies gilt auch, wenn bei SQL die Sub-Elemente eines Arrays in Master-Detail-Tabellen gespeichert werden.
 
 Für zusammenhängende Operationen mehrerer beteiligter Objekte, steht eine Transaktion zur Verfügung.
 

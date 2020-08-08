@@ -74,7 +74,9 @@ void MemberBase::doConfig(MemVarCfg c)
     case DbAuditTrail:
     case ColNameBase ... ColNameEnd:
     case PrefixBase ... PrefixEnd:
-    case VectorNull: break;
+    case VectorNull:
+    case DbJson:
+      break;
   }
 }
 
@@ -141,6 +143,7 @@ void MemBaseVector::doConfig(MemVarCfg c)
     case PrefixBase ... PrefixEnd:
     case ColNameBase ... ColNameEnd:
     case LengthBase ... LengthEnd:
+    case DbJson:
     case DbDetail: m_config.push_back(c); break; // für Vector selbst
     case DbCompact:
     case InitialNull: m_c.push_back(c); break; // für Member-Elemente
@@ -217,6 +220,7 @@ void ObjectBase::doConfig(MemVarCfg c)
     case DbDetail:
     case PrefixBase ... PrefixEnd:
     case LengthBase ... LengthEnd:
+    case DbJson:
     case Embedded: m_config.push_back(c); break;
     case InitialNull: nullAllowed(true); break;
     case Key1 ... Key5: m_key = c - Key1 + 1; break;
@@ -249,6 +253,7 @@ void ObjectBase::doConfigObj(MemVarCfg c)
     case DbDetail:
     case VectorNull:
     case DbVersionField:
+    case DbJson:
       break;
   }
 }
@@ -908,7 +913,7 @@ public:
       res << ",";
     newline();
     fst = true;
-    if (not obj.name().empty())
+    if (not obj.name().empty() and level > 0)
       res << quoteKeys << obj.getName(cth) << quoteKeys << ":";
     if (obj.isNull())
     {
@@ -944,8 +949,10 @@ public:
       res << ",";
     newline();
     fst = true;
-    res << quoteKeys << vec.getName(cth) << quoteKeys << ":";
-    needBreak = true;
+    if (level > 0) {
+      res << quoteKeys << vec.getName(cth) << quoteKeys << ":";
+      needBreak = true;
+    }
     if (vec.isNull())
     {
       res << "null";
@@ -994,6 +1001,26 @@ private:
 }
 
 std::string ObjectBase::to_string(const ConvObjToString& cth) const
+{
+  if (cth.toJson())
+  {
+    ObjDump od(cth);
+    traverse(od);
+    return od.result();
+  }
+  else if (cth.toXml())
+  {
+    XmlWriter wr(XmlWriter::CS_utf8, cth.withIndentation());
+    XmlOut xd(&wr, cth);
+    wr.writeHead();
+    traverse(xd);
+    return wr.getString();
+  }
+  else
+    return "";
+}
+
+std::string MemBaseVector::to_string(const ConvObjToString& cth) const
 {
   if (cth.toJson())
   {

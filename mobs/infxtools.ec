@@ -185,3 +185,8 @@ const char *infx_error_msg2()
   return sqlca.sqlerrm;
 }
 
+int infx_check_warn1()
+{
+  return sqlca.sqlwarn.sqlwarn0 == 'W' && sqlca.sqlwarn.sqlwarn1 == 'W';
+}
+

@@ -46,8 +46,14 @@ public:
 
   virtual std::string valueStmtIndex(size_t i) { return std::string(" ") + to_string(i);  }
 
+  virtual std::string valueStmtText(const std::string &tx, bool isNull) { return std::string(" ") + (isNull ? string("null"):mobs::to_squote(tx));  }
+
   virtual std::string createStmtIndex(std::string name) {
     return "INT NOT NULL";
+  }
+
+  virtual std::string createStmtText(const std::string &name, size_t len) {
+    return string("VARCHAR(") + to_string(len) + ")";
   }
 
   virtual std::string createStmt(const mobs::MemberBase &mem, bool compact) {
@@ -103,13 +109,23 @@ public:
     mem.memInfo(mi);
     if (mi.isUnsigned)
       mem.fromUInt64(1);
+    else if (mi.isSigned)
+      mem.fromInt64(2);
     else if (mem.is_chartype(mobs::ConvToStrHint(compact)))
       mem.fromStr("x", not compact ? mobs::ConvFromStrHint::convFromStrHintExplizit : mobs::ConvFromStrHint::convFromStrHintDflt);
   }
 
+  virtual void readValueText(const std::string &name, std::string &text, bool &null) override {
+    null = false;
+    if (name == "ll")
+      text = "[1,2,4]";
+    else
+      text = "{aa:2,bb:3,cc:4,col:\"green\"}";
+  }
+
   virtual size_t readIndexValue() { return 1; }
-  virtual void startReading() {};
-  virtual void finishReading() {};
+  virtual void startReading() {}
+  virtual void finishReading() {}
 
 };
 
@@ -163,6 +179,7 @@ public:
   MemMobsEnumVar(Colour, col, DBCOMPACT);
 
 };
+
 class ObjE3 : virtual public mobs::ObjectBase {
 public:
   ObjInit(ObjE3);
@@ -172,6 +189,15 @@ public:
   MemVar(int, zz);
 };
 
+class ObjJ1 : virtual public mobs::ObjectBase {
+public:
+  ObjInit(ObjJ1);
+
+  MemVar(int, xx, KEYELEMENT1);
+  MemObj(ObjE1, yy, DBJSON LENGTH(99));
+  MemVar(int, zz);
+  MemVarVector(int, ll, DBJSON LENGTH(88));
+};
 
 
 
@@ -226,7 +252,7 @@ TEST(helperTest, fields) {
 }
 
 
-  TEST(helperTest, sql) {
+TEST(helperTest, sql) {
 
   ObjA3 a3;
 
@@ -321,8 +347,25 @@ TEST(helperTest, fields) {
 
 
 
+TEST(helperTest, dbjson) {
+  ObjJ1 j1,j2;
+
+  EXPECT_NO_THROW(mobs::string2Obj("{xx:1,yy:{aa:2,bb:3,cc:4},zz:5,ll:[1,2,4]}", j1, mobs::ConvObjFromStr().useExceptUnknown()));
+  SQLDBTestDesc sd;
+  mobs::SqlGenerator gsql(j1, sd);
+  EXPECT_EQ(R"(replace D.ObjJ1(xx,yy,zz,ll) VALUES (1, '{aa:2,bb:3,cc:4,col:"green"}',5, '[1,2,4]');)",
+            gsql.replaceStatement(true));
+  EXPECT_EQ(R"(create table D.ObjJ1(xx INT NOT NULL,yy VARCHAR(99),zz INT NOT NULL,ll VARCHAR(88), unique(xx));)",
+            gsql.createStatement(true));
+
+  gsql.readObject(j2);
+  EXPECT_EQ(R"({xx:2,yy:{aa:2,bb:3,cc:4,col:"green"},zz:2,ll:[1,2,4]})", j2.to_string());
+
+}
+
+
 TEST(helperTest, auditTrail) {
-  
+
   ObjA3 a3;
   a3.version(0);
   a3.oa3.o2oo[2].c1de(4);

@@ -60,8 +60,12 @@ public:
 
   std::string valueStmtIndex(size_t i) override { return std::to_string(i);  }
 
-  std::string createStmtIndex(std::string name) override {
-    return "INT NOT NULL";
+  std::string valueStmtText(const std::string &tx, bool isNull) override { return isNull ? string("null"):mobs::to_squote(tx); }
+
+  std::string createStmtIndex(std::string name) override { return "INT NOT NULL"; }
+
+  std::string createStmtText(const std::string &name, size_t len) override {
+    return string("VARCHAR(") + std::to_string(len) + ") CHARACTER SET utf8";
   }
 
   std::string createStmt(const MemberBase &mem, bool compact) override {
@@ -208,7 +212,17 @@ public:
     pos++;
   }
 
-  size_t readIndexValue() override {
+  void readValueText(const std::string &name, std::string &text, bool &null) override {
+    if ((*row)[pos]) {
+      null = false;
+      text = string((*row)[pos], lengths[pos]);
+    }
+    else
+      null = true;
+    pos++;
+  }
+
+  size_t readIndexValue(const std::string &name) override {
     if ((*row)[pos]) {
       string value((*row)[pos], lengths[pos]);
       pos++;

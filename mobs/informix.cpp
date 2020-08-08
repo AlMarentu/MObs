@@ -91,6 +91,10 @@ public:
     return "INT NOT NULL";
   }
 
+  std::string createStmtText(const std::string &name, size_t len) override {
+    return string(len > 255 ? u8"LVARCHAR(": u8"VARCHAR(") + std::to_string(len) + ")";
+  }
+
   std::string createStmt(const MemberBase &mem, bool compact) override {
     std::stringstream res;
     MobsMemberInfo mi;
@@ -153,7 +157,36 @@ public:
     *(int32_t *)(sql_var.sqldata) = i;
     return "?";
   }
-  void setBuffer(ifx_sqlvar_t &sql_var, unsigned sz = 0) {
+
+  std::string valueStmtText(const std::string &tx, bool isNull) override {
+    LOG(LM_DEBUG, "Informix SqlVar DBJSON: " << tx);
+    if (not descriptor or not buf)
+      return isNull ? string("null"):mobs::to_quote(tx);
+    if (fldCnt == 0)
+      pos = 0;
+    ifx_sqlvar_t &sql_var = descriptor->sqlvar[fldCnt++];
+    memset(&sql_var, 0, sizeof(ifx_sqlvar_t));
+    descriptor->sqld = fldCnt;
+    sql_var.sqltype = SQLVCHAR;
+    unsigned int sz = tx.length() + 1;
+    if (tx.empty()) {
+      sql_var.sqltype = SQLCHAR;
+      sz = 2;
+    } else if (tx.length() >= 255) {
+      sql_var.sqltype = SQLLVARCHAR;
+    }
+    setBuffer(sql_var, sz);
+    if (isNull)
+      rsetnull(sql_var.sqltype, sql_var.sqldata);
+    else if (tx.empty())
+      stcopy(const_cast<char *>(" "), sql_var.sqldata);
+    else
+      stcopy(const_cast<char *>(tx.c_str()), sql_var.sqldata);
+
+    return "?";
+  }
+
+  void setBuffer(ifx_sqlvar_t &sql_var, unsigned int sz = 0) {
     pos = (short)rtypalign(pos, sql_var.sqltype);
     sql_var.sqldata = buf + pos;
     sql_var.sqllen = sz;
@@ -368,20 +401,20 @@ public:
       }
       case SQLBOOL:
         if (mi.isUnsigned)
-          mi.u64 = *(int8_t *) (col.sqldata);
+          mi.u64 = *(uint8_t *) (col.sqldata);
         else
           mi.i64 = *(int8_t *) (col.sqldata);
         break;
       case SQLSMINT:
         if (mi.isUnsigned)
-          mi.u64 = *(int16_t *) (col.sqldata);
+          mi.u64 = *(uint16_t *) (col.sqldata);
         else
           mi.i64 = *(int16_t *) (col.sqldata);
         break;
       case SQLINT:
       case SQLSERIAL:
         if (mi.isUnsigned)
-          mi.u64 = *(int32_t *) (col.sqldata);
+          mi.u64 = *(uint32_t *) (col.sqldata);
         else
           mi.i64 = *(int32_t *) (col.sqldata);
         break;
@@ -436,11 +469,43 @@ public:
       throw runtime_error(u8"conversion error in " + mem.name());
   }
 
-  size_t readIndexValue() override {
+  void readValueText(const std::string &name, std::string &text, bool &null) override {
+    if (pos >= fldCnt)
+      throw runtime_error(u8"Result not found " + name);
+    auto &col = descriptor->sqlvar[pos++];
+    LOG(LM_DEBUG, "Read " << name << " " << col.sqlname << " " << col.sqllen << " " << rtypname(col.sqltype));
+
+    if (risnull(col.sqltype, col.sqldata)) {
+      null = true;
+      return;
+    }
+    null = false;
+    bool ok = true;
+    int e = 0;
+
+    switch (col.sqltype) {
+      case SQLCHAR:
+      case SQLNCHAR:
+        // strip trailing blanks
+        for (char *cp = col.sqldata + col.sqllen - 2; *cp == ' ' and cp >= col.sqldata; --cp)
+          *cp = '\0';
+        // fall into
+      case SQLLVARCHAR:
+      case SQLNVCHAR:
+      case SQLVCHAR:
+        text = string(col.sqldata);
+        return;
+      case SQLTEXT:
+      default:
+        throw runtime_error(u8"conversion error in " + name + " Type=" + to_string(col.sqltype));
+    }
+  }
+
+  size_t readIndexValue(const std::string &name) override {
     if (pos >= fldCnt)
       throw runtime_error(u8"Result not found index");
     auto &col = descriptor->sqlvar[pos++];
-    LOG(LM_DEBUG, "Read idx " << col.sqlname << " " << col.sqllen);
+    LOG(LM_DEBUG, "Read idx " << name << " " << col.sqlname << " " << col.sqllen);
 
     if (risnull(col.sqltype, col.sqldata))
       throw runtime_error(u8"index value is null");
@@ -988,6 +1053,7 @@ void InformixDatabaseConnection::rollbackTransaction(DbTransaction *transaction,
 
 size_t InformixDatabaseConnection::doSql(const string &sql) {
   LOG(LM_DEBUG, "SQL " << sql);
+  open();
   int e = infx_execute(sql.c_str());
   if (e)
     throw informix_exception(u8"doSql " + sql + ": ", e);
