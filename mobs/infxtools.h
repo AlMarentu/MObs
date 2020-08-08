@@ -113,6 +113,12 @@ void infx_remove_curs(const char *cursname, const char *prepname);
  */
 int infx_processed_rows();
 
+/** \brief Isam-Errorcode oder Serial ermitteln
+ *
+ * @return Isam-error, wenn SQLCODE < 0 ansonsten neu erzeugter Serial
+ */
+int infx_isam_or_serial();
+
 /** \brief Liefert den dynamischen Teil der Fehlermeldung
  *
  * @return Fehler-Detail-Info

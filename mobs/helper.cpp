@@ -191,12 +191,12 @@ public:
       compact = true;
     string name = mem.getName(cth);
 
-//    if (level == 1 and not mem.isVersionField()) {
+    if (level == 1) {
       if (not selectField.empty())
         selectField += ",";
       selectField += "mt.";
       selectField += name;
-//    }
+    }
     if (not mem.isModified() and cth.modOnly())
       return;
     if (mem.isNull() and cth.omitNull())

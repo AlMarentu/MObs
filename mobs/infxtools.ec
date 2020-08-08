@@ -180,6 +180,11 @@ int infx_processed_rows()
   return sqlca.sqlerrd[2];
 }
 
+int infx_isam_or_serial()
+{
+  return sqlca.sqlerrd[1];
+}
+
 const char *infx_error_msg2()
 {
   return sqlca.sqlerrm;

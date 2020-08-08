@@ -50,6 +50,8 @@ namespace {
 using namespace mobs;
 using namespace std;
 
+const int ISAM_EXCLUSIVE = -106;
+
 string getErrorMsg(int errNum) {
   string e = "SQL erro:";
   e += std::to_string(errNum);
@@ -62,6 +64,15 @@ string getErrorMsg(int errNum) {
     size_t pos = e.find("%s");
     if (pos != string::npos)
       e.replace(pos, 2, infx_error_msg2());
+
+    int isam = infx_isam_or_serial();
+    if (isam < 0) {
+      e += " Isam:";
+      e += std::to_string(isam);
+      e += ":";
+      if (rgetlmsg(int32_t(isam), buf, sizeof(buf), &len) == 0)
+        e += string(buf, len);
+    }
   }  else
     e += "infx error in getErrorMsg";
   return e;
@@ -331,6 +342,11 @@ public:
       } else if (s.length() >= 2) {
         sql_var.sqltype = SQLLVARCHAR;
       }
+      // Längentest
+      mobs::MemVarCfg c = mem.hasFeature(mobs::LengthBase);
+      if (c and s.length() > (c - mobs::LengthBase))
+        throw runtime_error(u8"SQL: content to big für column " +
+        mem.getName(mobs::ConvObjToString().exportPrefix().exportAltNames()) + " need " + std::to_string(s.length()));
       setBuffer(sql_var, s.length() + 1);
       if (mem.isNull())
         e = rsetnull(sql_var.sqltype, sql_var.sqldata);
