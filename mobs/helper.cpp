@@ -156,12 +156,14 @@ public:
     useName.push_back(sqldb.tableName(name));
     keys.push_back(vec.getName(cth));
     level++;
+    levelArray++;
     return true;
   };
   /// \private
   void doArrayEnd(const MemBaseVector &vec) final
   {
     level--;
+    levelArray--;
     keys.pop_back();
 
     if (not fst) {
@@ -191,7 +193,7 @@ public:
       compact = true;
     string name = mem.getName(cth);
 
-    if (level == 1) {
+    if (levelArray == 0) {
       if (not selectField.empty())
         selectField += ",";
       selectField += "mt.";
@@ -273,6 +275,7 @@ private:
   ConvObjToString cth;
   bool fst = true;
   int level = 0;
+  int levelArray = 0;
   vector<string> tableName;
   vector<string> useName;
   vector<string> keys;

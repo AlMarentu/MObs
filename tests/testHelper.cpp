@@ -42,21 +42,21 @@ MOBS_ENUM_VAL(Colour, "green", "blue", "red", "yellow", "orange", "cyan");
 class SQLDBTestDesc : public mobs::SQLDBdescription {
 public:
 
-  virtual std::string tableName(const std::string &tabnam) { return u8"D." + tabnam;  }
+  virtual std::string tableName(const std::string &tabnam) override { return u8"D." + tabnam;  }
 
-  virtual std::string valueStmtIndex(size_t i) { return std::string(" ") + to_string(i);  }
+  virtual std::string valueStmtIndex(size_t i) override { return std::string(" ") + to_string(i);  }
 
-  virtual std::string valueStmtText(const std::string &tx, bool isNull) { return std::string(" ") + (isNull ? string("null"):mobs::to_squote(tx));  }
+  virtual std::string valueStmtText(const std::string &tx, bool isNull) override { return std::string(" ") + (isNull ? string("null"):mobs::to_squote(tx));  }
 
-  virtual std::string createStmtIndex(std::string name) {
+  virtual std::string createStmtIndex(std::string name) override {
     return "INT NOT NULL";
   }
 
-  virtual std::string createStmtText(const std::string &name, size_t len) {
+  virtual std::string createStmtText(const std::string &name, size_t len) override {
     return string("VARCHAR(") + to_string(len) + ")";
   }
 
-  virtual std::string createStmt(const mobs::MemberBase &mem, bool compact) {
+  virtual std::string createStmt(const mobs::MemberBase &mem, bool compact) override {
     std::stringstream res;
     mobs::MobsMemberInfo mi;
     mem.memInfo(mi);
@@ -84,7 +84,7 @@ public:
     return res.str();
   }
 
-  virtual std::string valueStmt(const mobs::MemberBase &mem, bool compact, bool increment, bool inWhere) {
+  virtual std::string valueStmt(const mobs::MemberBase &mem, bool compact, bool increment, bool inWhere) override {
     if (increment) {
       mobs::MobsMemberInfo mi;
       mem.memInfo(mi);
@@ -104,7 +104,7 @@ public:
   }
 
   // Einlesen der Elemente - Mocking-Test, die Sequenz entspricht der Abfrage aus GenerateSql
-  virtual void readValue(mobs::MemberBase &mem, bool compact) {
+  virtual void readValue(mobs::MemberBase &mem, bool compact) override {
     mobs::MobsMemberInfo mi;
     mem.memInfo(mi);
     if (mi.isUnsigned)
@@ -123,9 +123,9 @@ public:
       text = "{aa:2,bb:3,cc:4,col:\"green\"}";
   }
 
-  virtual size_t readIndexValue() { return 1; }
-  virtual void startReading() {}
-  virtual void finishReading() {}
+  virtual size_t readIndexValue(const std::string &name) override { return 1; }
+  virtual void startReading() override {}
+  virtual void finishReading() override {}
 
 };
 
