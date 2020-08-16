@@ -27,8 +27,7 @@ add_subdirectory(mobs)
 
 
 
-add_executable(db db.cpp)
-target_link_libraries(db mobs)
+
 
 add_executable(fileio fileio.cpp)
 target_link_libraries(fileio mobs)
@@ -74,25 +73,27 @@ if(BUILD_MONGO_INTERFACE)
     include_directories("/usr/local/include/libbson-1.0")
     include_directories("/usr/local/lib")
 
-    target_link_libraries(db ${LIBMONGOCXX_LIBRARIES})
-    target_link_libraries(db ${LIBBSONCXX_LIBRARIES})
+    set(DB_LIBS ${DB_LIBS} ${LIBMONGOCXX_LIBRARIES} ${LIBBSONCXX_LIBRARIES})
 endif()
 
 
 if(BUILD_MARIA_INTERFACE)
     find_library(mariadb mariadb)
-    target_link_libraries(db ${mariadb})
+    set(DB_LIBS ${DB_LIBS} ${mariadb})
 endif()
 
 if(BUILD_INFORMIX_INTERFACE)
 #    find_library(informix informix)
 #        MESSAGE(FATAL_ERROR "BOOM ${informix}")
     set(INFORMIXDIR /opt/IBM/Informix_Software_Bundle)
-    set(INFX_LIBS ixsql ixasf ixgen ixos ixgls ${INFORMIXDIR}/lib/esql/checkapi.o)
+    link_directories(${INFORMIXDIR}/lib ${INFORMIXDIR}/lib/esql)
+    set(DB_LIBS ${DB_LIBS} ixsql ixasf ixgen ixos ixgls ${INFORMIXDIR}/lib/esql/checkapi.o)
 
 #    add_link_options("LINKER:-rpath,${INFORMIXDIR}/lib/esql")
-    target_link_directories(db PUBLIC ${INFORMIXDIR}/lib ${INFORMIXDIR}/lib/esql)
-    target_link_libraries(db  ${INFX_LIBS})
 endif()
+
+add_executable(db db.cpp)
+target_link_libraries(db mobs)
+target_link_libraries(db ${DB_LIBS})
 
 
