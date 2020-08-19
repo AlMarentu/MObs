@@ -19,8 +19,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "helper.h"
-#include <sstream>
-#include <set>
 
 
 using namespace mobs;
@@ -42,8 +40,8 @@ string vecTableName(const mobs::MemBaseVector *v, const string &name) {
 class GenerateSqlJoin : virtual public ObjTravConst {
 public:
 
-  explicit GenerateSqlJoin(ConvObjToString c, SQLDBdescription &sqldBdescription) :
-          cth(c.exportPrefix().exportAltNames()), sqldb(sqldBdescription)  {}
+  explicit GenerateSqlJoin(const ConvObjToString& c, SQLDBdescription &sqlDbDescription) :
+          cth(c.exportPrefix().exportAltNames()), sqldb(sqlDbDescription)  {}
 
 
 
@@ -72,8 +70,8 @@ public:
       ObKey ok(cth, keys);
       obj.traverseKey(ok);
       tableName.push_back(masterName);
-      useName.push_back("mt");
-      for (auto k:keys) {
+      useName.emplace_back("mt");
+      for (const auto& k:keys) {
         if (not selectKeys.empty())
           selectKeys += ",";
         selectKeys += "mt.";
@@ -170,7 +168,7 @@ public:
       size_t last = useName.size() - 1;
       selectJoin += " left join ";
       selectJoin +=  useName[last] + " on ";
-      for (auto k:keys) {
+      for (auto const &k:keys) {
         if (fst)
           selectJoin += " and ";
         fst = true;
@@ -269,7 +267,7 @@ public:
   string selectWhere;
   string selectJoin;
   string masterName;
-  bool noJoin;  // ersetze joinGenerierung
+  bool noJoin = false;  // ersetze joinGenerierung
 
 private:
   ConvObjToString cth;
@@ -285,8 +283,9 @@ private:
 
 class ExtractSql : virtual public ObjTrav {
 public:
-  explicit ExtractSql(SQLDBdescription &s, ConvObjToString c) : current(nullptr, "", {}), cth(move(c.exportPrefix().exportAltNames())),
-                                                                sqldb(s) { }
+  explicit ExtractSql(SQLDBdescription &s, const ConvObjToString& c) : current(nullptr, "", {}),
+                                                                       cth(move(c.exportPrefix().exportAltNames())),
+                                                                       sqldb(s) { }
 
   bool doObjBeg(ObjectBase &obj) final
   {
@@ -367,7 +366,7 @@ public:
     sqldb.readValue(mem, compact);
   };
 
-  std::string keyPrefix; // = "mt."; ///< für master table
+//  std::string keyPrefix; // = "mt."; ///< für master table
 
   list<SqlGenerator::DetailInfo> detailVec;
 
@@ -385,7 +384,7 @@ private:
 class GenerateSql : virtual public ObjTravConst {
 public:
   enum Mode { Where, Fields, Values, Update, Create, FldVal, FldVal2 };
-  explicit GenerateSql(Mode m, SQLDBdescription &s, ConvObjToString c) : current(nullptr, "", {}), mode(m),
+  explicit GenerateSql(Mode m, SQLDBdescription &s, const ConvObjToString& c) : current(nullptr, "", {}), mode(m),
   cth(c.exportPrefix().exportAltNames()), sqldb(s) { }
 
   string delimiter() noexcept {  if (not fst) return mode == Where ? " and ": ","; fst = false; return string(); }
@@ -473,7 +472,7 @@ public:
 //      LOG(LM_DEBUG, "START VEC " << vec.getName(cth));
       key.push(true);
       // neuen Array-Namen hinten Liste anhängen
-      for (auto i:k) {
+      for (const auto &i:k) {
         string name = i.first;
         if (mode == Values) {
           res << delimiter() << sqldb.valueStmtIndex(i.second);
@@ -1159,12 +1158,12 @@ void SqlGenerator::readObject(const DetailInfo &di) {
 
 }
 
-void SqlGenerator::readObject(mobs::ObjectBase &obj) {
+void SqlGenerator::readObject(mobs::ObjectBase &o) {
   ExtractSql es(sqldb, mobs::ConvObjToString());
   DetailInfo di(nullptr, tableName(), {});
   es.current = di;
   sqldb.startReading();
-  obj.traverse(es);
+  o.traverse(es);
   sqldb.finishReading();
   detailVec.splice(detailVec.end(), es.detailVec);
 
@@ -1183,10 +1182,10 @@ std::string SqlGenerator::selectStatementArray(DetailInfo &di) {
 uint64_t SqlGenerator::getVersion() const {
   class GetVers  : virtual public mobs::ObjTravConst {
   public:
-    bool doObjBeg(const mobs::ObjectBase &obj) override { return true; }
-    void doObjEnd(const mobs::ObjectBase &obj) override {  }
-    bool doArrayBeg(const mobs::MemBaseVector &vec) override {  return false; }
-    void doArrayEnd(const mobs::MemBaseVector &vec) override { }
+    bool doObjBeg(const mobs::ObjectBase &) override { return true; }
+    void doObjEnd(const mobs::ObjectBase &) override {  }
+    bool doArrayBeg(const mobs::MemBaseVector &) override {  return false; }
+    void doArrayEnd(const mobs::MemBaseVector &) override { }
     void doMem(const mobs::MemberBase &mem) override {
       if (version < 0 and mem.isVersionField()) {
         MobsMemberInfo mi;
@@ -1205,7 +1204,7 @@ uint64_t SqlGenerator::getVersion() const {
   GetVers ok;
   ok.withVersionField = true;
   obj.traverseKey(ok);
-  return ok.version;
+  return static_cast<uint64_t>(ok.version);
 }
 
 std::string SqlGenerator::query(QueryMode queryMode, const std::string &where, const std::string &join) {
@@ -1320,7 +1319,7 @@ bool AuditTrail::doObjBeg(const ObjectBase &obj) {
     if (version < 0)
       act.objects.back().initialVersion.forceNull();
     else
-      act.objects.back().initialVersion(version);
+      act.objects.back().initialVersion(static_cast<const int &>(version));
     if (destroyMode)
       act.objects.back().destroy(true);
     else if (version == 0) {
