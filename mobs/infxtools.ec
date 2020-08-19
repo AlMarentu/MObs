@@ -34,7 +34,7 @@ EXEC SQL BEGIN DECLARE SECTION;
 EXEC SQL END DECLARE SECTION;
   static int n = 0;
   sprintf(conn, "con%d", ++n);
-  EXEC SQL connect to :db as :conn user :user using :pwd;
+  EXEC SQL connect to :db as :conn user :user using :pwd with concurrent transaction;
   int e = SQLCODE;
   if (e < 0)
     return e;

@@ -93,6 +93,7 @@ class SQLInformixdescription : public mobs::SQLDBdescription {
 public:
   explicit SQLInformixdescription(const string &dbName) : dbPrefix(dbName + ".") {
     changeTo_is_IfNull = false;
+    createWith_IfNotExists = true;
   }
 
   std::string tableName(const std::string &tabnam) override { return dbPrefix + tabnam;  }

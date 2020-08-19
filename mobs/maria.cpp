@@ -160,7 +160,7 @@ public:
   }
 
   void readValue(MemberBase &mem, bool compact) override {
-//    LOG(LM_DEBUG, "Read " << mem.name() << " " << string(fields[pos].name, fields[pos].name_length));
+//    LOG(LM_DEBUG, "Read " << mem.getName(ConvObjToString().exportAltNames()) << " " << string(fields[pos].name, fields[pos].name_length));
 //     IS_NUM(fields[pos].type)
     if ((*row)[pos]) {
       string value((*row)[pos], lengths[pos]);
