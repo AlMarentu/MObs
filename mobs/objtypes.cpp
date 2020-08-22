@@ -270,48 +270,36 @@ std::wstring to_wstring(const std::u16string &t) {
 
 template<>
 /// \private
-bool to_int64(int t, int64_t &i, int64_t &min, uint64_t &max)
-{ i = t; min = std::numeric_limits<int>::min(); max = std::numeric_limits<int>::max(); return true; }
+bool to_int64(int t, int64_t &i)
+{ i = t; return true; }
 template<>
 /// \private
-bool to_int64(short int t, int64_t &i, int64_t &min, uint64_t &max)
-{ i = t; min = std::numeric_limits<short int>::min(); max = std::numeric_limits<short int>::max(); return true; }
+bool to_int64(short int t, int64_t &i)
+{ i = t; return true; }
 template<>
 /// \private
-bool to_int64(long int t, int64_t &i, int64_t &min, uint64_t &max)
-{ i = t; min = std::numeric_limits<long int>::min(); max = std::numeric_limits<long int>::max(); return true; }
+bool to_int64(long int t, int64_t &i)
+{ i = t; return true; }
 template<>
 /// \private
-bool to_int64(long long int t, int64_t &i, int64_t &min, uint64_t &max)
-{ i = t; min = std::numeric_limits<long long int>::min(); max = std::numeric_limits<long long int>::max(); return true; }
+bool to_int64(long long int t, int64_t &i)
+{ i = t; return true; }
 template<>
 /// \private
-bool to_uint64(unsigned int t, uint64_t &u, uint64_t &max)
-{ u = t; max = std::numeric_limits<unsigned int>::max(); return true; }
+bool to_uint64(unsigned int t, uint64_t &u)
+{ u = t; return true; }
 template<>
 /// \private
-bool to_uint64(unsigned short int t, uint64_t &u, uint64_t &max)
-{ u = t; max = std::numeric_limits<unsigned short int>::max(); return true; }
+bool to_uint64(unsigned short int t, uint64_t &u)
+{ u = t; return true; }
 template<>
 /// \private
-bool to_uint64(unsigned long int t, uint64_t &u, uint64_t &max)
-{ u = t; max = std::numeric_limits<unsigned long int>::max(); return true; }
+bool to_uint64(unsigned long int t, uint64_t &u)
+{ u = t;  return true; }
 template<>
 /// \private
-bool to_uint64(unsigned long long int t, uint64_t &u, uint64_t &max)
-{ u = t; max = std::numeric_limits<unsigned long long int>::max(); return true; }
-template<>
-/// \private
-bool to_uint64(bool t, uint64_t &u, uint64_t &max)
-{ u = t ? 1:0; max = 1; return true; }
-template<>
-/// \private
-bool to_double(double t, double &d) { d = t; return true; }
-template<>
-/// \private
-bool to_double(float t, double &d) { d = t; return true; }
-//template<>
-//bool to_double(long double t, double &d) { d = t; return true; }
+bool to_uint64(unsigned long long int t, uint64_t &u)
+{ u = t; return true; }
 
 template<>
 /// \private
@@ -376,13 +364,6 @@ bool from_number(uint64_t u, bool &t) {
   t = u != 0;
   return true;
 }
-template<>
-/// \private
-bool from_number(double d, float &t) { t = d; return true; }
-template<>
-/// \private
-bool from_number(double d, double &t) { t = d; return true; }
-
 
 
 class ConvFromStrHintDefault : virtual public ConvFromStrHint {
@@ -406,14 +387,14 @@ const ConvFromStrHint &ConvFromStrHint::convFromStrHintExplizit = ConvFromStrHin
 
 void MobsMemberInfo::toLocalTime(struct ::tm &ts) const {
   std::chrono::system_clock::time_point tp{};
-  tp += std::chrono::microseconds(i64);
+  tp += std::chrono::microseconds(t64);
   time_t time = std::chrono::system_clock::to_time_t(tp);
   ::localtime_r(&time, &ts);
 }
 
 void MobsMemberInfo::toGMTime(struct ::tm &ts) const {
   std::chrono::system_clock::time_point tp{};
-  tp += std::chrono::microseconds(i64);
+  tp += std::chrono::microseconds(t64);
   time_t time = std::chrono::system_clock::to_time_t(tp);
   ::gmtime_r(&time, &ts);
 }
@@ -422,13 +403,76 @@ void MobsMemberInfo::fromLocalTime(tm &ts) {
   ts.tm_isdst = -1;
   std::time_t t = ::timelocal(&ts);
   std::chrono::system_clock::time_point tp = std::chrono::system_clock::from_time_t(t);
-  i64 = std::chrono::duration_cast<std::chrono::microseconds>(tp.time_since_epoch()).count();
+  setTime(std::chrono::duration_cast<std::chrono::microseconds>(tp.time_since_epoch()).count());
 }
 
 void MobsMemberInfo::fromGMTime(tm &ts) {
   std::time_t t = ::timegm(&ts);
   std::chrono::system_clock::time_point tp = std::chrono::system_clock::from_time_t(t);
-  i64 = std::chrono::duration_cast<std::chrono::microseconds>(tp.time_since_epoch()).count();
+  setTime(std::chrono::duration_cast<std::chrono::microseconds>(tp.time_since_epoch()).count());
+}
+
+void MobsMemberInfo::setTime(int64_t t) {
+  t64 = t;
+  isSigned = false;
+  isUnsigned = false;
+  isFloat = false;
+  // isTime muss explizit gesetzt werden;
+}
+
+void MobsMemberInfo::setInt(int64_t t) {
+  if (isFloat) {
+    d = double(t);
+    return;
+  }
+  if (isSigned) {
+    if ((t >= 0 and uint64_t(t) > max) or t < min)
+      throw runtime_error(u8"MobsMemberInfo int out of range");
+    i64 = t;
+  } else if (isUnsigned) {
+    if (t < 0 or uint64_t(t) > max or t < min)
+      throw runtime_error(u8"MobsMemberInfo int out of range");
+    u64 = uint64_t(t);
+  }
+  else
+     throw runtime_error(u8"MobsMemberInfo no int");
+}
+
+void MobsMemberInfo::setUInt(uint64_t t) {
+  if (isFloat) {
+    d = double(t);
+    return;
+  }
+  if (t > max)
+    throw runtime_error(u8"MobsMemberInfo uint out of range");
+  if (isSigned)
+    i64 = int64_t(t);
+  else if (isUnsigned)
+    u64 = t;
+  else
+    throw runtime_error(u8"MobsMemberInfo no int");
+}
+
+void MobsMemberInfo::setBool(bool t) {
+  if (isSigned)
+    i64 = t ? 1 : 0;
+  else if (isUnsigned)
+    u64 = t ? 1 : 0;
+  else
+    throw runtime_error(u8"MobsMemberInfo no bool");
+}
+
+void MobsMemberInfo::changeCompact(bool compact) {
+  if (not hasCompact)
+    return;
+  if (compact) {
+    isTime = false;
+    is_specialized = true;
+  } else {
+    is_specialized = false;
+    isUnsigned = false;
+    isSigned = false;
+  }
 }
 
 

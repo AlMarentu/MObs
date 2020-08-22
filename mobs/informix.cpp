@@ -111,7 +111,7 @@ public:
     std::stringstream res;
     MobsMemberInfo mi;
     mem.memInfo(mi);
-    double d;
+    mi.changeCompact(compact);
     if (mi.isTime and mi.granularity >= 86400000000)
       res << "DATE";
     else if (mi.isTime and mi.granularity >= 1000000)
@@ -128,7 +128,7 @@ public:
       res << "DATETIME YEAR TO FRACTION(5)";
     else if (mi.isUnsigned and mi.max == 1)
       res << "BOOLEAN"; //"SMALLINT";
-    else if (mem.toDouble(d))
+    else if (mi.isFloat)
       res << "FLOAT";
     else if (mem.is_chartype(mobs::ConvToStrHint(compact))) {
       if (mi.is_specialized and mi.size == 1)
@@ -213,9 +213,9 @@ public:
   std::string valueStmt(const MemberBase &mem, bool compact, bool increment, bool inWhere) override {
     if (fldCnt == 0)
       pos = 0;
-    double d;
     MobsMemberInfo mi;
     mem.memInfo(mi);
+    mi.changeCompact(compact);
     if (not descriptor or not buf)
     {
       if (mem.isNull())
@@ -229,7 +229,7 @@ public:
       }
       else if (mi.isTime) {
         MTime t;
-        if (not from_number(mi.i64, t))
+        if (not from_number(mi.t64, t))
           throw std::runtime_error("Time Conversion");
         return mobs::to_squote(to_string_ansi(t));
       }
@@ -264,7 +264,7 @@ public:
     }
     else if (mi.isTime) {
       MTime t;
-      if (not from_number(mi.i64, t))
+      if (not from_number(mi.t64, t))
         throw std::runtime_error("Time Conversion");
       std::string s = to_string_ansi(t, mobs::MF5);
       LOG(LM_DEBUG, "Informix SqlVar " << mem.name() << ": " << fldCnt -1 << "=" << s);
@@ -322,14 +322,14 @@ public:
       if (mem.isNull())
         e = rsetnull(sql_var.sqltype, sql_var.sqldata);
 
-    } else if (mem.toDouble(d)) {
-      LOG(LM_DEBUG, "Informix SqlVar " << mem.name() << ": " << fldCnt - 1 << "=" << d);
+    } else if (mi.isFloat) {
+      LOG(LM_DEBUG, "Informix SqlVar " << mem.name() << ": " << fldCnt - 1 << "=" << mi.d);
       sql_var.sqltype = SQLFLOAT;
       setBuffer(sql_var);
       if (mem.isNull())
         e = rsetnull(sql_var.sqltype, sql_var.sqldata);
       else
-        *(double *) (sql_var.sqldata) = d;
+        *(double *) (sql_var.sqldata) = mi.d;
     } else {
       std::string s = mem.toStr(mobs::ConvToStrHint(compact));
       LOG(LM_DEBUG, "Informix SqlVar " << mem.name() << ": " << fldCnt - 1 << "=" << s);
@@ -374,6 +374,7 @@ public:
     int e = 0;
     MobsMemberInfo mi;
     mem.memInfo(mi);
+    mi.changeCompact(compact);
     switch (col.sqltype) {
       case SQLCHAR:
       case SQLNCHAR:
@@ -412,59 +413,39 @@ public:
           throw informix_exception(u8"DateTime Conversion", e);
         LOG(LM_INFO, "DATETIME " << timebuf);
         MTime t;
-        ok = string2x(string(timebuf), t);
-        mi.i64 = t.time_since_epoch().count();
+        ok = string2x(string(timebuf), t) and mi.isTime;
+        mi.setTime(t.time_since_epoch().count());
         break;
       }
       case SQLBOOL:
-        if (mi.isUnsigned)
-          mi.u64 = *(uint8_t *) (col.sqldata);
-        else
-          mi.i64 = *(int8_t *) (col.sqldata);
+        mi.setInt(*(int8_t *) (col.sqldata));
         break;
       case SQLSMINT:
-        if (mi.isUnsigned)
-          mi.u64 = *(uint16_t *) (col.sqldata);
-        else
-          mi.i64 = *(int16_t *) (col.sqldata);
+        mi.setInt(*(int16_t *) (col.sqldata));
         break;
       case SQLINT:
       case SQLSERIAL:
-        if (mi.isUnsigned)
-          mi.u64 = *(uint32_t *) (col.sqldata);
-        else
-          mi.i64 = *(int32_t *) (col.sqldata);
+        mi.setInt(*(int32_t *) (col.sqldata));
         break;
       case SQLINFXBIGINT:
       case SQLBIGSERIAL:
-        if (mi.isUnsigned)
-          mi.u64 = *(int64_t *) (col.sqldata);
-        else
-          mi.i64 = *(int64_t *) (col.sqldata);
+        mi.setInt(*(int64_t *) (col.sqldata));
         break;
       case SQLSERIAL8:
       case SQLINT8: {
         bigint i;
         e = bigintcvifx_int8((const ifx_int8_t *) (col.sqldata), &i);
-        if (mi.isUnsigned)
-          mi.u64 = i;
-        else
-          mi.i64 = i;
+        mi.setInt(i);
         if (e)
           throw informix_exception(u8"INT8 Conversion", e);
         break;
       }
       case SQLFLOAT:
-      {
-        double d;
-        if (mem.toDouble(d)) {
-          ok = mem.fromDouble(*(double *) (col.sqldata));
-          if (ok)
-            return;
-        } else
+        if (mi.isFloat)
+          mi.d = *(double *) (col.sqldata);
+        else
           ok = false;
         break;
-      }
       case SQLTEXT:
       case SQLBYTES:
       default:
@@ -473,17 +454,12 @@ public:
 //    if (mi.isUnsigned and mi.max == 1) // bool
 //      ok = mem.fromUInt64(res == 0 ? 0 : 1);
 //    else
-    if (not ok)
-      ;
-    else if (mi.isSigned or mi.isTime)
-      ok = mem.fromInt64(mi.i64);
-    else if (mi.isUnsigned)
-      ok = mem.fromUInt64(mi.u64);
-    else  // TODO konvertierung über string versuchen
-      ok = false;
+    if (ok)
+      ok = mem.fromMemInfo(mi);
 
     if (not ok)
       throw runtime_error(u8"conversion error in " + mem.name());
+    // TODO konvertierung über string versuchen
   }
 
   void readValueText(const std::string &name, std::string &text, bool &null) override {
@@ -583,6 +559,7 @@ public:
           dbCon(std::move(dbi)), databaseName(std::move(dbName)), m_conNr(conNr) {
     static int n = 0;
     m_cursNr = ++n;
+    buf[0] = '\0';
   }
   ~InformixCursor() override {
     if (descPtr)

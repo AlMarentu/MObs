@@ -37,10 +37,6 @@ using MDate = std::chrono::time_point<std::chrono::system_clock, MDays>;
 
 /// \private
 template <> bool string2x(const std::string &str, MDate &t);
-/// \private
-template<> bool to_int64(MDate t, int64_t &i, int64_t &min, uint64_t &max);
-/// \private
-template<> bool from_number(int64_t i, MDate &t);
 
 
 /// Konvertier-Funktion \c MDate nach \c std::string im Format ISO8601
@@ -52,15 +48,16 @@ inline std::wstring to_wstring(MDate t) {
   return to_wstring(to_string(t));
 }
 
+
 /// \private
 template<>
-class StrConv<MDate> : public StrConvBase {
+class StrConv<MDate> : public StrConvBaseT<MDate> {
 public:
   /// \private
   static bool c_string2x(const std::string &str, MDate &t, const ConvFromStrHint &);
 
   /// \private
-  static bool c_wstring2x(const std::wstring &wstr, MDate &t, const ConvFromStrHint &);
+  static inline bool c_wstring2x(const std::wstring &wstr, MDate &t, const ConvFromStrHint &cth) { return c_string2x(mobs::to_string(wstr), t, cth); }
 
   /// \private
   static std::string c_to_string(const MDate &t, const ConvToStrHint &cth);
@@ -76,6 +73,24 @@ public:
 
   /// \private
   static inline MDate c_empty() { return MDate{}; }
+
+  /// \private
+  static inline uint64_t c_max() { return INT32_MAX; }
+
+  /// \private
+  static inline int64_t c_min() { return INT32_MIN; }
+
+  /// \private
+  static bool c_from_int(int64_t i, MDate &t);
+
+  /// \private
+  static bool c_to_int64(MDate t, int64_t &i);
+
+  /// \private
+  static bool c_from_mtime(int64_t i, MDate &t);
+
+  /// \private
+  static bool c_to_mtime(MDate t, int64_t &i);
 };
 
 
@@ -91,16 +106,18 @@ using MTime = std::chrono::time_point<std::chrono::system_clock, std::chrono::mi
  * @return true, wenn Umwandlung fehlerfrei
  */
 template <> bool string2x(const std::string &str, MTime &t);
-/// \private
-template<> bool to_int64(MTime t, int64_t &i, int64_t &min, uint64_t &max);
-/// \private
-template<> bool from_number(int64_t i, MTime &t);
 
 /// Konvertier-Funktion \c MTime nach \c std::wstring im Format ISO8601
 std::string to_string(MTime t);
 
 /// Konvertier-Funktion \c MTime nach \c std::string im Format ISO8601
 std::wstring to_wstring(MTime t);
+
+/// Konvertierung Mikrosekunden nach Epoche in MTime
+template<> bool from_number(int64_t , MTime &t);
+/// Konvertierung MTime nach Mikrosekunden nach Epoche
+template<> bool to_int64(MTime t, int64_t &i);
+
 
 /// Enums für to_string Methoden bei Typ MTime
 enum MTimeFract {MYear, MMonth, MDay, MHour, MMinute, MSecond, MF1, MF2, MF3, MF4, MF5, MF6};
@@ -132,13 +149,13 @@ std::string to_string_iso8601(MTime t, MTimeFract f = MF6);
 
 /// \private
 template<>
-class StrConv<MTime> : public StrConvBase {
+class StrConv<MTime> : public StrConvBaseT<MTime> {
 public:
   /// \private
   static bool c_string2x(const std::string &str, MTime &t, const ConvFromStrHint &);
 
   /// \private
-  static bool c_wstring2x(const std::wstring &wstr, MTime &t, const ConvFromStrHint &);
+  static inline bool c_wstring2x(const std::wstring &wstr, MTime &t, const ConvFromStrHint &cth) { return c_string2x(mobs::to_string(wstr), t, cth); }
 
   /// \private
   static std::string c_to_string(const MTime &t, const ConvToStrHint &cth);
@@ -154,6 +171,25 @@ public:
 
   /// \private
   static inline MTime c_empty() { return MTime{}; }
+
+  /// \private
+  static inline uint64_t c_max() { return INT64_MAX; }
+
+  /// \private
+  static inline int64_t c_min() { return INT64_MIN; }
+
+  /// \private
+  static bool c_from_int(int64_t i, MTime &t) { return c_from_mtime(i, t); }
+
+  /// \private
+  static bool c_to_int64(MTime t, int64_t &i) { return c_to_mtime(t, i); }
+
+  /// \private
+  static bool c_from_mtime(int64_t i, MTime &t);
+
+  /// \private
+  static bool c_to_mtime(MTime t, int64_t &i);
+
 };
 
 }

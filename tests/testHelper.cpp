@@ -60,12 +60,12 @@ public:
     std::stringstream res;
     mobs::MobsMemberInfo mi;
     mem.memInfo(mi);
-    double d;
+    mi.changeCompact(compact);
     if (mi.isTime and mi.granularity >= 86400000)
       res << "DATE";
     else if (mi.isTime)
       res << "DATETIME";
-    else if (mem.toDouble(d))
+    else if (mi.isFloat)
       res << "FLOAT";
     else if (mem.is_chartype(mobs::ConvToStrHint(compact))) {
       mobs::MemVarCfg c = mem.hasFeature(mobs::LengthBase);
@@ -88,6 +88,7 @@ public:
     if (increment) {
       mobs::MobsMemberInfo mi;
       mem.memInfo(mi);
+      mi.changeCompact(compact);
       if (mi.isUnsigned)
         return to_string(mi.u64 + 1);
       else if (mi.isSigned)
@@ -107,11 +108,14 @@ public:
   virtual void readValue(mobs::MemberBase &mem, bool compact) override {
     mobs::MobsMemberInfo mi;
     mem.memInfo(mi);
-    if (mi.isUnsigned)
-      mem.fromUInt64(1);
-    else if (mi.isSigned)
-      mem.fromInt64(2);
-    else if (mem.is_chartype(mobs::ConvToStrHint(compact)))
+    mi.changeCompact(compact);
+    if (mi.isUnsigned) {
+      mi.setUInt(1);
+      mem.fromMemInfo(mi);
+    } else if (mi.isSigned) {
+      mi.setInt(2);
+      mem.fromMemInfo(mi);
+    } else if (mem.is_chartype(mobs::ConvToStrHint(compact)))
       mem.fromStr("x", not compact ? mobs::ConvFromStrHint::convFromStrHintExplizit : mobs::ConvFromStrHint::convFromStrHintDflt);
   }
 

@@ -203,25 +203,6 @@ bool string2x(const std::string &str, MDate &t) {
   return true;
 }
 
-template<>
-bool to_int64(MDate t, int64_t &i, int64_t &min, uint64_t &max) {
-//  std::chrono::system_clock::time_point tp = std::chrono::system_clock::from_time_t(t);
-  i = std::chrono::duration_cast<std::chrono::microseconds>(t.time_since_epoch()).count();
-  min = INT32_MIN;
-  max = INT32_MAX;
-//  std::chrono::system_clock::time_point tp{};
-//  tp += std::chrono::milliseconds(i64);
-  return true;
-}
-
-template<>
-bool from_number(int64_t i, MDate &t) {
-  std::chrono::system_clock::time_point tp{}; // sollte genau auf "epoch" stehen
-  tp += std::chrono::microseconds(i);
-  t = std::chrono::time_point_cast<MDays>(tp);
-  return true;
-}
-
 std::string to_string(MDate t) {
   std::stringstream s;
   struct tm ts{};
@@ -231,28 +212,54 @@ std::string to_string(MDate t) {
   return s.str();
 }
 
-
 std::wstring StrConv<MDate>::c_to_wstring(const MDate &t, const ConvToStrHint &cth) {
-  if (cth.compact()) return std::to_wstring(t.time_since_epoch().count());
+  if (cth.compact())
+    return std::to_wstring(t.time_since_epoch().count());
   return to_wstring(t);
 }
 
 std::string StrConv<MDate>::c_to_string(const MDate &t, const ConvToStrHint &cth) {
-  if (cth.compact()) return std::to_string(t.time_since_epoch().count());
+  if (cth.compact())
+    return std::to_string(t.time_since_epoch().count());
   return to_string(t);
 }
 
-bool StrConv<MDate>::c_string2x(const std::string &str, MDate &t, const ConvFromStrHint &) {
-  return mobs::string2x(str, t);
+bool StrConv<MDate>::c_string2x(const std::string &str, MDate &t, const ConvFromStrHint &cfh) {
+  if (cfh.acceptExtended()) {
+    if (mobs::string2x(str, t))
+      return true;
+  }
+  if (not cfh.acceptCompact())
+    return false;
+  int i;
+  if (not mobs::string2x(str, i))
+    return false;
+  return c_from_int(i, t);
 }
 
-bool StrConv<MDate>::c_wstring2x(const std::wstring &wstr, MDate &t, const ConvFromStrHint &) {
-  return mobs::string2x(mobs::to_string(wstr), t);
+bool StrConv<MDate>::c_from_int(int64_t i, MDate &t) {
+  std::chrono::system_clock::time_point tp{}; // sollte genau auf "epoch" stehen
+  tp += MDays(i);
+  t = std::chrono::time_point_cast<MDays>(tp);
+  return true;
 }
 
+bool StrConv<MDate>::c_to_int64(MDate t, int64_t &i) {
+  i = t.time_since_epoch().count();
+  return true;
+}
 
+bool StrConv<MDate>::c_from_mtime(int64_t i, MDate &t) {
+  std::chrono::system_clock::time_point tp{}; // sollte genau auf "epoch" stehen
+  tp += std::chrono::microseconds(i);
+  t = std::chrono::time_point_cast<MDays>(tp);
+  return true;
+}
 
-
+bool StrConv<MDate>::c_to_mtime(MDate t, int64_t &i) {
+  i = std::chrono::duration_cast<std::chrono::microseconds>(t.time_since_epoch()).count();
+  return true;
+}
 
 
 template<>
@@ -268,22 +275,8 @@ bool string2x(const std::string &str, MTime &t) {
   return false;
 }
 
-template<>
-bool to_int64(MTime t, int64_t &i, int64_t &min, uint64_t &max) {
-  i = std::chrono::duration_cast<std::chrono::microseconds>(t.time_since_epoch()).count();
-  min = INT64_MIN;
-  max = INT64_MAX;
 
-  return true;
-}
 
-template<>
-bool from_number(int64_t i, MTime &t) {
-  std::chrono::system_clock::time_point tp{}; // sollte genau auf "epoch" stehen
-  tp += std::chrono::microseconds (i);
-  t = std::chrono::time_point_cast<std::chrono::microseconds>(tp);
-  return true;
-}
 
 std::string to_string_iso8601(MTime t, MTimeFract f) {
   static const char *fmt[] = {"%Y", "%Y-%m", "%F", "%FT%H", "%FT%H:%M", "%FT%T", "%FT%T", "%FT%T", "%FT%T", "%FT%T", "%FT%T", "%FT%T"};
@@ -359,22 +352,55 @@ std::wstring to_wstring(MTime t) {
   return to_wstring(to_string(t));
 }
 
+template<>
+bool from_number(int64_t i, MTime &t) {
+  return StrConv<MTime>::c_from_mtime(i, t);
+}
+
+template<>
+bool to_int64(MTime t, int64_t &i) {
+  i = t.time_since_epoch().count();
+  return true;
+}
+
 std::wstring StrConv<MTime>::c_to_wstring(const MTime &t, const ConvToStrHint &cth) {
-  if (cth.compact()) return std::to_wstring(t.time_since_epoch().count());
+  if (cth.compact())
+    return std::to_wstring(t.time_since_epoch().count());
   return to_wstring(t);
 }
 
 std::string StrConv<MTime>::c_to_string(const MTime &t, const ConvToStrHint &cth) {
-  if (cth.compact()) return std::to_string(t.time_since_epoch().count());
+  if (cth.compact())
+    return std::to_string(t.time_since_epoch().count());
   return to_string(t);
 }
 
-bool StrConv<MTime>::c_string2x(const std::string &str, MTime &t, const ConvFromStrHint &) {
-  return mobs::string2x(str, t);
+bool StrConv<MTime>::c_string2x(const std::string &str, MTime &t, const ConvFromStrHint &cfh) {
+  if (cfh.acceptExtended()) {
+    if (mobs::string2x(str, t))
+      return true;
+  }
+  if (not cfh.acceptCompact())
+    return false;
+  int64_t i;
+  if (not mobs::string2x(str, i))
+    return false;
+  return c_from_int(i, t);
 }
 
-bool StrConv<MTime>::c_wstring2x(const std::wstring &wstr, MTime &t, const ConvFromStrHint &) {
-  return mobs::string2x(mobs::to_string(wstr), t);
+
+bool StrConv<MTime>::c_from_mtime(int64_t i, MTime &t) {
+  std::chrono::system_clock::time_point tp{}; // sollte genau auf "epoch" stehen
+  tp += std::chrono::microseconds (i);
+  t = std::chrono::time_point_cast<std::chrono::microseconds>(tp);
+  return true;
 }
+
+bool StrConv<MTime>::c_to_mtime(MTime t, int64_t &i) {
+  i = std::chrono::duration_cast<std::chrono::microseconds>(t.time_since_epoch()).count();
+  return true;
+}
+
+
 
 }

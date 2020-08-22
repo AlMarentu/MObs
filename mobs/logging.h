@@ -75,8 +75,10 @@ void logMessage(loglevel l, const std::string &message);
 #define __FILE_NAME__ __FILE__
 #endif
 
+/// \brief Erzeugt eine Log-Meldung als stream und wirft sie als runtime-error.
+#define THROW(x) do { std::stringstream s; s << __FILE_NAME__ << ':' << __LINE__ << " " << std::boolalpha << x; throw runtime_error(s.str()); } while(false)
 
-/// \brief Erzeugt eine Logmeldung aud stderr.
+/// \brief Erzeugt eine Log-Meldung auf stderr.
 #define LOG(l,x) do { std::stringstream ___s___; ___s___ << __FILE_NAME__ << ':' << __LINE__ << " " << std::boolalpha << x; logging::logMessage(l, ___s___.str()); } while(false)
 
 

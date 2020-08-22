@@ -72,7 +72,7 @@ public:
     std::stringstream res;
     MobsMemberInfo mi;
     mem.memInfo(mi);
-    double d;
+    mi.changeCompact(compact);
     if (mi.isTime and mi.granularity >= 86400000000)
       res << "DATE";
     else if (mi.isTime and mi.granularity >= 1000000)
@@ -91,7 +91,7 @@ public:
       res << "DATETIME(6)";
     else if (mi.isUnsigned and mi.max == 1)
       res << "TINYINT";
-    else if (mem.toDouble(d))
+    else if (mi.isFloat)
       res << "FLOAT";
     else if (mem.is_chartype(mobs::ConvToStrHint(compact))) {
       if (mi.is_specialized and mi.size == 1)
@@ -123,6 +123,7 @@ public:
   std::string valueStmt(const MemberBase &mem, bool compact, bool increment, bool inWhere) override {
     MobsMemberInfo mi;
     mem.memInfo(mi);
+    mi.changeCompact(compact);
     if (increment) {
       if (mi.isUnsigned) {
         if (mi.u64 == mi.max)
@@ -166,6 +167,7 @@ public:
       string value((*row)[pos], lengths[pos]);
       MobsMemberInfo mi;
       mem.memInfo(mi);
+      mi.changeCompact(compact);
       bool ok = true;
       if (mi.isTime and mi.granularity >= 86400000) {
         std::istringstream s(value);
@@ -174,7 +176,7 @@ public:
         ok = not s.fail();
         if (ok) {
           mi.fromLocalTime(t);
-          ok = mem.fromInt64(mi.i64);
+          ok = mem.fromMemInfo(mi);
         }
       } else if (mi.isTime) {
         ok = mem.fromStr(value, not compact ? ConvFromStrHint::convFromStrHintExplizit : ConvFromStrHint::convFromStrHintDflt);
@@ -200,9 +202,10 @@ public:
         if (ok)
           ok = mem.fromInt64(mi.i64);
 #endif
-      }  else if (mi.isUnsigned and mi.max == 1) // bool
-        ok = mem.fromUInt64(value == "0" ? 0 : 1);
-      else //if (mem.is_chartype(mobs::ConvToStrHint(compact)))
+      } else if (mi.isUnsigned and mi.max == 1) {// bool
+        mi.u64 = value == "0" ? 0 : 1;
+        ok = mem.fromMemInfo(mi);
+      } else //if (mem.is_chartype(mobs::ConvToStrHint(compact)))
         ok = mem.fromStr(value, not compact ? ConvFromStrHint::convFromStrHintExplizit : ConvFromStrHint::convFromStrHintDflt);
 
       if (not ok)

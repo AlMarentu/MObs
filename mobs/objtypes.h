@@ -79,7 +79,7 @@ static enum typ toEnum(size_t pos) { \
 
 /// Deklaration der Ausgabewerte zu einem \c MOBS_ENUM_DEF
 #define MOBS_ENUM_VAL(typ, ... ) \
-class typ##StrEnumConv : public mobs::StrConvBase { \
+class typ##StrEnumConv : public mobs::StrConvBaseT<typ> { \
 public: \
   static std::string toStr(size_t pos) { \
     static const std::vector<std::string> v = { __VA_ARGS__ }; \
@@ -109,6 +109,8 @@ public: \
   static inline bool c_is_chartype(const mobs::ConvToStrHint &cth) { return not cth.compact(); } \
   static inline bool c_is_mobsEnmum() { return true; } \
   static inline typ c_empty() { return mobsEnum_##typ##_define::toEnum(0); } \
+  static inline bool c_from_uint(uint64_t u, typ &t) { t = typ(u); return true; } \
+  static inline uint64_t c_max() { return INT_MAX; } \
 }
 
 
@@ -594,21 +596,13 @@ protected:
 ///Template für Hilfsfunktion zum Konvertieren eines Datentyps in einen unsigned int
 /// @param t zu wandelnder Typ
 /// @param u Ergebnisrückgabe als Zahl
-/// @param max Rückgabe des maximalen Wertes zu diesem Typ
 /// \return true wenn Konvertierung möglich
-template<typename T> inline bool to_uint64(T t, uint64_t &u, uint64_t &max) { return false; }
+template<typename T> inline bool to_uint64(T t, uint64_t &u) { return false; }
 ///Template für Hilfsfunktion zum Konvertieren eines Datentyps in einen signed int
 /// @param t zu wandelnder Typ
 /// @param i Ergebnisrückgabe als Zahl
-/// @param min Rückgabe des minimalen Wertes zu diesem Typ
-/// @param max Rückgabe des maximalen Wertes zu diesem Typ
 /// \return true wenn Konvertierung möglich
-template<typename T> inline bool to_int64(T t, int64_t &i, int64_t &min, uint64_t &max) { return false; }
-///Template für Hilfsfunktion zum Konvertieren eines Datentyps in einen double
-/// @param t zu wandelnder Typ
-/// @param d Ergebnisrückgabe als Zahl
-/// \return true wenn Konvertierung möglich
-template<typename T> inline bool to_double(T t, double &d) { return false; }
+template<typename T> inline bool to_int64(T t, int64_t &i) { return false; }
 ///Template für Hilfsfunktion zum Konvertieren eines eines \c int in einen Typ t
 /// \return true wenn Konvertierung möglich
 template<typename T> inline bool from_number(int64_t, T &t) { return false; }
@@ -620,18 +614,14 @@ template<typename T> inline bool from_number(uint64_t, T &t) { return false; }
 template<typename T> inline bool from_number(double, T &t) { return false; }
 
 
-template<> bool to_int64(int t, int64_t &i, int64_t &min, uint64_t &max);
-template<> bool to_int64(short int t, int64_t &i, int64_t &min, uint64_t &max);
-template<> bool to_int64(long int t, int64_t &i, int64_t &min, uint64_t &max);
-template<> bool to_int64(long long int t, int64_t &i, int64_t &min, uint64_t &max);
-template<> bool to_uint64(unsigned int t, uint64_t &u, uint64_t &max);
-template<> bool to_uint64(unsigned short int t, uint64_t &u, uint64_t &max);
-template<> bool to_uint64(unsigned long int t, uint64_t &u, uint64_t &max);
-template<> bool to_uint64(unsigned long long int t, uint64_t &u, uint64_t &max);
-template<> bool to_uint64(bool t, uint64_t &u, uint64_t &max);
-template<> bool to_double(double t, double &d);
-template<> bool to_double(float t, double &d);
-//template<> bool to_double(long double t, double &d) { d = t; return true; }
+template<> bool to_int64(int t, int64_t &i);
+template<> bool to_int64(short int t, int64_t &i);
+template<> bool to_int64(long int t, int64_t &i);
+template<> bool to_int64(long long int t, int64_t &i);
+template<> bool to_uint64(unsigned int t, uint64_t &u);
+template<> bool to_uint64(unsigned short int t, uint64_t &u);
+template<> bool to_uint64(unsigned long int t, uint64_t &u);
+template<> bool to_uint64(unsigned long long int t, uint64_t &u);
 template<> bool from_number(int64_t, int &t);
 template<> bool from_number(int64_t, short int &t);
 template<> bool from_number(int64_t, long int &t);
@@ -641,8 +631,6 @@ template<> bool from_number(uint64_t, unsigned short int &t);
 template<> bool from_number(uint64_t, unsigned long int &t);
 template<> bool from_number(uint64_t, unsigned long long int &t);
 template<> bool from_number(uint64_t, bool &t);
-template<> bool from_number(double, float &t);
-template<> bool from_number(double, double &t);
 
 /// Infos zum aktuellen Wert, wenn dieser als Zahl darstellbar ist.
 ///
@@ -652,16 +640,20 @@ class MobsMemberInfo {
 public:
   bool isUnsigned = false; ///< hat Wert von typ \c signed, i64, min und max sind gesetzt
   bool isSigned = false; ///< wht Wert vom Typ \c unsigned, u64 und max sind gesetzt
+  bool isFloat = false; ///< wht Wert vom Typ \c Fließkommazahl, d ist gesetzt
+  bool isTime = false; ///< Wert ist Millisekunde seit Unix-Epoche i64 ist gesetzt
+  bool isEnum = false; ///<  Wert ist ein enum -> besser als Klartext darstellen \see acceptExtended
+  bool is_specialized = false; ///< is_specialized aus std::numeric_limits
+  bool isBlob = false; ///< Binär-Daten-Objekt
+  bool hasCompact = false; ///< hat member Compact-Modus
   int64_t i64 = 0; ///< Inhalt des Wertes wenn signed (unabhängig von \c isNull)
   uint64_t u64 = 0; ///< Inhalt des Wertes wenn unsigned (unabhängig von \c isNull)
+  int64_t t64 = 0; ///< Inhalt des Wertes wenn isTime in Mikrosekunden seit Epoche (unabhängig von \c isNull)
   int64_t min = 0; ///< Minimalwert des Datentyps
   uint64_t max = 0; ///< Maximalwert des Datentyps
   uint64_t granularity = 0; ///< Körnung des Datentyps nur bei \c isTime; 1 = Mikrosekunden
+  double d = 0.0;
   unsigned int size = 0; ///< sizeof wenn is_specialized
-  bool isEnum = false; ///<  Wert ist ein enum -> besser als Klartext darstellen \see acceptExtended
-  bool isTime = false; ///< Wert ist Millisekunde seit Unix-Epoche i64 ist gesetzt
-  bool is_specialized = false; ///< is_specialized aus std::numeric_limits
-  bool isBlob = false; ///< Binär-Daten-Objekt
   /// fülle ein Time-Struct mit local time (nur wenn isTime == true)
   void toLocalTime(struct ::tm &ts) const;
   /// fülle ein Time-Struct mit gmt (nur wenn isTime == true)
@@ -670,6 +662,19 @@ public:
   void fromLocalTime(struct ::tm &ts);
   /// setze i64 aus einem Time-Struct mit gmt (nur wenn isTime == true)
   void fromGMTime(struct ::tm &ts);
+  /// setzte Zeit-Wert in Mikrosekunden
+  void setTime(int64_t t);
+  /// setze Int-Wert
+  /// \throw runtime_error, wenn out of range oder kein int
+  void setInt(int64_t t);
+  /// setze Int-Wert
+  /// \throw runtime_error, wenn out of range oder kein int
+  void setUInt(uint64_t t);
+  /// setze Bool-Wert
+  /// \throw runtime_error, wenn kein bool
+  void setBool(bool t);
+  /// passt die Info entsprechen den compact-Mode an
+  void changeCompact(bool compact);
 
 };
 
@@ -692,14 +697,53 @@ public:
   static inline int64_t c_min() { return 0; }
 };
 
+/// Basis der Konvertierungs-Klasse Typabhängig für Serialisierung von und nach std::string
+template <typename T>
+class StrConvBaseT : public StrConvBase {
+public:
+  /// Angabe, ob die Ausgabe als Text erfolgt (quoting, escaping nötig)
+  static inline bool c_is_chartype(const ConvToStrHint &) { return true; }
+  /// zeigt an, ob spezialisierter Typ vorliegt (\c \<limits>)
+  static inline bool c_is_specialized() { return false; }
+  /// zeigt an, ob des Element ein binäres Datenobjekt ist
+  static inline bool c_is_blob() { return false; }
+  /// zeigt an, ob des Element ein MOBSENUM ist
+  static inline bool c_is_mobsEnum() { return false; }
+  /// Körnung des Datentyps wenn es ein Date-Typ ist, \c 0 sonst
+  static inline uint64_t c_time_granularity() { return 0; }
+  /// \private
+  static inline uint64_t c_max() { return 0; }
+  /// \private
+  static inline int64_t c_min() { return 0; }
+  /// liefert eine \e leere Variable die zum löschen oder Initialisieren einer Membervariablen verwendet wird
+  /// \see clear()
+  static inline T c_empty() { return T(); }
+  /// Einlesen von int_64_t
+  static bool c_from_int(int64_t i, T &t) { return false; }
+  /// Einlesen von int_64_t
+  static bool c_from_uint(uint64_t u, T &t) { return false; }
+  /// Einlesen von double
+  static bool c_from_double(double d, T &t) { return false; }
+  /// Wandeln in double
+  static bool c_to_double(T t, double &) { return false; }
+  /// Wandeln in uint64
+  static bool c_to_uint64(T t, uint64_t &) { return false; }
+  /// Wandeln in int64
+  static bool c_to_int64(T t, int64_t &) { return false; }
+  /// Wandeln in MTime
+  static bool c_from_mtime(int64_t i, T &t) { return false; }
+  /// Einlesen von MTime
+  static bool c_to_mtime(T t, int64_t &) { return false; }
+};
+
 template <typename T>
 /// Standard Konvertierungs-Klasse für Serialisierung von und nach std::string
-class StrConv : public StrConvBase {
+class StrConv : public StrConvBaseT<T> {
 public:
   /// liest eine Variable aus einem \c std::string
   static inline bool c_string2x(const std::string &str, T &t, const ConvFromStrHint &) { return mobs::string2x(str, t); }
   /// liest eine Variable aus einem \c std::wstring
-  static inline bool c_wstring2x(const std::wstring &wstr, T &t, const ConvFromStrHint &) { return mobs::string2x(mobs::to_string(wstr), t); }
+  static inline bool c_wstring2x(const std::wstring &wstr, T &t, const ConvFromStrHint &cth) { return c_string2x(mobs::to_string(wstr), t, cth); }
   /// Wandelt eine Variable in einen \c std::string um
   static inline std::string c_to_string(const T &t, const ConvToStrHint &) { return to_string(t); };
   /// Wandelt eine Variable in einen \c std::wstring um
@@ -707,17 +751,87 @@ public:
 //  static inline bool c_blob_ref(const T &t, const char *&ptr, size_t &sz) { return false; }
   /// Angabe, ob die Ausgabe als Text erfolgt (quoting, escaping nötig)
   static inline bool c_is_chartype(const ConvToStrHint &) { return mobschar(T()); }
-  /// zeigt an, ob spezialisierter Typ vorliegt (\c \<limits>)
-  static inline bool c_is_specialized() { return std::numeric_limits<T>::is_specialized; }
-  /// liefert eine \e leere Variable die zum löschen oder Initialisieren einer Membervariablen verwendet wird
-  /// \see clear()
-  static inline T c_empty() { return T(); }
-
+  /// Größter möglicher Wert
+  static inline uint64_t c_max() { uint64_t u; int64_t i; if (c_to_int64(std::numeric_limits<T>::max(), i)) return uint64_t(i);
+                                   return c_to_uint64(std::numeric_limits<T>::max(), u) ? u : 0; }
+  /// Kleinster möglicher Wert
+  static inline int64_t c_min() { uint64_t u; int64_t i; if (c_to_int64(std::numeric_limits<T>::min(), i)) return i;
+                                  return c_to_uint64(std::numeric_limits<T>::min(), u) ? int64_t(u) : 0; }
+  /// Wandeln in uint64
+  static inline bool c_to_uint64(T t, uint64_t &u) { return to_uint64(t, u); }
+  /// Wandeln in int64
+  static inline bool c_to_int64(T t, int64_t &i) { return to_int64(t, i); }
+  /// Einlesen von int_64_t
+  static inline bool c_from_int(int64_t i, T &t) { return from_number(i, t); }
+  /// Einlesen von int_64_t
+  static inline bool c_from_uint(uint64_t u, T &t) { return from_number(u, t); }
 };
 
 template <>
 /// \private
-class StrConv<std::vector<u_char>> : public StrConvBase {
+class StrConv<bool> : public StrConvBaseT<bool> {
+public:
+  /// \private
+  static inline bool c_string2x(const std::string &str, bool &t, const ConvFromStrHint &) { return mobs::string2x(str, t); }
+  /// \private
+  static inline bool c_wstring2x(const std::wstring &wstr, bool &t, const ConvFromStrHint &cth) { return c_string2x(mobs::to_string(wstr), t, cth); }
+  /// \private
+  static inline std::string c_to_string(const bool &t, const ConvToStrHint &) { return to_string(t); };
+  /// \private
+  static inline std::wstring c_to_wstring(const bool &t, const ConvToStrHint &) { return to_wstring(t); };
+  /// \private
+  static inline bool c_is_chartype(const ConvToStrHint &) { return false; }
+  /// \private
+  static inline uint64_t c_max() { return 1; }
+  /// \private
+  static inline bool c_to_uint64(bool t, uint64_t &u) { u = t ? 1:0; return true; }
+  /// \private
+  static inline bool c_from_uint(uint64_t u, bool &t) { t = (u != 0); return true; }
+};
+
+template <>
+/// \private
+class StrConv<float> : public StrConvBaseT<float> {
+public:
+  /// \private
+  static inline bool c_string2x(const std::string &str, float &t, const ConvFromStrHint &) { return mobs::string2x(str, t); }
+  /// \private
+  static inline bool c_wstring2x(const std::wstring &wstr, float &t, const ConvFromStrHint &cth) { return c_string2x(mobs::to_string(wstr), t, cth); }
+  /// \private
+  static inline std::string c_to_string(const float &t, const ConvToStrHint &) { return to_string(t); };
+  /// \private
+  static inline std::wstring c_to_wstring(const float &t, const ConvToStrHint &) { return to_wstring(t); };
+  /// \private
+  static inline bool c_is_chartype(const ConvToStrHint &) { return false; }
+  /// \private
+  static inline bool c_to_double(float t, double &d) { d = t; return true; }
+  /// \private
+  static inline bool c_from_double(double d, float &t) { t = d; return true; }
+};
+
+template <>
+/// \private
+class StrConv<double> : public StrConvBaseT<double> {
+public:
+  /// \private
+  static inline bool c_string2x(const std::string &str, double &t, const ConvFromStrHint &) { return mobs::string2x(str, t); }
+  /// \private
+  static inline bool c_wstring2x(const std::wstring &wstr, double &t, const ConvFromStrHint &cth) { return c_string2x(mobs::to_string(wstr), t, cth); }
+  /// \private
+  static inline std::string c_to_string(const double &t, const ConvToStrHint &) { return to_string(t); };
+  /// \private
+  static inline std::wstring c_to_wstring(const double &t, const ConvToStrHint &) { return to_wstring(t); };
+  /// \private
+  static inline bool c_is_chartype(const ConvToStrHint &) { return false; }
+  /// \private
+  static inline bool c_to_double(double t, double &d) { d = t; return true; }
+  /// \private
+  static inline bool c_from_double(double d, double &t) { t = d; return true; }
+};
+
+template <>
+/// \private
+class StrConv<std::vector<u_char>> : public StrConvBaseT<std::vector<u_char>> {
 public:
   /// \private
   static bool c_string2x(const std::string &str, std::vector<u_char> &t, const ConvFromStrHint &);
@@ -728,14 +842,12 @@ public:
   /// \private
   static std::wstring c_to_wstring(const std::vector<u_char> &t, const ConvToStrHint &);
   /// \private
-  static inline  std::vector<u_char> c_empty() { return std::vector<u_char>(); }
-  /// \private
   static inline bool c_is_blob() { return true; }
 };
 
 template <typename T>
 /// Konvertierungs-Klasse für enums mit Ein-/Ausgabe als \c int
-class StrIntConv : public StrConvBase {
+class StrIntConv : public StrConvBaseT<T> {
 public:
   /// \private
   static inline bool c_string2x(const std::string &str, T &t, const ConvFromStrHint &) { int i; if (not mobs::string2x(str, i)) return false; t = T(i); return true; }

@@ -79,10 +79,6 @@ inline double operator-(UxTime t1, UxTime t2) {return ::difftime(t1.toUxTime(), 
 
 /// \private
 template <> bool string2x(const std::string &str, UxTime &t);
-/// \private
-template<> bool to_int64(UxTime t, int64_t &i, int64_t &min, uint64_t &max);
-/// \private
-template<> bool from_number(int64_t, UxTime &t);
 
 /// Konvertier-Funktion \c UxTime nach \c std::string im Format ISO8601
 inline std::string to_string(UxTime t) {
@@ -96,12 +92,12 @@ inline std::wstring to_wstring(UxTime t) {
 
 template <>
 /// Konvertiertungs-Klasse für \c UxTime um sie mit Mobs verwenden zu können
-class StrConv <UxTime>  : public StrConvBase {
+class StrConv <UxTime>  : public StrConvBaseT<UxTime> {
 public:
   /// \private
-  static inline bool c_string2x(const std::string &str, UxTime &t, const ConvFromStrHint &) { return mobs::string2x(str, t); }
+  static bool c_string2x(const std::string &str, UxTime &t, const ConvFromStrHint &);
   /// \private
-  static inline bool c_wstring2x(const std::wstring &wstr, UxTime &t, const ConvFromStrHint &) { return mobs::string2x(mobs::to_string(wstr), t); }
+  static inline bool c_wstring2x(const std::wstring &wstr, UxTime &t, const ConvFromStrHint &cth) { return c_string2x(mobs::to_string(wstr), t, cth); }
   /// \private
   static inline std::string c_to_string(const UxTime &t, const ConvToStrHint &cth) { if (cth.compact()) return std::to_string(t.toUxTime()); return to_string(t); };
   /// \private
@@ -111,9 +107,20 @@ public:
   /// \private
   static inline uint64_t c_time_granularity() { return 1000000; } // returning Seconds
   /// \private
-  static inline UxTime c_empty() { return UxTime(); }
+  static inline uint64_t c_max() { return std::numeric_limits<time_t>::max(); }
+  /// \private
+  static inline int64_t c_min() { return std::numeric_limits<time_t>::min(); }
+  /// \private
+  static bool c_from_int(int64_t i, UxTime &t);
+  /// \private
+  static inline bool c_to_int64(UxTime t, int64_t &i) { i = t.toUxTime(); return true; }
+  /// \private
+  static bool c_from_mtime(int64_t i, UxTime &t) { t = UxTime(time_t(i / c_time_granularity())); return true; }
+  /// \private
+  static bool c_to_mtime(UxTime t, int64_t &i) { i = t.toUxTime() * c_time_granularity(); return true; }
+
 };
-  
+
 
 }
 

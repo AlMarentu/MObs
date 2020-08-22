@@ -298,17 +298,10 @@ public:
   virtual bool fromStr(const std::string &s, const ConvFromStrHint &) = 0;
   /// Versuch, die  Variable aus einem \c std::wstring einzulesen
   virtual bool fromStr(const std::wstring &s, const ConvFromStrHint &) = 0;
-  /// Versuch, die  Variable aus einem \c uint64_t einzulesen
-  virtual bool fromUInt64(uint64_t) = 0;
-  /// Versuch, die Variable aus einem \c int64_t einzulesen
-  virtual bool fromInt64(int64_t) = 0;
-  /// Versuch, die Variable aus einem \c double einzulesen
-  virtual bool fromDouble(double) = 0;
   /// hole detaillierte Informatiom zu einer Membervariablen /see MobsMemberInfo
   virtual void memInfo(MobsMemberInfo &i) const = 0;
-  /// lese den Inhalt einer Fließkommazahl; liefert true, wenn es eine Fließkommazahl ist
-  virtual bool toDouble(double &d) const = 0;
-
+  /// Versuch Variable aus Meminfo auszulesen (isFloat/isSigned/isUnsigned/isTime)
+  virtual bool fromMemInfo(const MobsMemberInfo &i) = 0;
   /// natives Kopieren einer Member-Variable
   /// \return true, wenn kopieren erfolgreich (Typ-Gleichheit beider Elemente)
   virtual bool doCopy(const MemberBase *other) = 0;
@@ -366,7 +359,7 @@ private:
 ///
 /// Bitte als Makro MemVarVector oder MemVector verwenden
 /// \see MemVarVector
-/// \see MemVector
+/// \see MemVector
 class MemBaseVector : public NullValue {
 public:
   friend class ObjectBase;
@@ -688,17 +681,19 @@ public:
   void fromStrExplizit(const std::string &sin)  { if (not fromStr(sin, ConvFromStrHint::convFromStrHintExplizit)) throw std::runtime_error("fromStrExplizit input error"); }
   /// Einlesen der Variable aus einem \c std::wstring
   bool fromStr(const std::wstring &sin, const ConvFromStrHint &cfh) override { doAudit(); if (this->c_wstring2x(sin, wert, cfh)) { activate(); return true; } return false; }
-  bool toDouble(double &d) const override { return to_double(wert, d); }
+  /// Info zum aktuellen Datentyp mit Inhalt
   void memInfo(MobsMemberInfo &i) const override;
-  /// Versuch, die  Variable aus einem \c uint64_t einzulesen
-  bool fromUInt64(uint64_t u) override { doAudit(); if (from_number(u, wert)) { activate(); return true; } return false; }
-  /// Versuch, die Variable aus einem \c int64_t einzulesen
-  bool fromInt64(int64_t i) override { doAudit(); if (from_number(i, wert)) { activate(); return true; } return false; }
-  /// Versuch, die Variable aus einem \c double einzulesen
-  bool fromDouble(double d) override { doAudit(); if (from_number(d, wert)) { activate(); return true; } return false; }
+  /// Versuch Variabkle aus Meminfo auszulesen (isFloat/isSigned/isUnsigned/isTime)
+  bool fromMemInfo(const MobsMemberInfo &i) override;
+//  /// Versuch, die  Variable aus einem \c uint64_t einzulesen
+//  bool fromUInt64(uint64_t u) override { doAudit(); if (C::c_from_number(u, wert)) { activate(); return true; } return false; }
+//  /// Versuch, die Variable aus einem \c int64_t einzulesen
+//  bool fromInt64(int64_t i, bool time = false) override { doAudit(); if (C::c_from_numberT(i, wert, time)) { activate(); return true; } return false; }
+//  /// Versuch, die Variable aus einem \c double einzulesen
+//  bool fromDouble(double d) override { doAudit(); if (C::c_from_number(d, wert)) { activate(); return true; } return false; }
   /// Versuche ein Member nativ zu kopieren
   bool doCopy(const MemberBase *other) override { auto t = dynamic_cast<const Member<T, C> *>(other); if (t) doCopy(*t); return t != nullptr; }
-  std::string auditEmpty() const override { return this->c_to_string(T(), ConvToStrHint(hasFeature(mobs::DbCompact))); }
+  std::string auditEmpty() const override { return C::c_to_string(C::c_empty(), ConvToStrHint(hasFeature(mobs::DbCompact))); }
   /// \private
   void inline doCopy(const Member<T, C> &other) { if (other.isNull()) forceNull(); else operator()(other()); }
 
@@ -881,21 +876,38 @@ template<typename T, class C>
 void Member<T, C>::memInfo(MobsMemberInfo &i) const
 {
   i = MobsMemberInfo();
-  i.isSigned = to_int64(wert, i.i64, i.min, i.max);
-  i.isUnsigned = to_uint64(wert, i.u64, i.max);
-  i.is_specialized = this->c_is_specialized();
+  i.hasCompact = C::c_is_chartype(ConvObjToString()) and not C::c_is_chartype(ConvObjToString().exportCompact());
+  i.max = C::c_max();
+  i.min = C::c_min();
+  i.isSigned = false;
+  i.isUnsigned = false;
+  if (C::c_to_int64(wert, i.i64))
+    i.isSigned = true;
+  else if (C::c_to_uint64(wert, i.u64))
+    i.isUnsigned = true;
+  i.isTime = C::c_to_mtime(wert, i.t64);
+  i.isFloat = C::c_to_double(wert, i.d);
+  i.is_specialized = C::c_is_specialized();
   if (i.is_specialized)
     i.size = sizeof(T);
   i.isBlob = this->c_is_blob();
-  i.isEnum = false;
-  i.isTime = false;
+  i.isEnum = this->c_is_mobsEnum();
   i.granularity = this->c_time_granularity();
-  if (i.granularity > 0) {
-    i.isTime = true;
-    i.isSigned = false;
-  }
-  else
+  if (i.granularity <= 0)
     i.granularity = 1;
+}
+
+template<typename T, class C>
+bool  Member<T, C>::fromMemInfo(const MobsMemberInfo &i) {
+  doAudit();
+  if ((i.isFloat and C::c_from_double(i.d, wert)) or
+      (i.isSigned and C::c_from_int(i.i64, wert)) or
+      (i.isUnsigned and C::c_from_uint(i.u64, wert)) or
+      (i.isTime and C::c_from_mtime(i.t64, wert))) {
+    activate();
+    return true;
+  }
+  return false;
 }
 
 

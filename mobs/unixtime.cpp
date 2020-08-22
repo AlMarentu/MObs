@@ -171,27 +171,25 @@ template <> bool string2x(const std::string &str, UxTime &t)
   return true;
 }
 
-/// \private
-template<> bool to_int64(UxTime t, int64_t &i, int64_t &min, uint64_t &max)
-{
-  i = t.toUxTime() * 1000000;
-  min = 0;
-  max = std::numeric_limits<time_t>::max();
+
+bool StrConv<UxTime>::c_string2x(const std::string &str, UxTime &t, const ConvFromStrHint &cfh) {
+  if (cfh.acceptExtended()) {
+    if (mobs::string2x(str, t))
+      return true;
+  }
+  if (not cfh.acceptCompact())
+    return false;
+  int64_t i;
+  if (not mobs::string2x(str, i))
+    return false;
+  return c_from_int(i, t);
+}
+
+bool StrConv<UxTime>::c_from_int(int64_t i, UxTime &t) {
+  if (i < std::numeric_limits<time_t>::min() or i > std::numeric_limits<time_t>::max())
+    return false;
+  t = UxTime(time_t(i));
   return true;
 }
-
-/// \private
-template<> bool from_number(int64_t i, UxTime &t)
-{
-  i /= 1000000;
-  if (i > std::numeric_limits<time_t>::min() and i < std::numeric_limits<time_t>::max())
-  {
-    t = UxTime(i);
-    return true;
-  }
-  return false;
-}
-
-
 
 }

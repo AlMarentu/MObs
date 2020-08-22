@@ -375,10 +375,12 @@ public:
       MobsMemberInfo mi;
       mem.memInfo(mi);
       if (mi.isUnsigned) {
-        if (not mem.fromUInt64(mi.u64 + 1))
+        mi.u64++;
+        if (not mem.fromMemInfo(mi))
           throw std::runtime_error(u8"VersionVariable can't assign");
       } else if (mi.isSigned) {
-        if (not mem.fromInt64(mi.i64 + 1))
+        mi.i64++;
+        if (not mem.fromMemInfo(mi))
           throw std::runtime_error(u8"VersionVariable can't assign");
       } else
         throw std::runtime_error("VersionElement is not int");

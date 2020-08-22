@@ -67,7 +67,7 @@ public:
 
     MobsMemberInfo mi;
     mem.memInfo(mi);
-    double d;
+    mi.changeCompact(compact);
     int32_t i32;
     int64_t i64 = mi.i64;
     bsoncxx::decimal128 i128;
@@ -112,7 +112,7 @@ public:
     }
     else if (mi.isTime)
     {
-      tp += std::chrono::microseconds(i64);
+      tp += std::chrono::microseconds(mi.t64);
     }
     else if (mi.isBlob)
     {
@@ -142,8 +142,8 @@ public:
       doc.append(kvp(name, i128));
     else if (bin.bytes)
       doc.append(kvp(name, types::b_binary(bin)));
-    else if (mem.toDouble(d))
-      doc.append(kvp(name, d));
+    else if (mi.isFloat)
+      doc.append(kvp(name, mi.d));
     else
       doc.append(kvp(name, mem.toStr(mobs::ConvToStrHint(compact))));
   }
@@ -194,7 +194,7 @@ public:
     bsoncxx::document::value val = level.top().doc.extract();
     level.pop();
     if (level.empty())
-      throw std::runtime_error("underflow");
+      THROW("underflow");
     if (inArray())
     {
       if (obj.isNull())
@@ -284,8 +284,12 @@ public:
       level.top().doc.append(kvp(name, 1));
       return;
     }
+    bool compact = cth.compact();
+    if (mem.is_chartype(cth) and mem.hasFeature(mobs::DbCompact))
+      compact = true;
     MobsMemberInfo mi;
     mem.memInfo(mi);
+    mi.changeCompact(compact);
     double d;
     int32_t i32;
     int64_t i64 = mi.i64;
@@ -294,7 +298,7 @@ public:
     types::b_binary bin{};
     bin.size = 0;
     bin.bytes = nullptr;
-    bool useChar = mem.is_chartype(cth);
+    bool useChar = mem.is_chartype(mobs::ConvToStrHint(compact));
     bool useBool = false;
     bool use32 = false;
     bool use64 = false;
@@ -305,14 +309,14 @@ public:
         if (version == -1)
           version = i64;
         else
-          throw runtime_error("VersionInfo duplicate");
+          THROW("VersionInfo duplicate");
       }
       if (increment and mem.isVersionField()) {
         if (i64 == mi.max)
           throw std::runtime_error("VersionElement overflow");
         i64++;
       }
-      if (mi.max <= std::numeric_limits<int32_t>::max() and mi.min >= std::numeric_limits<int32_t>::min())
+      if (mi.max <= INT32_MAX and mi.min >= INT32_MIN)
       {
         i32 = (int32_t)i64;
         use32 = true;
@@ -325,11 +329,11 @@ public:
       if (inKeyMode() and mem.isVersionField()) {
         LOG(LM_DEBUG, "FOUND Version " << mi.u64);
         if (mi.u64 >= INT64_MAX)
-          throw runtime_error("VersionInfo overflow");
+          THROW("VersionInfo overflow");
         else if (version == -1)
           version = mi.u64;
         else
-          throw runtime_error("VersionInfo duplicate");
+          THROW("VersionInfo duplicate");
       }
       if (increment and mem.isVersionField()) {
         if (mi.u64 == mi.max or mi.max == 1)
@@ -344,7 +348,7 @@ public:
         i32 = (int32_t)mi.u64;
         use32 = true;
       }
-      else if (mi.max <= std::numeric_limits<int64_t>::max() or mi.i64 <= std::numeric_limits<int64_t>::max()) {
+      else if (mi.max <= INT64_MAX or mi.i64 <= INT64_MAX) {
         i64 = (int64_t)mi.u64;
         use64 = true;
       }
@@ -358,7 +362,7 @@ public:
       throw std::runtime_error("VersionElement is not int");
     else if (mi.isTime)
     {
-      tp += std::chrono::microseconds(i64);
+      tp += std::chrono::microseconds(mi.t64);
     }
     else if (mi.isBlob)
     {
@@ -390,8 +394,8 @@ public:
         level.top().arr.append(i128);
       else if (bin.bytes)
         level.top().arr.append(types::b_binary(bin));
-      else if (mem.toDouble(d))
-        level.top().arr.append(d);
+      else if (mi.isFloat)
+        level.top().arr.append(mi.d);
       else
         level.top().arr.append(mem.toStr(cth));
     }
@@ -413,8 +417,8 @@ public:
         level.top().doc.append(kvp(name, i128));
       else if (bin.bytes)
         level.top().doc.append(kvp(name, types::b_binary(bin)));
-      else if (mem.toDouble(d))
-        level.top().doc.append(kvp(name, d));
+      else if (mi.isFloat)
+        level.top().doc.append(kvp(name, mi.d));
       else
         level.top().doc.append(kvp(name, mem.toStr(cth)));
     }
@@ -456,124 +460,128 @@ public:
   MongoRead(ConvObjFromStr c) : mobs::ObjectNavigator(c) { }
 
   void parsival(const bsoncxx::document::view &v, const std::string& array = "") {
-    for (auto const &e:v) {
-      bool skip = false;
-      std::string key = e.key().to_string();
-      //      cerr << "K " << key << " - " << array << endl;
-      if (not array.empty())
-        enter(array);
-      switch (e.type())
-      {
-        case bsoncxx::type::k_oid:
-          oid_time = UxTime(e.get_oid().value.get_time_t());
-          oid = e.get_oid().value.to_string();
-          skip = true;
-          break;
-        case bsoncxx::type::k_array:
-        {
-          const types::b_array a = e.get_array();
-          //          cerr << "ARRAY BEG" << endl;
-          parsival(a.value, key);
-          //          cerr << "ARRAY END" << endl;
-          skip = true;
-          break;
+    try {
+      for (auto const &e:v) {
+        bool skip = false;
+        std::string key = e.key().to_string();
+        //      cerr << "K " << key << " - " << array << endl;
+        if (not array.empty())
+          enter(array);
+        switch (e.type()) {
+          case bsoncxx::type::k_oid:
+            oid_time = UxTime(e.get_oid().value.get_time_t());
+            oid = e.get_oid().value.to_string();
+            skip = true;
+            break;
+          case bsoncxx::type::k_array: {
+            const types::b_array a = e.get_array();
+            //          cerr << "ARRAY BEG" << endl;
+            parsival(a.value, key);
+            //          cerr << "ARRAY END" << endl;
+            skip = true;
+            break;
+          }
+          case bsoncxx::type::k_null:
+            if (array.empty())
+              enter(key);
+            setNull();
+            if (array.empty())
+              leave();
+            skip = true;
+            break;
+          case bsoncxx::type::k_document: {
+            types::b_document d = e.get_document();
+            if (array.empty())
+              enter(key);
+            //          cerr << "OBJECT BEG" << endl;
+            parsival(d.value);
+            //          cerr << "OBJECT END" << endl;
+            if (array.empty())
+              leave(key);
+            skip = true;
+            break;
+          }
+          default:
+            break;
         }
-        case bsoncxx::type::k_null:
+        if (not skip) {
           if (array.empty())
             enter(key);
-          setNull();
-          if (array.empty())
-            leave();
-          skip = true;
-          break;
-        case bsoncxx::type::k_document:
-        {
-          types::b_document d = e.get_document();
-          if (array.empty())
-            enter(key);
-          //          cerr << "OBJECT BEG" << endl;
-          parsival(d.value);
-          //          cerr << "OBJECT END" << endl;
-          if (array.empty())
-            leave(key);
-          skip = true;
-          break;
-        }
-        default: break;
-      }
-      if (not skip) {
-        if (array.empty())
-          enter(key);
-        if (member()) {
-          switch (e.type())
-          {
-            case bsoncxx::type::k_oid:  break; // skipped
-            case bsoncxx::type::k_utf8:
-              if (not member()->fromStr(e.get_utf8().value.to_string(), cfs))
-                throw runtime_error(u8"mongodb: invalid type in variable " + showName() + " can't assign");
-              break;
-            case bsoncxx::type::k_bool:
-            {
-              MobsMemberInfo mi;
-              member()->memInfo(mi);
-              if (not mi.isUnsigned or mi.max != 1 or not member()->fromUInt64(e.get_bool().value != 0))
-                throw runtime_error(u8"mongodb: invalid type in variable " + showName() + " can't assign");
-              break;
-            }
-            case bsoncxx::type::k_int32:
-              if (not member()->fromInt64(e.get_int32().value) and not member()->fromUInt64(e.get_int32().value))
-                throw runtime_error(u8"mongodb: invalid type in variable " + showName() + " can't assign");
-              break;
-            case bsoncxx::type::k_int64:
-              if (not member()->fromInt64(e.get_int64().value) and not member()->fromUInt64(e.get_int64().value))
-                throw runtime_error(u8"mongodb: invalid type in variable " + showName() + " can't assign");
-              break;
-            case bsoncxx::type::k_decimal128:
-              if (e.get_decimal128().value.high() != 0 or
-                  (not member()->fromInt64(e.get_decimal128().value.low()) and not member()->fromUInt64(e.get_decimal128().value.low())))
-                throw runtime_error(u8"mongodb: invalid type in variable " + showName() + " can't assign");
-              break;
-            case bsoncxx::type::k_date:
-              {
-                MobsMemberInfo mi;
-                member()->memInfo(mi);
-                if (not mi.isTime or not member()->fromInt64(e.get_date().to_int64() * 1000))
-                  throw runtime_error(u8"mongodb: invalid type in variable " + showName() + " can't assign");
+          if (member()) {
+            ConvToStrHint cts(not cfs.acceptExtended());
+            bool compact = cts.compact();
+            if (member()->is_chartype(cts) and member()->hasFeature(mobs::DbCompact))
+              compact = true;
+            MobsMemberInfo mi;
+            member()->memInfo(mi);
+            mi.changeCompact(compact);
+            switch (e.type()) {
+              case bsoncxx::type::k_oid:
+                break; // skipped
+              case bsoncxx::type::k_utf8:
+                if (not member()->fromStr(e.get_utf8().value.to_string(), cfs))
+                  throw runtime_error(u8"invalid type, can't assign");
+                break;
+              case bsoncxx::type::k_bool:
+                mi.setBool(e.get_bool().value != 0);
+                if (not mi.isUnsigned or mi.max != 1 or not member()->fromMemInfo(mi))
+                  throw runtime_error(u8"invalid type, can't assign");
+                break;
+              case bsoncxx::type::k_int32:
+                mi.setInt(e.get_int32().value);
+                if (not member()->fromMemInfo(mi))
+                  throw runtime_error(u8"invalid type, can't assign");
+                break;
+              case bsoncxx::type::k_int64:
+                mi.setInt(e.get_int64().value);
+                if (not member()->fromMemInfo(mi))
+                  throw runtime_error(u8"invalid type, can't assign");
+                break;
+              case bsoncxx::type::k_decimal128:
+                mi.setUInt(e.get_decimal128().value.low());
+                if (e.get_decimal128().value.high() != 0 or not member()->fromMemInfo(mi))
+                  throw runtime_error(u8"invalid type, can't assign");
+                break;
+              case bsoncxx::type::k_date:
+                mi.setTime(e.get_date().to_int64() * 1000);
+                if (not mi.isTime or not member()->fromMemInfo(mi))
+                  throw runtime_error(u8"invalid type, can't assign");
+                break;
+              case bsoncxx::type::k_timestamp:
+                cerr << "timestamp" << endl;
+                throw runtime_error(u8"invalid type, can't assign");
+                break;
+              case bsoncxx::type::k_double:
+                mi.d = e.get_double().value;
+                if (not mi.isFloat or not member()->fromMemInfo(mi))
+                  throw runtime_error(u8"invalid type, can't assign");
+                break;
+              case bsoncxx::type::k_binary: {
+                if (not mi.isBlob)
+                  throw runtime_error(u8"invalid type, can't assign blob");
+                auto p = dynamic_cast<MemVarType(vector<u_char>) *>(member());
+                if (not p)
+                  throw runtime_error(u8"invalid type, can't assign blob");
+                u_char *cp = (u_char *) e.get_binary().bytes;
+                p->emplace(vector<u_char>(cp, cp + e.get_binary().size));
                 break;
               }
-            case bsoncxx::type::k_timestamp: cerr << "timestamp" << endl;
-              throw runtime_error(u8"mongodb: invalid type in variable " + showName() + " can't assign");
-              break;
-            case bsoncxx::type::k_double:
-              if (not member()->fromDouble(e.get_double().value))
-                throw runtime_error(u8"mongodb: invalid type in variable " + showName() + " can't assign");
-              break;
-            case bsoncxx::type::k_binary:
-            {
-              MobsMemberInfo mi;
-              member()->memInfo(mi);
-              if (not mi.isBlob)
-                throw runtime_error(u8"mongodb: invalid type in variable " + showName() + " can't assign blob");
-              auto p = dynamic_cast<MemVarType(vector<u_char>) *>(member());
-              if (not p)
-                throw runtime_error(u8"mongodb: invalid type in variable " + showName() + " can't assign blob");
-              u_char *cp = (u_char*)e.get_binary().bytes;
-              p->emplace(vector<u_char>(cp, cp + e.get_binary().size));
-              break;
+              default:
+                cerr << "sonst " << int(e.type()) << endl;
+                throw runtime_error(u8"invalid type, can't assign");
             }
-            default: cerr << "sonst "<< int(e.type()) << endl;
-              throw runtime_error(u8"mongodb: invalid type in variable " + showName() + " can't assign");
-          }
+          } else if (cfs.exceptionIfUnknown())
+            throw runtime_error(u8"no variable, can't assign");
+          else
+            LOG(LM_DEBUG, u8"mongodb element " << showName() << " is not in object");
+          if (array.empty())
+            leave();
         }
-        else if (cfs.exceptionIfUnknown())
-          throw runtime_error(u8"mongodb: " + showName() + " is no variable, can't assign");
-        else
-          LOG(LM_DEBUG, u8"mongodb element " << showName() << " is not in object");
-        if (array.empty())
-          leave();
+        if (not array.empty())
+          leave(array);
       }
-      if (not array.empty())
-        leave(array);
+    } catch (std::exception &e) {
+      THROW(u8"mongodb element " << showName() << ": " << e.what());
     }
   }
   UxTime oid_time{};
@@ -674,7 +682,7 @@ void MongoDatabaseConnection::create(DatabaseInterface &dbi, const ObjectBase &o
   auto result = db[collectionName(obj)].insert_one(bo.value());
 
   if (not result)
-    throw runtime_error(u8"create failed");
+    THROW(u8"create failed");
   auto oid = result->inserted_id();
   LOG(LM_DEBUG, "OID " << oid.get_oid().value.to_string());
 }
@@ -702,14 +710,14 @@ void MongoDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj
   if (bk.version == 0) { // initiale version
     auto result = db[collectionName(obj)].insert_one(bo.value());
     if (not result)
-      throw runtime_error(u8"save failed");
+      THROW(u8"save failed");
     auto oid = result->inserted_id();
     LOG(LM_DEBUG, "INSERTED " << oid.get_oid().value.to_string());
   } else { // ohne Versionsfeld (-1) auch upsert erlauben
     auto r_opt = mongocxx::options::replace().upsert(bk.version < 0);
     auto result = db[collectionName(obj)].replace_one(bk.value(), bo.value(), r_opt);
     if (not result)
-      throw runtime_error(u8"save failed");
+      THROW(u8"save failed");
     LOG(LM_DEBUG, "MATCHED " << result->matched_count());
     auto oid = result->upserted_id();
     if (oid)
@@ -729,7 +737,7 @@ bool MongoDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase &
   obj.traverseKey(bo);
   LOG(LM_INFO, "VERSION IS " << bo.version);
   if (bo.version == 0)
-    throw runtime_error(u8"destroy Object version = 0 cannot destroy");
+    THROW(u8"destroy Object version = 0 cannot destroy");
   LOG(LM_DEBUG, "DESTROY " << dbi.database() << "." << collectionName(obj) << " " <<  bo.result());
 
   bool found;
@@ -738,16 +746,16 @@ bool MongoDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase &
     LOG(LM_DEBUG, "drop with session");
     auto result = db[collectionName(obj)].delete_one(mtdb->session, bo.value());
     if (not result)
-      throw runtime_error(u8"destroy returns with error");
+      THROW(u8"destroy returns with error");
     found = result->deleted_count() != 0;
   } else {
     auto result = db[collectionName(obj)].delete_one(bo.value());
     if (not result)
-      throw runtime_error(u8"destroy returns with error");
+      THROW(u8"destroy returns with error");
     found = result->deleted_count() != 0;
   }
   if (bo.version > 0 and not found)
-    throw runtime_error(u8"destroy: Object with appropriate version not found");
+    THROW(u8"destroy: Object with appropriate version not found");
 
   return found;
 }
@@ -830,7 +838,7 @@ void
 MongoDatabaseConnection::retrieve(DatabaseInterface &dbi, ObjectBase &obj, std::shared_ptr<mobs::DbCursor> cursor) {
   auto curs = std::dynamic_pointer_cast<Cursor>(cursor);
   if (not curs)
-    throw runtime_error("invalid cursor");
+    THROW("invalid cursor");
 
   LOG(LM_DEBUG, "ANSWER " << bsoncxx::to_json(*(curs->it)));
   MongoRead mr(ConvObjFromStr().useAlternativeNames());

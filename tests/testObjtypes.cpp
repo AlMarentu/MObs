@@ -261,8 +261,7 @@ TEST(objtypeTest, tobase64) {
 
 TEST(objtypeTest, times) {
   mobs::MobsMemberInfo mi;
-  mi.i64 = 1577199660000000;
-  mi.isTime = true;
+  mi.setTime(1577199660000000);
 
   {
     std::stringstream s;
@@ -284,7 +283,7 @@ TEST(objtypeTest, times) {
     std::tm t = {};
     s >> std::get_time(&t, "%Y-%m-%d");
     mi.fromLocalTime(t);
-    time_t ti = mi.i64 / 1000000;
+    time_t ti = mi.t64 / 1000000;
     EXPECT_STREQ("Thu Dec 24 00:00:00 2020\n", ctime(&ti));
   }
 
@@ -294,7 +293,7 @@ TEST(objtypeTest, times) {
     s >> std::get_time(&t, "%Y-%m-%d %H:%M:%S");
     EXPECT_FALSE(s.fail());
     mi.fromLocalTime(t);
-    time_t ti = mi.i64 / 1000000;
+    time_t ti = mi.t64 / 1000000;
     EXPECT_STREQ("Thu Dec 24 17:02:01 2020\n", ctime(&ti));
   }
 
@@ -304,7 +303,7 @@ TEST(objtypeTest, times) {
     s >> std::get_time(&t, "%Y-%m-%d %H:%M:%S");
     EXPECT_FALSE(s.fail());
     mi.fromGMTime(t);
-    time_t ti = mi.i64 / 1000000;
+    time_t ti = mi.t64 / 1000000;
     EXPECT_STREQ("Thu Dec 24 17:02:01 2020\n", ctime(&ti));
   }
 
@@ -322,7 +321,7 @@ TEST(objtypeTest, times) {
     EXPECT_FALSE(s.fail());
     EXPECT_EQ(123, i);
     mi.fromGMTime(t);
-    time_t ti = mi.i64 / 1000000;
+    time_t ti = mi.t64 / 1000000;
     EXPECT_STREQ("Thu Dec 24 17:02:01 2020\n", ctime(&ti));
   }
 }
@@ -331,8 +330,7 @@ TEST(objtypeTest, times) {
 
 TEST(objtypeTest, historic) {
   mobs::MobsMemberInfo mi;
-  mi.i64 = -1577199660000000;
-  mi.isTime = true;
+  mi.setTime(-1577199660000000);
 
   {
     std::stringstream s;
