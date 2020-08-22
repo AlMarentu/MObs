@@ -249,9 +249,7 @@ void DbTransaction::writeAuditTrail() {
     auto dti = i.second;
     for (auto a:dti.audit) {
       LOG(LM_DEBUG, "Writing audit");
-      // time as microseconds since epoch
-      int64_t t = startTime().time_since_epoch().count();
-      a.second.time(t);
+      a.second.time(startTime());
       if (DbTransactionData::s_uid < 0)
         DbTransactionData::s_uid = getuid();
       a.second.userId(DbTransactionData::s_uid);

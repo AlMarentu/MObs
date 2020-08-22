@@ -25,6 +25,7 @@
 #define MOBS_HELPER_H
 
 #include "objgen.h"
+#include "mchrono.h"
 #include <sstream>
 #include <set>
 
@@ -219,7 +220,7 @@ class AuditActivity : public mobs::ObjectBase {
 public:
   ObjInit(AuditActivity);
   
-  MemVar(long long, time, KEYELEMENT1);
+  MemVar(MTime, time, KEYELEMENT1 DBCOMPACT);
   MemVar(int, userId, KEYELEMENT2);
   MemVar(std::string, comment, USENULL LENGTH(200));
   MemVector(AuditObjects, objects, COLNAME(auditObjects));
