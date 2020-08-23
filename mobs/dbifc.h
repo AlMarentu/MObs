@@ -423,8 +423,12 @@ public:
 
   /// Setzen des Isolation-Levels
   void setIsolation(IsolationLevel level);
-  /// Setzen einer uid für Audit Trail; standarsmäßig mit UserId des Systems vorbesetzt
+  /// Setzen einer uid für Audit Trail; standardmäßig mit UserId des Systems vorbesetzt
   static void setUid(int id);
+  /// Id des gesamten Prozesses, wird mit einer UUID vorbelegt
+  static void setJobId(const std::string &id);
+  /// Auslesen der JobId, ist mit einer UUID vorbelegt
+  static const std::string &getJobId();
   /// setze Kommentar für Audit Trail
   void setComment(const std::string &comment);
 

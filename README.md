@@ -379,7 +379,8 @@ jedem beliebigen Zeitpunkt ermitteln.
 Die Änderungsaktivitäten, werden pro Transaktion zusammengefasst und im Datenpool des jeweiligen
 Objektes abgelegt. Werden einzelne Objekte gespeichert, so werden die Änderungsdaten zusammen mit dem Objekt
  implizit in einer Transaktion gespeichert. Zu jeder Transaktion kann auch ein Begründungstext mit angegeben werden.
-Zusätzlich werden Zeit und User (Id) mitprotokolliert.
+Zusätzlich werden Zeit, User (Id) und Job-Id mitprotokolliert. Über die JobId kann dann bei jedem Programmstart auch eine 
+weitere Info jedes ausgeführte Programm erfasst werden.
 
 Idealerweise sollte dazu auch Objekt-Versionierung aktiviert werden. 
 
@@ -398,7 +399,8 @@ Darüber lassen sich
 usw. realisieren
 
 ## Installation
-Zum Übersetzen wird ein c++11 Compiler inkl. STL benötigt. Für die Test-Suite wird googletest benötigt
+Zum Übersetzen wird ein c++11 Compiler inkl. STL benötigt. Zusätzlich muss die UUID-Lib vorhanden sein.
+Für die Test-Suite wird googletest benötigt
 Die Entwicklung erfolgt mit clang version 11.0.3
 
 Build und Installation erfolgen über cmake

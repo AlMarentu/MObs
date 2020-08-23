@@ -35,7 +35,10 @@
 
 #include "helper.h"
 #include "mchrono.h"
+#include <iomanip>
+#include <sstream>
 #include <unistd.h> // getuid
+#include <uuid/uuid.h>
 
 namespace mobs {
 namespace {
@@ -208,13 +211,30 @@ public:
 
   std::string comment;
   static int s_uid;
+  static std::string s_jobId;
 };
 
 int DbTransactionData::s_uid = -1;
+std::string DbTransactionData::s_jobId;
 
 void DbTransaction::setUid(int i) {
   if (i >= 0)
     DbTransactionData::s_uid = i;
+}
+
+void DbTransaction::setJobId(const std::string &id) {
+  DbTransactionData::s_jobId = id;
+}
+
+const std::string &DbTransaction::getJobId() {
+  if (DbTransactionData::s_jobId.empty()) {
+    uuid_t uuid;
+    uuid_generate_time(uuid); // effiziente Methode die mac-Adresse enthält, sollte aber kein Datenschutzproblem sein
+    std::stringstream s;
+    for (auto c:uuid)
+      s << std::hex << std::setw(2) << std::setfill('0') << uint(c);
+    DbTransactionData::s_jobId = s.str();
+  }  return DbTransactionData::s_jobId;
 }
 
 void DbTransaction::setComment(const std::string &comment) {
@@ -253,6 +273,7 @@ void DbTransaction::writeAuditTrail() {
       if (DbTransactionData::s_uid < 0)
         DbTransactionData::s_uid = getuid();
       a.second.userId(DbTransactionData::s_uid);
+      a.second.jobId(DbTransaction::getJobId());
       if (not data->comment.empty())
         a.second.comment(data->comment);
       DatabaseInterface dbi_t(dti.dbCon, a.first);

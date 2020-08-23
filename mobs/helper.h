@@ -222,6 +222,7 @@ public:
   
   MemVar(MTime, time, KEYELEMENT1 DBCOMPACT);
   MemVar(int, userId, KEYELEMENT2);
+  MemVar(std::string, jobId, LENGTH(32));
   MemVar(std::string, comment, USENULL LENGTH(200));
   MemVector(AuditObjects, objects, COLNAME(auditObjects));
   
