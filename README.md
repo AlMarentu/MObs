@@ -425,9 +425,18 @@ Unterstützte Funktionen
 | uint64_t    | +       | +       | -        |
 | MTime Auflösung | 1 µs    | 1000 µs | 10 µs    |
 | Blob        | -       | -       | -        |
-| Transaktionen | +     | - *     | +        |
+| Transaktionen | +     | -       | +        |
 
-* Bei MongoDB werden Transaktionen nur im Cluster-Mode unterstützt -> TODO 
+##TODOs
+
+* Bei MongoDB werden Transaktionen nur im Cluster-Mode unterstützt
+* AuditTrail: Werte mit mehr als 200 Zeichen in mehrere Objekte aufteilen
+* Sortierung bei QBE
+* BLOBs in DB speichern
+* DB: Isolation, transaction level, timeouts, skip, limit
+* SQLite
+
+
 
 
 ## Module
