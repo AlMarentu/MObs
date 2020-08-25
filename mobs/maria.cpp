@@ -512,7 +512,7 @@ bool MariaDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase &
     LOG(LM_DEBUG, "SQL " << s);
     if (mysql_real_query(connection, s.c_str(), s.length()))
       throw mysql_exception(u8"Transaction failed", connection);
-    throw e;
+    THROW(u8"MariaDB destroy: " << e.what());
   } catch (exception &e) {
     string s = "ROLLBACK WORK";
     if (currentTransaction)
@@ -521,7 +521,7 @@ bool MariaDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase &
     LOG(LM_DEBUG, "SQL " << s);
     if (mysql_real_query(connection, s.c_str(), s.length()))
       throw mysql_exception(u8"Transaction failed", connection);
-    throw e;
+    THROW(u8"MariaDB destroy: " << e.what());
   }
 
   string s;
@@ -711,6 +711,10 @@ void MariaDatabaseConnection::rollbackTransaction(DbTransaction *transaction, st
   if (mysql_real_query(connection, s.c_str(), s.length()))
     throw mysql_exception(u8"Transaction failed", connection);
   currentTransaction = nullptr;
+}
+
+size_t MariaDatabaseConnection::maxAuditChangesValueSize(const DatabaseInterface &dbi) const {
+  return 200;
 }
 
 

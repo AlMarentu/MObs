@@ -428,7 +428,7 @@ hier kann für ältere Versionen INFORMIX_DTFMT_BUG definiert werden
 | Blob        | -       | -       | -       | -       |
 | Transaktionen | +     | -       | +       | +       |
 | DB-Name     | +       | +       | ignored | +       |
-| Zugriffskonrtrolle | + | -      | -       | +       |
+| Zugriffskontrolle | + | -       | -       | +       |
 
 * Informix benötigt eine Environment-Variable CLIENT_LOCALE die auf einen UTF-8 Zeichensatz
  gestellt ist z.B.: de_DE.UTF8
@@ -445,7 +445,6 @@ hier kann für ältere Versionen INFORMIX_DTFMT_BUG definiert werden
 
 * Bei MongoDB werden Transaktionen nur im Cluster-Mode unterstützt
 * Zugriffskontrolle Mongo
-* AuditTrail: Werte mit mehr als 200 Zeichen in mehrere Objekte aufteilen
 * Sortierung bei QBE
 * BLOBs in DB speichern
 * SQLite: Datum nicht als string speichern

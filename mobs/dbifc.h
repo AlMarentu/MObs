@@ -107,6 +107,10 @@ public:
   virtual void endTransaction(DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) = 0;
   /// \private
   virtual void rollbackTransaction(DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) = 0;
+
+  /// \private
+  virtual size_t maxAuditChangesValueSize(const DatabaseInterface &dbi) const = 0;
+
 };
 
 /// Container für die Information zu einer Datenbankverbindung
@@ -293,6 +297,8 @@ public:
   /// Abfrage TransactionDbInfo
   TransactionDbInfo *transactionDbInfo() const;
 
+  /// Abfrage max. Elementgröße AuditChanges-Value; 0 == unbegrenzt
+  size_t maxAuditChangesValueSize() const;
 
 private:
   std::shared_ptr<DatabaseConnection> dbCon;

@@ -255,7 +255,9 @@ public:
 
   /// Wenn Startwerte nicht gespeichert werden sollen (sind eigentlich redundant) auf false setzen
   static bool s_saveInitialValues;
-  
+  /// Maximale Value-Size für ein AuditChanges-Objekt
+  size_t max_val_size = 200;
+
 private:
   AuditActivity &act;
   ConvObjToString cth;

@@ -268,6 +268,7 @@ void DbTransaction::doAuditSave(const ObjectBase &obj, const DatabaseInterface &
     return;
   
   AuditTrail at(s->second.audit[dbi.database()]);
+  at.max_val_size = dbi.maxAuditChangesValueSize();
   obj.traverse(at);
 }
 
@@ -277,6 +278,7 @@ void DbTransaction::doAuditDestroy(const ObjectBase &obj, const DatabaseInterfac
     return;
 
   AuditTrail at(s->second.audit[dbi.database()]);
+  at.max_val_size = dbi.maxAuditChangesValueSize();
   at.destroyObj();
   obj.traverse(at);
 }
@@ -526,6 +528,10 @@ TransactionDbInfo *DatabaseInterface::transactionDbInfo() const {
   if (transaction)
     return transaction->transactionDbInfo(*this);
   return nullptr;
+}
+
+size_t DatabaseInterface::maxAuditChangesValueSize() const {
+  return dbCon->maxAuditChangesValueSize(*this);
 }
 
 

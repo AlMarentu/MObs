@@ -912,4 +912,8 @@ void MongoDatabaseConnection::rollbackTransaction(DbTransaction *transaction, st
 //  throw std::runtime_error("rollbackTransaction missing TransactinInfo");
 }
 
+size_t MongoDatabaseConnection::maxAuditChangesValueSize(const DatabaseInterface &dbi) const {
+  return 0;   // do not split AuditChanges values
+}
+
 }

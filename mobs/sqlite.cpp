@@ -758,5 +758,9 @@ void SQLiteDatabaseConnection::rollbackTransaction(DbTransaction *transaction, s
   }
 }
 
+size_t SQLiteDatabaseConnection::maxAuditChangesValueSize(const DatabaseInterface &dbi) const {
+  return 200;
+}
+
 
 }

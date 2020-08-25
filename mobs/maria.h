@@ -72,6 +72,8 @@ namespace mobs {
     void endTransaction(DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) override;
     /// \private
     void rollbackTransaction(DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) override;
+    /// \private
+    size_t maxAuditChangesValueSize(const DatabaseInterface &dbi) const override;
     // ------------------------------
 
 

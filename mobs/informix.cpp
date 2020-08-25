@@ -1054,5 +1054,9 @@ size_t InformixDatabaseConnection::doSql(const string &sql) {
   return infx_processed_rows();
 }
 
+size_t InformixDatabaseConnection::maxAuditChangesValueSize(const DatabaseInterface &dbi) const {
+  return 200;
+}
+
 
 }

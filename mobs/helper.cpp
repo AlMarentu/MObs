@@ -1452,10 +1452,18 @@ void AuditTrail::doMem(const MemberBase &mem) {
     if (not null and not mem.isNull() and val == mem.auditValue())
       return;
   }
-  
-  act.objects.back().changes[MemBaseVector::nextpos].field(name);
-  act.objects.back().changes.back().value(val);
-  act.objects.back().changes.back().nullVal(null);
+
+  do {
+    string v;
+    if (max_val_size > 0 and val.length() > max_val_size) {
+      v = val.substr(0, max_val_size);
+      val.erase(0, max_val_size);
+    } else
+      v.swap(val);
+    act.objects.back().changes[MemBaseVector::nextpos].field(name);
+    act.objects.back().changes.back().value(v);
+    act.objects.back().changes.back().nullVal(null);
+  } while (not val.empty());
 }
 
   
