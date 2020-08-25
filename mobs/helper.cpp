@@ -93,8 +93,7 @@ public:
         fst = false;
         size_t last = useName.size() -1;
         selectWhere += useName[last] + "." + obj.getName(cth);
-        string val;
-        sqldb.valueStmtText("", true);
+        string val = sqldb.valueStmtText("", true);
         if (sqldb.changeTo_is_IfNull)
           selectWhere += " is ";
         else
@@ -481,10 +480,10 @@ public:
           if (index != SIZE_T_MAX) {
             string d = delimiter();
             res << d << name;
+            res3 << d << name;
             if (not d.empty())
               d = " and ";
-            res2 << d << name << "=?";
-            sqldb.valueStmtIndex(index);
+            res2 << d << name << "=" << sqldb.valueStmtIndex(index);
             fields++;
           }
         } else if (mode == Where) {
@@ -586,9 +585,9 @@ public:
         res << d << name;
         if (mode == FldVal2 and not d.empty())
           d = " and ";
-        res2 << d << name << "=?";
+        res2 << d << name << "=";
         fields++;
-        sqldb.valueStmtText(tx, vec.isNull());
+        res2 << sqldb.valueStmtText(tx, vec.isNull());
       } else if (mode == Create)  {
         if (dupl.find(name) != dupl.end())
           throw runtime_error(name + u8" is a duplicate id in SQL statement");
@@ -670,14 +669,16 @@ public:
     } else if (mode == FldVal or mode == FldVal2) {
       string d = delimiter();
       res << d << name;
+      if (mode == FldVal2)
+        res3 << d << name;
       if (mode == FldVal2 and not d.empty())
         d = " and ";
       if (mode == FldVal and mem.isVersionField())
-        res2 << d << name << "=?";
+        res2 << d << name << "=";
       else
-        res2 << d << name << "=?";
+        res2 << d << name << "=";
       fields++;
-      sqldb.valueStmt(mem, compact, mem.isVersionField(), false);
+      res2 << sqldb.valueStmt(mem, compact, mem.isVersionField(), false);
     } else if (mode == Create)  {
       if (dupl.find(name) != dupl.end())
         throw runtime_error(name + u8" is a duplicate id in SQL statement");
@@ -692,6 +693,7 @@ public:
   }
   string result() { return res.str(); }
   string result2() { return res2.str(); }
+  string result3() { return res3.str(); }
   void setMode(Mode m) { mode = m; }
   void addText(const string &tx) { res << tx; fst = true; }
   void addText2(const string &tx) { res2 << tx; fst = true; }
@@ -711,6 +713,7 @@ private:
   int level = 0;
   stringstream res;
   stringstream res2;
+  stringstream res3;
   SQLDBdescription &sqldb;
   uint fields = 0;
 };
@@ -838,9 +841,16 @@ string SqlGenerator::doInsertUpd(SqlGenerator::DetailInfo &di, std::string &upd)
   gs.addText2("update ");
 
   if (di.vec) {
-    gs.addTextAll(sqldb.tableName(vecTableName(di.vec, di.tableName)));
-  } else
-    gs.addTextAll(sqldb.tableName(di.tableName));
+    if (sqldb.withInsertOnConflict)
+      gs.addText(sqldb.tableName(vecTableName(di.vec, di.tableName)));
+    else
+      gs.addTextAll(sqldb.tableName(vecTableName(di.vec, di.tableName)));
+  } else {
+    if (sqldb.withInsertOnConflict)
+      gs.addText(sqldb.tableName(di.tableName));
+    else
+      gs.addTextAll(sqldb.tableName(di.tableName));
+  }
   gs.addText("(");
   gs.addText2(" set ");
   gs.detailVec.clear();
@@ -867,10 +877,17 @@ string SqlGenerator::doInsertUpd(SqlGenerator::DetailInfo &di, std::string &upd)
   gs.detailVec.clear();
 
   gs.addText(") values (");
-  gs.addText2(";");
   gs.completeInsert();
 
-  gs.addText(");");
+  gs.addText(")");
+  if (sqldb.withInsertOnConflict) {
+    gs.addText(" ON CONFLICT (");
+    gs.addText(gs.result3());
+    gs.addText(") DO ");
+    gs.addText(gs.result2());
+  }
+
+  gs.addTextAll(";");
   upd = gs.result2();
   return gs.result();
 }
@@ -894,7 +911,8 @@ string SqlGenerator::doInsert(SqlGenerator::DetailInfo &di, bool replace) {
   gs.current = di;
   if (replace) {
     gs.addText("replace ");
-
+    if (sqldb.replaceWithInto)
+      gs.addText("into ");
   } else {
     gs.withCleaner = false;
 
@@ -955,14 +973,21 @@ string SqlGenerator::insertStatement(bool first) {
 
 string SqlGenerator::replaceStatement(bool first) {
   string s;
+  string upd;
   if (first) {
     detailVec.clear();
     DetailInfo di(nullptr, tableName(), {});
-    s = doInsert(di, true);
+    if (sqldb.withInsertOnConflict)
+      s = doInsertUpd(di, upd);
+    else
+      s = doInsert(di, true);
   } else if (eof())
     return "";
   else {
-    s = doInsert(detailVec.front(), true);
+    if (sqldb.withInsertOnConflict)
+      s = doInsertUpd(detailVec.front(), upd);
+    else
+      s = doInsert(detailVec.front(), true);
     detailVec.erase(detailVec.begin());
   }
   return s;
@@ -1006,6 +1031,8 @@ string SqlGenerator::doDrop(SqlGenerator::DetailInfo &di) {
   GenerateSql gs(GenerateSql::Create, sqldb, mobs::ConvObjToString());
   gs.current = di;
   gs.addText("drop table ");
+  if (sqldb.dropWith_IfExists)
+    gs.addText("if exists ");
   if (di.vec)
     gs.addText(sqldb.tableName(vecTableName(di.vec, di.tableName)));
   else
@@ -1117,7 +1144,7 @@ string SqlGenerator::doSelect(SqlGenerator::DetailInfo &di) {
   if (not di.vec)
     throw runtime_error("error in doSelect");
   GenerateSql gs(GenerateSql::Fields, sqldb, mobs::ConvObjToString());
-  // In ExtractSql wurden die Verkoren der nächsten Ebene auf Size=1 gesetzt
+  // In ExtractSql wurden die Vektoren der nächsten Ebene auf Size=1 gesetzt
   gs.withCleaner = false;
   gs.current = di;
   gs.addText("select ");

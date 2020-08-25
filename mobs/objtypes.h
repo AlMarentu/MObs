@@ -424,7 +424,7 @@ class ConvToStrHint {
 public:
   ConvToStrHint() = delete;
   /// Konstruktor
-  /// @param print_compact führt bei einigen Typen zur vereinfachten Ausgabe
+  /// @param print_compact führt bei einigen Typen zur vereinfachten Ausgabe als ganzahliger Wert
   /// @param altNames verwende alternative Namen wenn Vorhanden
   /// @param pfix verwende den Prefix vor dem Namen, falls vorhanden
   /// @param lowercase wandelt den Namen in Kleinbuchstaben
@@ -461,7 +461,7 @@ public:
   virtual ~ConvFromStrHint() = default;
   /// darf ein nicht-kompakter Wert als Eingabe fungieren
   virtual bool acceptExtended() const = 0;
-  /// darf ein kompakter Wert als Eingabe fungieren
+  /// darf ein kompakter Wert (Zahlenwert bei MobsEnum oder Datum) als Eingabe fungieren
   virtual bool acceptCompact() const = 0;
 
   /// Standard Konvertierungshinweis, kompakte und erweiterte Eingaben sind erlaubt

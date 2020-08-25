@@ -29,6 +29,9 @@
 #ifdef USE_MARIA
 #include "maria.h"
 #endif
+#ifdef USE_SQLITE
+#include "sqlite.h"
+#endif
 #ifdef USE_INFORMIX
 #include "informix.h"
 #endif
@@ -67,6 +70,8 @@ public:
 
 void DatabaseManagerData::addConnection(const std::string &connectionName,
                                         const ConnectionInformation &connectionInformation) {
+  if (connections.find(connectionName) != connections.end())
+    throw std::runtime_error(connectionName + u8" already exists");
   // zuständiges Datenbankmodul ermitteln
   size_t pos = connectionInformation.m_url.find(':');
   if (pos == std::string::npos)
@@ -92,6 +97,16 @@ void DatabaseManagerData::addConnection(const std::string &connectionName,
     return;
   }
 #endif
+#ifdef USE_SQLITE
+  if (db == "sqlite")
+  {
+    Database &dbCon = connections[connectionName];
+    auto dbi = std::make_shared<SQLiteDatabaseConnection>(connectionInformation);
+    dbCon.database = connectionInformation.m_database;
+    dbCon.connection = dbi;
+    return;
+  }
+#endif
 #ifdef USE_INFORMIX
   if (db == "informix")
   {
@@ -107,6 +122,8 @@ void DatabaseManagerData::addConnection(const std::string &connectionName,
 
 void DatabaseManagerData::copyConnection(const std::string &connectionName, const std::string &oldConnectionName,
                                          const std::string &database) {
+  if (connections.find(connectionName) != connections.end())
+    throw std::runtime_error(connectionName + u8" already exists");
   auto i = connections.find(oldConnectionName);
   if (i == connections.end())
     throw std::runtime_error(oldConnectionName + u8" is not a valid connection");

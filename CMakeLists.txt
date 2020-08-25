@@ -12,6 +12,7 @@ option(PACKAGE_TESTS "Build the tests" OFF)
 option(BUILD_DOC "Build Documentation" ON)
 option(BUILD_MONGO_INTERFACE "Build the Mongo database modules" ON)
 option(BUILD_MARIA_INTERFACE "Build the Maria database modules" ON)
+option(BUILD_SQLITE_INTERFACE "Build the SQLite database modules" ON)
 option(BUILD_INFORMIX_INTERFACE "Build the Informix database modules" ON)
 
 
@@ -80,6 +81,10 @@ endif()
 if(BUILD_MARIA_INTERFACE)
     find_library(mariadb mariadb)
     set(DB_LIBS ${DB_LIBS} ${mariadb})
+endif()
+
+if(BUILD_SQLITE_INTERFACE)
+    set(DB_LIBS ${DB_LIBS} sqlite3)
 endif()
 
 if(BUILD_INFORMIX_INTERFACE)

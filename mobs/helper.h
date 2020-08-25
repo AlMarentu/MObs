@@ -75,6 +75,12 @@ public:
   bool changeTo_is_IfNull = true;
   /// Erzeuge create if not exists - Statement
   bool createWith_IfNotExists = false;
+  /// Erzeuge drop if not exists - Statement
+  bool dropWith_IfExists = false;
+  /// erzeuge replace mit into
+  bool replaceWithInto = false;
+  /// Erzeuge Insert ... on conflict update - Statement
+  bool withInsertOnConflict = false;
 };
 
 /// Generator-Klasse für SQL-Statements für Lesen und Schreiben, benötigt ein SQL-Beschreibungs-Objekt \c SQLDBdescription

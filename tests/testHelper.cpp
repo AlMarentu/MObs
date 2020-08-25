@@ -44,9 +44,17 @@ public:
 
   virtual std::string tableName(const std::string &tabnam) override { return u8"D." + tabnam;  }
 
-  virtual std::string valueStmtIndex(size_t i) override { return std::string(" ") + to_string(i);  }
+  virtual std::string valueStmtIndex(size_t i) override {
+    if (useBindVars)
+      return "?";
+    return std::string(" ") + to_string(i);
+  }
 
-  virtual std::string valueStmtText(const std::string &tx, bool isNull) override { return std::string(" ") + (isNull ? string("null"):mobs::to_squote(tx));  }
+  virtual std::string valueStmtText(const std::string &tx, bool isNull) override {
+    if (useBindVars)
+      return "?";
+    return std::string(" ") + (isNull ? string("null"):mobs::to_squote(tx));
+  }
 
   virtual std::string createStmtIndex(std::string name) override {
     return "INT NOT NULL";
@@ -85,6 +93,8 @@ public:
   }
 
   virtual std::string valueStmt(const mobs::MemberBase &mem, bool compact, bool increment, bool inWhere) override {
+    if (useBindVars)
+      return "?";
     if (increment) {
       mobs::MobsMemberInfo mi;
       mem.memInfo(mi);
@@ -130,6 +140,8 @@ public:
   virtual size_t readIndexValue(const std::string &name) override { return 1; }
   virtual void startReading() override {}
   virtual void finishReading() override {}
+
+  bool useBindVars = false;
 
 };
 
@@ -310,15 +322,17 @@ TEST(helperTest, sql) {
   a3.oa3.o2oo.resize(1);
 
   string upd;
+  sd.useBindVars = true;
   EXPECT_EQ("insert into D.ObjA3(p3p,o_k2kk,o_s2s,k3kk,version) values (?,?,?,?,?);", gsql.insertUpdStatement(true, upd));
   EXPECT_FALSE(gsql.eof());
   EXPECT_EQ("update D.ObjA3 set version=version+1,p3p=?,o_k2kk=?,o_s2s=? where k3kk=? and version=?;", upd);
   EXPECT_EQ("insert into D.ObjA3_o2oo(a1bc,c1de,f1gh,k3kk,o_oo_ix) values (?,?,?,?,?);", gsql.insertUpdStatement(false, upd));
   EXPECT_FALSE(gsql.eof());
   EXPECT_EQ("update D.ObjA3_o2oo set a1bc=?,c1de=?,f1gh=? where k3kk=? and o_oo_ix=?;", upd);
-  EXPECT_EQ("delete from D.ObjA3_o2oo where k3kk=0 and o_oo_ix> 0;", gsql.insertUpdStatement(false, upd));
+  EXPECT_EQ("delete from D.ObjA3_o2oo where k3kk=? and o_oo_ix>?;", gsql.insertUpdStatement(false, upd));
   EXPECT_EQ("", upd);
   EXPECT_TRUE(gsql.eof());
+  sd.useBindVars = false;
 
 
   EXPECT_EQ("update D.ObjA3 set version=1,p3p='',o_k2kk=0,o_s2s='' where k3kk=0 and version=0;", gsql.updateStatement(true));

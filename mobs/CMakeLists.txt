@@ -20,6 +20,10 @@ if(BUILD_MONGO_INTERFACE)
 endif()
 
 
+if(BUILD_SQLITE_INTERFACE)
+    set(libSrcs ${libSrcs} sqlite.cpp sqlite.h)
+endif()
+
 if(BUILD_MARIA_INTERFACE)
     include_directories("/usr/local/include/mysql")
 
@@ -48,6 +52,10 @@ endif()
 
 if(BUILD_MARIA_INTERFACE)
     target_compile_definitions(mobs PUBLIC USE_MARIA)
+endif()
+
+if(BUILD_SQLITE_INTERFACE)
+    target_compile_definitions(mobs PUBLIC USE_SQLITE)
 endif()
 
 if(BUILD_INFORMIX_INTERFACE)

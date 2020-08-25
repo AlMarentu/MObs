@@ -55,7 +55,7 @@ void worker(mobs::DatabaseInterface &dbi) {
     f2.zugmaschiene.achsen(2);
     f2.zugmaschiene.antrieb(true);
     f2.haenger[0].typ("Anhänger");
-    f2.haenger[0].achsen(2);
+    f2.haenger[0].achsen(1);
 
     // Tabelle/Collection löschen !!!
     dbi.dropAll(f1);
@@ -66,6 +66,7 @@ void worker(mobs::DatabaseInterface &dbi) {
     dbi.save(f2);
 
     f2.typ("Schlepper mit 2 Anhängern");
+    f2.haenger[0].achsen(2);
     f2.haenger[1].typ("Anhänger");
     f2.haenger[1].achsen(2);
     dbi.save(f2);
@@ -213,8 +214,12 @@ int main(int argc, char* argv[])
     dbMgr.addConnection("my_mongo", mobs::ConnectionInformation("mongodb://localhost:27017", "mobs"));
     dbMgr.addConnection("my_maria", mobs::ConnectionInformation("mariadb://localhost", "mobs"));
     dbMgr.addConnection("my_informix", mobs::ConnectionInformation("informix://ol_informix1210", "mobs", "informix", "db"));
+    dbMgr.addConnection("my_sqlite", mobs::ConnectionInformation("sqlite://sqlite.db", ""));
+    dbMgr.addConnection("my_sqlitem", mobs::ConnectionInformation("sqlite://:memory:", ""));
 
-    mobs::DatabaseInterface dbi = dbMgr.getDbIfc("my_mongo");
+//    mobs::DatabaseInterface dbi = dbMgr.getDbIfc("my_mongo");
+    mobs::DatabaseInterface dbi = dbMgr.getDbIfc("my_sqlite");
+//    mobs::DatabaseInterface dbi = dbMgr.getDbIfc("my_maria");
 //    mobs::DatabaseInterface dbi = dbMgr.getDbIfc("my_informix");
 
     gespann::worker(dbi);

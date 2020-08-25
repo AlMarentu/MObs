@@ -406,6 +406,7 @@ Die Entwicklung erfolgt mit clang version 11.0.3
 Build und Installation erfolgen über cmake
 Folgende Defines können angegeben werden:
 - BUILD_MARIA_INTERFACE
+- BUILD_SQLITE_INTERFACE
 - BUILD_MONGO_INTERFACE
 - BUILD_INFORMIX_INTERFACE
 - BUILD_DOC
@@ -418,23 +419,37 @@ hier kann für ältere Versionen INFORMIX_DTFMT_BUG definiert werden
 
 ## Datenbanken
 
-Unterstützte Funktionen
+### Unterstützte Funktionen
 
-| Datenbanken | MariaDB | MongoDB | Informix | 
-|-------------|---------|---------|----------|
-| uint64_t    | +       | +       | -        |
-| MTime Auflösung | 1 µs    | 1000 µs | 10 µs    |
-| Blob        | -       | -       | -        |
-| Transaktionen | +     | -       | +        |
+| Datenbanken | MariaDB | MongoDB | SQLite | Informix | 
+|-------------|---------|---------|--------|----------|
+| uint64_t    | +       | +       | -      | -        |
+| MTime Auflösung | 1 µs    | 1000 µs | 1µs | 10 µs   |
+| Blob        | -       | -       | -       | -       |
+| Transaktionen | +     | -       | +       | +       |
+| DB-Name     | +       | +       | ignored | +       |
+| Zugriffskonrtrolle | + | -      | -       | +       |
 
-##TODOs
+* Informix benötigt eine Environment-Variable CLIENT_LOCALE die auf einen UTF-8 Zeichensatz
+ gestellt ist z.B.: de_DE.UTF8
+ 
+### URLs
+* mariadb://\<host>\[.\<port>] 
+* mongodb://\<host>\[.\<port>] 
+* sqlite://\<file>
+* sqlite://:memory: 
+* informix://\<sql_host_entry> 
+
+
+## TODOs
 
 * Bei MongoDB werden Transaktionen nur im Cluster-Mode unterstützt
+* Zugriffskontrolle Mongo
 * AuditTrail: Werte mit mehr als 200 Zeichen in mehrere Objekte aufteilen
 * Sortierung bei QBE
 * BLOBs in DB speichern
+* SQLite: Datum nicht als string speichern
 * DB: Isolation, transaction level, timeouts, skip, limit
-* SQLite
 
 
 
@@ -456,6 +471,7 @@ Unterstützte Funktionen
 * mchrono.h Definitionen für Zeit und Datum aus std::chrono
 * maria.h Datenbankinterface 
 * mongo.h Datenbankinterface 
+* sqlite.h Datenbankinterface 
 * informix.h Datenbankinterface 
 * infxtools.h Hilfsfunktionen Informix
 
