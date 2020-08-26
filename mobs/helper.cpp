@@ -19,7 +19,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "helper.h"
-
+//#include <strstream>
 
 using namespace mobs;
 using namespace std;
@@ -466,7 +466,7 @@ public:
   bool doArrayBeg(const MemBaseVector &vec) final
   {
     vector<pair<string, size_t>> k = current.arrayKeys;
-
+//std::stringstream s; for (auto i:k)  s << " " << i.first << "," << i.second; LOG(LM_INFO, "KKKKKK " << s.str());
     if (level == 0) {
 //      LOG(LM_DEBUG, "START VEC " << vec.getName(cth));
       key.push(true);
@@ -1147,12 +1147,17 @@ string SqlGenerator::doSelect(SqlGenerator::DetailInfo &di) {
   // In ExtractSql wurden die Vektoren der nächsten Ebene auf Size=1 gesetzt
   gs.withCleaner = false;
   gs.current = di;
+  // bei Select mit Laufindex des aktuellen Objektes beginnen
+  while (gs.current.arrayKeys.size() > 1)
+    gs.current.arrayKeys.erase(gs.current.arrayKeys.begin());
   gs.addText("select ");
   di.vec->traverse(gs);
   gs.addText(" from ");
   gs.addText(sqldb.tableName(vecTableName(di.vec, di.tableName)));
   gs.addText(" where ");
   gs.setMode(GenerateSql::Where);
+  // bei der Where-Bedingung wieder alle Keys prüfen
+  gs.current = di;
   obj.traverseKey(gs);
   di.vec->traverse(gs);
   gs.detailVec.clear();
@@ -1455,9 +1460,10 @@ void AuditTrail::doMem(const MemberBase &mem) {
 
   do {
     string v;
-    if (max_val_size > 0 and val.length() > max_val_size) {
-      v = val.substr(0, max_val_size);
-      val.erase(0, max_val_size);
+    if (maxValSize > 0 and val.length() > maxValSize) {
+      v = val.substr(0, maxValSize -1);
+      v += '\\';  // Marker am Zeilenende wenn Folgezeile kommt, um trailing spaces zu kapseln
+      val.erase(0, maxValSize -1);
     } else
       v.swap(val);
     act.objects.back().changes[MemBaseVector::nextpos].field(name);
@@ -1466,7 +1472,24 @@ void AuditTrail::doMem(const MemberBase &mem) {
   } while (not val.empty());
 }
 
-  
+void AuditObjects::unsplit() {
+  if (changes.size() <= 1)
+    return;
+  size_t j = 0;
+  for (size_t i = 1; i < changes.size(); i++) {
+    string s = changes[j].value();
+    if (not s.empty() and s[s.length()-1] == '\\' and changes[i].field() == changes[j].field()) {
+      s.replace(s.length() -1, 1, changes[i].value());
+      changes[j].value(s);
+    }
+    else {
+      j++;
+      if (i != j)
+        changes[j] = changes[i];
+    }
+  }
+  changes.resize(j+1);
+}
 
 
 }

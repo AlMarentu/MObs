@@ -266,9 +266,9 @@ void DbTransaction::doAuditSave(const ObjectBase &obj, const DatabaseInterface &
   auto s = data->connections.find(&*dbi.getConnection());
   if (s == data->connections.end())
     return;
-  
+
   AuditTrail at(s->second.audit[dbi.database()]);
-  at.max_val_size = dbi.maxAuditChangesValueSize();
+  at.maxValSize = dbi.maxAuditChangesValueSize();
   obj.traverse(at);
 }
 
@@ -278,7 +278,7 @@ void DbTransaction::doAuditDestroy(const ObjectBase &obj, const DatabaseInterfac
     return;
 
   AuditTrail at(s->second.audit[dbi.database()]);
-  at.max_val_size = dbi.maxAuditChangesValueSize();
+  at.maxValSize = dbi.maxAuditChangesValueSize();
   at.destroyObj();
   obj.traverse(at);
 }

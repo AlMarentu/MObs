@@ -219,6 +219,8 @@ public:
   MemVar(std::string, objectKey, LENGTH(80));
   MemVector(AuditChanges, changes, COLNAME(auditChanges));
 
+  /// fügt gesplittete changes.values wieder zusammen
+  void unsplit();
 };
 
 /// Datenbank-Objekt für Audit-Trail
@@ -256,7 +258,7 @@ public:
   /// Wenn Startwerte nicht gespeichert werden sollen (sind eigentlich redundant) auf false setzen
   static bool s_saveInitialValues;
   /// Maximale Value-Size für ein AuditChanges-Objekt
-  size_t max_val_size = 200;
+  size_t maxValSize = 200;
 
 private:
   AuditActivity &act;

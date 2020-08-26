@@ -50,9 +50,9 @@ std::string to_quote(const std::string &s) {
   {
     size_t pos = 0;
     size_t pos2 = 0;
-    while ((pos = s.find('"', pos2)) != string::npos)
+    while ((pos = s.find_first_of("\"\\", pos2)) != string::npos)
     {
-      result += s.substr(pos2, pos - pos2) + "\\\"";
+      result += s.substr(pos2, pos - pos2) + "\\" + s[pos];
       pos2 = pos+1;
     }
     result += s.substr(pos2);
@@ -67,9 +67,9 @@ std::string to_squote(const std::string &s) {
   {
     size_t pos = 0;
     size_t pos2 = 0;
-    while ((pos = s.find('\'', pos2)) != string::npos)
+    while ((pos = s.find_first_of("\'\\", pos2)) != string::npos)
     {
-      result += s.substr(pos2, pos - pos2) + "\\'";
+      result += s.substr(pos2, pos - pos2) + "\\" + s[pos];
       pos2 = pos+1;
     }
     result += s.substr(pos2);
