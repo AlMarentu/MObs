@@ -476,4 +476,20 @@ void MobsMemberInfo::changeCompact(bool compact) {
 }
 
 
+bool StrConv<float>::c_string2x(const std::string &str, float &t, const ConvFromStrHint &) {
+  return mobs::string2x(str, t);
+}
+
+bool StrConv<float>::c_wstring2x(const std::wstring &wstr, float &t, const ConvFromStrHint &cth) {
+  return c_string2x(mobs::to_string(wstr), t, cth);
+}
+
+bool StrConv<double>::c_wstring2x(const std::wstring &wstr, double &t, const ConvFromStrHint &cth) {
+  return c_string2x(mobs::to_string(wstr), t, cth);
+}
+
+bool StrConv<double>::c_string2x(const std::string &str, double &t, const ConvFromStrHint &) {
+  return mobs::string2x(str, t);
+}
+
 }

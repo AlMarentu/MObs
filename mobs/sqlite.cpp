@@ -132,7 +132,7 @@ public:
     if (useBind) {
       if (mem.isNull())
         binding.emplace_back(make_pair(MobsMemberInfo(), nullptr));
-      else if (mi.isSigned or mi.isUnsigned or mi.isFloat)
+      else if (mi.isSigned or mi.isUnsigned or mi.isFloat or mi.isBlob)
         binding.emplace_back(make_pair(mi, nullptr));
       else {
         const string &value = mem.toStr(mobs::ConvToStrHint(compact));
@@ -191,6 +191,12 @@ public:
       } else if (mi.isUnsigned and mi.max == 1) {// bool
         mi.u64 = value == "0" ? 0 : 1;
         ok = mem.fromMemInfo(mi);
+      } else if (mi.isBlob) {
+        mi.blob = sqlite3_column_blob(stmt, pos);
+        if (not mi.blob)
+          throw runtime_error(u8"is not a blob");
+        mi.u64 = n;
+        ok = mem.fromMemInfo(mi);
       } else //if (mem.is_chartype(mobs::ConvToStrHint(compact)))
         ok = mem.fromStr(value, not compact ? ConvFromStrHint::convFromStrHintExplizit : ConvFromStrHint::convFromStrHintDflt);
 
@@ -237,6 +243,8 @@ public:
         rc = sqlite3_bind_int64(pStmt, i, mi.u64);
       } else if (mi.isFloat)
         rc = sqlite3_bind_double(pStmt, i, mi.d);
+      else if (mi.isBlob)
+        rc = sqlite3_bind_blob64(pStmt, i, mi.blob, mi.u64, nullptr);
       else if (v.second)
         rc = sqlite3_bind_text(pStmt, i, v.second, -1, nullptr);
       else

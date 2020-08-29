@@ -116,14 +116,9 @@ public:
     }
     else if (mi.isBlob)
     {
-      auto p = dynamic_cast<const MemVarType(vector<u_char>) *>(&mem);
-      if (p)
-      {
-        const vector<u_char> &v = p->operator()();
-        bin.size = int32_t(v.size());
-        bin.bytes = reinterpret_cast<const u_char *>(&v[0]);
-        useChar = false;
-      }
+      bin.size = int32_t(mi.u64);
+      bin.bytes = (uint8_t *)mi.blob;
+      useChar = false;
     }
 
     if (mem.isNull())
@@ -366,14 +361,9 @@ public:
     }
     else if (mi.isBlob)
     {
-      auto p = dynamic_cast<const MemVarType(vector<u_char>) *>(&mem);
-      if (p)
-      {
-        const vector<u_char> &v = p->operator()();
-        bin.size = int32_t(v.size());
-        bin.bytes = reinterpret_cast<const u_char *>(&v[0]);
-        useChar = false;
-      }
+      bin.size = int32_t(mi.u64);
+      bin.bytes = (uint8_t *)mi.blob;
+      useChar = false;
     }
 
     if (inArray() and not noArrays)
@@ -557,13 +547,10 @@ public:
                   throw runtime_error(u8"invalid type, can't assign");
                 break;
               case bsoncxx::type::k_binary: {
-                if (not mi.isBlob)
+                mi.blob = e.get_binary().bytes;
+                mi.u64 = e.get_binary().size;
+                if (not mi.isBlob or not member()->fromMemInfo(mi))
                   throw runtime_error(u8"invalid type, can't assign blob");
-                auto p = dynamic_cast<MemVarType(vector<u_char>) *>(member());
-                if (not p)
-                  throw runtime_error(u8"invalid type, can't assign blob");
-                u_char *cp = (u_char *) e.get_binary().bytes;
-                p->emplace(vector<u_char>(cp, cp + e.get_binary().size));
                 break;
               }
               default:
@@ -621,7 +608,7 @@ using mongocxx::v_noabi::client_session;
 
 class MongoTransactionDbInfo : public TransactionDbInfo {
 public:
-  MongoTransactionDbInfo(client_session &&cs) : session(std::move(cs)) {}
+  explicit MongoTransactionDbInfo(client_session &&cs) : session(std::move(cs)) {}
   client_session session;
 };
 

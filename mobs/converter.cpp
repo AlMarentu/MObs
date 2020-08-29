@@ -406,5 +406,17 @@ std::wstring StrConv<std::vector<u_char>>::c_to_wstring(const std::vector<u_char
   return u;
 }
 
+bool StrConv<std::vector<u_char>>::c_from_blob(const void *p, uint64_t sz, vector<u_char> &t) {
+  if (not p)
+    return false;
+  t = std::move(std::vector<u_char>((u_char *)p, (u_char *)p + sz));
+  return true;
+}
+
+bool StrConv<std::vector<u_char>>::c_to_blob(const vector<u_char> &t, const void *&p, uint64_t &sz) {
+  p = (void *)&t[0]; sz = t.size();
+  return true;
+}
+
 
 }

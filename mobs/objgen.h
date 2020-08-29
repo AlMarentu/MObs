@@ -893,7 +893,9 @@ void Member<T, C>::memInfo(MobsMemberInfo &i) const
   i.isBlob = this->c_is_blob();
   i.isEnum = this->c_is_mobsEnum();
   i.granularity = this->c_time_granularity();
-  if (i.granularity <= 0)
+  if (i.isBlob)
+    i.isBlob = C::c_to_blob(wert, i.blob, i.u64);
+  else if (i.granularity <= 0)
     i.granularity = 1;
 }
 
@@ -903,7 +905,8 @@ bool  Member<T, C>::fromMemInfo(const MobsMemberInfo &i) {
   if ((i.isFloat and C::c_from_double(i.d, wert)) or
       (i.isSigned and C::c_from_int(i.i64, wert)) or
       (i.isUnsigned and C::c_from_uint(i.u64, wert)) or
-      (i.isTime and C::c_from_mtime(i.t64, wert))) {
+      (i.isTime and C::c_from_mtime(i.t64, wert)) or
+      (i.isBlob and C::c_from_blob(i.blob, i.u64, wert))) {
     activate();
     return true;
   }

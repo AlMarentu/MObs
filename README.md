@@ -425,10 +425,12 @@ hier kann für ältere Versionen INFORMIX_DTFMT_BUG definiert werden
 |-------------|---------|---------|--------|----------|
 | uint64_t    | +       | +       | -      | -        |
 | MTime Auflösung | 1 µs    | 1000 µs | 1µs | 10 µs   |
-| Blob        | -       | -       | -       | -       |
+| Blob-Variable | 1     | +      | +       | 1       |
 | Transaktionen | +     | -       | +       | +       |
-| DB-Name     | +       | +       | ignored | +       |
-| Zugriffskontrolle | + | -       | -       | +       |
+| DB-Name     | +       | +       | -       | +       |
+| Zugriffskontrolle (Login) | + | -       | -       | +       |
+
+1. Binärdaten werden als BASE64 im Varchar gespeichert
 
 * Informix benötigt eine Environment-Variable CLIENT_LOCALE die auf einen UTF-8 Zeichensatz
  gestellt ist z.B.: de_DE.UTF8

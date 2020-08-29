@@ -647,11 +647,12 @@ public:
   bool isBlob = false; ///< Binär-Daten-Objekt
   bool hasCompact = false; ///< hat member Compact-Modus
   int64_t i64 = 0; ///< Inhalt des Wertes wenn signed (unabhängig von \c isNull)
-  uint64_t u64 = 0; ///< Inhalt des Wertes wenn unsigned (unabhängig von \c isNull)
+  uint64_t u64 = 0; ///< Inhalt des Wertes wenn unsigned oder Blob-Size in Bytes (unabhängig von \c isNull)
   int64_t t64 = 0; ///< Inhalt des Wertes wenn isTime in Mikrosekunden seit Epoche (unabhängig von \c isNull)
   int64_t min = 0; ///< Minimalwert des Datentyps
   uint64_t max = 0; ///< Maximalwert des Datentyps
   uint64_t granularity = 0; ///< Körnung des Datentyps nur bei \c isTime; 1 = Mikrosekunden
+  const void *blob = nullptr;
   double d = 0.0;
   unsigned int size = 0; ///< sizeof wenn is_specialized
   /// fülle ein Time-Struct mit local time (nur wenn isTime == true)
@@ -730,6 +731,10 @@ public:
   static bool c_to_uint64(T t, uint64_t &) { return false; }
   /// Wandeln in int64
   static bool c_to_int64(T t, int64_t &) { return false; }
+  /// Zeiger auf Byte Array
+  static bool c_to_blob(const T &t, const void *&, uint64_t &) { return false; }
+  /// Blob einlesen
+  static inline bool c_from_blob(const void *p, uint64_t sz, T &) { return false; }
   /// Wandeln in MTime
   static bool c_from_mtime(int64_t i, T &t) { return false; }
   /// Einlesen von MTime
@@ -794,9 +799,9 @@ template <>
 class StrConv<float> : public StrConvBaseT<float> {
 public:
   /// \private
-  static inline bool c_string2x(const std::string &str, float &t, const ConvFromStrHint &) { return mobs::string2x(str, t); }
+  static  bool c_string2x(const std::string &str, float &t, const ConvFromStrHint &);
   /// \private
-  static inline bool c_wstring2x(const std::wstring &wstr, float &t, const ConvFromStrHint &cth) { return c_string2x(mobs::to_string(wstr), t, cth); }
+  static  bool c_wstring2x(const std::wstring &wstr, float &t, const ConvFromStrHint &cth);
   /// \private
   static inline std::string c_to_string(const float &t, const ConvToStrHint &) { return to_string(t); };
   /// \private
@@ -809,14 +814,16 @@ public:
   static inline bool c_from_double(double d, float &t) { t = d; return true; }
 };
 
+
+
 template <>
 /// \private
 class StrConv<double> : public StrConvBaseT<double> {
 public:
   /// \private
-  static inline bool c_string2x(const std::string &str, double &t, const ConvFromStrHint &) { return mobs::string2x(str, t); }
+  static bool c_string2x(const std::string &str, double &t, const ConvFromStrHint &);
   /// \private
-  static inline bool c_wstring2x(const std::wstring &wstr, double &t, const ConvFromStrHint &cth) { return c_string2x(mobs::to_string(wstr), t, cth); }
+  static bool c_wstring2x(const std::wstring &wstr, double &t, const ConvFromStrHint &cth);
   /// \private
   static inline std::string c_to_string(const double &t, const ConvToStrHint &) { return to_string(t); };
   /// \private
@@ -828,6 +835,7 @@ public:
   /// \private
   static inline bool c_from_double(double d, double &t) { t = d; return true; }
 };
+
 
 template <>
 /// \private
@@ -843,6 +851,10 @@ public:
   static std::wstring c_to_wstring(const std::vector<u_char> &t, const ConvToStrHint &);
   /// \private
   static inline bool c_is_blob() { return true; }
+  /// \private
+  static bool c_to_blob(const std::vector<u_char> &t, const void *&p, uint64_t &sz);
+  /// \private
+  static bool c_from_blob(const void *p, uint64_t sz, std::vector<u_char> &t);
 };
 
 template <typename T>
