@@ -157,10 +157,19 @@ public:
     return res.str();
   }
 
+  void startWriting() override
+  {
+    LOG(LM_INFO, "START");
+    fldCnt = 0;
+    pos = 0;
+  }
+
+  void finishWriting() override {
+    LOG(LM_INFO, "FINISH");
+  }
+
   std::string valueStmtIndex(size_t i) override {
     LOG(LM_DEBUG, "Informix SqlVar index: " << fldCnt << "=" << i);
-    if (fldCnt == 0)
-      pos = 0;
     ifx_sqlvar_t &sql_var = descriptor->sqlvar[fldCnt++];
     memset(&sql_var, 0, sizeof(ifx_sqlvar_t));
     descriptor->sqld = fldCnt;
@@ -174,8 +183,6 @@ public:
     LOG(LM_DEBUG, "Informix SqlVar DBJSON: " << tx);
     if (not descriptor or not buf)
       return isNull ? string("null"):mobs::to_quote(tx);
-    if (fldCnt == 0)
-      pos = 0;
     ifx_sqlvar_t &sql_var = descriptor->sqlvar[fldCnt++];
     memset(&sql_var, 0, sizeof(ifx_sqlvar_t));
     descriptor->sqld = fldCnt;
@@ -211,8 +218,6 @@ public:
     }
   }
   std::string valueStmt(const MemberBase &mem, bool compact, bool increment, bool inWhere) override {
-    if (fldCnt == 0)
-      pos = 0;
     MobsMemberInfo mi;
     mem.memInfo(mi);
     mi.changeCompact(compact);
@@ -701,7 +706,7 @@ void InformixDatabaseConnection::open() {
   if (conNr > 0)
     return;
   if (conNr < 0)
-    throw informix_exception(u8"save failed", conNr);
+    throw informix_exception(u8"open failed", conNr);
   throw runtime_error("informix: error connecting to db");
 }
 
@@ -723,7 +728,6 @@ bool InformixDatabaseConnection::load(DatabaseInterface &dbi, ObjectBase &obj) {
 }
 
 void InformixDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj) {
-  const int UNIQCONSTRAINT=-268;
   open();
   SQLInformixdescription sd(dbi.database());
   mobs::SqlGenerator gsql(obj, sd);
@@ -755,45 +759,49 @@ void InformixDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &
   int64_t version = gsql.getVersion();
   LOG(LM_DEBUG, "VERSION IS " << version);
 
+  bool insertOnly = version == 0;
+  bool updateOnly = version > 0;
   try {
     string s;
     string upd;
-    if (version > 0) // bei unsicher (-1) immer erst insert probieren
+    if (insertOnly)
+      s = gsql.insertStatement(true);
+    else if (updateOnly)
       s = gsql.updateStatement(true);
-    else
+    else {// bei unsicher (-1) immer erst update probieren
       s = gsql.insertUpdStatement(true, upd);
+      if (not upd.empty()) s.swap(upd); // failed update is faster then insert
+    }
     LOG(LM_DEBUG, "SQL " << s);
     int e = infx_exec_desc(s.c_str(), &descriptor);
-    if (version < 0 and e == UNIQCONSTRAINT and not upd.empty()) {  // try update
-      LOG(LM_DEBUG, "Uniq Constraint error -> try update");
+    int rows = infx_processed_rows();
+    if (not e and not insertOnly and not updateOnly and rows == 0 and not upd.empty()) {  // try insert
       LOG(LM_DEBUG, "SQL " << upd);
       e = infx_exec_desc(upd.c_str(), &descriptor);
+      insertOnly = true;
     }
     if (e)
       throw informix_exception(u8"save failed", e);
-    if (version > 0 and infx_processed_rows() != 1)
+    if (version > 0 and rows != 1)
       throw runtime_error(u8"number of processed rows is " + to_string(infx_processed_rows()) + " should be 1");
 
     while (not gsql.eof()) {
-      sd.fldCnt = 0;
-      s = gsql.insertUpdStatement(false, upd);
+      if (insertOnly)
+        s = gsql.insertStatement(false);
+      else {
+        s = gsql.insertUpdStatement(false, upd);
+        if (not upd.empty()) s.swap(upd);
+      }
       LOG(LM_DEBUG, "SQL " << s);
       e = infx_exec_desc(s.c_str(), &descriptor);
-      if (e == UNIQCONSTRAINT and not upd.empty()) {  // try update
-        LOG(LM_DEBUG, "Uniq Constraint error -> try update");
+      int rows = infx_processed_rows();
+      if (not insertOnly and not e and rows == 0 and not upd.empty()) {  // try insert
         LOG(LM_DEBUG, "SQL " << upd);
         e = infx_exec_desc(upd.c_str(), &descriptor);
       }
       if (e)
         throw informix_exception(u8"save failed", e);
     }
-
-
-
-
-
-
-
 
   } catch (runtime_error &exc) {
     string s = "ROLLBACK WORK";
@@ -863,7 +871,6 @@ bool InformixDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBas
   bool found = false;
   try {
     for (bool first = true; first or not gsql.eof(); first = false) {
-      sd.fldCnt = 0;
       string s = gsql.deleteStatement(first);
       LOG(LM_DEBUG, "SQL " << s);
       int e = infx_exec_desc(s.c_str(), &descriptor);
@@ -926,7 +933,6 @@ void InformixDatabaseConnection::dropAll(DatabaseInterface &dbi, const ObjectBas
 }
 
 void InformixDatabaseConnection::structure(DatabaseInterface &dbi, const ObjectBase &obj) {
-  const int EXISTS = -310;
   open();
   SQLInformixdescription sd(dbi.database());
   mobs::SqlGenerator gsql(obj, sd);
@@ -935,7 +941,7 @@ void InformixDatabaseConnection::structure(DatabaseInterface &dbi, const ObjectB
     string s = gsql.createStatement(first);
     LOG(LM_DEBUG, "SQL " << s);
     int e = infx_execute(s.c_str());
-    if (e and e != EXISTS)
+    if (e)
       throw informix_exception(u8"create failed", e);
   }
 }

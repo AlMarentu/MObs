@@ -410,24 +410,31 @@ void MariaDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj
   int64_t version = gsql.getVersion();
   LOG(LM_DEBUG, "VERSION IS " << version);
 
+  bool insertOnly = version == 0;
   try {
     string s;
-    if (version == -1)
-      s = gsql.replaceStatement(true);
+    if (insertOnly)
+      s = gsql.insertStatement(true);
     else if (version > 0)
       s = gsql.updateStatement(true);
     else
-      s = gsql.insertStatement(true);
+      s = gsql.replaceStatement(true);
     LOG(LM_DEBUG, "SQL " << s);
     if (mysql_real_query(connection, s.c_str(), s.length()))
       throw mysql_exception(u8"save failed", connection);
-    LOG(LM_DEBUG, "ROWS " << mysql_affected_rows(connection));
-    // wenn sich, obwohl gefunden, nichts geändert hat wird hier auch 0 geliefert - die Version muss sich aber immer ändern
-    if (version > 0 and mysql_affected_rows(connection) != 1)
+    int rows = mysql_affected_rows(connection);
+    LOG(LM_DEBUG, "ROWS " << rows);
+    // update: wenn sich, obwohl gefunden, nichts geändert hat wird hier auch 0 geliefert - die Version muss sich aber immer ändern
+    // replace: 2, wenn wenn zuvor delete nötig
+    if (version > 0 and rows != 1)
       throw runtime_error(u8"number of processed rows is " + to_string(mysql_affected_rows(connection)) + " should be 1");
-
+    if (not insertOnly and version < 0 and rows == 1) // wen bei replace 1 geliefert wird war es ein insert
+      insertOnly = true;
     while (not gsql.eof()) {
-      s = gsql.replaceStatement(false);
+      if (insertOnly) // Bei insert MasterTable reicht auch ein insert auf SubElemente
+        s = gsql.insertStatement(false);
+      else
+        s = gsql.replaceStatement(false);
       LOG(LM_DEBUG, "SQL " << s);
       if (mysql_real_query(connection, s.c_str(), s.length()))
         throw mysql_exception(u8"save failed", connection);

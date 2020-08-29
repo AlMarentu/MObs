@@ -38,14 +38,8 @@ public:
   /// Aufbau des Tabellennamen
   virtual std::string tableName(const std::string &tabnam) = 0;
 
-  /// Erzeuge SQL-Fragment für einen Index-Wert
-  virtual std::string valueStmtIndex(size_t i) = 0;
-
   /// Erzeuge SQL-Fragment für einen Index Eintrag
   virtual std::string createStmtIndex(std::string name) = 0;
-
-  /// Erzeuge SQL-Fragment für einen Index-Wert
-  virtual std::string valueStmtText(const std::string &t, bool isNull) = 0;
 
   /// Erzeuge SQL-Fragment für einen DBJSON Eintrag
   virtual std::string createStmtText(const std::string &name, size_t len) = 0;
@@ -53,18 +47,28 @@ public:
   /// Erzeuge SQL-Create-Statement
   virtual std::string createStmt(const MemberBase &mem, bool compact) = 0;
 
+  /// Erzeuge SQL-Fragment für einen Index-Wert
+  virtual std::string valueStmtIndex(size_t i) = 0;
+
+  /// Erzeuge SQL-Fragment für einen Index-Wert
+  virtual std::string valueStmtText(const std::string &t, bool isNull) = 0;
+
   /// Erzeuge SQL-Fragment für einen Wert Eintrag
   virtual std::string valueStmt(const MemberBase &mem, bool compact, bool increment, bool inWhere) = 0;
 
-  /// Einlesen der Elemente, die Sequenz entspricht der Abfrage aus GenerateSql
-  virtual void readValue(MemberBase &mem, bool compact) = 0;
-
-  /// Einlesen der DBJSON Elemente, die Sequenz entspricht der Abfrage aus GenerateSql
-  virtual void readValueText(const std::string &name, std::string &text, bool &null) = 0;
+  /// Callback zum Start der Variablen
+  virtual void startWriting() {};
+  /// Callback zum Ende der Variablen
+  virtual void finishWriting() {};
 
   /// Einlesen der Index-Elemente, die Sequenz entspricht der Abfrage aus GenerateSql
   virtual size_t readIndexValue(const std::string &name) = 0;
 
+  /// Einlesen der DBJSON Elemente, die Sequenz entspricht der Abfrage aus GenerateSql
+  virtual void readValueText(const std::string &name, std::string &text, bool &null) = 0;
+
+  /// Einlesen der Elemente, die Sequenz entspricht der Abfrage aus GenerateSql
+  virtual void readValue(MemberBase &mem, bool compact) = 0;
 
   /// Callback zum Start des Einlesens
   virtual void startReading() {};

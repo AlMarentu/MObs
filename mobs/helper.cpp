@@ -384,7 +384,9 @@ class GenerateSql : virtual public ObjTravConst {
 public:
   enum Mode { Where, Fields, Values, Update, Create, FldVal, FldVal2 };
   explicit GenerateSql(Mode m, SQLDBdescription &s, const ConvObjToString& c) : current(nullptr, "", {}), mode(m),
-  cth(c.exportPrefix().exportAltNames()), sqldb(s) { }
+  cth(c.exportPrefix().exportAltNames()), sqldb(s) { sqldb.startWriting(); }
+
+  ~GenerateSql() { sqldb.finishWriting(); }
 
   string delimiter() noexcept {  if (not fst) return mode == Where ? " and ": ","; fst = false; return string(); }
 
