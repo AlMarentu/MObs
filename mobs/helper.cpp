@@ -508,6 +508,7 @@ public:
         }
         else if (mode == Fields) {
           res << delimiter() << name;
+          res2 << name; // für order by
 //        } else if (mode == Update) {
           // Keinen Key ausgeben
         }
@@ -1163,6 +1164,8 @@ string SqlGenerator::doSelect(SqlGenerator::DetailInfo &di) {
   obj.traverseKey(gs);
   di.vec->traverse(gs);
   gs.detailVec.clear();
+  gs.addText(" order by ");
+  gs.addText(gs.result2());
   gs.addText(";");
   return gs.result();
 }
