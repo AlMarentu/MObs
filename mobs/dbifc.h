@@ -39,6 +39,34 @@ class DatabaseInterface;
 class DbTransaction;
 class DatabaseManager;
 
+/** \brief Exception falls Datenbank temporär geblocked oder nicht verfügbar
+ *
+ */
+class locked_error : public std::runtime_error {
+public:
+  /// \private
+  explicit locked_error(const std::string &e) : std::runtime_error(e) {}
+};
+
+/** \brief Exception falls bei save(..) oder destroy() der optimistic lock nicht geklappt hat
+ *
+ * für optimistic locking muss ein Versions-Element vorhanden sein
+ */
+ class optLock_error : public std::runtime_error {
+public:
+  /// \private
+  explicit optLock_error(const std::string &e) : std::runtime_error(e) {}
+};
+
+/** \brief Exception falls Datenbank beim save(..) einen unique constraint verletzt
+ *
+ */
+ class duplicateValue_error : public std::runtime_error {
+public:
+  /// \private
+  explicit duplicateValue_error(const std::string &e) : std::runtime_error(e) {}
+};
+
 /// \private
 class TransactionDbInfo {
 

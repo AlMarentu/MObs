@@ -425,12 +425,13 @@ hier kann für ältere Versionen INFORMIX_DTFMT_BUG definiert werden
 |-------------|---------|---------|--------|----------|
 | uint64_t    | +       | +       | -      | -        |
 | MTime Auflösung | 1 µs    | 1000 µs | 1µs | 10 µs   |
-| Blob-Variable | 1     | +      | +       | 1       |
+| Binary-Variable | Varchar | binary | blob | Varchar |
 | Transaktionen | +     | -       | +       | +       |
 | DB-Name     | +       | +       | -       | +       |
 | Zugriffskontrolle (Login) | + | -       | -       | +       |
 
-1. Binärdaten werden als BASE64 im Varchar gespeichert
+* Binärdaten werden bei MariaDB und Informix als BASE64 im Varchar gespeichert
+* Zeitangaben werden bei SQLite als Text gespeichert
 
 * Informix benötigt eine Environment-Variable CLIENT_LOCALE die auf einen UTF-8 Zeichensatz
  gestellt ist z.B.: de_DE.UTF8
@@ -448,7 +449,7 @@ hier kann für ältere Versionen INFORMIX_DTFMT_BUG definiert werden
 * Bei MongoDB werden Transaktionen nur im Cluster-Mode unterstützt
 * Zugriffskontrolle Mongo
 * Sortierung bei QBE
-* BLOBs in DB speichern
+* MariaDB + Informix: Blob unterstützen 
 * SQLite: Datum nicht als string speichern
 * DB: Isolation, transaction level, timeouts, skip, limit
 

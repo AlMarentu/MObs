@@ -295,10 +295,10 @@ TEST(helperTest, sql) {
   EXPECT_TRUE(gsql.eof());
 
   a3.clearModified();
-  EXPECT_EQ("create table D.ObjA3(k3kk INT NOT NULL,version INT NOT NULL,p3p VARCHAR(30) NOT NULL,o_k2kk INT NOT NULL,o_s2s VARCHAR(30) NOT NULL, unique(k3kk));",
+  EXPECT_EQ("create table D.ObjA3(k3kk INT NOT NULL,version INT NOT NULL,p3p VARCHAR(30) NOT NULL,o_k2kk INT NOT NULL,o_s2s VARCHAR(30) NOT NULL, primary key (k3kk));",
             gsql.createStatement(true));
   EXPECT_FALSE(gsql.eof());
-  EXPECT_EQ("create table D.ObjA3_o2oo(k3kk INT NOT NULL,o_oo_ix INT NOT NULL,a1bc VARCHAR(30) NOT NULL,c1de INT NOT NULL,f1gh INT NOT NULL, unique(k3kk,o_oo_ix));",
+  EXPECT_EQ("create table D.ObjA3_o2oo(k3kk INT NOT NULL,o_oo_ix INT NOT NULL,a1bc VARCHAR(30) NOT NULL,c1de INT NOT NULL,f1gh INT NOT NULL, primary key (k3kk,o_oo_ix));",
             gsql.createStatement(false));
   EXPECT_TRUE(gsql.eof());
 
@@ -355,7 +355,7 @@ TEST(helperTest, sql) {
   
   mobs::SqlGenerator::DetailInfo di;
   EXPECT_FALSE(gsql.eof());
-  EXPECT_EQ("select o_oo_ix,a1bc,c1de,f1gh from D.ObjA3_o2oo where k3kk=0;", gsql.selectStatementArray(di));
+  EXPECT_EQ("select o_oo_ix,a1bc,c1de,f1gh from D.ObjA3_o2oo where k3kk=0 order by o_oo_ix;", gsql.selectStatementArray(di));
   EXPECT_TRUE(gsql.eof());
 
   a3.k3kk.forceNull();
@@ -373,7 +373,7 @@ TEST(helperTest, dbjson) {
   mobs::SqlGenerator gsql(j1, sd);
   EXPECT_EQ(R"(replace D.ObjJ1(xx,yy,zz,ll) VALUES (1, '{aa:2,bb:3,cc:4,col:"green"}',5, '[1,2,4]');)",
             gsql.replaceStatement(true));
-  EXPECT_EQ(R"(create table D.ObjJ1(xx INT NOT NULL,yy VARCHAR(99),zz INT NOT NULL,ll VARCHAR(88), unique(xx));)",
+  EXPECT_EQ(R"(create table D.ObjJ1(xx INT NOT NULL,yy VARCHAR(99),zz INT NOT NULL,ll VARCHAR(88), primary key (xx));)",
             gsql.createStatement(true));
 
   gsql.readObject(j2);

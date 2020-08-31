@@ -81,6 +81,11 @@ void logMessage(loglevel l, const std::string &message);
 /// \brief Erzeugt eine Log-Meldung auf stderr.
 #define LOG(l,x) do { std::stringstream ___s___; ___s___ << __FILE_NAME__ << ':' << __LINE__ << " " << std::boolalpha << x; logging::logMessage(l, ___s___.str()); } while(false)
 
+/// \brief Hilfs-Makro das einen Stream als std::string ausgibt
+#define STRSTR(x) ([&]()->std::string { std::stringstream ___s___; ___s___ << x; return ___s___.str(); })()
+/// \brief Makro zum Erzeugen eines Log std::string für exceptions o.ä.
+#define LOGSTR(x) STRSTR(__FILE_NAME__ << ':' << __LINE__ << ' ' << std::boolalpha << x)
+
 
 /// \brief Hilfs-Makro für TRACE, stellt Parameternamen vor Inhalt.
 #define PARAM(x) " " #x "=\"" << x << "\""

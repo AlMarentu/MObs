@@ -88,6 +88,8 @@ namespace mobs {
     sqlite3 *getConnection();
 
   private:
+    void failed();
+    void setConf(DatabaseInterface &dbi);
     sqlite3 *connection = nullptr;
     DbTransaction * currentTransaction = nullptr;
   };

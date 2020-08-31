@@ -192,6 +192,18 @@ void DatabaseManager::execute(DatabaseManager::transaction_callback &cb) {
   try {
     cb(&transaction);
     transaction.writeAuditTrail();
+  } catch (mobs::locked_error &e) {
+    LOG(LM_DEBUG, "TRANSACTION FAILED locked_error " << e.what());
+    transaction.finish(false);
+    throw mobs::locked_error(std::string(u8"DbTransaction error: ") + e.what());
+  } catch (mobs::optLock_error &e) {
+    LOG(LM_DEBUG, "TRANSACTION FAILED optLock_error " << e.what());
+    transaction.finish(false);
+    throw mobs::optLock_error(std::string(u8"DbTransaction error: ") + e.what());
+  } catch (mobs::duplicateValue_error &e) {
+    LOG(LM_DEBUG, "TRANSACTION FAILED duplicateValue_error " << e.what());
+    transaction.finish(false);
+    throw mobs::duplicateValue_error(std::string(u8"DbTransaction error: ") + e.what());
   } catch (std::runtime_error &e) {
     LOG(LM_DEBUG, "TRANSACTION FAILED runtime " << e.what());
     transaction.finish(false);
@@ -348,6 +360,15 @@ void DbTransaction::finish(bool good) {
       error = true;
       if (good) {
         LOG(LM_ERROR, "TRANSACTION FINISH FAILED " << e.what());
+        msg += " ";
+        msg += e.what();
+      }
+      else
+        LOG(LM_DEBUG, "Transaction rollback " << e.what());
+    } catch (mobs::locked_error &e) {
+      error = true;
+      if (good) {
+        LOG(LM_ERROR, "TRANSACTION FINISH FAILED WITH LOCK " << e.what());
         msg += " ";
         msg += e.what();
       }

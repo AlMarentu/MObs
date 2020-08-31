@@ -1097,7 +1097,7 @@ string SqlGenerator::doCreate(SqlGenerator::DetailInfo &di) {
   }
   detailVec.splice(detailVec.end(), gs.detailVec);
 
-  gs.addText(", unique(");
+  gs.addText(", primary key (");
   gs.setMode(GenerateSql::Fields);
   obj.traverseKey(gs);
   if (di.vec) {

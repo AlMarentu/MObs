@@ -19,6 +19,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // TODO speichern von datum überarbeiten
+// TODO optLock exception von duplicateValue besser unterscheiden
 
 #include "sqlite.h"
 
@@ -351,6 +352,7 @@ SQLiteDatabaseConnection::~SQLiteDatabaseConnection() {
 
 bool SQLiteDatabaseConnection::load(DatabaseInterface &dbi, ObjectBase &obj) {
   open();
+  setConf(dbi);
   SQLSQLiteDescription sd(dbi.database());
   mobs::SqlGenerator gsql(obj, sd);
   string s = gsql.selectStatementFirst();
@@ -358,7 +360,7 @@ bool SQLiteDatabaseConnection::load(DatabaseInterface &dbi, ObjectBase &obj) {
   sqlite3_stmt *ppStmt = nullptr;
   int rc = sqlite3_prepare_v2(connection, s.c_str(), s.length(), &ppStmt, nullptr);
   if (rc != SQLITE_OK)
-    throw sqlite_exception(u8"prepare load failed", connection);
+    throw sqlite_exception(u8"prepare load failed", connection);  // TODO except
   rc = sqlite3_step(ppStmt);
   if (rc != SQLITE_ROW)
   {
@@ -372,12 +374,26 @@ bool SQLiteDatabaseConnection::load(DatabaseInterface &dbi, ObjectBase &obj) {
   return true;
 }
 
+void SQLiteDatabaseConnection::failed() {
+  string s = "ROLLBACK TRANSACTION";
+  if (currentTransaction)
+    s += " TO SAVEPOINT MOBS";
+  s += ";";
+  LOG(LM_DEBUG, "SQL " << s);
+  try {
+    doSql(s);
+  } catch (std::exception &e) {
+    LOG(LM_ERROR, u8"SQLite rollback error: " << e.what());
+  }
+}
+
 void SQLiteDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj) {
   SQLSQLiteDescription sd(dbi.database());
   sd.useBind = true;
   mobs::SqlGenerator gsql(obj, sd);
   try {
     open();
+    setConf(dbi);
     // Transaktion benutzen zwecks Atomizität
     if (currentTransaction == nullptr) {
       string s = "BEGIN TRANSACTION;";
@@ -391,12 +407,15 @@ void SQLiteDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &ob
       LOG(LM_DEBUG, "SQL " << s);
       doSql(s);
     }
+  } catch (mobs::locked_error &e) {
+    throw mobs::locked_error(LOGSTR(u8"SQLite save transaction failed: " << e.what()));
   } catch (std::exception &e) {
     THROW(u8"SQLite save transaction failed: " << e.what());
   }
 
   int64_t version = gsql.getVersion();
   LOG(LM_DEBUG, "VERSION IS " << version);
+  bool optLckErr = version == 0;
 
   try {
     string s;
@@ -420,9 +439,9 @@ void SQLiteDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &ob
 
     int sz = sqlite3_changes(connection);
     LOG(LM_DEBUG, "ROWS " << sz);
-    // wenn sich, obwohl gefunden, nichts geändert hat wird hier auch 0 geliefert - die Version muss sich aber immer ändern
     if (version > 0 and sz != 1)
-      throw runtime_error(u8"number of processed rows is " + to_string(sz) + " should be 1");
+      throw mobs::optLock_error(LOGSTR(u8"number of processed rows is " << sz << " should be 1"));
+    optLckErr = false;
 
     while (not gsql.eof()) {
       s = gsql.replaceStatement(false);
@@ -435,30 +454,41 @@ void SQLiteDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &ob
       sd.clearBinds();
       rc = sqlite3_finalize(ppStmt);
       if (rc != SQLITE_OK)
-        throw sqlite_exception(u8"save failed", connection);    }
-  } catch (runtime_error &e) {
-    string s = "ROLLBACK TRANSACTION";
-    if (currentTransaction)
-      s += " TO SAVEPOINT MOBS";
-    s += ";";
-    LOG(LM_DEBUG, "SQL " << s);
-    try {
-      doSql(s);
-    } catch (std::exception &e) {
-      LOG(LM_ERROR, u8"SQLite save rollback error: " << e.what());
+        throw sqlite_exception(u8"save failed", connection);
     }
-    THROW(u8"SQLite save: " << e.what());
+  } catch (sqlite_exception &e) {
+    switch (sqlite3_errcode(connection)) {
+      case SQLITE_BUSY:
+      case SQLITE_LOCKED:
+        failed();
+        throw mobs::locked_error(LOGSTR(u8"SQLite save optLock UNIQ CONSTRAINT: " << e.what()));
+      case SQLITE_CONSTRAINT:
+        switch (sqlite3_extended_errcode(connection)) {
+          case SQLITE_CONSTRAINT_UNIQUE:
+            failed();
+            if (optLckErr)
+              throw mobs::optLock_error(LOGSTR(u8"SQLite save optLock UNIQ CONSTRAINT: " << e.what()));
+            else
+              throw mobs::optLock_error(LOGSTR(u8"SQLite save optLock UNIQ CONSTRAINT: " << e.what()));
+          case SQLITE_CONSTRAINT_PRIMARYKEY:
+            failed();
+            if (optLckErr)
+              throw mobs::optLock_error(LOGSTR(u8"SQLite save optLock CONSTRAINT: " << e.what()));
+            else
+              throw mobs::optLock_error(LOGSTR(u8"SQLite save optLock CONSTRAINT: " << e.what()));
+        }
+      default:
+        failed();
+        THROW(u8"SQLite save: " << e.what());
+    }
+  } catch (mobs::optLock_error &e) {
+    failed();
+    throw mobs::optLock_error(LOGSTR(u8"SQLite save optLock: " << e.what()));
+  } catch (mobs::locked_error &e) {
+    failed();
+    throw mobs::locked_error(LOGSTR(u8"SQLite save: " << e.what()));
   } catch (exception &e) {
-    string s = "ROLLBACK TRANSACTION";
-    if (currentTransaction)
-      s += " TO SAVEPOINT MOBS";
-    s += ";";
-    LOG(LM_DEBUG, "SQL " << s);
-    try {
-      doSql(s);
-    } catch (std::exception &e) {
-      LOG(LM_ERROR, u8"SQLite save rollback error: " << e.what());
-    }
+    failed();
     THROW(u8"SQLite save: " << e.what());
   }
 
@@ -470,6 +500,8 @@ void SQLiteDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &ob
       s = "COMMIT TRANSACTION;";
     LOG(LM_DEBUG, "SQL " << s);
     doSql(s);
+  } catch (mobs::locked_error &e) {
+    throw mobs::locked_error(LOGSTR(u8"SQLite save transaction failed: " << e.what()));
   } catch (std::exception &e) {
     THROW(u8"SQLite save transaction failed: " << e.what());
   }
@@ -479,6 +511,7 @@ void SQLiteDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &ob
 
 bool SQLiteDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase &obj) {
   open();
+  setConf(dbi);
   SQLSQLiteDescription sd(dbi.database());
   sd.useBind = true;
   mobs::SqlGenerator gsql(obj, sd);
@@ -497,6 +530,8 @@ bool SQLiteDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase 
       LOG(LM_DEBUG, "SQL " << s);
       doSql(s);
     }
+  } catch (mobs::locked_error &e) {
+    throw mobs::locked_error(LOGSTR(u8"SQLite destroy transaction failed: " << e.what()));
   } catch (std::exception &e) {
     THROW(u8"SQLite destroy transaction failed: " << e.what());
   }
@@ -524,32 +559,17 @@ bool SQLiteDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase 
       if (first) {
         found = sqlite3_changes(connection) > 0;
         if (version > 0 and not found)
-          throw runtime_error(u8"Object with appropriate version not found");
+          throw mobs::optLock_error(u8"Object with appropriate version not found");
       }
     }
-  } catch (runtime_error &e) {
-    string s = "ROLLBACK TRANSACTION";
-    if (currentTransaction)
-      s += " TO SAVEPOINT MOBS";
-    s += ";";
-    LOG(LM_DEBUG, "SQL " << s);
-    try {
-      doSql(s);
-    } catch (std::exception &e) {
-      LOG(LM_ERROR, u8"SQLite destroy rollback error: " << e.what());
-    }
-    THROW(u8"SQLite destroy: " << e.what());
+  } catch (mobs::locked_error &e) {
+    failed();
+    throw mobs::locked_error(LOGSTR(u8"SQLite destroy: " << e.what()));
+  } catch (mobs::optLock_error &e) {
+    failed();
+    throw mobs::optLock_error(LOGSTR(u8"SQLite destroy: " << e.what()));
   } catch (exception &e) {
-    string s = "ROLLBACK TRANSACTION";
-    if (currentTransaction)
-      s += " TO SAVEPOINT MOBS";
-    s += ";";
-    LOG(LM_DEBUG, "SQL " << s);
-    try {
-      doSql(s);
-    } catch (std::exception &e) {
-      LOG(LM_ERROR, u8"SQLite destroy rollback error: " << e.what());
-    }
+    failed();
     THROW(u8"SQLite destroy: " << e.what());
   }
 
@@ -561,6 +581,8 @@ bool SQLiteDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase 
       s = "COMMIT TRANSACTION;";
     LOG(LM_DEBUG, "SQL " << s);
     doSql(s);
+  } catch (mobs::locked_error &e) {
+    throw mobs::locked_error(LOGSTR(u8"SQLite destroy transaction failed: " << e.what()));
   } catch (std::exception &e) {
     THROW(u8"SQLite destroy transaction failed: " << e.what());
   }
@@ -573,6 +595,7 @@ SQLiteDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, const s
   mobs::SqlGenerator gsql(obj, sd);
   try {
     open();
+    setConf(dbi);
     string s;
     if (qbe)
       s = gsql.queryBE(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal);
@@ -606,8 +629,8 @@ SQLiteDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, const s
     }
     auto cursor = std::make_shared<SQLiteCursor>(ppStmt, dbi.getConnection(), dbi.database());
     return cursor;
-  } catch (runtime_error &e) {
-    THROW(u8"SQLite query: " << e.what());
+  } catch (mobs::locked_error &e) {
+    throw mobs::locked_error(LOGSTR(u8"SQLite query: " << e.what()));
   } catch (exception &e) {
     THROW(u8"SQLite query: " << e.what());
   }
@@ -625,6 +648,7 @@ SQLiteDatabaseConnection::retrieve(DatabaseInterface &dbi, ObjectBase &obj, std:
     throw runtime_error("Cursor eof");
   }
   open();
+  setConf(dbi);
   SQLSQLiteDescription sd(dbi.database());
   mobs::SqlGenerator gsql(obj, sd);
 
@@ -654,8 +678,8 @@ SQLiteDatabaseConnection::retrieve(DatabaseInterface &dbi, ObjectBase &obj, std:
         }
         gsql.readObject(di);
       }
-    } catch (runtime_error &e) {
-      THROW(u8"SQLite retrieve: " << e.what());
+    } catch (mobs::locked_error &e) {
+      throw mobs::locked_error(LOGSTR(u8"SQLite retrieve: " << e.what()));
     } catch (exception &e) {
       THROW(u8"SQLite retrieve: " << e.what());
     }
@@ -667,14 +691,16 @@ SQLiteDatabaseConnection::retrieve(DatabaseInterface &dbi, ObjectBase &obj, std:
 void SQLiteDatabaseConnection::dropAll(DatabaseInterface &dbi, const ObjectBase &obj) {
   try {
     open();
+    setConf(dbi);
     SQLSQLiteDescription sd(dbi.database());
     mobs::SqlGenerator gsql(obj, sd);
-
     for (bool first = true; first or not gsql.eof(); first = false) {
       string s = gsql.dropStatement(first);
       LOG(LM_DEBUG, "SQL " << s);
       doSql(s);
     }
+  } catch (mobs::locked_error &e) {
+    throw mobs::locked_error(LOGSTR(u8"SQLite dropAll: " << e.what()));
   } catch (std::exception &e) {
     THROW(u8"SQLite dropAll: " << e.what());
   }
@@ -683,6 +709,7 @@ void SQLiteDatabaseConnection::dropAll(DatabaseInterface &dbi, const ObjectBase 
 void SQLiteDatabaseConnection::structure(DatabaseInterface &dbi, const ObjectBase &obj) {
   try {
     open();
+    setConf(dbi);
     SQLSQLiteDescription sd(dbi.database());
     mobs::SqlGenerator gsql(obj, sd);
 
@@ -693,6 +720,8 @@ void SQLiteDatabaseConnection::structure(DatabaseInterface &dbi, const ObjectBas
 //    if (mysql_real_query(connection, s.c_str(), s.length()))
 //      throw sqlite_exception(u8"create failed", connection);
     }
+  } catch (mobs::locked_error &e) {
+    throw mobs::locked_error(string(u8"SQLite structure: ") + e.what());
   } catch (std::exception &e) {
     THROW(u8"SQLite structure: " << e.what());
   }
@@ -714,14 +743,27 @@ size_t SQLiteDatabaseConnection::doSql(const string &sql)
   if (rc != SQLITE_DONE)
     LOG(LM_ERROR, "STEP FAILED " << rc);
   rc = sqlite3_finalize(ppStmt);
-  if (rc != SQLITE_OK)
-    throw sqlite_exception(u8"step failed", connection);
+  if (rc != SQLITE_OK) {
+    switch (sqlite3_errcode(connection)) {
+      case SQLITE_BUSY:
+      case SQLITE_LOCKED:
+        throw mobs::locked_error(sqlite3_errmsg(connection));
+      case SQLITE_CONSTRAINT:
+        switch (sqlite3_extended_errcode(connection)) {
+          case SQLITE_CONSTRAINT_UNIQUE:
+            throw sqlite_exception(u8"UNIQ CONSTRAINT", connection);
+          case SQLITE_CONSTRAINT_PRIMARYKEY:
+            throw sqlite_exception(u8"CONSTRAINT", connection);
+        }
+      default:
+        throw sqlite_exception(u8"step failed", connection);
+    }
+  }
   return sqlite3_changes(connection);
 }
 
 void SQLiteDatabaseConnection::startTransaction(DatabaseInterface &dbi, DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) {
   try {
-    open();
     if (currentTransaction == nullptr) {
       // SET SESSION idle_transaction_timeout=2;
       // SET SESSION idle_transaction_timeout=2, SESSION idle_readonly_transaction_timeout=10;
@@ -731,6 +773,8 @@ void SQLiteDatabaseConnection::startTransaction(DatabaseInterface &dbi, DbTransa
       currentTransaction = transaction;
     } else if (currentTransaction != transaction)
       throw std::runtime_error("transaction mismatch"); // hier geht nur eine Transaktion gleichzeitig
+  } catch (mobs::locked_error &e) {
+    throw mobs::locked_error(string(u8"SQLite startTransaction: failed: ") + e.what());
   } catch (std::exception &e) {
     THROW(u8"SQLite startTransaction: failed " << e.what());
   }
@@ -746,6 +790,9 @@ void SQLiteDatabaseConnection::endTransaction(DbTransaction *transaction, std::s
     LOG(LM_DEBUG, "SQL " << s);
     doSql(s);
     currentTransaction = nullptr;
+  } catch (mobs::locked_error &e) {
+    currentTransaction = nullptr;
+    throw mobs::locked_error(LOGSTR(u8"SQLite transaction failed: " << e.what()));
   } catch (std::exception &e) {
     currentTransaction = nullptr;
     THROW(u8"SQLite transaction failed: " << e.what());
@@ -760,6 +807,9 @@ void SQLiteDatabaseConnection::rollbackTransaction(DbTransaction *transaction, s
     LOG(LM_DEBUG, "SQL " << s);
     doSql(s);
     currentTransaction = nullptr;
+  } catch (mobs::locked_error &e) {
+    currentTransaction = nullptr;
+    throw mobs::locked_error(LOGSTR(u8"SQLite transaction failed: " << e.what()));
   } catch (std::exception &e) {
     currentTransaction = nullptr;
     THROW(u8"SQLite transaction failed: " << e.what());
@@ -768,6 +818,10 @@ void SQLiteDatabaseConnection::rollbackTransaction(DbTransaction *transaction, s
 
 size_t SQLiteDatabaseConnection::maxAuditChangesValueSize(const DatabaseInterface &dbi) const {
   return 200;
+}
+
+void SQLiteDatabaseConnection::setConf(DatabaseInterface &dbi) {
+  sqlite3_busy_timeout(connection, dbi.getTimeout().count());
 }
 
 
