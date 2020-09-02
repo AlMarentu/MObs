@@ -345,15 +345,67 @@ TEST(objgenTest, Vectors) {
   
 TEST(objgenTest, iterator) {
   Person info;
-  info.kontakte[4].number("+40 0000 1111 222");
+  info.kontakte[0].number("+00");
+  info.kontakte[1].number("+10");
+  info.kontakte[2].number("+20");
+  info.kontakte[3].number("+30");
+  info.kontakte[4].number("+40");
 
-  mobs::MemberVector<Kontakt>::iterator it= info.kontakte.begin();
+  mobs::MemberVector<Kontakt>::iterator it = info.kontakte.begin();
+  mobs::MemberVector<Kontakt>::iterator it2 = it;
   it += 4;
-  EXPECT_EQ(u8"+40 0000 1111 222", it->number());
+  EXPECT_EQ(u8"+40", it->number());
   int i = 0;
   for(auto a:info.kontakte)
     i++;
   EXPECT_EQ(5, i);
+  std::string s;
+  for(auto &a:info.kontakte)
+    s += a.number();
+  EXPECT_EQ(s, "+00+10+20+30+40");
+
+  mobs::MemberVector<Kontakt>::reverse_iterator itr = info.kontakte.rbegin();
+  EXPECT_FALSE(itr == info.kontakte.rend());
+  s = "";
+  for(; itr != info.kontakte.rend(); itr++)
+    s += itr->number();
+  EXPECT_EQ(s, "+40+30+20+10+00");
+  it2->number("");
+
+
+}
+
+TEST(objgenTest, const_iterator) {
+  Person info;
+  info.kontakte[0].number("+00");
+  info.kontakte[1].number("+10");
+  info.kontakte[2].number("+20");
+  info.kontakte[3].number("+30");
+  info.kontakte[4].number("+40");
+
+  const Person &cinfo = info;
+
+  mobs::MemberVector<Kontakt>::const_iterator it = cinfo.kontakte.cbegin();
+  EXPECT_EQ(&*info.kontakte.cbegin(), &*cinfo.kontakte.begin());
+  mobs::MemberVector<Kontakt>::const_iterator it2 = it;
+  it += 4;
+  EXPECT_EQ(u8"+40", it->number());
+  int i = 0;
+  for(auto const a:cinfo.kontakte)
+    i++;
+  EXPECT_EQ(5, i);
+  std::string s;
+  for(auto const &a:cinfo.kontakte)
+    s += a.number();
+  EXPECT_EQ(s, "+00+10+20+30+40");
+
+  mobs::MemberVector<Kontakt>::const_reverse_iterator itr = cinfo.kontakte.crbegin();
+  EXPECT_FALSE(itr == cinfo.kontakte.crend());
+  s = "";
+  for(; itr != cinfo.kontakte.crend(); itr++)
+    s += itr->number();
+  EXPECT_EQ(s, "+40+30+20+10+00");
+//  it2->number("");  // Übersetzt nicht wegen const
 }
 
 TEST(objgenTest, Pointer) {

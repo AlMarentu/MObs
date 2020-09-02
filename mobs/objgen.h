@@ -171,7 +171,7 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 #define COLNAME(name) ::mobs::mobsToken(::mobs::ColNameBase,m_confToken,#name), ///< Definition eines Alternativen Namens für den Collection-Namen (oder Tabellennamen) der Datenbank
 #define PREFIX(name) ::mobs::mobsToken(::mobs::PrefixBase,m_confToken,#name), ///< Definition eines Prefix für den Export-Namen, wenn in eine flache Struktur exportiert wird \see EMBEDDED
 /// Angabe der max. Länge des Strings; [1..9999] möglich
-#define LENGTH(len)  mobs::MemVarCfg((len > 0 and mobs::LengthBase +len <= mobs::LengthEnd)?mobs::LengthBase +len: mobs::LengthEnd),
+#define LENGTH(len)  mobs::MemVarCfg(((len) > 0 and mobs::LengthBase +(len) <= mobs::LengthEnd)?mobs::LengthBase +(len): mobs::LengthEnd),
 
 
 
@@ -271,9 +271,11 @@ class MemBaseVector;
 class MemberBase : public NullValue {
 protected:
   /// \private
-  MemberBase(std::string n, ObjectBase *obj, const std::vector<MemVarCfg>& cv) : m_name(std::move(n)), m_parent(obj) { for (auto c:cv) doConfig(c); }
+  MemberBase(std::string n, ObjectBase *obj, const std::vector<MemVarCfg>& cv) : NullValue(), m_name(std::move(n)), m_parent(obj) {
+    for (auto c:cv) doConfig(c); }
   /// \private
-  MemberBase(mobs::MemBaseVector *m, mobs::ObjectBase *o, const std::vector<MemVarCfg>& cv) : m_name(""), m_parent(o), m_parVec(m) { for (auto c:cv) doConfig(c); }
+  MemberBase(mobs::MemBaseVector *m, mobs::ObjectBase *o, const std::vector<MemVarCfg>& cv) : NullValue(), m_name(""), m_parent(o), m_parVec(m) {
+    for (auto c:cv) doConfig(c); }
 public:
   friend class ObjectBase;
   template <class T>
@@ -717,20 +719,9 @@ public:
   using reference = T&;
 
   MemberVectorIterator() = default;
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "google-explicit-constructor"
-  MemberVectorIterator(typename std::vector<T *>::iterator it) { m_iter = it; }
-#pragma clang diagnostic pop
-  MemberVectorIterator(const MemberVectorIterator<T>& rawIterator) = default;
+  explicit MemberVectorIterator(const typename std::vector<T *>::iterator it) { m_iter = std::move(it); }
   ~MemberVectorIterator() = default;
-
-  MemberVectorIterator<T>& operator=(const MemberVectorIterator<T>& rawIterator) = default;
-  //    MemberVectorIterator<T>&                  operator=(T* ptr){m_ptr = ptr;return (*this);}
-
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "google-explicit-constructor"
-  operator bool() const { return m_iter; }
-#pragma clang diagnostic pop
+  explicit operator bool() const { return m_iter; }
   bool operator==(const MemberVectorIterator<T>& rawIterator)const{ return (m_iter == rawIterator.m_iter); }
   bool operator!=(const MemberVectorIterator<T>& rawIterator)const{ return (m_iter != rawIterator.m_iter); }
   MemberVectorIterator<T>& operator+=(const difference_type& movement) { m_iter += movement;return *this; }
@@ -758,7 +749,7 @@ protected:
 template<class T>
 /// \brief Klasse für Vektoren auf Membervariablen oder Objekten innerhalb von von \c ObjectBase angeleiteten Klasse; Bitte als Makro MemVarVector oder MemVector verwenden
 /// \see MemVarVector
-/// \see MemVector
+/// \see MemVector
 /// \tparam T entweder eine von \c MemberBase oder eine von \c ObjectBase abgeleitete Klasse
 class MemberVector : virtual public MemBaseVector {
 public:
@@ -796,26 +787,37 @@ public:
   /// Typ-Deklaration iterator auf Vector
   typedef MemberVectorIterator<const T> const_iterator;
   /// Typ-Deklaration iterator auf Vector
-  typedef MemberVectorIterator<T> reverse_iterator;
+  typedef std::reverse_iterator<MemberVectorIterator<T>> reverse_iterator;
   /// Typ-Deklaration iterator auf Vector
-  typedef MemberVectorIterator<const T> const_reverse_iterator;
+  typedef std::reverse_iterator<MemberVectorIterator<const T>> const_reverse_iterator;
 
   /// Start-Iterator
-  iterator begin() noexcept { return werte.begin(); }
+  iterator begin() noexcept { return iterator(werte.begin()); }
   /// Ende-Iterator
-  iterator end() noexcept { if (werte.size() <= size()) return werte.end(); return werte.begin()+size(); }
-  /// Start-Iterator
-  reverse_iterator rbegin() { if (werte.size() <= size()) return werte.rbegin(); return werte.rend()-size(); }
-  /// Ende-Iterator
-  reverse_iterator rend() { return werte.rend(); }
-  /// Start-Iterator
-  const_iterator cbegin() noexcept { return werte.cbegin(); }
-  /// Ende-Iterator
-  const_iterator cend() noexcept { if (werte.size() <= size()) return werte.cend(); return werte.cbegin()+size(); }
-  /// Start-Iterator
-  const_reverse_iterator crbegin() { if (werte.size() <= size()) return werte.crbegin(); return werte.crend()-size(); }
-  /// Ende-Iterator
-  const_reverse_iterator crend() { return werte.crend(); }
+  iterator end() noexcept { if (werte.size() <= size()) return iterator(werte.end()); return iterator(werte.begin()+size()); }
+  /// Start-Iterator reverse
+  reverse_iterator rbegin() noexcept { return reverse_iterator(end()); }
+  /// Ende-Iterator revers
+  reverse_iterator rend() noexcept { return reverse_iterator(begin()); }
+
+  /// Start-Iterator const
+  const_iterator begin() const noexcept { return cbegin(); }
+  /// Ende-Iterator const
+  const_iterator end() const noexcept { return cend(); }
+  /// Start-Iterator const
+  const_reverse_iterator rbegin() const noexcept { return crbegin(); }
+  /// Ende-Iterator const
+  const_reverse_iterator rend() const noexcept { return crend(); }
+
+  // need to cast "const vector<T *>::iterator" to "vector<const T *>::iterator"
+  /// Start-Iterator const
+  const_iterator cbegin() const noexcept { return const_iterator(((std::vector<const T *>&)werte).begin()); }
+  /// Ende-Iterator const
+  const_iterator cend() const noexcept { return const_iterator(((std::vector<const T *>&)werte).end()); }
+  /// Start-Iterator const reverse
+  const_reverse_iterator crbegin() const noexcept { return const_reverse_iterator(cend()); }
+  /// Ende-Iterator const reverse
+  const_reverse_iterator crend() const noexcept { return const_reverse_iterator(cbegin()); }
 
 protected:
   /// \private
