@@ -196,6 +196,12 @@ public:
     int dir;
     if (sort and sort->sortInfo(mem, pos, dir)) {
       selectOrder[pos] = STRSTR(useName[last] << '.' << name << (dir > 0? "": " descending"));
+      if (sqldb.orderInSelect) {
+        if (levelArray > 0 or not mem.key())
+          selectKeysXtra += STRSTR(',' << useName[last] << '.' << name);
+        if (levelArray > 0)
+          selectFieldXtra += STRSTR(',' << useName[last] << '.' << name);
+      }
 //      LOG(LM_INFO, "SORT " << pos << " " << selectOrder[pos]);
       fst = false;
     }
@@ -256,6 +262,10 @@ public:
         s += selectKeys;
       else
         s += selectField;
+      if (keyMode)
+        s += selectKeysXtra;
+      else
+        s += selectFieldXtra;
       s += " from ";
     }
     s += sqldb.tableName(masterName);
@@ -284,6 +294,8 @@ public:
   string selectWhere;
   string selectJoin;
   string masterName;
+  string selectKeysXtra;  ///< für orderInSelect
+  string selectFieldXtra; ///< für orderInSelect
   map<uint, string>  selectOrder;
   bool noJoin = false;  // ersetze joinGenerierung
   const QueryOrder *sort = nullptr;

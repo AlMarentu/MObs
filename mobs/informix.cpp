@@ -94,6 +94,7 @@ public:
   explicit SQLInformixdescription(const string &dbName) : dbPrefix(dbName + ".") {
     changeTo_is_IfNull = false;
     createWith_IfNotExists = true;
+    orderInSelect = true; // Es müssen alle Elemente des "order by" auch im "select" vorkommen
   }
 
   std::string tableName(const std::string &tabnam) override { return dbPrefix + tabnam;  }

@@ -444,6 +444,15 @@ TEST(helperTest, sort) {
             "order by mt.p3p,mt.k3kk descending,D.ObjA3_o2oo.f1gh;",
             gsql.queryBE(mobs::SqlGenerator::Normal, &sortList));
 
+  sd.orderInSelect = true;
+  EXPECT_EQ("select distinct mt.k3kk,mt.version,mt.p3p,mt.o_k2kk,mt.o_s2s,D.ObjA3_o2oo.f1gh from D.ObjA3 mt "
+            " left join D.ObjA3_o2oo on mt.k3kk = D.ObjA3_o2oo.k3kk where D.ObjA3_o2oo.f1gh=1 "
+            "order by mt.p3p,mt.k3kk descending,D.ObjA3_o2oo.f1gh;",
+            gsql.queryBE(mobs::SqlGenerator::Normal, &sortList));
+  EXPECT_EQ("select distinct mt.k3kk,mt.p3p,D.ObjA3_o2oo.f1gh from D.ObjA3 mt "
+            " left join D.ObjA3_o2oo on mt.k3kk = D.ObjA3_o2oo.k3kk where D.ObjA3_o2oo.f1gh=1 "
+            "order by mt.p3p,mt.k3kk descending,D.ObjA3_o2oo.f1gh;",
+            gsql.queryBE(mobs::SqlGenerator::Keys, &sortList));
 
   ObjE2 e2;
   mobs::QueryOrder sortList2;

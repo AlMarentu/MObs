@@ -87,6 +87,8 @@ public:
   bool replaceWithInto = false;
   /// Erzeuge Insert ... on conflict update - Statement
   bool withInsertOnConflict = false;
+  /// Ein Order by Element muss auch im Select enthalten sein
+  bool orderInSelect = false;
 };
 
 /// Generator-Klasse für SQL-Statements für Lesen und Schreiben, benötigt ein SQL-Beschreibungs-Objekt \c SQLDBdescription
