@@ -20,6 +20,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "objgen.h"
+#include "queryorder.h"
 #include "helper.h"
 #include "logging.h"
 
@@ -236,8 +237,12 @@ class Elementor : virtual public mobs::ElementNames {
 public:
   explicit Elementor(mobs::ConvObjToString c) : mobs::ElementNames(c) { };
 
+  void orderStmt(const std::string &name, int direction) override {
+    res << " " << name << ":" << direction;
+  }
 
-  virtual void valueStmt(const std::string &name, const mobs::MemberBase &mem, bool compact) {
+
+  void valueStmt(const std::string &name, const mobs::MemberBase &mem, bool compact) override {
     res << " ";
     if (mem.isNull()) {
       res << name << ":null";
@@ -410,8 +415,44 @@ TEST(helperTest, auditTrail) {
   for (bool first = true; first or not gsql.eof(); first = false)
     LOG(LM_INFO, "CR " << gsql.createStatement(first));
 
-
 }
 
+TEST(helperTest, sort) {
+
+  ObjA3 e;
+  mobs::QueryOrder sortList;
+  sortList << e.p3p << mobs::QueryOrder::descending << e.k3kk << mobs::QueryOrder::ascending << e.oa3.o2oo[0].f1gh;
+//  e.oa3.o2oo[0].f1gh(1);
+  SQLDBTestDesc sd;
+  mobs::SqlGenerator gsql(e, sd);
+
+  LOG(LM_INFO, "QQQQQ "  << gsql.queryBE());
+
+//  Elementor elk((mobs::ConvObjToString()));
+//  elk.keyList = &sortList;
+//  e.traverse(elk);
+//  LOG(LM_INFO, "EEEE " << elk.result());
+
+  EXPECT_EQ("select distinct mt.k3kk,mt.version,mt.p3p,mt.o_k2kk,mt.o_s2s from D.ObjA3 mt "
+            " left join D.ObjA3_o2oo on mt.k3kk = D.ObjA3_o2oo.k3kk "
+            "order by mt.p3p,mt.k3kk descending,D.ObjA3_o2oo.f1gh;",
+            gsql.queryBE(mobs::SqlGenerator::Normal, &sortList));
+  e.oa3.o2oo[0].f1gh(1);
+  EXPECT_EQ("select distinct mt.k3kk,mt.version,mt.p3p,mt.o_k2kk,mt.o_s2s from D.ObjA3 mt "
+            " left join D.ObjA3_o2oo on mt.k3kk = D.ObjA3_o2oo.k3kk where D.ObjA3_o2oo.f1gh=1 "
+            "order by mt.p3p,mt.k3kk descending,D.ObjA3_o2oo.f1gh;",
+            gsql.queryBE(mobs::SqlGenerator::Normal, &sortList));
+
+
+  ObjE2 e2;
+  mobs::QueryOrder sortList2;
+  sortList2 << e2.aa << mobs::QueryOrder::descending << e2.xx;
+  Elementor elk((mobs::ConvObjToString()));
+  elk.startOrder(sortList2);
+  e2.traverseKey(elk);
+  elk.finishOrder();
+  EXPECT_EQ(" aa:1 xx:-1", elk.result());
+
+}
 
 }

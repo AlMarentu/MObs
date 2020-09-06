@@ -57,8 +57,11 @@ class BsonElements : virtual public mobs::ElementNames {
 public:
   explicit BsonElements(mobs::ConvObjToString c) : mobs::ElementNames(c.exportAltNames()) { };
 
-  virtual void valueStmt(const std::string &name, const mobs::MemberBase &mem, bool compact)
-  {
+  void orderStmt(const std::string &name, int direction) override {
+    doc.append(kvp(name, direction));
+  }
+
+  void valueStmt(const std::string &name, const mobs::MemberBase &mem, bool compact) override {
     if (index)
     {
       doc.append(kvp(name, 1));
@@ -768,7 +771,7 @@ void MongoDatabaseConnection::structure(DatabaseInterface &dbi, const ObjectBase
   db[collectionName(obj)].create_index(bo.value(), idx.extract());
 }
 
-std::shared_ptr<DbCursor> MongoDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, const std::string& query, bool qbe) {
+std::shared_ptr<DbCursor> MongoDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, const std::string& query, bool qbe, const QueryOrder *sort) {
   open();
   mongocxx::database db = client[dbi.database()];
   mongocxx::collection col = db[collectionName(obj)];
@@ -796,6 +799,18 @@ std::shared_ptr<DbCursor> MongoDatabaseConnection::query(DatabaseInterface &dbi,
     f_opt = f_opt.projection(bo.value());
   }
 #endif
+  // Sortierung
+  std::string sortLog;
+  if (sort and not dbi.getCountCursor()) {
+    BsonElements bo((mobs::ConvObjToString()));
+    bo.startOrder(*sort);
+    obj.traverse(bo);
+    bo.finishOrder();
+    sortLog = " sort (";
+    sortLog += bo.result();
+    sortLog += ")";
+    f_opt = f_opt.sort(bo.value());
+  }
   if (dbi.getTimeout() > std::chrono::milliseconds(0)) {
     c_opt = c_opt.max_time(dbi.getTimeout());
     f_opt = f_opt.max_time(dbi.getTimeout());
@@ -805,7 +820,7 @@ std::shared_ptr<DbCursor> MongoDatabaseConnection::query(DatabaseInterface &dbi,
     BsonElements bq(mobs::ConvObjToString().exportModified());
     obj.setModified(true);  // äußere Klammer muss sein
     obj.traverse(bq);
-    LOG(LM_DEBUG, "QUERY " << dbi.database() << "." << collectionName(obj) << " " << bq.result());
+    LOG(LM_DEBUG, "QUERY " << dbi.database() << "." << collectionName(obj) << " " << bq.result() << sortLog);
 
     if (dbi.getCountCursor())
       return std::make_shared<CountCursor>(col.count_documents(bq.value(), c_opt));
@@ -814,6 +829,7 @@ std::shared_ptr<DbCursor> MongoDatabaseConnection::query(DatabaseInterface &dbi,
     std::string q = query;
     if (q.empty())
       q = "{}";
+    LOG(LM_DEBUG, "QUERY " << dbi.database() << "." << collectionName(obj) << " " << q << sortLog);
     auto doc = bsoncxx::from_json(q);
     if (dbi.getCountCursor())
       return std::make_shared<CountCursor>(col.count_documents(doc.view(), c_opt));

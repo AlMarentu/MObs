@@ -317,8 +317,29 @@ gesucht:
     ...
   }
 ~~~~~~~~~~
+
 Wird über den Inhalt eines Sub-Arrays gesucht, darf nur das erste Element eines Vektors benutzt werden.
 Werden mehrere Felder gesetzt, so müssen alle Bedingungen zutreffen.
+
+Soll die Ausgabe sortiert erfolgen, son kann bei query() unf qbe() eine Sortierangabe ergolgen:
+
+~~~~~~~~~~cpp
+class Fahrzeug : public ObjectBase
+{
+  public:
+    ObjInit(Fahrzeug);
+ 
+    MemVar(std::string, fahrzeugTyp, KEYELEMENT1);
+    MemVar(int,         anzahlRaeder);
+    MemVar(float,       leistung);
+};
+...
+Fahrzeug f;
+QueryOrder sort;
+sort << f.leistung << QueryOrder::descending << f.anzahlRaeder;
+auto cursor = dbi.qbe(f2, sort);
+~~~~~~~~~~
+
 
 Um verschachtelte Objekte in eine SQL-Datenbank schreiben zu können stehen folgende Featuere-Token
 zur Verfügung:
@@ -446,12 +467,11 @@ hier kann für ältere Versionen INFORMIX_DTFMT_BUG definiert werden
 
 ## TODOs
 
-* Bei MongoDB werden Transaktionen nur im Cluster-Mode unterstützt
+* Bei MongoDB Transaktionen im Cluster-Mode unterstützt
 * Zugriffskontrolle Mongo
-* Sortierung bei QBE
 * MariaDB + Informix: Blob unterstützen 
 * SQLite: Datum nicht als string speichern
-* DB: Isolation, transaction level, timeouts, skip, limit
+* Vervollständigung DB: Isolation, transaction level, timeouts, skip, limit
 
 
 

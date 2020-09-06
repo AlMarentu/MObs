@@ -2,6 +2,7 @@
 #include "mobs/logging.h"
 #include "mobs/objgen.h"
 #include "mobs/dbifc.h"
+#include "mobs/queryorder.h"
 #include "mobs/unixtime.h"
 #include "mobs/mchrono.h"
 
@@ -87,7 +88,9 @@ void worker(mobs::DatabaseInterface &dbi) {
     // Query By Example
     f2.clearModified();
     f2.haenger[0].achsen(2);
-    for (auto cursor = dbi.qbe(f2); not cursor->eof(); cursor->next()) {
+    mobs::QueryOrder sort;
+    sort << f2.haenger[0].typ;
+    for (auto cursor = dbi.qbe(f2, sort); not cursor->eof(); cursor->next()) {
       dbi.retrieve(f2, cursor);
       LOG(LM_INFO, "QBE result: pos=" << cursor->pos() << " id=" << f2.id() << " " << f2.typ());
     }

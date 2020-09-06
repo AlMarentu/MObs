@@ -31,6 +31,8 @@
 
 namespace mobs {
 
+class QueryOrder;
+
 /// Klasse die Datenbank-Typ abhängige Definitionen enthält
 class SQLDBdescription {
 public:
@@ -115,8 +117,8 @@ public:
   std::string tableName() const;
 
   enum QueryMode { Normal, Keys, Count };
-  std::string queryBE(QueryMode querMode = Normal, const std::string &where = "");
-  std::string query(QueryMode querMode, const std::string &where, const std::string &join = "");
+  std::string queryBE(QueryMode querMode = Normal, const QueryOrder *sort = nullptr, const std::string &where = "");
+  std::string query(QueryMode querMode, const QueryOrder *sort, const std::string &where, const std::string &join = "");
 
   std::string createStatement(bool first);
   std::string dropStatement(bool first);
@@ -159,13 +161,42 @@ private:
   std::list<ObjectBase *> m_deleteLater;
 };
 
+class ElementNamesData;
 
-/// Ermittle Elementnamen in mit kompletten Pfad zB.: a.b.c
+/** \brief Ermittle Elementnamen in mit kompletten Pfad zB.: a.b.c
+ *
+ */
 class ElementNames : virtual public ObjTravConst {
 public:
   explicit ElementNames(ConvObjToString c);
+  ~ElementNames();
 
+  /** \brief Callback für einen Statement-Generator
+   *
+   * @param name Pfad-Name der Name der Variablen
+   * @param mem Variable selbst
+   * @param compact Formatangabe
+   */
   virtual void valueStmt(const std::string &name, const MemberBase &mem, bool compact) = 0;
+
+  /** \brief Callback für einen Order-Statement-Generator
+   *
+   * @param name Pfad-Name der Name der Variablen
+   * @param direction 1 oder -1 für Sortierreihenfolge
+   */
+  virtual void orderStmt(const std::string &name, int direction) = 0;
+
+  /** \brief Starte Auswertung für QueryOrder
+   *
+   * Erzeuge Statement mittels \c orderStmt zur Sortierung einer Query.
+   *
+   * Aufruf wird gefolgt von traverse und mit finishOrder abgeschlossen
+   * @param sort QuerySort-Objekt
+   */
+  void startOrder(const QueryOrder &sort);
+
+  /// Abschluss von \c startOrder nach traverse()
+  void finishOrder();
 
   /// \private
   bool doObjBeg(const ObjectBase &obj) final;
@@ -179,8 +210,7 @@ public:
   void doMem(const MemberBase &mem) final;
 
 private:
-  ConvObjToString cth;
-  std::stack<std::string> names{};
+  ElementNamesData *data;
 };
 
 /// Traversier-Klasse: Setzt alle Vektoren eines Objektes auf Größe 1

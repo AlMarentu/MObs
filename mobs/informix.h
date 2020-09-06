@@ -61,7 +61,7 @@ public:
   /// \private
   void structure(DatabaseInterface &dbi, const ObjectBase &obj) override;
   /// \private
-  std::shared_ptr<DbCursor> query(DatabaseInterface &dbi, ObjectBase &obj, const std::string &query, bool qbe) override;
+  std::shared_ptr<DbCursor> query(DatabaseInterface &dbi, ObjectBase &obj, const std::string &query, bool qbe, const QueryOrder *sort) override;
   /// \private
   void retrieve(DatabaseInterface &dbi, ObjectBase &obj, std::shared_ptr<mobs::DbCursor> cursor) override;
   /// \private

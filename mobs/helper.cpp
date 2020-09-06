@@ -19,6 +19,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "helper.h"
+#include "queryorder.h"
 //#include <strstream>
 
 using namespace mobs;
@@ -79,6 +80,8 @@ public:
       }
     }
     else {
+      if (inArray() and arrayIndex() > 0)
+        return false;
       if (obj.hasFeature(mobs::DbDetail))
         return false;
       if (obj.isNull() and cth.omitNull())
@@ -101,8 +104,6 @@ public:
         selectWhere += val;
         return false;
       }
-      if (inArray() and arrayIndex() > 0)
-        return false;
     }
     level++;
     return true;
@@ -162,8 +163,8 @@ public:
     level--;
     levelArray--;
     keys.pop_back();
-
-    if (not fst) {
+    if (not fst)
+    {
       size_t last = useName.size() - 1;
       selectJoin += " left join ";
       selectJoin +=  useName[last] + " on ";
@@ -171,7 +172,7 @@ public:
         if (fst)
           selectJoin += " and ";
         fst = true;
-        selectJoin += useName[last - 1] + "." + k + " = " + useName[last] + "." + k;
+        selectJoin += STRSTR(useName[last - 1] << '.' << k << " = " << useName[last] << '.' << k);
       }
       fst = true;
     }
@@ -189,7 +190,14 @@ public:
     if (mem.is_chartype(cth) and mem.hasFeature(mobs::DbCompact))
       compact = true;
     string name = mem.getName(cth);
-
+    size_t last = useName.size() -1;
+    uint pos;
+    int dir;
+    if (sort and sort->sortInfo(mem, pos, dir)) {
+      selectOrder[pos] = STRSTR(useName[last] << '.' << name << (dir > 0? "": " descending"));
+//      LOG(LM_INFO, "SORT " << pos << " " << selectOrder[pos]);
+      fst = false;
+    }
     if (levelArray == 0) {
       if (not selectField.empty())
         selectField += ",";
@@ -212,7 +220,6 @@ public:
       selectWhere += " and ";
 
     fst = false;
-    size_t last = useName.size() -1;
 
     selectWhere += useName[last] + "." + name;
     string val = sqldb.valueStmt(mem, compact, false, true);
@@ -257,6 +264,15 @@ public:
       s += " where ";
       s += selectWhere;
     }
+    if (not count and not selectOrder.empty()) {
+      s += " order by ";
+      string del;
+      for (auto &o:selectOrder) {
+        s += del;
+        del = ",";
+        s += o.second;
+      }
+    }
     s += ";";
     return s;
   }
@@ -266,7 +282,9 @@ public:
   string selectWhere;
   string selectJoin;
   string masterName;
+  map<uint, string>  selectOrder;
   bool noJoin = false;  // ersetze joinGenerierung
+  const QueryOrder *sort = nullptr;
 
 private:
   ConvObjToString cth;
@@ -1244,9 +1262,10 @@ uint64_t SqlGenerator::getVersion() const {
   return static_cast<uint64_t>(ok.version);
 }
 
-std::string SqlGenerator::query(QueryMode queryMode, const std::string &where, const std::string &join) {
+std::string SqlGenerator::query(QueryMode queryMode, const QueryOrder *sort, const std::string &where, const std::string &join) {
   GenerateSqlJoin gsjoin((mobs::ConvObjToString()), sqldb);
   gsjoin.noJoin = true;
+  gsjoin.sort = sort;
   obj.traverse(gsjoin);
   gsjoin.selectJoin = join;
   gsjoin.selectWhere = where;
@@ -1254,8 +1273,9 @@ std::string SqlGenerator::query(QueryMode queryMode, const std::string &where, c
   return gsjoin.result(queryMode == Count, queryMode == Keys);
 }
 
-string SqlGenerator::queryBE(QueryMode queryMode, const std::string &where) {
+string SqlGenerator::queryBE(QueryMode queryMode, const QueryOrder *sort, const std::string &where) {
   GenerateSqlJoin gsjoin((mobs::ConvObjToString()), sqldb);
+  gsjoin.sort = sort;
   obj.traverse(gsjoin);
   if (not where.empty())
     gsjoin.addWhere(where);
@@ -1282,55 +1302,93 @@ std::string SqlGenerator::insertUpdStatement(bool first, string &upd) {
 
 //////////////////////////////// ElementNames ////////////////////////////////
 
-ElementNames::ElementNames(ConvObjToString c) : cth(std::move(c)) { names.push(""); }
+class ElementNamesData {
+public:
+  ConvObjToString cth;
+  std::stack<std::string> names{};
+  const QueryOrder *sort = nullptr;
+  std::map<uint, std::pair<std::string, int>> selectOrder;
+};
+
+ElementNames::ElementNames(ConvObjToString c) {
+  data = new ElementNamesData;
+  data->names.push("");
+  data->cth = std::move(c);
+}
+
+ElementNames::~ElementNames() {
+  delete data;
+}
 
 bool ElementNames::doObjBeg(const ObjectBase &obj) {
+  if (data->sort and inArray() and arrayIndex() > 0)
+    return false;
   if (obj.hasFeature(mobs::DbDetail))
     return false;
-  if (obj.isNull() and cth.omitNull())
+  if (obj.isNull() and data->cth.omitNull())
     return false;
-  if (not obj.isModified() and cth.modOnly())
+  if (not obj.isModified() and data->cth.modOnly())
     return false;
   if (inArray() and arrayIndex() > 0)
     return false;
-  std::string name = obj.getName(cth);
+  std::string name = obj.getName(data->cth);
   if (not name.empty())
     name += ".";
-  names.push(names.top() + name);
+  data->names.push(data->names.top() + name);
   return true;
 }
 
 void ElementNames::doObjEnd(const ObjectBase &obj) {
-  names.pop();
+  data->names.pop();
 }
 
 bool ElementNames::doArrayBeg(const MemBaseVector &vec) {
   if (vec.hasFeature(mobs::DbDetail))
     return false;
-  if (vec.isNull() and cth.omitNull())
+  if (vec.isNull() and data->cth.omitNull())
     return false;
-  if (not vec.isModified() and cth.modOnly())
+  if (not vec.isModified() and data->cth.modOnly())
     return false;
-  names.push(names.top() + vec.getName(cth) + ".");
+  data->names.push(data->names.top() + vec.getName(data->cth) + ".");
   return true;
 }
 
 void ElementNames::doArrayEnd(const MemBaseVector &vec) {
-  names.pop();
+  data->names.pop();
 }
 
 void ElementNames::doMem(const MemberBase &mem) {
-  if (mem.isNull() and cth.omitNull())
+  if (data->sort) {
+    int dir;
+    uint pos;
+    if (inArray() and arrayIndex() > 0)
+      return;
+    if (data->sort->sortInfo(mem, pos, dir))
+      data->selectOrder[pos] = make_pair(data->names.top() + mem.getName(data->cth), dir);
     return;
-  if (not mem.isModified() and cth.modOnly())
+  }
+  if (mem.isNull() and data->cth.omitNull())
+    return;
+  if (not mem.isModified() and data->cth.modOnly())
     return;
   if (inArray() and arrayIndex() > 0)
     return;
-  bool compact = cth.compact();
-  if (mem.is_chartype(cth) and mem.hasFeature(mobs::DbCompact))
+  bool compact = data->cth.compact();
+  if (mem.is_chartype(data->cth) and mem.hasFeature(mobs::DbCompact))
     compact = true;
 
-  valueStmt(names.top() + mem.getName(cth), mem, compact);
+  valueStmt(data->names.top() + mem.getName(data->cth), mem, compact);
+}
+
+void ElementNames::startOrder(const QueryOrder &s) {
+  data->sort = &s;
+}
+
+void ElementNames::finishOrder() {
+  for (auto const &o:data->selectOrder) {
+    orderStmt(o.second.first, o.second.second);
+  }
+
 }
 
 

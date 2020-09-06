@@ -38,8 +38,9 @@ namespace mobs {
 class DatabaseInterface;
 class DbTransaction;
 class DatabaseManager;
+class QueryOrder;
 
-/** \brief Exception falls Datenbank temporär geblocked oder nicht verfügbar
+/** \brief Exception falls Datenbank temporär geblockt oder nicht verfügbar
  *
  */
 class locked_error : public std::runtime_error {
@@ -124,7 +125,7 @@ public:
 
   /// \private
   virtual std::shared_ptr<DbCursor>
-  query(DatabaseInterface &dbi, ObjectBase &obj, const std::string &query, bool qbe) = 0;
+  query(DatabaseInterface &dbi, ObjectBase &obj, const std::string &query, bool qbe, const QueryOrder *sort) = 0;
 
   /// \private
   virtual void retrieve(DatabaseInterface &dbi, ObjectBase &obj, std::shared_ptr<mobs::DbCursor> cursor) = 0;
@@ -236,7 +237,7 @@ public:
    * @return Shared-Pointer auf einen Ergebnis-Cursor
    * \throw runtime_error wenn ein Fehler auftrat. Eine leere Ergebnismenge ist kein Fehler
    */
-  std::shared_ptr<DbCursor> query(ObjectBase &obj, const std::string &query);
+  std::shared_ptr<DbCursor> query(ObjectBase &obj, const std::string &query, const QueryOrder *sort = nullptr);
 
   /** \brief Datenbankabfrage Query By Example
    *
@@ -247,6 +248,17 @@ public:
    * \throw runtime_error wenn ein Fehler auftrat. Eine leere Ergebnismenge ist kein Fehler
    */
   std::shared_ptr<DbCursor> qbe(ObjectBase &obj);
+
+  /** \brief Datenbankabfrage Query By Example
+   *
+   * Es wird eine Datenbankabfrage aus dem übergebenen Objekt generiert, die auf alle,
+   * als "modified" gekennzeichneten Elemente passt.
+   * @param obj Objekt zum Aufbau der Query
+   * @param sort Sortier-Objekt zum Aufbau der Query
+   * @return Shared-Pointer auf einen Ergebnis-Cursor
+   * \throw runtime_error wenn ein Fehler auftrat. Eine leere Ergebnismenge ist kein Fehler
+   */
+  std::shared_ptr<DbCursor> qbe(ObjectBase &obj, const QueryOrder &sort);
 
   /** lade das Objekt, auf das der Cursor zeigt
    *

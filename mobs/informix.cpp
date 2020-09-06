@@ -947,16 +947,16 @@ void InformixDatabaseConnection::structure(DatabaseInterface &dbi, const ObjectB
 }
 
 std::shared_ptr<DbCursor>
-InformixDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, const string &query, bool qbe) {
+InformixDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, const string &query, bool qbe, const QueryOrder *sort) {
   open();
   SQLInformixdescription sd(dbi.database());
   mobs::SqlGenerator gsql(obj, sd);
 
   string s;
   if (qbe)
-    s = gsql.queryBE(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal);
+    s = gsql.queryBE(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, sort);
   else
-    s = gsql.query(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, query);
+    s = gsql.query(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, sort, query);
 // TODO  s += " LOCK IN SHARE MODE WAIT 10 "; / NOWAIT
   LOG(LM_INFO, "SQL: " << s);
   if (dbi.getCountCursor()) {
