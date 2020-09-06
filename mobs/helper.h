@@ -231,45 +231,7 @@ public:
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////   Audit Trail   ////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Datenbank-Objekt für Audit-Trail
-class AuditChanges : public mobs::ObjectBase {
-public:
-  ObjInit(AuditChanges);
-  MemVar(std::string, field, LENGTH(100));
-  MemVar(std::string, value, LENGTH(200));
-  MemVar(bool,        nullVal);
-
-};
-
-/// Datenbank-Objekt für Audit-Trail
-class AuditObjects : public mobs::ObjectBase {
-public:
-  ObjInit(AuditObjects);
-  
-  MemVar(int, initialVersion); // wenn 0, dann Startwerte, sonst alte Werte
-  MemVar(bool, destroy);  // wenn true, letzter Wert
-  MemVar(std::string, objectName, LENGTH(20));
-  MemVar(std::string, objectKey, LENGTH(80));
-  MemVector(AuditChanges, changes, COLNAME(auditChanges));
-
-  /// fügt gesplittete changes.values wieder zusammen
-  void unsplit();
-};
-
-/// Datenbank-Objekt für Audit-Trail
-class AuditActivity : public mobs::ObjectBase {
-public:
-  ObjInit(AuditActivity);
-  
-  MemVar(MTime, time, KEYELEMENT1 DBCOMPACT);
-  MemVar(int, userId, KEYELEMENT2);
-  MemVar(std::string, jobId, LENGTH(32));
-  MemVar(std::string, comment, USENULL LENGTH(200));
-  MemVector(AuditObjects, objects, COLNAME(auditObjects));
-  
-};
-
+class AuditActivity;
 
 /// Ermittle Elementnamen in mit kompletten Pfad zB.: a.b.c
 class AuditTrail : virtual public ObjTravConst {

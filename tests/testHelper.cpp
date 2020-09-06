@@ -22,6 +22,7 @@
 #include "objgen.h"
 #include "queryorder.h"
 #include "helper.h"
+#include "audittrail.h"
 #include "logging.h"
 
 #include <sstream>

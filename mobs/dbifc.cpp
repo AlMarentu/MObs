@@ -38,6 +38,7 @@
 
 #include "helper.h"
 #include "mchrono.h"
+#include "audittrail.h"
 #include <iomanip>
 #include <sstream>
 #include <unistd.h> // getuid

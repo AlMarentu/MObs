@@ -19,6 +19,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "helper.h"
+#include "audittrail.h"
 #include "queryorder.h"
 //#include <strstream>
 
@@ -1535,24 +1536,6 @@ void AuditTrail::doMem(const MemberBase &mem) {
   } while (not val.empty());
 }
 
-void AuditObjects::unsplit() {
-  if (changes.size() <= 1)
-    return;
-  size_t j = 0;
-  for (size_t i = 1; i < changes.size(); i++) {
-    string s = changes[j].value();
-    if (not s.empty() and s[s.length()-1] == '\\' and changes[i].field() == changes[j].field()) {
-      s.replace(s.length() -1, 1, changes[i].value());
-      changes[j].value(s);
-    }
-    else {
-      j++;
-      if (i != j)
-        changes[j] = changes[i];
-    }
-  }
-  changes.resize(j+1);
-}
 
 
 }
