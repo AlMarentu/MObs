@@ -471,7 +471,7 @@ hier kann für ältere Versionen INFORMIX_DTFMT_BUG definiert werden
 * Zugriffskontrolle Mongo
 * MariaDB + Informix: Blob unterstützen 
 * SQLite: Datum nicht als string speichern
-* Vervollständigung DB: Isolation, transaction level, timeouts, skip, limit
+* Vervollständigung DB: Isolation, transaction level, timeouts
 
 
 
@@ -491,6 +491,8 @@ hier kann für ältere Versionen INFORMIX_DTFMT_BUG definiert werden
 * logging.h Makros und Klassen für Logging und Tracing auf stderr 
 * unixtime.h Wrapper Klasse für Datum-Zeit auf Basis von Unix-time_t
 * mchrono.h Definitionen für Zeit und Datum aus std::chrono
+* helper.h Interne Hilfsfunktionen
+* audittrail.h Datenbankobjekte des Audit Trails
 * maria.h Datenbankinterface 
 * mongo.h Datenbankinterface 
 * sqlite.h Datenbankinterface 
