@@ -274,6 +274,7 @@ public:
         s += o.second;
       }
     }
+    s += injectEnd;
     s += ";";
     return s;
   }
@@ -286,6 +287,7 @@ public:
   map<uint, string>  selectOrder;
   bool noJoin = false;  // ersetze joinGenerierung
   const QueryOrder *sort = nullptr;
+  std::string injectEnd;    ///< wird bei QueryWithJoin am enge angehängt
 
 private:
   ConvObjToString cth;
@@ -1263,25 +1265,30 @@ uint64_t SqlGenerator::getVersion() const {
   return static_cast<uint64_t>(ok.version);
 }
 
-std::string SqlGenerator::query(QueryMode queryMode, const QueryOrder *sort, const std::string &where, const std::string &join) {
+std::string
+SqlGenerator::query(QueryMode querMode, const QueryOrder *sort, const std::string &where, const std::string &join,
+                    const std::string &atEnd) {
   GenerateSqlJoin gsjoin((mobs::ConvObjToString()), sqldb);
+  gsjoin.injectEnd = atEnd;
   gsjoin.noJoin = true;
   gsjoin.sort = sort;
   obj.traverse(gsjoin);
   gsjoin.selectJoin = join;
   gsjoin.selectWhere = where;
   querywJoin = not gsjoin.selectJoin.empty();
-  return gsjoin.result(queryMode == Count, queryMode == Keys);
+  return gsjoin.result(querMode == Count, querMode == Keys);
 }
 
-string SqlGenerator::queryBE(QueryMode queryMode, const QueryOrder *sort, const std::string &where) {
+std::string
+SqlGenerator::queryBE(QueryMode querMode, const QueryOrder *sort, const std::string &where, const std::string &atEnd) {
   GenerateSqlJoin gsjoin((mobs::ConvObjToString()), sqldb);
+  gsjoin.injectEnd = atEnd;
   gsjoin.sort = sort;
   obj.traverse(gsjoin);
   if (not where.empty())
     gsjoin.addWhere(where);
   querywJoin = not gsjoin.selectJoin.empty();
-  return gsjoin.result(queryMode == Count, queryMode == Keys);
+  return gsjoin.result(querMode == Count, querMode == Keys);
 }
 
 

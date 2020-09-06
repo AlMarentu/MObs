@@ -593,14 +593,20 @@ std::shared_ptr<DbCursor>
 SQLiteDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, const string &query, bool qbe, const QueryOrder *sort) {
   SQLSQLiteDescription sd(dbi.database());
   mobs::SqlGenerator gsql(obj, sd);
+  string sqlLimit;
+  if (not dbi.getCountCursor() and dbi.getQueryLimit() > 0)
+    sqlLimit += STRSTR(" LIMIT " << dbi.getQueryLimit());
+  if (not dbi.getCountCursor() and dbi.getQuerySkip() > 0)
+    sqlLimit += STRSTR(" OFFSET " << dbi.getQuerySkip());
+
   try {
     open();
     setConf(dbi);
     string s;
     if (qbe)
-      s = gsql.queryBE(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, sort);
+      s = gsql.queryBE(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, sort, "", sqlLimit);
     else
-      s = gsql.query(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, sort, query);
+      s = gsql.query(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, sort, query, "", sqlLimit);
     // TODO  s += " LOCK IN SHARE MODE WAIT 10 "; / NOWAIT
 
     LOG(LM_INFO, "SQL: " << s);

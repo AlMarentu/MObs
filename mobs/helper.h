@@ -117,8 +117,10 @@ public:
   std::string tableName() const;
 
   enum QueryMode { Normal, Keys, Count };
-  std::string queryBE(QueryMode querMode = Normal, const QueryOrder *sort = nullptr, const std::string &where = "");
-  std::string query(QueryMode querMode, const QueryOrder *sort, const std::string &where, const std::string &join = "");
+  std::string queryBE(QueryMode querMode = Normal, const QueryOrder *sort = nullptr, const std::string &where = "",
+                      const std::string &atEnd = "");
+  std::string query(QueryMode querMode, const QueryOrder *sort, const std::string &where, const std::string &join = "",
+                    const std::string &atEnd = "");
 
   std::string createStatement(bool first);
   std::string dropStatement(bool first);
@@ -163,7 +165,7 @@ private:
 
 class ElementNamesData;
 
-/** \brief Ermittle Elementnamen in mit kompletten Pfad zB.: a.b.c
+/** \brief Ermittle Elementnamen mit kompletten Pfad zB.: a.b.c
  *
  */
 class ElementNames : virtual public ObjTravConst {
@@ -213,7 +215,10 @@ private:
   ElementNamesData *data;
 };
 
-/// Traversier-Klasse: Setzt alle Vektoren eines Objektes auf Größe 1
+/** \brief Traversier-Klasse: Setzt alle Vektoren eines Objektes auf Größe 1
+ *
+ * bei rekursiv angelegten Objekten ergibt sich eine Endlosschleife
+ */
 class SetArrayStructure  : virtual public mobs::ObjTrav {
 public:
   /// \private
