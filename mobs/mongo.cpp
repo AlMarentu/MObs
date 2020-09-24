@@ -30,6 +30,7 @@
 #include "objgen.h"
 #include "unixtime.h"
 #include "helper.h"
+#include "querygenerator.h"
 #include "mchrono.h"
 
 #include <cstdint>
@@ -48,6 +49,7 @@ using namespace bsoncxx;
 using bsoncxx::builder::basic::kvp;
 using bsoncxx::builder::basic::sub_document;
 using bsoncxx::builder::basic::sub_array;
+using bsoncxx::builder::basic::make_document;
 
 namespace {
 using namespace mobs;
@@ -444,6 +446,380 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
+class MongoQuery {
+public:
+  class Level {
+  public:
+    explicit Level(QueryGenerator::Operator o, bool negate) : op(o), neg(negate) { };
+    QueryGenerator::Operator op;
+    bool neg = false;
+//    bsoncxx::builder::basic::document doc;
+    bsoncxx::builder::basic::array arr;
+    bool invert() { return neg and op == QueryGenerator::AndBegin; }
+  };
+
+  MongoQuery(const QueryGenerator *query) : query(query) {
+    if (query)
+      query->createLookup(lookUp);
+  }
+#if 0
+  void showValue(QueryItem &i, std::stringstream &res) {
+    switch(i.op) {
+      case QueryGenerator::ConstStr:
+        res << to_quote(i.str);
+        break;
+      case QueryGenerator::ConstInt:
+        res << i.int64;
+        break;
+      case QueryGenerator::ConstUInt:
+        res << i.uint64;
+        break;
+      case QueryGenerator::ConstDbl:
+        res << i.dbl;
+        break;
+      case QueryGenerator::ConstTrue:
+        res << " true ";
+        break;
+      case QueryGenerator::ConstFalse:
+        res << " false ";
+        break;
+      default:
+        THROW("Value missing");
+    }
+  }
+#endif
+
+  void reduceRevel() {
+    std::string op = level.top().op == QueryGenerator::AndBegin ? "$and" : "$or";
+    if (level.top().neg)
+      op = level.top().op == QueryGenerator::AndBegin ? "$or" : "$nor"; // invert() beachten
+
+    bsoncxx::array::value val = level.top().arr.extract();
+    level.pop();
+    if (level.empty())
+      doc.append(kvp(op, val));
+    else
+      level.top().arr.append(make_document(kvp(op, val)));
+  }
+
+  void genValue(bsoncxx::builder::basic::document &doc, const std::string name, const QueryGenerator::QueryItem &i) {
+    if (i.op != QueryGenerator::Const)
+      THROW("no constant");
+//    LOG(LM_INFO, " OPER " << name << " " << i.toString());
+
+    if (i.isTime)
+    {
+      std::chrono::system_clock::time_point tp{};
+      tp += std::chrono::microseconds(i.t64);
+      doc.append(kvp(name, types::b_date(tp)));
+    } else if (i.isSigned)
+      doc.append(kvp(name, i.i64));
+    else if (i.isUnsigned and i.max == 1)
+      doc.append(kvp(name, (i.u64 ? true:false)));
+    else if (i.isUnsigned and i.u64 <= INT64_MAX)
+      doc.append(kvp(name, int64_t(i.u64)));
+    else if (i.isUnsigned) {
+      bsoncxx::decimal128 i128 = bsoncxx::decimal128(0, i.u64);
+      doc.append(kvp(name, types::b_decimal128(i128)));
+    } else
+      doc.append(kvp(name, types::b_utf8(i.text)));
+  }
+
+  void genValue(bsoncxx::builder::basic::array &arr, const QueryGenerator::QueryItem &i) {
+    if (i.op != QueryGenerator::Const)
+      THROW("no constant");
+//    LOG(LM_INFO, "ARRAY " << i.toString());
+    if (i.isTime)
+    {
+      std::chrono::system_clock::time_point tp{};
+      tp += std::chrono::microseconds(i.t64);
+      arr.append(types::b_date(tp));
+    } else if (i.isSigned)
+      arr.append(i.i64);
+    else if (i.isUnsigned and i.max == 1)
+      arr.append((i.u64 ? true:false));
+    else if (i.isUnsigned and i.u64 <= INT64_MAX)
+      arr.append(int64_t(i.u64));
+    else if (i.isUnsigned) {
+      bsoncxx::decimal128 i128 = bsoncxx::decimal128(0, i.u64);
+      arr.append(types::b_decimal128(i128));
+    } else
+      arr.append(types::b_utf8(i.text));
+  }
+
+  void generate() {
+    std::stringstream res;
+    int params = 0;
+    int vars = 0;
+
+    // Equal, Less, LessEqual, Grater, GraterEqual, NotEqual, Like
+    std::vector<const char *> binOp = {"$eq", "$lt", "$lte", "$gt", "$gte", "$ne", "$regex"};
+    std::vector<const char *> txtOp = {"=",   "<",   "<=",   ">",   ">=",   "!=",  " LIKE "};
+//    std::stack<std::string> lastDelim;
+//    std::string aktDelim = " AND ";
+//    std::string valDelim;
+//    std::string delim;
+//    std::string d;
+
+    std::string script;
+    bool literal = false;
+    bool inScript = false;
+    bool simpleScript = false;  // Ohne ExpBegin
+    bool negate = false;
+    for (auto it = query->query.begin(); it != query->query.end(); it++) {
+      auto i = *it;
+      std::string variable;
+      bool scriptFinish = false;
+      switch (i.op) {
+        case QueryGenerator::Not:
+          if (inScript or literal)
+            THROW("'not' not allowed in literal");
+          negate = not negate;
+          break;
+//        case QueryGenerator::ExpBegin:
+//          if (inScript or literal)
+//            THROW("already in expression mode");
+//          inScript = true;
+//          break;
+//        case QueryGenerator::ExpEnd:
+//          if (not inScript)
+//            THROW("not in in expression mode");
+//          scriptFinish = true;
+//          break;
+        case QueryGenerator::Variable: {
+          auto lu = lookUp.find(i.mem);
+          if (lu != lookUp.end())
+            variable = lu->second;
+          else
+            THROW("variable missing");
+          if (inScript or literal) {
+            if (inScript)
+              script += "this.";
+            script += variable;
+            variable = "";
+            if (simpleScript)
+              scriptFinish = true;
+            break;
+          }
+          auto it2 = it;
+          if (++it2 == query->query.end())
+            THROW("syntax");
+          switch (it2->op) {
+            case QueryGenerator::Equal ... QueryGenerator::Like: {
+              bool like = it2->op == QueryGenerator::Like;
+              std::string op = binOp[int(it2->op) - int(QueryGenerator::Equal)];
+              if (++it2 == query->query.end())
+                THROW("syntax");
+              bsoncxx::builder::basic::document d;
+              if (like) {
+                if (it2->op != QueryGenerator::Const or it2->isNumber())
+                  THROW("'like' with no string constant");
+                QueryGenerator::QueryItem qi(QueryGenerator::Const);
+                qi.text = mobs::convLikeToRegexp(it2->text);
+                genValue(d, op, qi);
+              } else if (it2->op == QueryGenerator::Variable) {
+#if 0
+                inScript = true;
+                simpleScript = true;
+                script = "this.";
+                script += variable;
+                continue;
+#else
+                bsoncxx::builder::basic::array arr;
+                // $expr:{$gt:["$Grade1", "$Grade2"]}
+                arr.append(variable);
+                auto lu = lookUp.find(it2->mem);
+                if (lu != lookUp.end())
+                  arr.append(lu->second);
+                else
+                  THROW("variable missing");
+                bsoncxx::array::value val = arr.extract();
+                d.append(kvp(op, val));
+                variable = "$expr";
+                LOG(LM_WARNING, "$expr statement is experimental");
+#endif
+              } else
+                genValue(d, op, *it2);
+              bsoncxx::document::value val = d.extract();
+              if (negate)
+                val = make_document(kvp("$not", val));
+              negate = not level.empty() and level.top().invert();
+              if (not level.empty())
+                level.top().arr.append(make_document(kvp(variable, val)));
+              else
+                doc.append(kvp(variable, val));
+              it = it2;
+              break;
+            }
+            case QueryGenerator::IsNotNull:
+            case QueryGenerator::IsNull: {
+              if (it2->op == QueryGenerator::IsNotNull)
+                negate = not negate;
+              std::string op = negate ? "$ne" : "$eq";
+              negate = not level.empty() and level.top().invert();
+              bsoncxx::document::value val = make_document(kvp(op, types::b_null()));
+              if (not level.empty())
+                level.top().arr.append(make_document(kvp(variable, val)));
+              else
+                doc.append(kvp(variable, val));
+              it = it2;
+              break;
+            }
+            case QueryGenerator::Between: {
+              if (++it2 == query->query.end())
+                THROW("syntax");
+              bsoncxx::builder::basic::document d;
+              genValue(d, "$gte", *it2);
+              if (++it2 == query->query.end())
+                THROW("syntax");
+              genValue(d, "$lte", *it2);
+              bsoncxx::document::value val = d.extract();
+              if (negate)
+                val = make_document(kvp("$not", val));
+              negate = not level.empty() and level.top().invert();
+              if (not level.empty())
+                level.top().arr.append(make_document(kvp(variable, val)));
+              else
+                doc.append(kvp(variable, val));
+              it = it2;
+              break;
+            }
+            case QueryGenerator::InBegin: {
+              bsoncxx::builder::basic::array arr;
+              for (;;) {
+                if (++it2 == query->query.end())
+                  THROW("syntax");
+                if (it2->op == QueryGenerator::InEnd)
+                  break;
+                genValue(arr, *it2);
+              }
+              std::string op = negate ? "$nin" : "$in";
+              bsoncxx::document::value val = make_document(kvp(op, arr.extract()));
+              negate = not level.empty() and level.top().invert();
+              if (not level.empty())
+                level.top().arr.append(make_document(kvp(variable, val)));
+              else
+                doc.append(kvp(variable, val));
+              it = it2;
+              break;
+            }
+            default:
+              THROW("syntax");
+          }
+          break;
+        }
+        case QueryGenerator::AndBegin:
+        case QueryGenerator::OrBegin:
+          level.emplace(i.op, negate);
+          LOG(LM_INFO, "LEVEL " << level.size());
+          negate = level.top().invert();
+          break;
+        case QueryGenerator::AndEnd:
+        case QueryGenerator::OrEnd: {
+          if (level.empty())
+            THROW("parentheses error");
+          if (level.top().op != (i.op == QueryGenerator::AndEnd ? QueryGenerator::AndBegin : QueryGenerator::OrBegin))
+            THROW("and/or mismatch");
+          reduceRevel();
+          break;
+        }
+        case QueryGenerator::Equal ... QueryGenerator::NotEqual: {
+          if (not inScript)
+            THROW("syntax");
+          const char *op = txtOp[int(i.op) - int(QueryGenerator::Equal)];
+          script += op;
+          break;
+        }
+        case QueryGenerator::Const: {
+          if (not inScript and not literal)
+            THROW("syntax");
+          bool quote;
+          std::string t = i.toString(&quote);
+          if (quote and not literal)
+            script += mobs::to_quote(t);
+          else
+            script += t;
+          break;
+        }
+        case QueryGenerator::literalBegin:
+          if (inScript or literal)
+            THROW("already in literal mode");
+          literal = true;
+          if (level.empty()) {
+            level.emplace(QueryGenerator::AndBegin, negate);
+            LOG(LM_INFO, "LEVEL " << level.size());
+            negate = not level.empty() and level.top().invert();
+          }
+          break;
+        case QueryGenerator::literalEnd: {
+          LOG(LM_DEBUG, "literal: " << script);
+          auto it2 = it;
+          auto val = bsoncxx::from_json(script);
+          if (not level.empty()) {
+            bsoncxx::builder::basic::document d;
+            if (negate) {
+              d.append(kvp("$not", val));
+              val = d.extract();
+            }
+            level.top().arr.append(val);
+            literal = false;
+            script = "";
+          } else
+            THROW("literal needs AND or OR");
+          negate = not level.empty() and level.top().invert();
+          break;
+        }
+        default:
+          THROW("unknown element");
+
+      }
+      if (scriptFinish) {
+        script = std::string("function() { return ") + script + " }";
+        if (not level.empty()) {
+          bsoncxx::builder::basic::document d;
+          if (negate)
+            d.append(kvp("$not", make_document(kvp("$where", types::b_code(script)))));
+          else
+            d.append(kvp("$where", types::b_code(script)));
+          bsoncxx::document::value val = d.extract();
+          level.top().arr.append(val);
+
+        } else {
+          if (negate)
+            doc.append(kvp("$not", make_document(kvp("$where", types::b_code(script)))));
+          else
+            doc.append(kvp("$where", types::b_code(script)));
+        }
+        script = "";
+        inScript = false;
+        simpleScript = false;
+      }
+    }
+    while (not level.empty())
+      reduceRevel();
+  }
+
+  std::string result() {
+    return bsoncxx::to_json(doc.view());
+  }
+  bsoncxx::document::value value() {
+    return doc.extract();
+  }
+
+
+  const QueryGenerator *query;
+  std::map<const MemberBase *, std::string> lookUp;
+  bsoncxx::builder::basic::document doc;
+  stack<Level> level;
+
+
+
+};
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
 
 
@@ -771,7 +1147,9 @@ void MongoDatabaseConnection::structure(DatabaseInterface &dbi, const ObjectBase
   db[collectionName(obj)].create_index(bo.value(), idx.extract());
 }
 
-std::shared_ptr<DbCursor> MongoDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, const std::string& query, bool qbe, const QueryOrder *sort) {
+std::shared_ptr<DbCursor>
+MongoDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, bool qbe, const QueryGenerator *query,
+                               const QueryOrder *sort) {
   open();
   mongocxx::database db = client[dbi.database()];
   mongocxx::collection col = db[collectionName(obj)];
@@ -826,14 +1204,19 @@ std::shared_ptr<DbCursor> MongoDatabaseConnection::query(DatabaseInterface &dbi,
       return std::make_shared<CountCursor>(col.count_documents(bq.value(), c_opt));
     return std::make_shared<Cursor>(col.find(bq.value(), f_opt), dbi.getConnection(), dbi.database());
   } else {
-    std::string q = query;
-    if (q.empty())
-      q = "{}";
-    LOG(LM_DEBUG, "QUERY " << dbi.database() << "." << collectionName(obj) << " " << q << sortLog);
-    auto doc = bsoncxx::from_json(q);
+    MongoQuery qgen(query);
+    if (not qgen.lookUp.empty()) {
+      BsonElements bo((mobs::ConvObjToString()));
+      bo.startLookup(qgen.lookUp);
+      obj.traverse(bo);
+    }
+    qgen.generate();
+
+    LOG(LM_DEBUG, "QUERY " << dbi.database() << "." << collectionName(obj) << " " << qgen.result() << "  " << sortLog);
+//    auto doc = bsoncxx::from_json(q); doc.view()
     if (dbi.getCountCursor())
-      return std::make_shared<CountCursor>(col.count_documents(doc.view(), c_opt));
-    return std::make_shared<Cursor>(col.find(doc.view(), f_opt), dbi.getConnection(), dbi.database());
+      return std::make_shared<CountCursor>(col.count_documents(qgen.value(), c_opt));
+    return std::make_shared<Cursor>(col.find(qgen.value(), f_opt), dbi.getConnection(), dbi.database());
   }
 }
 

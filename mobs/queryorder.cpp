@@ -54,7 +54,7 @@ bool QueryOrder::sortInfo(const mobs::MemberBase &mem, uint &pos, int &dir) cons
 }
 
 void QueryOrder::add(const MemberBase &mem) {
-  LOG(LM_INFO, "ADD " << mem.name());
+//  LOG(LM_INFO, "ADD " << mem.name() << " " << &mem);
   QuerySortData::SortInfo &k = data->info[&mem];
   k.pos = data->cnt++;
   k.sort = data->asc ? 1 : -1;

@@ -63,7 +63,8 @@ namespace mobs {
     /// \private
     void structure(DatabaseInterface &dbi, const ObjectBase &obj) override;
     /// \private
-    std::shared_ptr<DbCursor> query(DatabaseInterface &dbi, ObjectBase &obj, const std::string &query, bool qbe, const QueryOrder *sort) override;
+    std::shared_ptr<DbCursor> query(DatabaseInterface &dbi, ObjectBase &obj, bool qbe, const QueryGenerator *query,
+                                    const QueryOrder *sort) override;
     /// \private
     void retrieve(DatabaseInterface &dbi, ObjectBase &obj, std::shared_ptr<mobs::DbCursor> cursor) override;
     /// \private

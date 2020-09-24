@@ -29,6 +29,7 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <list>
 #include <limits>
 #ifndef INT_MAX
 #include <limits.h>
@@ -676,8 +677,39 @@ public:
   void setBool(bool t);
   /// passt die Info entsprechen den compact-Mode an
   void changeCompact(bool compact);
-
+  /// ist Zahl (signed/unsigned/time/bool/float)
+  bool isNumber() const;
 };
+
+class MemberBase;
+
+/** \brief Erweiterte \c MobsMemberInfo die den Wert als String enthält, falls nicht anders darstellbar
+ *
+ */
+class MobsMemberInfoDb : public MobsMemberInfo {
+public:
+  MobsMemberInfoDb() = default;
+  /// Konstruktor Text
+  explicit MobsMemberInfoDb(const std::string &t) : MobsMemberInfo(), text(t) { }
+  /// Konstruktor MemberInfo
+  explicit MobsMemberInfoDb(const MobsMemberInfo &m) : MobsMemberInfo(m), text() { }
+  /** \brief Ausgabe als Text
+   *
+   * @param needQuotes Rückgabe, ob Quoting erforderlich, falls nicht \c nullptr
+   * @return MemberInfo als Text
+   */
+  std::string toString(bool *needQuotes = nullptr) const;
+  std::string text; ///< Membervariable für Text
+};
+
+/// Interne Struktur zur Ablage von Query-Informationen
+struct QueryInfo {
+  QueryInfo(const MemberBase *mem, const char *oper) : mem(mem), op(oper) { }
+  const MemberBase *mem;  ///< Zeiger aud MobsMenberVariable
+  const char *op;         ///< Zeiger auf Oerator z.B. "<=" oder "IN"
+  std::list<MobsMemberInfoDb> content{}; ///< Liste der konstanten Parameter zur Operation
+};
+
 
 /// Basis der Konvertierungs-Klasse für Serialisierung von und nach std::string
 class StrConvBase {

@@ -21,6 +21,7 @@
 
 #include "objgen.h"
 #include "queryorder.h"
+#include "querygenerator.h"
 #include "helper.h"
 #include "audittrail.h"
 #include "logging.h"
@@ -464,5 +465,45 @@ TEST(helperTest, sort) {
   EXPECT_EQ(" aa:1 xx:-1", elk.result());
 
 }
+
+
+
+TEST(helperTest, like) {
+  EXPECT_EQ("^otto$", mobs::convLikeToRegexp("otto"));
+  EXPECT_EQ("otto$", mobs::convLikeToRegexp("%otto"));
+  EXPECT_EQ("^otto", mobs::convLikeToRegexp("otto%"));
+  EXPECT_EQ("otto", mobs::convLikeToRegexp("%otto%"));
+  EXPECT_EQ("^ot.*to$", mobs::convLikeToRegexp("ot%to"));
+  EXPECT_EQ("^o.tto$", mobs::convLikeToRegexp("o_tto"));
+  EXPECT_EQ("^o.\\.\\*tto$", mobs::convLikeToRegexp("o_.*tto"));
+  EXPECT_EQ("^o.t%_to$", mobs::convLikeToRegexp("o_t\\%\\_to"));
+}
+
+
+TEST(helperTest, query) {
+  ObjA3 e;
+  mobs::QueryOrder sortList;
+  sortList << e.p3p << mobs::QueryOrder::descending << e.k3kk << mobs::QueryOrder::ascending << e.oa3.o2oo[0].f1gh;
+  SQLDBTestDesc sd;
+  using Q = mobs::QueryGenerator;
+  Q w1;
+  w1 << e.oa3.o2oo[0].f1gh.Qi("!=", 7);
+  mobs::SqlGenerator gsql(e, sd);
+  EXPECT_EQ("select distinct mt.k3kk,mt.version,mt.p3p,mt.o_k2kk,mt.o_s2s from D.ObjA3 mt  "
+            "left join D.ObjA3_o2oo on mt.k3kk = D.ObjA3_o2oo.k3kk where D.ObjA3_o2oo.f1gh<>7;",
+            gsql.query(mobs::SqlGenerator::Normal, nullptr, &w1));
+  Q www;
+  www << Q::OrBegin << e.p3p << Q::InBegin << 77 <<  88 << 99 << 12 << Q::InEnd << e.k3kk << Q::Equal << "Otto" << Q::OrEnd << e.oa3.o2oo[0].f1gh << Q::IsNotNull << true;
+  Q where;
+  where << e.k3kk.Qi("<>", 5) << e.oa3.o2oo[0].f1gh.QiIn({1,2,3}) << e.oa3.o2oo[0].f1gh.QiNotNull() << e.p3p.QiBetween("Anton", "Berti");
+
+//  std::map<const mobs::MemberBase *, std::string> lookUp;
+//  LOG(LM_INFO, "QQQQ " << where.show(lookUp));
+//  SQLDBTestDesc sd;
+//  mobs::SqlGenerator gsql(e, sd);
+//
+//  LOG(LM_INFO, "QQQQQ "  << gsql.queryBE());
+}
+
 
 }

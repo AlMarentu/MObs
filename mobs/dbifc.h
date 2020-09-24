@@ -39,6 +39,7 @@ class DatabaseInterface;
 class DbTransaction;
 class DatabaseManager;
 class QueryOrder;
+class QueryGenerator;
 
 /** \brief Exception falls Datenbank temporär geblockt oder nicht verfügbar
  *
@@ -90,6 +91,7 @@ public:
   /// Increment-Operator
   virtual void operator++() = 0;
 
+  /// lade nächstes Element analog operator++
   void next() { operator++(); }
 
   /// Aktuelle Position, bei eof() oder withCountCursor, Anzahl der Datensätze
@@ -125,7 +127,7 @@ public:
 
   /// \private
   virtual std::shared_ptr<DbCursor>
-  query(DatabaseInterface &dbi, ObjectBase &obj, const std::string &query, bool qbe, const QueryOrder *sort) = 0;
+  query(DatabaseInterface &dbi, ObjectBase &obj, bool qbe, const QueryGenerator *query, const QueryOrder *sort) = 0;
 
   /// \private
   virtual void retrieve(DatabaseInterface &dbi, ObjectBase &obj, std::shared_ptr<mobs::DbCursor> cursor) = 0;
@@ -233,11 +235,22 @@ public:
    *
    * Die Angabe der Bedingung ist datenbankabhängig
    * @param obj Objekt zur Generierung der Abfrage
-   * @param query Bedingung/Filter der Abfrage, ein leerer String sucht alle Objekte
+   * @param query Bedingung/Filter der Abfrage. \see QueryGenerator
    * @return Shared-Pointer auf einen Ergebnis-Cursor
    * \throw runtime_error wenn ein Fehler auftrat. Eine leere Ergebnismenge ist kein Fehler
    */
-  std::shared_ptr<DbCursor> query(ObjectBase &obj, const std::string &query, const QueryOrder *sort = nullptr);
+  std::shared_ptr<DbCursor> query(ObjectBase &obj, const QueryGenerator &query);
+
+  /** \brief Datenbankabfrage über eine Bedingung als Text
+  *
+  * Die Angabe der Bedingung ist datenbankabhängig
+  * @param obj Objekt zur Generierung der Abfrage
+  * @param query Bedingung/Filter der Abfrage. \see QueryGenerator
+  * @param sort Sortier-Objekt zum Aufbau der Query
+  * @return Shared-Pointer auf einen Ergebnis-Cursor
+  * \throw runtime_error wenn ein Fehler auftrat. Eine leere Ergebnismenge ist kein Fehler
+  */
+  std::shared_ptr<DbCursor> query(ObjectBase &obj, const QueryGenerator &query, const QueryOrder &sort);
 
   /** \brief Datenbankabfrage Query By Example
    *
@@ -446,8 +459,10 @@ class DbTransaction {
 public:
   friend class DatabaseManager;
   friend class DatabaseInterface;
+  /// Verwende Mikrosekunden als Auflösung für Audit-Trail
   using MTime = std::chrono::time_point<std::chrono::system_clock, std::chrono::microseconds>;
 
+  /// Konstanten für Isolation-Level
   enum IsolationLevel {
     ReadUncommitted, ReadCommitted, CursorStability, RepeatableRead, Serializable
   };

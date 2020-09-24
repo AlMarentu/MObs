@@ -32,6 +32,7 @@
 namespace mobs {
 
 class QueryOrder;
+class QueryGenerator;
 
 /// Klasse die Datenbank-Typ abhängige Definitionen enthält
 class SQLDBdescription {
@@ -119,9 +120,9 @@ public:
   std::string tableName() const;
 
   enum QueryMode { Normal, Keys, Count };
-  std::string queryBE(QueryMode querMode = Normal, const QueryOrder *sort = nullptr, const std::string &where = "",
+  std::string queryBE(QueryMode querMode = Normal, const QueryOrder *sort = nullptr, const QueryGenerator *where = nullptr,
                       const std::string &atEnd = "");
-  std::string query(QueryMode querMode, const QueryOrder *sort, const std::string &where, const std::string &join = "",
+  std::string query(QueryMode querMode, const QueryOrder *sort, const QueryGenerator *where, const std::string &join = "",
                     const std::string &atEnd = "");
 
   std::string createStatement(bool first);
@@ -172,6 +173,7 @@ class ElementNamesData;
  */
 class ElementNames : virtual public ObjTravConst {
 public:
+  /// Konstruktor mit Konvertierungmodalität
   explicit ElementNames(ConvObjToString c);
   ~ElementNames();
 
@@ -198,6 +200,9 @@ public:
    * @param sort QuerySort-Objekt
    */
   void startOrder(const QueryOrder &sort);
+
+  /// initiiere Lookup fpr Query
+  void startLookup(std::map<const MemberBase *, std::string> &lookUp);
 
   /// Abschluss von \c startOrder nach traverse()
   void finishOrder();
@@ -271,6 +276,13 @@ private:
   bool initial = false;
   bool destroyMode = false;
 };
+
+/** \brief wandelt ein SQL LIKE in eine Regexp um
+ *
+ * @param like SQL Like
+ * @return Regular Expression
+ */
+std::string convLikeToRegexp(const std::string &like);
 
 
 }

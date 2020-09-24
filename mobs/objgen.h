@@ -157,7 +157,7 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 #define USEVECNULL mobs::VectorNull, ///< Bei Vektoren wird der Vector selbst mit \c null vorinitialisiert
 #define XMLATTR mobs::XmlAsAttr, ///< Bei XML-Ausgabe als Attribute ausgeben (nur MemberVariable, nur von erstem Element fortlaufend)
 #define EMBEDDED mobs::Embedded, ///< Bei Ausgabe als Attribute/Traversierung werden die Member des Objektes direkt, auf ser selben Ebene, serialisiert
-#define DBCOMPACT mobs::DbCompact, ///< In der Datenbank wird der MOBSENUM numerisch gespeichert
+#define DBCOMPACT mobs::DbCompact, ///< In der Datenbank wird der MOBSENUM oder der Zeit-Wert numerisch gespeichert
 #define DBDETAIL mobs::DbDetail, ///< In der Datenbank wird dieses Subelement in einer Detail Table abgelegt, muss also seperat gespeichert werden
 #define DBJSON mobs::DbJson, ///< In nicht dokumentbasierten Datenbanken wird das Unterobjekt als Text im JSON-Format abgelegt
 #define VERSIONFIELD mobs::DbVersionField, ///< In diesem Feld wird die Objektversion gespeichert, 0 entspricht noch nicht gespeichert
@@ -230,7 +230,6 @@ static RegMe##name regme; \
 }; \
 RegMe##name RegMe##name::regme; \
 }
-
 
 template <class T>
 class MemberVector;
@@ -684,9 +683,11 @@ public:
   /// Einlesen der Variable aus einem \c std::wstring
   bool fromStr(const std::wstring &sin, const ConvFromStrHint &cfh) override { doAudit(); if (this->c_wstring2x(sin, wert, cfh)) { activate(); return true; } return false; }
   /// Info zum aktuellen Datentyp mit Inhalt
-  void memInfo(MobsMemberInfo &i) const override;
+  void memInfo(MobsMemberInfo &i) const override { memInfo(i, wert); }
   /// Versuch Variabkle aus Meminfo auszulesen (isFloat/isSigned/isUnsigned/isTime)
   bool fromMemInfo(const MobsMemberInfo &i) override;
+  /// Info zum aktuellen Datentyp mit variablen Wert
+  void memInfo(MobsMemberInfo &i, const T &value) const;
 //  /// Versuch, die  Variable aus einem \c uint64_t einzulesen
 //  bool fromUInt64(uint64_t u) override { doAudit(); if (C::c_from_number(u, wert)) { activate(); return true; } return false; }
 //  /// Versuch, die Variable aus einem \c int64_t einzulesen
@@ -695,9 +696,72 @@ public:
 //  bool fromDouble(double d) override { doAudit(); if (C::c_from_number(d, wert)) { activate(); return true; } return false; }
   /// Versuche ein Member nativ zu kopieren
   bool doCopy(const MemberBase *other) override { auto t = dynamic_cast<const Member<T, C> *>(other); if (t) doCopy(*t); return t != nullptr; }
+  /// \private
   std::string auditEmpty() const override { return C::c_to_string(C::c_empty(), ConvToStrHint(hasFeature(mobs::DbCompact))); }
   /// \private
   void inline doCopy(const Member<T, C> &other) { if (other.isNull()) forceNull(); else operator()(other()); }
+
+  // definitionen Qi* in querygenerator.h
+
+  /** \brief Erzeuge eine Query-Bedingung: MemberVariable "oper" "Konstante"
+   *
+   * Als Vergleichsoperatoren sind =, ==, !=, <>, >, <, >=, <= zugelassen
+   * @param oper Vergleichsoperator als const char *
+   * @param value Vergleichswert vom Typ der Membervariablen
+   * @return QueryInfo für QueryGenerator::operator<<()
+   */
+  QueryInfo Qi(const char *oper, const T &value) const;
+
+  /** \brief Erzeuge eine Query-Bedingung: MemberVariable "oper" "Konstante"
+   *
+   * Als Vergleichsoperatoren sind =, ==, !=, <>, >, <, >=, <= zugelassen
+   * @param oper Vergleichsoperator als const char *
+   * @param value Vergleichswert vom Typ const char * \see fromStrExplizit()
+   * @return QueryInfo für QueryGenerator::operator<<()
+   */
+  QueryInfo Qi(const char *oper, const char *value) const;
+
+  /** \brief Erzeuge eine Query-Bedingung: MemberVariable "ist null"
+   *
+   * @return QueryInfo für QueryGenerator::operator<<()
+   */
+  QueryInfo QiNull() const { return QueryInfo(this, "NU"); }
+
+  /** \brief Erzeuge eine Query-Bedingung: MemberVariable "ist nicht null"
+   *
+   * @return QueryInfo für QueryGenerator::operator<<()
+   */
+  QueryInfo QiNotNull() const { return QueryInfo(this, "NN"); }
+
+  /** \brief Erzeuge eine Query-Bedingung: MemberVariable is between "Konstante1" und "Konstante2"
+   *
+   * @param value1 untere Grenze vom Typ der Membervariablen
+   * @param value2 obere Grenze vom Typ der Membervariablen
+   * @return QueryInfo für QueryGenerator::operator<<()
+   */
+  QueryInfo QiBetween(const T &value1, const T &value2) const;
+
+  /** \brief Erzeuge eine Query-Bedingung: MemberVariable is between "Konstante1" und "Konstante2"
+   *
+   * @param value1 untere Grenze vom Typ const char * \see fromStrExplizit()
+   * @param value2 obere Grenze vom Typ const char * \see fromStrExplizit()
+   * @return QueryInfo für QueryGenerator::operator<<()
+   */
+  QueryInfo QiBetween(const char *value1, const char *value2) const;
+
+  /** \brief Erzeuge eine Query-Bedingung: MemberVariable is Element aus {"Konstante1",..., "KonstanteN"}
+   *
+   * @param values Liste der Elemente vom Typ der Membervariablen
+   * @return QueryInfo für QueryGenerator::operator<<()
+   */
+  QueryInfo QiIn(const std::list<T>& values) const;
+
+  /** \brief Erzeuge eine Query-Bedingung: MemberVariable is Element aus {"Konstante1",..., "KonstanteN"}
+   *
+   * @param values Liste/Vektor der Elemente vom Typ const char * \see fromStrExplizit()
+   * @return QueryInfo für QueryGenerator::operator<<()
+   */
+  QueryInfo QiIn(const std::vector<const char *>& values) const;
 
 private:
   void doClear()  { wert = this->c_empty(); }
@@ -875,7 +939,7 @@ void MemberVector<T>::resize(size_t s)
 //}
 
 template<typename T, class C>
-void Member<T, C>::memInfo(MobsMemberInfo &i) const
+void Member<T, C>::memInfo(MobsMemberInfo &i, const T &value) const
 {
   i = MobsMemberInfo();
   i.hasCompact = C::c_is_chartype(ConvObjToString()) and not C::c_is_chartype(ConvObjToString().exportCompact());
@@ -883,12 +947,12 @@ void Member<T, C>::memInfo(MobsMemberInfo &i) const
   i.min = C::c_min();
   i.isSigned = false;
   i.isUnsigned = false;
-  if (C::c_to_int64(wert, i.i64))
+  if (C::c_to_int64(value, i.i64))
     i.isSigned = true;
-  else if (C::c_to_uint64(wert, i.u64))
+  else if (C::c_to_uint64(value, i.u64))
     i.isUnsigned = true;
-  i.isTime = C::c_to_mtime(wert, i.t64);
-  i.isFloat = C::c_to_double(wert, i.d);
+  i.isTime = C::c_to_mtime(value, i.t64);
+  i.isFloat = C::c_to_double(value, i.d);
   i.is_specialized = C::c_is_specialized();
   if (i.is_specialized)
     i.size = sizeof(T);
@@ -896,7 +960,7 @@ void Member<T, C>::memInfo(MobsMemberInfo &i) const
   i.isEnum = this->c_is_mobsEnum();
   i.granularity = this->c_time_granularity();
   if (i.isBlob)
-    i.isBlob = C::c_to_blob(wert, i.blob, i.u64);
+    i.isBlob = C::c_to_blob(value, i.blob, i.u64);
   else if (i.granularity <= 0)
     i.granularity = 1;
 }

@@ -590,7 +590,8 @@ bool SQLiteDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase 
 }
 
 std::shared_ptr<DbCursor>
-SQLiteDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, const string &query, bool qbe, const QueryOrder *sort) {
+SQLiteDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, bool qbe, const QueryGenerator *query,
+                                const QueryOrder *sort) {
   SQLSQLiteDescription sd(dbi.database());
   mobs::SqlGenerator gsql(obj, sd);
   string sqlLimit;
@@ -604,7 +605,7 @@ SQLiteDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, const s
     setConf(dbi);
     string s;
     if (qbe)
-      s = gsql.queryBE(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, sort, "", sqlLimit);
+      s = gsql.queryBE(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, sort, nullptr, sqlLimit);
     else
       s = gsql.query(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, sort, query, "", sqlLimit);
     // TODO  s += " LOCK IN SHARE MODE WAIT 10 "; / NOWAIT

@@ -3,8 +3,10 @@
 #include "mobs/objgen.h"
 #include "mobs/dbifc.h"
 #include "mobs/queryorder.h"
+#include "mobs/querygenerator.h"
 #include "mobs/unixtime.h"
 #include "mobs/mchrono.h"
+#include "mobs/audittrail.h"
 
 using namespace std;
 
@@ -90,13 +92,13 @@ void worker(mobs::DatabaseInterface &dbi) {
     f2.haenger[0].achsen(2);
     mobs::QueryOrder sort;
     sort << f2.haenger[0].typ;
-    for (auto cursor = dbi.qbe(f2, sort); not cursor->eof(); cursor->next()) {
+    for (auto cursor = dbi.withQueryLimit(300).withQuerySkip(1).qbe(f2, sort); not cursor->eof(); cursor->next()) {
       dbi.retrieve(f2, cursor);
       LOG(LM_INFO, "QBE result: pos=" << cursor->pos() << " id=" << f2.id() << " " << f2.typ());
     }
 
     // Count
-    auto cursor = dbi.withCountCursor().query(f2, "");
+    auto cursor = dbi.withCountCursor().query(f2, mobs::QueryGenerator());
     LOG(LM_INFO, "Anzahl " << cursor->pos());
 
 
@@ -127,9 +129,10 @@ void worker(mobs::DatabaseInterface &dbi) {
 
       Gespann f;
       f.id(1);
-      if (t_dbi.load(f))
+      if (t_dbi.load(f)) {
+        f.zugmaschiene.antrieb(false);
         t_dbi.save(f);
-
+      }
     };
 
     // Transaktion ausführen
@@ -159,7 +162,7 @@ void worker(mobs::DatabaseInterface &dbi) {
       MemVar(bool, an, USENULL);
       MemVar(bool, aus, USENULL);
       MemVar(char, ch, USENULL);
-      MemVar(unsigned long long , ulolo, USENULL);
+      MemVar(uint64_t , ulolo, USENULL);
       MemObj(Data2, d2, DBJSON LENGTH(100));
     };
 

@@ -230,7 +230,7 @@ Konfiguriert werden kann:
 * useOriginalNames() Nur Original-Namen akzeptieren
 * useAlternativeNames() Nur Alternativ-Namen akzeptieren
 * useAutoNames() Original oder Alternativ-Namen akzeptieren
-* useDontShrink() Vektoren beim Schreiben entsprechens verkleinern
+* useDontShrink() Vektoren beim Schreiben entsprechend verkleinern
 * exceptionIfUnknown() werfe eine Exception falls ein Element nicht gefunden wird; ansonsten werden zusätzliche Felder ignoriert
 * useExceptNull() null-Elemente werden beim Einlesen abhängig von "USENULL"  auf null gesetzt. Im Fehlerfall erfolgt eine Exception
 * useOmitNull() null-Elemente werden beim Einlesen überlesen
@@ -318,10 +318,11 @@ gesucht:
   }
 ~~~~~~~~~~
 
-Wird über den Inhalt eines Sub-Arrays gesucht, darf nur das erste Element eines Vektors benutzt werden.
+Wird über den Inhalt eines Sub-Arrays gesucht, darf nur das erste Element eines Vektors benutzt werden. Vektorelemente
+größer als 0 werden ignoriert.
 Werden mehrere Felder gesetzt, so müssen alle Bedingungen zutreffen.
 
-Soll die Ausgabe sortiert erfolgen, son kann bei query() unf qbe() eine Sortierangabe ergolgen:
+Soll die Ausgabe sortiert erfolgen, son kann bei query() und qbe() eine Sortierangabe ergolgen:
 
 ~~~~~~~~~~cpp
 class Fahrzeug : public ObjectBase
@@ -337,9 +338,41 @@ class Fahrzeug : public ObjectBase
 Fahrzeug f;
 QueryOrder sort;
 sort << f.leistung << QueryOrder::descending << f.anzahlRaeder;
-auto cursor = dbi.qbe(f2, sort);
+auto cursor = dbi.qbe(f, sort);
 ~~~~~~~~~~
 
+Reicht die Möglichkeit von "Query by Example" nicht aus, so kann über den QueryGenerator eine
+erweiterte Bedingung erzeugt werden. Diese ist im Idealfall dann Datenbank-unabhängig.
+
+~~~~~~~~~~cpp
+ Fahrzeug f;
+
+ using Q = mobs::QueryGenerator;    // Erleichtert die Tipp-Arbeit
+ Q filter;
+ filter << f.anzahlRaeder.QiIn({2,6}) << f.leistung.Qi(">", 90.5);
+ auto cursor = dbi.query(f, filter);
+~~~~~~~~~~
+Standardmäßig werden die Filter Und-verknüpft. 
+Ein QueryOrder-Objekt kann als 3. Parameter bei query() angegeben werden.
+
+Eine komplexe Abfrage mit verschachtelten Und/Oder-Bedingungen könnte wie folgt aussehen:
+
+~~~~~~~~~~cpp
+ using Q = mobs::QueryGenerator;
+ Q filter;
+ filter << Q::AndBegin << kunde.Nr.Qi("!=", 7)
+        << Q::OrBegin << Q::Not << kunde.Ort.Qi("LIKE", "%Nor_heim") << kunde.Ort.Qi("=", "Nordheim") << Q::OrEnd
+        << kunde.eintritt.QiBetween("2020-01-01", "2020-06-30") << Q::Not << kunde.status.QiIn({7,8,3}) << Q::AndEnd;
+~~~~~~~~~~
+
+Für Extremfälle kann auch ein freier Filtertext angegeben werden. Dabei werden Membervariablen in ihren Datenbanknamen 
+umgewandelt. Dieser Filter ist dann jedoch dann spezifisch für die jeweilige
+Datenbank. Hier MongoDB:
+~~~~~~~~~~cpp
+ filter << kunde.Name.QiNotNull() << Q::literalBegin 
+        << "{ \\"$expr\" : { \\"$in\" : [\\"$" << kunde.Ort << "\", \\"$" << kunde.SearchText[0].Value << "\"]}}" 
+        << Q::literalEnd;
+~~~~~~~~~~
 
 Um verschachtelte Objekte in eine SQL-Datenbank schreiben zu können stehen folgende Featuere-Token
 zur Verfügung:
@@ -467,7 +500,8 @@ hier kann für ältere Versionen INFORMIX_DTFMT_BUG definiert werden
 
 ## TODOs
 
-* Bei MongoDB Transaktionen im Cluster-Mode unterstützt
+* Bei SQL-Query Joins optimieren
+* Bei MongoDB Transaktionen im Cluster-Mode unterstützen
 * Zugriffskontrolle Mongo
 * MariaDB + Informix: Blob unterstützen 
 * SQLite: Datum nicht als string speichern
@@ -488,11 +522,13 @@ hier kann für ältere Versionen INFORMIX_DTFMT_BUG definiert werden
 * xmlout.h  Klasse zur Ausgabe von Mobs-Objekte im XML-Format
 * objpool.h  Klassen für Named Objects 
 * dbifc.h Datenbank Interface
+* queryorder.h Zusatzmodul für Datenbankabfrage mit Sortierung
+* querygenerator.h Zusatzmodul für Filter bei Datenbankabfrage
 * logging.h Makros und Klassen für Logging und Tracing auf stderr 
 * unixtime.h Wrapper Klasse für Datum-Zeit auf Basis von Unix-time_t
 * mchrono.h Definitionen für Zeit und Datum aus std::chrono
-* helper.h Interne Hilfsfunktionen
 * audittrail.h Datenbankobjekte des Audit Trails
+* helper.h Interne Hilfsfunktionen
 * maria.h Datenbankinterface 
 * mongo.h Datenbankinterface 
 * sqlite.h Datenbankinterface 

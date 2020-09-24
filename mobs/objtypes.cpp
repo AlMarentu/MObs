@@ -20,12 +20,14 @@
 
 #include "objgen.h"
 #include "objtypes.h"
+#include "mchrono.h"
 
 #include <codecvt>
 #include <locale>
 #include <algorithm>
 #include <ctime>
 #include <chrono>
+#include <iomanip>
 
 //#include <iostream>
 
@@ -365,6 +367,38 @@ bool from_number(uint64_t u, bool &t) {
   return true;
 }
 
+std::string MobsMemberInfoDb::toString(bool *needQuotes) const {
+  if (needQuotes)
+    *needQuotes = false;
+  if (isFloat)
+    return std::to_string(d);
+  if (isTime) {
+    if (needQuotes)
+      *needQuotes = true;
+    if (granularity >= 86400000000) { // nur Datum
+      std::stringstream s;
+      struct tm ts{};
+      toLocalTime(ts);
+      s << std::put_time(&ts, "%F");
+      return s.str();
+    } else {
+      MTime t;
+      if (not from_number(i64, t))
+        throw std::runtime_error("Time Conversion");
+      return to_string_ansi(t);
+    }
+  }
+  if (isUnsigned and max == 1) // bool
+    return (u64 ? "true" : "false");
+  if (isSigned)
+    return std::to_string(i64);
+  if (isUnsigned)
+    return std::to_string(u64);
+  if (needQuotes)
+    *needQuotes = true;
+  return text;
+}
+
 
 class ConvFromStrHintDefault : virtual public ConvFromStrHint {
 public:
@@ -473,6 +507,10 @@ void MobsMemberInfo::changeCompact(bool compact) {
     isUnsigned = false;
     isSigned = false;
   }
+}
+
+bool MobsMemberInfo::isNumber() const {
+  return isSigned or isUnsigned or isTime or isFloat;
 }
 
 

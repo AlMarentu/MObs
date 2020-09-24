@@ -544,7 +544,8 @@ bool MariaDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase &
 }
 
 std::shared_ptr<DbCursor>
-MariaDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, const string &query, bool qbe, const QueryOrder *sort) {
+MariaDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, bool qbe, const QueryGenerator *query,
+                               const QueryOrder *sort) {
   open();
   SQLMariaDBdescription sd(dbi.database());
   mobs::SqlGenerator gsql(obj, sd);
@@ -555,7 +556,7 @@ MariaDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, const st
 
   string s;
   if (qbe)
-    s = gsql.queryBE(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, sort, "", sqlLimit);
+    s = gsql.queryBE(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, sort, nullptr, sqlLimit);
   else
     s = gsql.query(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, sort, query, "", sqlLimit);
   // TODO  s += " LOCK IN SHARE MODE WAIT 10 "; / NOWAIT

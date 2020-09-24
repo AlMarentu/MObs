@@ -1,4 +1,4 @@
-/// Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
+// Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
 // Copyright 2020 Matthias Lautner
@@ -18,7 +18,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/** \file querysort.h
+/** \file queryorder.h
  \brief Datenbank-Interface: Generator für Sortier-Statement
  */
 
@@ -91,7 +91,7 @@ template<typename T, class C>
 /// Klasse zur Beschreibung von Membervariablen als Key-Element für einen Datenbank
 QueryOrder &operator<<(QueryOrder &k, mobs::Member<T, C> &m) { k.add(m); return k; }
 
-/// \private
+/// füge eine Sortier-Richtung hinzu
 QueryOrder &operator<<(QueryOrder &k, QueryOrder::SortSwitch &s);
 
 

@@ -510,16 +510,20 @@ bool DatabaseInterface::destroy(const ObjectBase &obj) {
 }
 
 
-std::shared_ptr<DbCursor> DatabaseInterface::query(ObjectBase &obj, const std::string &query, const QueryOrder *sort) {
-  return dbCon->query(*this, obj, query, false, sort);
+std::shared_ptr<DbCursor> DatabaseInterface::query(ObjectBase &obj, const QueryGenerator &query) {
+  return dbCon->query(*this, obj, false, &query, nullptr);
+}
+
+std::shared_ptr<DbCursor> DatabaseInterface::query(ObjectBase &obj, const QueryGenerator &query, const QueryOrder &sort) {
+  return dbCon->query(*this, obj, false, &query, &sort);
 }
 
 std::shared_ptr<DbCursor> DatabaseInterface::qbe(ObjectBase &obj) {
-  return dbCon->query(*this, obj, "", true, nullptr);
+  return dbCon->query(*this, obj, true, nullptr, nullptr);
 }
 
 std::shared_ptr<DbCursor> DatabaseInterface::qbe(ObjectBase &obj, const QueryOrder &sort) {
-  return dbCon->query(*this, obj, "", true, &sort);
+  return dbCon->query(*this, obj, true, nullptr, &sort);
 }
 
 void DatabaseInterface::retrieve(ObjectBase &obj, std::shared_ptr<mobs::DbCursor> cursor) {

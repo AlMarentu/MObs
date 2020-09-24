@@ -21,6 +21,7 @@
 #include "helper.h"
 #include "audittrail.h"
 #include "queryorder.h"
+#include "querygenerator.h"
 //#include <strstream>
 
 using namespace mobs;
@@ -87,8 +88,6 @@ public:
         return false;
       if (obj.isNull() and cth.omitNull())
         return false;
-      if (not obj.isModified() and cth.modOnly())
-        return false;
       if (obj.hasFeature(mobs::DbJson)) {
         if (not obj.isNull())
           throw runtime_error(u8"Query on DBJSON element not allowed");
@@ -117,9 +116,8 @@ public:
   /// \private
   bool doArrayBeg(const MemBaseVector &vec) final
   {
+//    LOG(LM_INFO, "VECTOR ");
     if (vec.hasFeature(mobs::DbDetail))
-      return false;
-    if (not vec.isModified() and cth.modOnly())
       return false;
     if (vec.isNull() and cth.omitNull())
       return false;
@@ -205,6 +203,14 @@ public:
 //      LOG(LM_INFO, "SORT " << pos << " " << selectOrder[pos]);
       fst = false;
     }
+    auto ql = queryLookUp.find(&mem);
+    if (ql != queryLookUp.end()) {
+      ql->second = useName[last];
+      ql->second += ".";
+      ql->second += name;
+      LOG(LM_INFO, "WHERE " << ql->second);
+      fst = false;
+    }
     if (levelArray == 0) {
       if (not selectField.empty())
         selectField += ",";
@@ -214,8 +220,6 @@ public:
     if (not mem.isModified() and cth.modOnly())
       return;
     if (mem.isNull() and cth.omitNull())
-      return;
-    if (not mem.isModified())
       return;
 
     if (mem.isVersionField()) {
@@ -299,7 +303,9 @@ public:
   map<uint, string>  selectOrder;
   bool noJoin = false;  // ersetze joinGenerierung
   const QueryOrder *sort = nullptr;
+  const QueryGenerator *queryGen = nullptr;
   std::string injectEnd;    ///< wird bei QueryWithJoin am enge angehängt
+  map<const MemberBase *, string> queryLookUp;
 
 private:
   ConvObjToString cth;
@@ -1278,28 +1284,38 @@ uint64_t SqlGenerator::getVersion() const {
 }
 
 std::string
-SqlGenerator::query(QueryMode querMode, const QueryOrder *sort, const std::string &where, const std::string &join,
+SqlGenerator::query(QueryMode querMode, const QueryOrder *sort, const QueryGenerator *where, const std::string &join,
                     const std::string &atEnd) {
   GenerateSqlJoin gsjoin((mobs::ConvObjToString()), sqldb);
   gsjoin.injectEnd = atEnd;
-  gsjoin.noJoin = true;
+  gsjoin.noJoin = not join.empty();
   gsjoin.sort = sort;
+  gsjoin.queryGen = where;
+  if (where)
+    where->createLookup(gsjoin.queryLookUp);
   obj.traverse(gsjoin);
-  gsjoin.selectJoin = join;
-  gsjoin.selectWhere = where;
+  if (not join.empty())
+    gsjoin.selectJoin = join;
+  if (where) {
+    gsjoin.selectWhere = where->show(gsjoin.queryLookUp);
+  }
   querywJoin = not gsjoin.selectJoin.empty();
   return gsjoin.result(querMode == Count, querMode == Keys);
 }
 
 std::string
-SqlGenerator::queryBE(QueryMode querMode, const QueryOrder *sort, const std::string &where, const std::string &atEnd) {
-  GenerateSqlJoin gsjoin((mobs::ConvObjToString()), sqldb);
+SqlGenerator::queryBE(QueryMode querMode, const QueryOrder *sort, const QueryGenerator *where, const std::string &atEnd) {
+  GenerateSqlJoin gsjoin((mobs::ConvObjToString().exportModified()), sqldb);
   gsjoin.injectEnd = atEnd;
   gsjoin.sort = sort;
+  gsjoin.queryGen = where;
+  if (where)
+    where->createLookup(gsjoin.queryLookUp);
   obj.traverse(gsjoin);
-  if (not where.empty())
-    gsjoin.addWhere(where);
   querywJoin = not gsjoin.selectJoin.empty();
+  if (where) {
+    gsjoin.selectWhere = where->show(gsjoin.queryLookUp);
+  }
   return gsjoin.result(querMode == Count, querMode == Keys);
 }
 
@@ -1328,6 +1344,7 @@ public:
   std::stack<std::string> names{};
   const QueryOrder *sort = nullptr;
   std::map<uint, std::pair<std::string, int>> selectOrder;
+  std::map<const MemberBase *, std::string> *lookUp = nullptr;
 };
 
 ElementNames::ElementNames(ConvObjToString c) {
@@ -1386,6 +1403,15 @@ void ElementNames::doMem(const MemberBase &mem) {
     if (data->sort->sortInfo(mem, pos, dir))
       data->selectOrder[pos] = make_pair(data->names.top() + mem.getName(data->cth), dir);
     return;
+  } else if (data->lookUp) {
+    if (inArray() and arrayIndex() > 0)
+      return;
+    auto ql = data->lookUp->find(&mem);
+    if (ql != data->lookUp->end()) {
+      ql->second = data->names.top();
+      ql->second += mem.getName(data->cth);
+    }
+    return;
   }
   if (mem.isNull() and data->cth.omitNull())
     return;
@@ -1409,6 +1435,10 @@ void ElementNames::finishOrder() {
     orderStmt(o.second.first, o.second.second);
   }
 
+}
+
+void ElementNames::startLookup(map<const MemberBase *, std::string> &lookUp) {
+  data->lookUp = &lookUp;
 }
 
 
@@ -1556,6 +1586,49 @@ void AuditTrail::doMem(const MemberBase &mem) {
 }
 
 
+std::string convLikeToRegexp(const string &like) {
+  std::string result;
+  bool esc = false;
+  bool first = true;
+  std::string append;
+  for (auto c:like) {
+    if (first and c != '%')
+      result = "^";
+    result += append;
+    append = "";
+    switch (c) {
+      case '\\':
+        esc = true;
+        break;
+      case '%':
+        if (esc) {
+          result += c;
+          esc = false;
+        } else if (not first)
+          append = ".*";
+        break;
+      case '_':
+        if (esc)
+          result += c;
+        else
+          result += ".";
+        esc = false;
+        break;
+      case '.':
+      case '*':
+      case '^':
+      case '$':
+        result += '\\';
+        // fall into
+      default:
+        result += c;
+    }
+    first = false;
+  }
+  if (append.empty())
+    result += '$';
+  return result;
+}
 
 }
 
