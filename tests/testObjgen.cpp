@@ -484,7 +484,7 @@ class Rechnung : virtual public mobs::ObjectBase {
   MemVar(int, id, USENULL);
 
   MemObj(Person, kunde, USENULL);
-  MemVector(RechPos, position, USENULL USEVECNULL);
+  MemVector(RechPos, position, USENULL, USEVECNULL);
 
 };
 ObjRegister(Rechnung)
@@ -573,9 +573,9 @@ class Obj1 : virtual public mobs::ObjectBase {
   ObjInit(Obj1);
   MemVar(int, id, KEYELEMENT1);
   MemVar(int, xx);
-  MemVar(int, yy, USENULL KEYELEMENT3);
+  MemVar(int, yy, USENULL, KEYELEMENT3);
   MemVar(int, zz);
-  MemObj(Obj0, oo, USENULL KEYELEMENT2);
+  MemObj(Obj0, oo, USENULL, KEYELEMENT2);
   // rekursive vorwärts Deklaration Compiliert nicht
   // MemObj(Obj2, rr, USENULL KEYELEMENT2);
 
@@ -667,11 +667,11 @@ TEST(objgenTest, keys) {
 class ObjX : virtual public mobs::ObjectBase {
 public:
 ObjInit(ObjX, COLNAME(sonst));
-  MemVar(int, id, KEYELEMENT1 ALTNAME(grimoald));
+  MemVar(int, id, KEYELEMENT1, ALTNAME(grimoald));
   MemVar(int, a, ALTNAME(pippin));
   MemVar(int, b, ALTNAME(karl));
   MemVar(int, c);
-  MemObj(Obj0, o, USENULL ALTNAME(karlmann));
+  MemObj(Obj0, o, USENULL, ALTNAME(karlmann));
   MemVector(MemVarType(std::string), d, ALTNAME(ludwig));
 };
 
@@ -831,7 +831,7 @@ public:
   ObjInit(ObjE2);
 
   MemVar(int, xx);
-  MemObj(ObjE1, yy, EMBEDDED PREFIX(a_));
+  MemObj(ObjE1, yy, EMBEDDED, PREFIX(a_));
   MemVar(int, aa);
   MemObj(ObjE1, ww, PREFIX(b_));
 

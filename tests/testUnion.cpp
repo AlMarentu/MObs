@@ -74,7 +74,7 @@ class Obj1 : virtual public BaseObj, virtual public mobs::ObjectBase {
   MemVar(int, i1,);
   MemVar(std::string, xx);
   MemVar(int, zz);
-  MemObj(Obj0, oo, USENULL KEYELEMENT2);
+  MemObj(Obj0, oo, USENULL, KEYELEMENT2);
   Obj1 &toObj1() override { return *this; };
 
 };

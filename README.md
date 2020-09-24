@@ -156,17 +156,18 @@ Werden alternative Namen Schlüsselelemente oder Behandlung von Null-Werten ben�
 * KEYELEMENT 
 * USENULL
 * ALTNAME
-Diese werdern  (ohne Trenner bei Mehrfachverwendung) als 3. Parameter im Makro angegeben 
+
+Diese werden als kommaseparierte Liste ab dem 3. Parameter im Makro angegeben 
 ~~~~~~~~~~cpp
 class Obj1 : virtual public mobs::ObjectBase {
   public:
   ObjInit(Obj1);
   MemVar(int, id, KEYELEMENT1);
   MemVar(int, xx);
-  MemVar(int, yy, USENULL KEYELEMENT3 ALTNAME(NewName));
+  MemVar(int, yy, USENULL, KEYELEMENT3, ALTNAME(NewName));
   MemVar(int, zz);
 
-  MemObj(Obj0, oo, USENULL KEYELEMENT2);
+  MemObj(Obj0, oo, USENULL, KEYELEMENT2);
 };
 ~~~~~~~~~~
 Über das Token EMBEDDED bei einer Objektvariable werden alle Elemente dieser beim Serialisieren flach, also auf der Ebene 
@@ -291,7 +292,7 @@ angegeben werden.
  
    MemVar(int, id, KEYELEMENT1);          // KEYELEMENT definiert die Schlüsselelemente
    MemVar(int, version, VERSIONFIELD);    // VERSIONFIELD definiert das Versionsfeld, falls Versionierung erwünscht
-   MemVar(string, typ, ALTNAME(bezeichnug) LENGTH(50));
+   MemVar(string, typ, ALTNAME(bezeichnug), LENGTH(50));
                                           // Weiterer Inhalt, mit alternativen Spaltennamen und Angabe einer optionalen Feldlänge
 ~~~~~~~~~~
 Der Zugriff auf Objekte erfolgt dann, indem die Schlüsselelemente des Objektes gesetzt und im

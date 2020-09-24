@@ -192,9 +192,9 @@ public:
 
   MemVar(int, xx, KEYELEMENT2);
   MemVar(unsigned int, version, mobs::DbVersionField);
-  MemObj(ObjE1, yy, EMBEDDED PREFIX(a_));
+  MemObj(ObjE1, yy, EMBEDDED, PREFIX(a_));
   MemVar(std::string, aa, KEYELEMENT1);
-  MemObj(ObjE1, ww, PREFIX(b_) USENULL);
+  MemObj(ObjE1, ww, PREFIX(b_), USENULL);
   MemMobsEnumVar(Colour, col, DBCOMPACT);
 
 };
@@ -213,9 +213,9 @@ public:
   ObjInit(ObjJ1);
 
   MemVar(int, xx, KEYELEMENT1);
-  MemObj(ObjE1, yy, DBJSON LENGTH(99));
+  MemObj(ObjE1, yy, DBJSON, LENGTH(99));
   MemVar(int, zz);
-  MemVarVector(int, ll, DBJSON LENGTH(88));
+  MemVarVector(int, ll, DBJSON, LENGTH(88));
 };
 
 

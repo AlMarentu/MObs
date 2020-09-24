@@ -30,11 +30,11 @@ public:
 class Gespann : virtual public mobs::ObjectBase
 {
 public:
-  ObjInit(Gespann, COLNAME(vehicle) AUDITTRAIL);
+  ObjInit(Gespann, COLNAME(vehicle), AUDITTRAIL);
 
   MemVar(int, id, KEYELEMENT1);
   MemVar(int, version, VERSIONFIELD);
-  MemVar(string, typ, ALTNAME(bezeichnug) LENGTH(50));
+  MemVar(string, typ, ALTNAME(bezeichnug), LENGTH(50));
   MemObj(Fahrzeug, zugmaschiene);
   MemVector(Fahrzeug, haenger, COLNAME(vehicle_part));
 };
@@ -154,7 +154,7 @@ void worker(mobs::DatabaseInterface &dbi) {
       ObjInit(Data);
 
       MemVar(int, id, KEYELEMENT1);
-      MemVar(string, text, USENULL LENGTH(2000));
+      MemVar(string, text, USENULL, LENGTH(2000));
       MemVar(mobs::MDate, datum, USENULL);
       MemVar(mobs::UxTime, utime, USENULL);
       MemVar(mobs::MTime, time, USENULL);
@@ -163,7 +163,8 @@ void worker(mobs::DatabaseInterface &dbi) {
       MemVar(bool, aus, USENULL);
       MemVar(char, ch, USENULL);
       MemVar(uint64_t , ulolo, USENULL);
-      MemObj(Data2, d2, DBJSON LENGTH(100));
+      MemObj(Data2, d2, DBJSON, LENGTH(100));
+      MemVar(vector<u_char>, big, USENULL );
     };
 
 
@@ -183,6 +184,8 @@ void worker(mobs::DatabaseInterface &dbi) {
     d.d2.zz[0](7);
     d.d2.zz[1](5);
     d.d2.zz[2](3);
+    vector<u_char> c = { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+    d.big(c);
 
     LOG(LM_INFO, "D " << d.to_string());
     try {

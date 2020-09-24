@@ -153,25 +153,25 @@ enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Embedded, DbComp
 /// \private
 enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confToken, const std::string &s);
 
-#define USENULL mobs::InitialNull, ///< Element wir mit\c null vorinitialisiert
-#define USEVECNULL mobs::VectorNull, ///< Bei Vektoren wird der Vector selbst mit \c null vorinitialisiert
-#define XMLATTR mobs::XmlAsAttr, ///< Bei XML-Ausgabe als Attribute ausgeben (nur MemberVariable, nur von erstem Element fortlaufend)
-#define EMBEDDED mobs::Embedded, ///< Bei Ausgabe als Attribute/Traversierung werden die Member des Objektes direkt, auf ser selben Ebene, serialisiert
-#define DBCOMPACT mobs::DbCompact, ///< In der Datenbank wird der MOBSENUM oder der Zeit-Wert numerisch gespeichert
-#define DBDETAIL mobs::DbDetail, ///< In der Datenbank wird dieses Subelement in einer Detail Table abgelegt, muss also seperat gespeichert werden
-#define DBJSON mobs::DbJson, ///< In nicht dokumentbasierten Datenbanken wird das Unterobjekt als Text im JSON-Format abgelegt
-#define VERSIONFIELD mobs::DbVersionField, ///< In diesem Feld wird die Objektversion gespeichert, 0 entspricht noch nicht gespeichert
-#define AUDITTRAIL mobs::DbAuditTrail, ///< für dieses Objekt wird automatisch ein Audit Trail mitgeführt
-#define KEYELEMENT1 mobs::Key1, ///<  Schlüsselelement der Priorität 1 (erstes Element)
-#define KEYELEMENT2 mobs::Key2, ///< Schlüsselelement der Priorität 2
-#define KEYELEMENT3 mobs::Key3, ///< Schlüsselelement der Priorität 3
-#define KEYELEMENT4 mobs::Key4, ///< Schlüsselelement der Priorität 4
-#define KEYELEMENT5 mobs::Key5, ///< Schlüsselelement der Priorität 5
-#define ALTNAME(name) ::mobs::mobsToken(::mobs::AltNameBase,m_confToken,#name), ///< Definition eines Alternativen Namens für die Ein-/Ausgabe
-#define COLNAME(name) ::mobs::mobsToken(::mobs::ColNameBase,m_confToken,#name), ///< Definition eines Alternativen Namens für den Collection-Namen (oder Tabellennamen) der Datenbank
-#define PREFIX(name) ::mobs::mobsToken(::mobs::PrefixBase,m_confToken,#name), ///< Definition eines Prefix für den Export-Namen, wenn in eine flache Struktur exportiert wird \see EMBEDDED
+#define USENULL mobs::InitialNull ///< Element wir mit\c null vorinitialisiert
+#define USEVECNULL mobs::VectorNull ///< Bei Vektoren wird der Vector selbst mit \c null vorinitialisiert
+#define XMLATTR mobs::XmlAsAttr ///< Bei XML-Ausgabe als Attribute ausgeben (nur MemberVariable, nur von erstem Element fortlaufend)
+#define EMBEDDED mobs::Embedded ///< Bei Ausgabe als Attribute/Traversierung werden die Member des Objektes direkt, auf ser selben Ebene, serialisiert
+#define DBCOMPACT mobs::DbCompact ///< In der Datenbank wird der MOBSENUM oder der Zeit-Wert numerisch gespeichert
+#define DBDETAIL mobs::DbDetail ///< In der Datenbank wird dieses Subelement in einer Detail Table abgelegt, muss also seperat gespeichert werden
+#define DBJSON mobs::DbJson ///< In nicht dokumentbasierten Datenbanken wird das Unterobjekt als Text im JSON-Format abgelegt
+#define VERSIONFIELD mobs::DbVersionField ///< In diesem Feld wird die Objektversion gespeichert, 0 entspricht noch nicht gespeichert
+#define AUDITTRAIL mobs::DbAuditTrail ///< für dieses Objekt wird automatisch ein Audit Trail mitgeführt
+#define KEYELEMENT1 mobs::Key1 ///<  Schlüsselelement der Priorität 1 (erstes Element)
+#define KEYELEMENT2 mobs::Key2 ///< Schlüsselelement der Priorität 2
+#define KEYELEMENT3 mobs::Key3 ///< Schlüsselelement der Priorität 3
+#define KEYELEMENT4 mobs::Key4 ///< Schlüsselelement der Priorität 4
+#define KEYELEMENT5 mobs::Key5 ///< Schlüsselelement der Priorität 5
+#define ALTNAME(name) ::mobs::mobsToken(::mobs::AltNameBase,m_confToken,#name) ///< Definition eines Alternativen Namens für die Ein-/Ausgabe
+#define COLNAME(name) ::mobs::mobsToken(::mobs::ColNameBase,m_confToken,#name) ///< Definition eines Alternativen Namens für den Collection-Namen (oder Tabellennamen) der Datenbank
+#define PREFIX(name) ::mobs::mobsToken(::mobs::PrefixBase,m_confToken,#name) ///< Definition eines Prefix für den Export-Namen, wenn in eine flache Struktur exportiert wird \see EMBEDDED
 /// Angabe der max. Länge des Strings; [1..9999] möglich
-#define LENGTH(len)  mobs::MemVarCfg(((len) > 0 and mobs::LengthBase +(len) <= mobs::LengthEnd)?mobs::LengthBase +(len): mobs::LengthEnd),
+#define LENGTH(len)  mobs::MemVarCfg(((len) > 0 and mobs::LengthBase +(len) <= mobs::LengthEnd)?mobs::LengthBase +(len): mobs::LengthEnd)
 
 
 
