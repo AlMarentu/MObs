@@ -202,7 +202,7 @@ public:
         ok = mem.fromStr(value, not compact ? ConvFromStrHint::convFromStrHintExplizit : ConvFromStrHint::convFromStrHintDflt);
 
       if (not ok)
-        throw runtime_error(u8"conversion error in " + mem.name() + " Value=" + value);
+        throw runtime_error(u8"conversion error in " + mem.getElementName() + " Value=" + value);
     } else
       mem.forceNull();
     pos++;
@@ -325,7 +325,7 @@ std::string SQLiteDatabaseConnection::tableName(const ObjectBase &obj, const Dat
   MemVarCfg c = obj.hasFeature(ColNameBase);
   if (c)
     return dbi.database() + "." + obj.getConf(c);
-  return dbi.database() + "." + obj.typeName();
+  return dbi.database() + "." + obj.getObjectName();
 }
 
 void SQLiteDatabaseConnection::open() {

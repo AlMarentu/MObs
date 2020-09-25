@@ -34,8 +34,8 @@ const size_t Cleaning = SIZE_T_MAX -1;
 
 string vecTableName(const mobs::MemBaseVector *v, const string &name) {
   mobs::MemVarCfg c = v->hasFeature(mobs::ColNameBase);
-  if (c and v->parent())
-    return v->parent()->getConf(c);
+  if (c and v->getParentObject())
+    return v->getParentObject()->getConf(c);
   else
     return name;
 }
@@ -57,7 +57,7 @@ public:
       if (c)
         masterName = obj.getConf(c);
       else
-        masterName = obj.typeName();
+        masterName = obj.getObjectName();
 
       class ObKey  : virtual public mobs::ObjTravConst {
       public:
@@ -145,11 +145,11 @@ public:
 
     string name = tableName[tableName.size() -1];
     name += "_";
-    name += vec.name();
+    name += vec.getElementName();
     tableName.push_back(name);
     mobs::MemVarCfg c = vec.hasFeature(mobs::ColNameBase);
-    if (c and vec.parent())
-      name = vec.parent()->getConf(c);
+    if (c and vec.getParentObject())
+      name = vec.getParentObject()->getConf(c);
     useName.push_back(sqldb.tableName(name));
     keys.push_back(vec.getName(cth));
     level++;
@@ -195,7 +195,7 @@ public:
     if (sort and sort->sortInfo(mem, pos, dir)) {
       selectOrder[pos] = STRSTR(useName[last] << '.' << name << (dir > 0? "": " descending"));
       if (sqldb.orderInSelect) {
-        if (levelArray > 0 or not mem.key())
+        if (levelArray > 0 or not mem.keyElement())
           selectKeysXtra += STRSTR(',' << useName[last] << '.' << name);
         if (levelArray > 0)
           selectFieldXtra += STRSTR(',' << useName[last] << '.' << name);
@@ -369,7 +369,7 @@ public:
         vec.forceNull();
       else {  // Input und Vector zu einem Objekt umbauen
         string t = "{";
-        t += vec.name();
+        t += vec.getElementName();
         t += ":";
         t += tx;
         t += "}";
@@ -384,7 +384,7 @@ public:
     vector<pair<string, size_t>> k = current.arrayKeys;
     size_t index = SIZE_T_MAX;
     k.emplace_back(make_pair(vec.getName(cth), index));
-    detailVec.emplace_back(&vec, current.tableName + "_" + vec.name(), k);
+    detailVec.emplace_back(&vec, current.tableName + "_" + vec.getElementName(), k);
     // übergeordete Vektoren auf Size=1 setzten, damit die Struktur für das nächste Statement vorhanden ist
     vec.resize(1);
     return false;
@@ -444,7 +444,7 @@ public:
       return false;
     if (obj.hasFeature(mobs::DbJson)) {
       string tx = obj.to_string(ConvObjToString().exportExtended().exportWoNull());
-      if (obj.key())
+      if (obj.keyElement())
         throw runtime_error("SQL: Key with DBJSON-element not allowed");
       if (mode == Values) {
         res << delimiter() << sqldb.valueStmtText(tx, obj.isNull());
@@ -494,7 +494,7 @@ public:
     if (mode != Values and mode != FldVal and inArray() and arrayIndex() > 0)
       return false;
     level++;
-    key.push((obj.key()));
+    key.push((obj.keyElement()));
     return true;
   };
   /// \private
@@ -661,7 +661,7 @@ public:
     if (not withCleaner and index == SIZE_T_MAX)
       return false;
     k.emplace_back(make_pair(vec.getName(cth), index));
-    detailVec.emplace_back(&vec, current.tableName + "_" + vec.name(), k, cleaning);
+    detailVec.emplace_back(&vec, current.tableName + "_" + vec.getElementName(), k, cleaning);
     return false;
   };
 
@@ -689,7 +689,7 @@ public:
       return;
     }
     string name = mem.getName(cth);
-    if ((mode == Update or mode == FldVal) and mem.key() and key.top()) { // Key or version element
+    if ((mode == Update or mode == FldVal) and mem.keyElement() and key.top()) { // Key or version element
       if (mode == FldVal and mem.isVersionField())  // version increment
         res2 << name << '=' << name << "+1,";
       if (mode == FldVal or not mem.isVersionField())
@@ -780,7 +780,7 @@ string SqlGenerator::tableName() const {
   if (c)
     return obj.getConf(c);
   else
-    return obj.typeName();
+    return obj.getObjectName();
 }
 
 string SqlGenerator::doDelete(SqlGenerator::DetailInfo &di) {
@@ -1460,7 +1460,7 @@ bool AuditTrail::doObjBeg(const ObjectBase &obj) {
     std::string objKey = obj.keyStr(&version);
     act.objects[MemBaseVector::nextpos].objectKey(objKey);
     MemVarCfg c = obj.hasFeature(ColNameBase);
-    act.objects.back().objectName(c ? obj.getConf(c) : obj.typeName());
+    act.objects.back().objectName(c ? obj.getConf(c) : obj.getObjectName());
     if (version < 0)
       act.objects.back().initialVersion.forceNull();
     else
@@ -1491,7 +1491,7 @@ bool AuditTrail::doObjBeg(const ObjectBase &obj) {
     name += obj.getName(cth);
   }
   names.push(name);
-  key.push(key.empty() or (key.top() and obj.key()));
+  key.push(key.empty() or (key.top() and obj.keyElement()));
   return true;
 }
 
@@ -1517,7 +1517,7 @@ bool AuditTrail::doArrayBeg(const MemBaseVector &vec) {
 }
 
 void AuditTrail::doArrayEnd(const MemBaseVector &vec) {
-  size_t old = vec.initialSize();
+  size_t old = vec.getInitialSize();
   if (old != vec.size()) {
     act.objects.back().changes[MemBaseVector::nextpos].field(names.top());
     string val;
@@ -1539,7 +1539,7 @@ void AuditTrail::doMem(const MemberBase &mem) {
     return;
   if (not inDelAudit() and not initial and not mem.isModified())
     return;
-  if ((mem.key() or mem.isVersionField()) and key.top())
+  if ((mem.keyElement() or mem.isVersionField()) and key.top())
     return;
   std::string name = names.top();
   if (inArray()) {
@@ -1564,7 +1564,7 @@ void AuditTrail::doMem(const MemberBase &mem) {
     else if (mem.hasFeature(mobs::InitialNull))
       return;
   } else {
-    mem.initialValue(val, null);
+    mem.getInitialValue(val, null);
     if (null and mem.isNull())
       return;
     if (not null and not mem.isNull() and val == mem.auditValue())

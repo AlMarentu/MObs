@@ -181,7 +181,7 @@ public:
       return false;
     if (inArray() and noArrays)
       return arrayIndex() == 0;
-    level.push(Level(level.empty() or (obj.key() and level.top().isKey)));
+    level.push(Level(level.empty() or (obj.keyElement() and level.top().isKey)));
     return true;
   };
   void doObjEnd(const ObjectBase &obj) override
@@ -202,7 +202,7 @@ public:
       else
         level.top().arr.append(val);
     }
-    else if (not obj.name().empty())
+    else if (not obj.getElementName().empty())
     {
       std::string name = obj.getName(cth);
       if (obj.isNull())
@@ -236,7 +236,7 @@ public:
         throw std::runtime_error("underflow");
 
       std::string name = vec.getName(cth);
-      if (not vec.name().empty())
+      if (not vec.getElementName().empty())
       {
         if (vec.isNull())
           level.top().doc.append(kvp(name, types::b_null()));
@@ -258,7 +258,7 @@ public:
       else
         level.top().arr.append(val);
     }
-    else if (not vec.name().empty())
+    else if (not vec.getElementName().empty())
     {
       std::string name = vec.getName(cth);
       if (vec.isNull())
@@ -269,7 +269,7 @@ public:
   };
   void doMem(const MemberBase &mem) override
   {
-    if (noKeys and mem.key() > 0 and level.top().isKey)
+    if (noKeys and mem.keyElement() > 0 and level.top().isKey)
       return;
     if (mem.isNull() and cth.omitNull())
       return;
@@ -1003,7 +1003,7 @@ std::string MongoDatabaseConnection::collectionName(const ObjectBase &obj) {
   MemVarCfg c = obj.hasFeature(ColNameBase);
   if (c)
     return obj.getConf(c);
-  return obj.typeName();
+  return obj.getObjectName();
 }
 
 

@@ -254,7 +254,7 @@ public:
       std::stringstream s;
       struct tm ts{};
       mi.toLocalTime(ts);
-      LOG(LM_DEBUG, "Informix SqlVar " << mem.name() << ": " << fldCnt -1 << "=" << std::put_time(&ts, "%F"));
+      LOG(LM_DEBUG, "Informix SqlVar " << mem.getElementName() << ": " << fldCnt - 1 << "=" << std::put_time(&ts, "%F"));
 //      s << std::put_time(&ts, "%F");  // TODO
       sql_var.sqltype = SQLDATE;
       setBuffer(sql_var);
@@ -273,7 +273,7 @@ public:
       if (not from_number(mi.t64, t))
         throw std::runtime_error("Time Conversion");
       std::string s = to_string_ansi(t, mobs::MF5);
-      LOG(LM_DEBUG, "Informix SqlVar " << mem.name() << ": " << fldCnt -1 << "=" << s);
+      LOG(LM_DEBUG, "Informix SqlVar " << mem.getElementName() << ": " << fldCnt - 1 << "=" << s);
       sql_var.sqltype = SQLDTIME;
       setBuffer(sql_var);
       if (mem.isNull())
@@ -291,7 +291,7 @@ public:
           throw std::runtime_error("VersionElement is null");
         mi.u64++;
       }
-      LOG(LM_DEBUG, "Informix SqlVar " << mem.name() << ": " << fldCnt - 1 << "=" << mi.u64);
+      LOG(LM_DEBUG, "Informix SqlVar " << mem.getElementName() << ": " << fldCnt - 1 << "=" << mi.u64);
       if (mi.max > INT32_MAX) {
         if (mi.u64 > INT64_MAX)
           throw std::runtime_error("Number to big");
@@ -315,7 +315,7 @@ public:
           throw std::runtime_error("VersionElement is null");
         mi.i64++;
       }
-      LOG(LM_DEBUG, "Informix SqlVar " << mem.name() << ": " << fldCnt - 1 << "=" << mi.i64);
+      LOG(LM_DEBUG, "Informix SqlVar " << mem.getElementName() << ": " << fldCnt - 1 << "=" << mi.i64);
       if (mi.max > INT32_MAX) {
         sql_var.sqltype = SQLINFXBIGINT;
         setBuffer(sql_var);
@@ -329,7 +329,7 @@ public:
         e = rsetnull(sql_var.sqltype, sql_var.sqldata);
 
     } else if (mi.isFloat) {
-      LOG(LM_DEBUG, "Informix SqlVar " << mem.name() << ": " << fldCnt - 1 << "=" << mi.d);
+      LOG(LM_DEBUG, "Informix SqlVar " << mem.getElementName() << ": " << fldCnt - 1 << "=" << mi.d);
       sql_var.sqltype = SQLFLOAT;
       setBuffer(sql_var);
       if (mem.isNull())
@@ -338,7 +338,7 @@ public:
         *(double *) (sql_var.sqldata) = mi.d;
     } else {
       std::string s = mem.toStr(mobs::ConvToStrHint(compact));
-      LOG(LM_DEBUG, "Informix SqlVar " << mem.name() << ": " << fldCnt - 1 << "=" << s);
+      LOG(LM_DEBUG, "Informix SqlVar " << mem.getElementName() << ": " << fldCnt - 1 << "=" << s);
       if (increment)
         throw std::runtime_error("VersionElement is not int");
       // leerstring entspricht NULL daher SQLCHAR mit 1 SPC als leer mit not null
@@ -368,9 +368,9 @@ public:
 
   void readValue(MemberBase &mem, bool compact) override {
     if (pos >= fldCnt)
-      throw runtime_error(u8"Result not found " + mem.name());
+      throw runtime_error(u8"Result not found " + mem.getElementName());
     auto &col = descriptor->sqlvar[pos++];
-    LOG(LM_DEBUG, "Read " << mem.name() << " " << col.sqlname << " " << col.sqllen << " " << rtypname(col.sqltype));
+    LOG(LM_DEBUG, "Read " << mem.getElementName() << " " << col.sqlname << " " << col.sqllen << " " << rtypname(col.sqltype));
 
     if (risnull(col.sqltype, col.sqldata)) {
       mem.forceNull();
@@ -394,7 +394,7 @@ public:
         ok = mem.fromStr(string(col.sqldata),
                          not compact ? ConvFromStrHint::convFromStrHintExplizit : ConvFromStrHint::convFromStrHintDflt);
         if (not ok)
-          throw runtime_error(u8"conversion error in " + mem.name() + " Value=" + string(col.sqldata));
+          throw runtime_error(u8"conversion error in " + mem.getElementName() + " Value=" + string(col.sqldata));
         return;
       case SQLDATE: {
         short mdy[3]; //  { 12, 21, 2007 };
@@ -455,7 +455,7 @@ public:
       case SQLTEXT:
       case SQLBYTES:
       default:
-        throw runtime_error(u8"conversion error in " + mem.name() + " Type=" + to_string(col.sqltype));
+        throw runtime_error(u8"conversion error in " + mem.getElementName() + " Type=" + to_string(col.sqltype));
     }
 //    if (mi.isUnsigned and mi.max == 1) // bool
 //      ok = mem.fromUInt64(res == 0 ? 0 : 1);
@@ -464,7 +464,7 @@ public:
       ok = mem.fromMemInfo(mi);
 
     if (not ok)
-      throw runtime_error(u8"conversion error in " + mem.name());
+      throw runtime_error(u8"conversion error in " + mem.getElementName());
     // TODO konvertierung über string versuchen
   }
 
@@ -674,7 +674,7 @@ std::string InformixDatabaseConnection::tableName(const ObjectBase &obj, const D
   MemVarCfg c = obj.hasFeature(ColNameBase);
   if (c)
     return dbi.database() + "." + obj.getConf(c);
-  return dbi.database() + "." + obj.typeName();
+  return dbi.database() + "." + obj.getObjectName();
 }
 
 void InformixDatabaseConnection::open() {

@@ -46,7 +46,7 @@ bool XmlOut::doObjBeg(const ObjectBase &obj)
   if (name.empty())
     name = to_wstring(obj.getName(cth));
   if (name.empty())
-    name = data->level() == 0 ? L"root": to_wstring(obj.typeName());
+    name = data->level() == 0 ? L"root": to_wstring(obj.getObjectName());
 
   data->writeTagBegin(name);
 

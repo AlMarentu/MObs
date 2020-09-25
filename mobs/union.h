@@ -114,13 +114,13 @@ public:
   MobsUnion(const MobsUnion &that) : ObjectBase() { TRACE(""); MobsUnion::doCopy(that); }
   ~MobsUnion() override { if (m_obj) delete m_obj; }
   /// liefert den Objekttyp des Unions oder \e leer  wenn nicht gesetzt
-  std::string type() const { if (m_obj) return m_obj->typeName(); return ""; }
+  std::string type() const { if (m_obj) return m_obj->getObjectName(); return ""; }
   /// setzt den Objekttyp des Unions, keine Aktion benn der Typ bereits passt
   /// @param t Objekttyp (muss mit \c ObjRegister) registriert sein; ist t leer, so wird das Objekt gelöscht
   /// \throw runtime_error wenn der Objekttyp nicht von der Basisklasse \c T abgeleitet ist
   void setType(const std::string& t);
   /// Übernehme eine Kopie des angegebenen Objektes
-  void operator() (const T &t) { setType(t.typeName()); m_obj->doCopy(t); activate(); }
+  void operator() (const T &t) { setType(t.getObjectName()); m_obj->doCopy(t); activate(); }
   /// const Zugriffsmethode auf die Basisklasse
   const T *operator-> () const { return m_obj; }
   /// Prüfen, ob  Objekt gesetzt
@@ -158,7 +158,7 @@ void MobsUnion<T>::setType(const std::string& t) {
     clear(); // wegen null-handling, Achtung ruft hinterher cleared() auf
     return;
   }
-  if (m_obj == nullptr or m_obj->typeName() != t) {
+  if (m_obj == nullptr or m_obj->getObjectName() != t) {
     if (m_obj) delete m_obj;
     regObj(nullptr); // ObjectBase.mlist clear
     // wird über Constructor in Obj-Liste von ObjectBase eingefügt

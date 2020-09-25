@@ -153,7 +153,7 @@ enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Embedded, DbComp
 /// \private
 enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confToken, const std::string &s);
 
-#define USENULL mobs::InitialNull ///< Element wir mit\c null vorinitialisiert
+#define USENULL mobs::InitialNull ///< Element wir mit \c null vorinitialisiert
 #define USEVECNULL mobs::VectorNull ///< Bei Vektoren wird der Vector selbst mit \c null vorinitialisiert
 #define XMLATTR mobs::XmlAsAttr ///< Bei XML-Ausgabe als Attribute ausgeben (nur MemberVariable, nur von erstem Element fortlaufend)
 #define EMBEDDED mobs::Embedded ///< Bei Ausgabe als Attribute/Traversierung werden die Member des Objektes direkt, auf ser selben Ebene, serialisiert
@@ -213,8 +213,8 @@ objname(const std::string &name, ObjectBase *t, const std::vector<mobs::MemVarCf
   { if (t) t->regObj(this); doInit(); objname::init(); setModified(false); } \
 objname &operator=(const objname &rhs) { if (this != &rhs) { doCopy(rhs); } return *this; } \
 static ObjectBase *createMe(ObjectBase *parent = nullptr) { if (parent) return new objname(#objname, parent, { }); else return new objname(); } \
-ObjectBase *createNew() const override {return new objname(); } \
-std::string typeName() const override { return #objname; } \
+ObjectBase *createNew() const override { return new objname(); } \
+std::string getObjectName() const override { return #objname; } \
 static std::string objName() { return #objname; }
 
 /*! \brief Makro um eine Objektklasse am Objekt-Generator anzumelden
@@ -236,6 +236,8 @@ class MemberVector;
 class ObjTrav;
 class ObjTravConst;
 class MemberBase;
+class ObjectBase;
+class MemBaseVector;
 
 /// Interne Klasse zur Behandlung von \c NULL \c -Werten
 class NullValue {
@@ -243,11 +245,11 @@ public:
   friend class MemberBase;
   /// Abfrage, ob eine Variable den Wet \c NULL hat (nur möglich, wenn \c nullAllowed gesetzt ist.
   bool isNull() const { return m_null; }
-  /// Abfrage ob \c NULL -Werte erlaubt sind
+  /// Setzmethode  ob \c NULL -Werte erlaubt sind
   void nullAllowed(bool on) { m_nullAllowed = on; }
   /// Abfrage ob für diese Variable Null-Werte erlaubt sind
   bool nullAllowed() const { return m_nullAllowed; }
-  /// Setzmethode für Modified-Flag
+  /// Interne Setzmethode für Modified-Flag. Immer in Baumstruktur Richtung Wurzel verodern
   void setModified(bool m) { m_modified = m; }
   /// Abfragemethode Modified-Flag
   bool isModified() const { return m_modified; }
@@ -261,27 +263,25 @@ private:
   bool m_saveOld = false; // copy für Audit Trail
 };
 
-class ObjectBase;
-class MemBaseVector;
 
 // ------------------ MemberBase ------------------
 
 /// Basisklasse für Membervariablen
 class MemberBase : public NullValue {
+  friend class ObjectBase;
+  template <class T>
+  friend class MemberVector;
 protected:
   /// \private
   MemberBase(std::string n, ObjectBase *obj, const std::vector<MemVarCfg>& cv) : NullValue(), m_name(std::move(n)), m_parent(obj) {
     for (auto c:cv) doConfig(c); }
   /// \private
-  MemberBase(mobs::MemBaseVector *m, mobs::ObjectBase *o, const std::vector<MemVarCfg>& cv) : NullValue(), m_name(""), m_parent(o), m_parVec(m) {
+  MemberBase(mobs::MemBaseVector *m, mobs::ObjectBase *o, const std::vector<MemVarCfg>& cv) : NullValue(), m_parent(o), m_parVec(m) {
     for (auto c:cv) doConfig(c); }
 public:
-  friend class ObjectBase;
-  template <class T>
-  friend class MemberVector;
   virtual ~MemberBase() = default;
   /// Abfrage des Namen der Membervariablen
-  std::string name() const { return m_name; }
+  std::string getElementName() const { return m_name; }
   /// Config-Token alternativer Name oder \c Unset
   MemVarCfg cAltName() const { return m_altName; };
   /// Abfrage des originalen oder des alternativen Namens der Membervariablen
@@ -316,19 +316,19 @@ public:
   void traverse(ObjTravConst &trav) const;
   /// \brief Abfrage ob Memvervariable ein Key-Element oder eine Versionsvariable ist
   /// @return Position im Schlüssel oder \c 0 wenn kein Schlüsselelement, INT_MAX, bei Versionsvariablen
-  int key() const { return m_key; }
+  int keyElement() const { return m_key; }
   /// Abfrage ob Versionselement
   bool isVersionField() const { return m_key == INT_MAX; }
   /// Zeiger auf Vater-Objekt
-  const ObjectBase *parent() const { return m_parent; }
-  /// Objekt wurde beschrieben
+  const ObjectBase *getParentObject() const { return m_parent; }
+  /// Objekt wurde beschrieben - modified setzen
   void activate();
   /// Abfrage gesetzter  Attribute
   MemVarCfg hasFeature(MemVarCfg c) const;
   /// \private
   static std::string objName() { return ""; }
   /// ursprünglicher Wert für Audit Trail
-  void initialValue(std::string &old, bool &null) const;
+  void getInitialValue(std::string &old, bool &null) const;
   /// leerer Wert für Audit Trail
   virtual std::string auditEmpty() const = 0;
   /// Ausgabe Wert im Format wie initialValue
@@ -345,12 +345,12 @@ private:
 
   int m_key = 0;
   MemVarCfg m_altName = Unset;
-  std::string m_name;
+  std::string m_name{};
   std::vector<MemVarCfg> m_config;
   ObjectBase *m_parent = nullptr;
   MemBaseVector *m_parVec = nullptr;
   std::string m_oldVal;  // Originalversion für Audit Trail
-  bool m_oldNull; // Originalversion für Audit Trail
+  bool m_oldNull = false; // Originalversion für Audit Trail
 };
 
 // ------------------ VectorBase ------------------
@@ -387,7 +387,7 @@ public:
   /// liefert den Namen des Elementes des Vektor Variablen falls diese ein Mobs-Objekt ist
   virtual std::string contentObjName() const = 0;
   /// liefert den Namen der Vektor variablen
-  inline std::string name() const { return m_name; }
+  inline std::string getElementName() const { return m_name; }
   /// Config-Token alternativer Name oder \c SIZE_T_MAX
   MemVarCfg cAltName() const { return m_altName; }
   /// Abfrage des originalen oder des alternativen Namens des Vektors
@@ -409,11 +409,11 @@ public:
   /// Objekt wurde beschrieben
   void activate();
   /// Zeiger auf Vater-Objekt
-  inline const ObjectBase *parent() const { return m_parent; }
+  inline const ObjectBase *getParentObject() const { return m_parent; }
   /// Abfrage gesetzter  Attribute
   MemVarCfg hasFeature(MemVarCfg c) const;
   /// Abfrage der ursrünglichen Vectorsize (Audit Trail)
-  size_t initialSize() const { return m_oldSize; }
+  size_t getInitialSize() const { return m_oldSize; }
   /// Ausgabe der Vector-Elemente als String
   std::string to_string(const ConvObjToString& cth) const;
 
@@ -433,67 +433,54 @@ private:
   ObjectBase *m_parent = nullptr;
 };
 
-#if 0
-/// Hilfsklasse für Json-Ausgabe
-class ConvToJsonHint : virtual public ConvToStrHint {
-public:
-  virtual ~ConvToJsonHint() {}
-  /// \private
-  virtual bool compact() const { return comp; }
-
-  bool comp;
-};
-#endif
 
 // ------------------ ObjectBase ------------------
 
 
 /// Basisklasse für Objekte
 class ObjectBase : public NullValue {
+  template<typename U, class V> friend class Member;
+  template<typename W> friend class MemberVector;
+protected:
+  ObjectBase(std::string n, ObjectBase *obj, const std::vector<MemVarCfg>& cv ) : m_varNam(std::move(n)), m_parent(obj) { for (auto c:cv) doConfig(c); } // Konstruktor for MemObj
+  /// \private
+  ObjectBase(MemBaseVector *m, ObjectBase *o, const std::vector<MemVarCfg>& cv) : m_varNam(""), m_parent(o), m_parVec(m) { for (auto c:cv) doConfig(c); } // Konstruktor for Vector
 public:
   ObjectBase() = default;
   ObjectBase(const ObjectBase &that) = delete;
   /// \private
-  ObjectBase(std::string n, ObjectBase *obj, const std::vector<MemVarCfg>& cv ) : m_varNam(std::move(n)), m_parent(obj) { for (auto c:cv) doConfig(c); } // Konstruktor for MemObj
-  /// \private
-  ObjectBase(MemBaseVector *m, ObjectBase *o, const std::vector<MemVarCfg>& cv) : m_varNam(""), m_parent(o), m_parVec(m) { for (auto c:cv) doConfig(c); } // Konstruktor for Vector
   virtual ~ObjectBase() = default;
   /// erzeuge leeres Duplikat;
   virtual ObjectBase *createNew() const { return nullptr; }
   /// \private
   ObjectBase &operator=(const ObjectBase &rhs) { if (this != &rhs) doCopy(rhs); return *this; }
-  /// \private
-  void regMem(MemberBase *mem);
-  /// \private
-  void regObj(ObjectBase *obj);
-  /// \private
-  void regArray(MemBaseVector *vec);
-  //void regMemList(std::list<MemberBase> *m, std::string n);
   /// Starte Traversierung nicht const
   void traverse(ObjTrav &trav);
   /// Starte Traversierung  const
   void traverse(ObjTravConst &trav) const;
-  /// Starte Traversierung der Key-Elemente in der durch das Element key angegebenen Reihenfolge
+  /// Starte Traversierung der Key-Elemente in der durch das keyElement angegebenen Reihenfolge
   void traverseKey(ObjTravConst &trav) const;
   /// liefert den Typnamen des Objektes
-  virtual std::string typeName() const { return ""; }
+  virtual std::string getObjectName() const { return ""; }
+protected:
   /// Callback-Funktion die einmalig im Constructor aufgerufen wird
   virtual void init() { };
   /// Callback-Funktion die nach einem \c clear aufgerufen wird
   virtual void cleared() { };
+public:
   /// liefert den Namen Membervariablen
-  std::string name() const { return m_varNam; };
+  std::string getElementName() const { return m_varNam; };
   /// Config-Token-Id alternativer Name oder \c Unset
   MemVarCfg cAltName() const { return m_altName; };
   /// Abfrage des originalen oder des alternativen Namens des Objektes
   std::string getName(const ConvToStrHint &) const;
   /// Objekt wurde beschrieben
   void activate();
-  /// private
-  void key(int k) { m_key = k; }
+//  /// private
+//  void key(int k) { m_key = k; }
   /// \brief Abfrage ob Unterobjekt ein Key-Element enthält
   /// @return Position im Schlüssel oder \c 0 wenn kein Schlüsselelement
-  int key() const { return m_key; }
+  int keyElement() const { return m_key; }
   /// Suche eine Membervariable
   /// @param name Name der zu suchenden Variable
   /// @param cfh Konvertierung Hinweise
@@ -509,7 +496,6 @@ public:
   /// @param cfh Konvertierung Hinweise
   /// @return Zeiger auf Objekt \c MemBaseVector oder \c nullptr
   MemBaseVector *getVecInfo(const std::string &name, const ConvObjFromStr &cfh);
-
   /// \private
   static void regObject(std::string n, ObjectBase *fun(ObjectBase *)) noexcept;
   /// \brief Erzeuge ein neues Objekt
@@ -549,7 +535,7 @@ public:
   /// \throw runtime_error Sind die Strukturen nicht identisch, wird eine Exception erzeugt
   virtual void doCopy(const ObjectBase &other);
   /// Zeiger auf Vater-Objekt
-  ObjectBase *parent() const { return m_parent; }
+  ObjectBase *getParentObject() const { return m_parent; }
   /// Abfrage gesetzter  Attribute (nur bei String-Attributen nur Basiswert)
   MemVarCfg hasFeature(MemVarCfg c) const;
   /// Config-Token lesen
@@ -557,6 +543,10 @@ public:
   /// Ausgabe als \c std::string (Json)
   std::string to_string(const ConvObjToString& cft = ConvObjToString()) const;
 
+  /// \private
+  void regObj(ObjectBase *obj);
+  /// \private
+  void regArray(MemBaseVector *vec);
 
 
 protected:
@@ -567,7 +557,6 @@ protected:
   /// \private
   void doConfigObj(MemVarCfg c);
 
-
 private:
   std::string m_varNam;
   ObjectBase *m_parent = nullptr;
@@ -576,6 +565,7 @@ private:
   MemVarCfg m_altName = Unset;
   std::vector<MemVarCfg> m_config;
 
+  void regMem(MemberBase *mem);
   void doConfig(MemVarCfg c);
 
   class MlistInfo {
@@ -655,7 +645,7 @@ public:
   // Keine Zuweisung, nur getter und setter
   Member &operator=(const Member<T, C> &other) = delete;
   Member &operator=(Member<T, C> &&other) = delete;
-  ~Member() override { TRACE(PARAM(name())); }
+  ~Member() override { TRACE(PARAM(getElementName())); }
   /// Zugriff auf Inhalt
   inline T operator() () const { return wert; }
   /// Zuweisung eines Wertes
@@ -684,16 +674,10 @@ public:
   bool fromStr(const std::wstring &sin, const ConvFromStrHint &cfh) override { doAudit(); if (this->c_wstring2x(sin, wert, cfh)) { activate(); return true; } return false; }
   /// Info zum aktuellen Datentyp mit Inhalt
   void memInfo(MobsMemberInfo &i) const override { memInfo(i, wert); }
-  /// Versuch Variabkle aus Meminfo auszulesen (isFloat/isSigned/isUnsigned/isTime)
+  /// Versuch Variable aus Meminfo auszulesen (isFloat/isSigned/isUnsigned/isTime)
   bool fromMemInfo(const MobsMemberInfo &i) override;
   /// Info zum aktuellen Datentyp mit variablen Wert
   void memInfo(MobsMemberInfo &i, const T &value) const;
-//  /// Versuch, die  Variable aus einem \c uint64_t einzulesen
-//  bool fromUInt64(uint64_t u) override { doAudit(); if (C::c_from_number(u, wert)) { activate(); return true; } return false; }
-//  /// Versuch, die Variable aus einem \c int64_t einzulesen
-//  bool fromInt64(int64_t i, bool time = false) override { doAudit(); if (C::c_from_numberT(i, wert, time)) { activate(); return true; } return false; }
-//  /// Versuch, die Variable aus einem \c double einzulesen
-//  bool fromDouble(double d) override { doAudit(); if (C::c_from_number(d, wert)) { activate(); return true; } return false; }
   /// Versuche ein Member nativ zu kopieren
   bool doCopy(const MemberBase *other) override { auto t = dynamic_cast<const Member<T, C> *>(other); if (t) doCopy(*t); return t != nullptr; }
   /// \private
@@ -1141,8 +1125,8 @@ void MemberVector<T>::traverse(ObjTravConst &trav) const
 {
 //  bool wasParentMode = trav.parentMode;
 //  if (trav.parentMode) {
-//    if (parent())
-//      parent()->traverseKey(trav);
+//    if (getParentObject())
+//      getParentObject()->traverseKey(trav);
 //    trav.parentMode = false;
 //  }
 

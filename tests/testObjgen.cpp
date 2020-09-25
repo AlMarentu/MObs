@@ -127,7 +127,7 @@ TEST(objgenTest, leer) {
   EXPECT_EQ(0, info.kundennr());
   EXPECT_EQ(false, info.firma());
   EXPECT_EQ("", info.name());
-  EXPECT_EQ("Person", info.typeName());
+  EXPECT_EQ("Person", info.getObjectName());
 }
 
 //Alle MemVar Datentypen Testen
@@ -303,7 +303,7 @@ TEST(objgenTest, setnull) {
 
   EXPECT_TRUE(info.adresse.isNull());
   EXPECT_EQ(2, info.kundennr());
-  EXPECT_EQ("Adresse", info.adresse.typeName());
+  EXPECT_EQ("Adresse", info.adresse.getObjectName());
   EXPECT_EQ(R"({kundennr:2,firma:false,name:"Das war ein ßäöü <>\"' ss \"#  ö",vorname:"",adresse:null,kontakte:[],hobbies:[]})", mobs::to_string(info));
   info.name(u8"John");
   info.adresse.ort(u8"Berlin");
@@ -323,7 +323,7 @@ TEST(objgenTest, Vectors) {
   info.kontakte[4].number("+40 0000 1111 222");
   info.hobbies[1]("Piano");
 
-  EXPECT_EQ("Adresse", info.adresse.typeName());
+  EXPECT_EQ("Adresse", info.adresse.getObjectName());
   EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:null,kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", info.to_string(mobs::ConvObjToString().exportCompact()));
   EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:null,kontakte:[{art:"fax",number:""},{art:"fax",number:""},{art:"fax",number:""},{art:"fax",number:""},{art:"mobil",number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", mobs::to_string(info));
   info.adresse.setEmpty();
@@ -413,7 +413,7 @@ TEST(objgenTest, Pointer) {
 
   Person *ip = dynamic_cast<Person *>(mobs::ObjectBase::createObj("Person"));
   ASSERT_NE(nullptr, ip);
-  EXPECT_EQ("Person", ip->typeName());
+  EXPECT_EQ("Person", ip->getObjectName());
   ASSERT_NO_THROW(mobs::string2Obj( R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", *ip));
   // Gegenprobe
   EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", ip->to_string(mobs::ConvObjToString().exportCompact()));
@@ -596,7 +596,7 @@ class KeyDump : virtual public mobs::ObjTravConst {
 public:
   explicit KeyDump(const mobs::ConvObjToString &c) : quoteKeys(c.withQuotes() ? "\"":""), cth(c) { };
   bool doObjBeg(const mobs::ObjectBase &obj) override {
-    if (not obj.name().empty())
+    if (not obj.getElementName().empty())
       objNames.push(obj.getName(cth) + ".");
     return true;
   };
@@ -643,9 +643,9 @@ std::string showKey(const mobs::ObjectBase &obj) {
 
 TEST(objgenTest, keys) {
   Obj1 o;
-  EXPECT_EQ(2, o.oo.key());
-  EXPECT_EQ(3, o.yy.key());
-  EXPECT_EQ(1, o.id.key());
+  EXPECT_EQ(2, o.oo.keyElement());
+  EXPECT_EQ(3, o.yy.keyElement());
+  EXPECT_EQ(1, o.id.keyElement());
   EXPECT_EQ("0::::", o.keyStr());
   o.oo.bb(7);
   EXPECT_EQ("0:0:0:0:", o.keyStr());

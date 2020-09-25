@@ -113,8 +113,8 @@ static std::string getNameAll(const mobs::ObjectBase *parent, const std::string 
   if (parent and ((cth.usePrefix() and (n or not parent->hasFeature(Embedded))) or
                   (n and parent->hasFeature(Embedded)))) {
     MemVarCfg p = parent->hasFeature(PrefixBase);
-    if (p and parent->parent())
-      tmp = parent->parent()->getConf(p);
+    if (p and parent->getParentObject())
+      tmp = parent->getParentObject()->getConf(p);
   }
   tmp += ((n == Unset) ? name : parent->getConf(n));
   if (cth.toLowercase()) {
@@ -126,7 +126,7 @@ static std::string getNameAll(const mobs::ObjectBase *parent, const std::string 
 
 
 std::string MemberBase::getName(const ConvToStrHint &cth) const {
-  return getNameAll(m_parent, name(), m_altName, cth);
+  return getNameAll(m_parent, getElementName(), m_altName, cth);
 }
 
 
@@ -166,7 +166,7 @@ MemVarCfg MemBaseVector::hasFeature(MemVarCfg c) const
 }
 
 std::string MemBaseVector::getName(const ConvToStrHint &cth) const {
-  return getNameAll(m_parent, name(), m_altName, cth);
+  return getNameAll(m_parent, getElementName(), m_altName, cth);
 }
 
 /////////////////////////////////////////////////
@@ -174,7 +174,7 @@ std::string MemBaseVector::getName(const ConvToStrHint &cth) const {
 /////////////////////////////////////////////////
 
 std::string ObjectBase::getName(const ConvToStrHint &cth) const {
-  return getNameAll(m_parent, name(), m_altName, cth);
+  return getNameAll(m_parent, getElementName(), m_altName, cth);
 }
 
 
@@ -290,8 +290,8 @@ void ObjectBase::regObj(ObjectBase *obj)
   else if (obj->hasFeature(Embedded)) {
     // Objekt-Prefix auf Membernamen übertragen
     MemVarCfg pfx = obj->hasFeature(PrefixBase);
-    if (pfx and obj->parent()) {
-      string prefix = obj->parent()->getConf(pfx);
+    if (pfx and obj->getParentObject()) {
+      string prefix = obj->getParentObject()->getConf(pfx);
 
       for (auto &m:obj->mlist) {
         if (m.obj) m.obj->m_varNam.insert(0, prefix);
@@ -426,7 +426,7 @@ public:
 void ObjectBase::doCopy(const ObjectBase &other)
 {
   ConvFromStrHintDoCopy cfh;
-  if (typeName() != other.typeName())
+  if (getObjectName() != other.getObjectName())
     throw runtime_error(u8"ObjectBase::doCopy: invalid Type");
   if (other.isNull())
   {
@@ -482,7 +482,7 @@ std::string MemberBase::auditValue() const {
   return toStr(ConvToStrHint(compact));
 }
 
-void MemberBase::initialValue(std::string &old, bool &null) const {
+void MemberBase::getInitialValue(std::string &old, bool &null) const {
   if (m_saveOld) {
     old = auditValue();
     null = isNull();
@@ -598,10 +598,10 @@ void ObjectBase::traverseKey(ObjTravConst &trav) const
   multimap<int, const MlistInfo *> tmp;
   for (auto const &m:mlist)
   {
-    if (m.mem and m.mem->key() > 0)
-      tmp.insert(make_pair(m.mem->key(), &m));
-    if (m.obj and m.obj->key() > 0)
-      tmp.insert(make_pair(m.obj->key(), &m));
+    if (m.mem and m.mem->keyElement() > 0)
+      tmp.insert(make_pair(m.mem->keyElement(), &m));
+    if (m.obj and m.obj->keyElement() > 0)
+      tmp.insert(make_pair(m.obj->keyElement(), &m));
   }
   // Key-Elemente jetzt in richtiger Reihenfolge durchgehen
   bool inNull = trav.m_inNull;
@@ -812,7 +812,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
       }
 //      LOG(LM_INFO, ele << " ist ein Vector " << s);
       memName += ".";
-      memName += v->name();
+      memName += v->getElementName();
       memName += "[";
       if (index != SIZE_T_MAX)
         memName += std::to_string(s);
@@ -829,7 +829,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
       }
       else if (m)
       {
-        memName += m->name();
+        memName += m->getElementName();
         memBase = m;
         //        LOG(LM_INFO, "Member: " << memName)
         return true;
@@ -843,13 +843,13 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
       mobs::ObjectBase *o = objekte.top().obj->getObjInfo(elementFind, cfs);
       if (o) {
 //        LOG(LM_INFO, ele << " ist ein Objekt");
-        memName += "." + o->name();
+        memName += "." + o->getElementName();
         objekte.push(ObjectNavigator::Objekt(o, memName));
         return true;
       }
       mobs::MemberBase *m = objekte.top().obj->getMemInfo(elementFind, cfs);
       if (m) {
-        memName += "." + m->name();
+        memName += "." + m->getElementName();
         memBase = m;
         //        LOG(LM_INFO, "Member: " << memName);
         return true;
@@ -913,7 +913,7 @@ public:
       res << ",";
     newline();
     fst = true;
-    if (not obj.name().empty() and level > 0)
+    if (not obj.getElementName().empty() and level > 0)
       res << quoteKeys << obj.getName(cth) << quoteKeys << ":";
     if (obj.isNull())
     {
