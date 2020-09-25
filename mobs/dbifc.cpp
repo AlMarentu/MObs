@@ -459,6 +459,8 @@ DatabaseInterface::DatabaseInterface(std::shared_ptr<DatabaseConnection> dbi, st
 bool DatabaseInterface::load(ObjectBase &obj) {
   if (not dbCon->load(*this, obj))
     return false;
+//  if (not keysOnly)
+  obj.loaded(); // Callback
   if (obj.hasFeature(DbAuditTrail))
     obj.startAudit();
   return true;

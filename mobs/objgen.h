@@ -439,8 +439,11 @@ private:
 
 /// Basisklasse für Objekte
 class ObjectBase : public NullValue {
-  template<typename U, class V> friend class Member;
-  template<typename W> friend class MemberVector;
+  template<typename U, class V>
+  friend class Member;
+  template<typename W>
+  friend class MemberVector;
+  friend class DatabaseInterface;
 protected:
   ObjectBase(std::string n, ObjectBase *obj, const std::vector<MemVarCfg>& cv ) : m_varNam(std::move(n)), m_parent(obj) { for (auto c:cv) doConfig(c); } // Konstruktor for MemObj
   /// \private
@@ -460,13 +463,18 @@ public:
   void traverse(ObjTravConst &trav) const;
   /// Starte Traversierung der Key-Elemente in der durch das keyElement angegebenen Reihenfolge
   void traverseKey(ObjTravConst &trav) const;
-  /// liefert den Typnamen des Objektes
+  /// liefert den Typ des Objektes
   virtual std::string getObjectName() const { return ""; }
 protected:
   /// Callback-Funktion die einmalig im Constructor aufgerufen wird
   virtual void init() { };
   /// Callback-Funktion die nach einem \c clear aufgerufen wird
   virtual void cleared() { };
+  /** \brief Callback-Funktion die nach einem \c load() über das DatenbankInterface aufgerufen wird
+   *
+   * Der Aufruf erfolgt bevor die Modified-Flags gelöscht und der Audit-Trail begonnen wird.
+   */
+  virtual void loaded() { };
 public:
   /// liefert den Namen Membervariablen
   std::string getElementName() const { return m_varNam; };

@@ -69,6 +69,11 @@ public:
   MemVar(std::string, comment, USENULL, LENGTH(200));
   MemVector(AuditObjects, objects, COLNAME(auditObjects));
 
+protected:
+  // Callback
+  void loaded() override { for (auto &i:objects) i.unsplit(); }
+
+
 };
 
 
