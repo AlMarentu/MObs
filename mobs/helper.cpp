@@ -89,19 +89,22 @@ public:
       if (obj.isNull() and cth.omitNull())
         return false;
       if (obj.hasFeature(mobs::DbJson)) {
-        if (not obj.isNull())
-          throw runtime_error(u8"Query on DBJSON element not allowed");
-        if (not selectWhere.empty())
-          selectWhere += " and ";
-        fst = false;
-        size_t last = useName.size() -1;
-        selectWhere += useName[last] + "." + obj.getName(cth);
-        string val = sqldb.valueStmtText("", true);
-        if (sqldb.changeTo_is_IfNull)
-          selectWhere += " is ";
-        else
-          selectWhere += "=";
-        selectWhere += val;
+        if (cth.modOnly()) // where nur in QBE erzeugen
+        {
+          if (not obj.isNull())
+            throw runtime_error(u8"Query on DBJSON element not allowed");
+          if (not selectWhere.empty())
+            selectWhere += " and ";
+          fst = false;
+          size_t last = useName.size() - 1;
+          selectWhere += useName[last] + "." + obj.getName(cth);
+          string val = sqldb.valueStmtText("", true);
+          if (sqldb.changeTo_is_IfNull)
+            selectWhere += " is ";
+          else
+            selectWhere += "=";
+          selectWhere += val;
+        }
         return false;
       }
     }
@@ -122,20 +125,23 @@ public:
     if (vec.isNull() and cth.omitNull())
       return false;
     if (vec.hasFeature(mobs::DbJson)) {
-      if (not vec.isNull())
-        throw runtime_error(u8"Query on DBJSON element not allowed");
-      if (not selectWhere.empty())
-        selectWhere += " and ";
-      fst = false;
-      size_t last = useName.size() -1;
-      selectWhere += useName[last] + "." + vec.getName(cth);
-      string val;
-      sqldb.valueStmtText("", true);
-      if (sqldb.changeTo_is_IfNull)
-        selectWhere += " is ";
-      else
-        selectWhere += "=";
-      selectWhere += val;
+      if (cth.modOnly()) // where nur in QBE erzeugen
+      {
+        if (not vec.isNull())
+          throw runtime_error(u8"Query on DBJSON element not allowed");
+        if (not selectWhere.empty())
+          selectWhere += " and ";
+        fst = false;
+        size_t last = useName.size() - 1;
+        selectWhere += useName[last] + "." + vec.getName(cth);
+        string val;
+        sqldb.valueStmtText("", true);
+        if (sqldb.changeTo_is_IfNull)
+          selectWhere += " is ";
+        else
+          selectWhere += "=";
+        selectWhere += val;
+      }
       return false;
     }
     if (noJoin)
@@ -227,11 +233,13 @@ public:
         return;
     }
 
-    if (not selectWhere.empty())
-      selectWhere += " and ";
-
     fst = false;
 
+    if (not cth.modOnly()) // where nur in QBE erzeugen
+      return;
+
+    if (not selectWhere.empty())
+      selectWhere += " and ";
     selectWhere += useName[last] + "." + name;
     string val = sqldb.valueStmt(mem, compact, false, true);
     if (sqldb.changeTo_is_IfNull and mem.isNull())
