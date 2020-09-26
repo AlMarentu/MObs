@@ -95,7 +95,6 @@ public:
             throw runtime_error(u8"Query on DBJSON element not allowed");
           if (not selectWhere.empty())
             selectWhere += " and ";
-          fst = false;
           size_t last = useName.size() - 1;
           selectWhere += useName[last] + "." + obj.getName(cth);
           string val = sqldb.valueStmtText("", true);
@@ -131,7 +130,6 @@ public:
           throw runtime_error(u8"Query on DBJSON element not allowed");
         if (not selectWhere.empty())
           selectWhere += " and ";
-        fst = false;
         size_t last = useName.size() - 1;
         selectWhere += useName[last] + "." + vec.getName(cth);
         string val;
@@ -158,28 +156,29 @@ public:
       name = vec.getParentObject()->getConf(c);
     useName.push_back(sqldb.tableName(name));
     keys.push_back(vec.getName(cth));
+    arrayLevelJoin.push(false);
     level++;
-    levelArray++;
     return true;
   };
   /// \private
   void doArrayEnd(const MemBaseVector &vec) final
   {
     level--;
-    levelArray--;
     keys.pop_back();
-    if (not fst)
-    {
-      size_t last = useName.size() - 1;
-      selectJoin += " left join ";
-      selectJoin +=  useName[last] + " on ";
-      for (auto const &k:keys) {
-        if (fst)
-          selectJoin += " and ";
-        fst = true;
-        selectJoin += STRSTR(useName[last - 1] << '.' << k << " = " << useName[last] << '.' << k);
+    if (not arrayLevelJoin.empty()) {
+      if (arrayLevelJoin.top()) { // Join benötigt
+        size_t last = useName.size() - 1;
+        selectJoin += " left join ";
+        selectJoin += useName[last] + " on ";
+        bool fst = false;
+        for (auto const &k:keys) {
+          if (fst)
+            selectJoin += " and ";
+          fst = true;
+          selectJoin += STRSTR(useName[last - 1] << '.' << k << " = " << useName[last] << '.' << k);
+        }
       }
-      fst = true;
+      arrayLevelJoin.pop();
     }
     tableName.pop_back();
     useName.pop_back();
@@ -201,13 +200,14 @@ public:
     if (sort and sort->sortInfo(mem, pos, dir)) {
       selectOrder[pos] = STRSTR(useName[last] << '.' << name << (dir > 0? "": " descending"));
       if (sqldb.orderInSelect) {
-        if (levelArray > 0 or not mem.keyElement())
+        if (not arrayLevelJoin.empty() or not mem.keyElement())
           selectKeysXtra += STRSTR(',' << useName[last] << '.' << name);
-        if (levelArray > 0)
+        if (not arrayLevelJoin.empty())
           selectFieldXtra += STRSTR(',' << useName[last] << '.' << name);
       }
 //      LOG(LM_INFO, "SORT " << pos << " " << selectOrder[pos]);
-      fst = false;
+      if (not arrayLevelJoin.empty())
+        arrayLevelJoin.top() = true;
     }
     auto ql = queryLookUp.find(&mem);
     if (ql != queryLookUp.end()) {
@@ -215,9 +215,10 @@ public:
       ql->second += ".";
       ql->second += name;
       LOG(LM_INFO, "WHERE " << ql->second);
-      fst = false;
+      if (not arrayLevelJoin.empty())
+        arrayLevelJoin.top() = true;
     }
-    if (levelArray == 0) {
+    if (arrayLevelJoin.empty()) {
       if (not selectField.empty())
         selectField += ",";
       selectField += "mt.";
@@ -233,11 +234,11 @@ public:
         return;
     }
 
-    fst = false;
-
     if (not cth.modOnly()) // where nur in QBE erzeugen
       return;
 
+    if (not arrayLevelJoin.empty())
+      arrayLevelJoin.top() = true;
     if (not selectWhere.empty())
       selectWhere += " and ";
     selectWhere += useName[last] + "." + name;
@@ -312,17 +313,16 @@ public:
   bool noJoin = false;  // ersetze joinGenerierung
   const QueryOrder *sort = nullptr;
   const QueryGenerator *queryGen = nullptr;
-  std::string injectEnd;    ///< wird bei QueryWithJoin am enge angehängt
+  std::string injectEnd;    ///< wird bei QueryWithJoin am Ende angehängt
   map<const MemberBase *, string> queryLookUp;
 
 private:
   ConvObjToString cth;
-  bool fst = true;
   int level = 0;
-  int levelArray = 0;
   vector<string> tableName;
   vector<string> useName;
   vector<string> keys;
+  stack<bool> arrayLevelJoin; // wird der Join des aktuellen Array-levels benötigt?
   SQLDBdescription &sqldb;
 };
 
