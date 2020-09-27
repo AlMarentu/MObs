@@ -23,17 +23,19 @@
 #define MOBS_LOGGING_H
 
 #include <sstream>
+#include <string>
 
 /** \file logging.h
 \brief Hilfsfunktionen und Makros für logging und tracing
  
- Kann leicht dur andere Tools esetzt werden. Es mussen die Makros
+ Kann leicht durch andere Tools ersetzt werden. Es müssen die Makros
  
- LOG(level, streamop)
- TRACE(streamop)
+ LOG(level, streamOp)
+ TRACE(streamOp)
  PARAM(par)
+ THROW(streamOp)
  
- sowie dei Log_level-Makros existieren.
+ sowie die Log_level-Makros existieren.
  
  
  */
@@ -53,7 +55,7 @@ typedef enum {
 class Trace {
 public:
   /// \private
-  Trace (const char *f, const std::string &str);
+  Trace (const char *f, std::function<std::string()> str);
   ~Trace ();
   static bool traceOn; ///< schaltet Tracing zur Laufzeit ein und aus
 private:
@@ -61,7 +63,7 @@ private:
   const char *fun;
 };
 
-void logMessage(loglevel l, const std::string &message);
+void logMessage(loglevel l, std::function<std::string()> message);
 
 }
 
@@ -79,7 +81,7 @@ void logMessage(loglevel l, const std::string &message);
 #define THROW(x) do { std::stringstream ___s___; ___s___ << __FILE_NAME__ << ':' << __LINE__ << " " << std::boolalpha << x; throw std::runtime_error(___s___.str()); } while(false)
 
 /// \brief Erzeugt eine Log-Meldung auf stderr.
-#define LOG(l,x) do { std::stringstream ___s___; ___s___ << __FILE_NAME__ << ':' << __LINE__ << " " << std::boolalpha << x; logging::logMessage(l, ___s___.str()); } while(false)
+#define LOG(l,x) logging::logMessage(l, [&]()->std::string { std::stringstream ___s___; ___s___ << __FILE_NAME__ << ':' << __LINE__ << " " << std::boolalpha << x; return ___s___.str(); })
 
 /// \brief Hilfs-Makro das einen Stream als std::string ausgibt
 #define STRSTR(x) ([&]()->std::string { std::stringstream ___s___; ___s___ << x; return ___s___.str(); })()
@@ -91,7 +93,7 @@ void logMessage(loglevel l, const std::string &message);
 #define PARAM(x) " " #x "=\"" << x << "\""
 #ifndef NDEBUG
 /// \brief Makro für Tracing
-#define TRACE(x) logging::Trace ___t___(__PRETTY_FUNCTION__, STRSTR(x))
+#define TRACE(x) logging::Trace ___t___(__PRETTY_FUNCTION__, [&]()->std::string { std::stringstream ___s___; ___s___ << x; return ___s___.str(); })
 #else
 #define TRACE(x)
 #endif

@@ -39,8 +39,8 @@ namespace logging {
 /// \brief Logmeldung ausgeben, interne Funktion, bitte Makro LOG() verwenden
 /// \see LOG(l, x)
 /// @param l Log-Level
-/// @param message Inhalt der Log-Meldung
-void logMessage(loglevel l, const std::string &message)
+/// @param message Inhalt der Log-Meldung als lambda
+void logMessage(loglevel l, std::function<std::string()> message)
   {
     char c = ' ';
     switch(l)
@@ -51,16 +51,16 @@ void logMessage(loglevel l, const std::string &message)
       case lm_error: c = 'E'; break;
       case lm_warn: c = 'W'; break;
     }
-    std::cerr << c << " " << message << std::endl;
+    std::cerr << c << " " << message() << std::endl;
   }
 
 
-  
-  Trace::Trace (const char *f, const std::string &str) : fun(f)
+
+Trace::Trace (const char *f, std::function<std::string()> str) : fun(f)
   {
     if (traceOn)
       std::cerr << "T B(" << ++lev << ") " << fun
-          << " with " << str << std::endl;
+          << " with " << str() << std::endl;
   }
 
   /// Destruktor
