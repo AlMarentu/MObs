@@ -91,7 +91,7 @@ void logMessage(loglevel l, const std::string &message);
 #define PARAM(x) " " #x "=\"" << x << "\""
 #ifndef NDEBUG
 /// \brief Makro für Tracing
-#define TRACE(x) std::stringstream ___s___; ___s___ << std::boolalpha << x; logging::Trace ___t___(__PRETTY_FUNCTION__, ___s___.str())
+#define TRACE(x) logging::Trace ___t___(__PRETTY_FUNCTION__, STRSTR(x))
 #else
 #define TRACE(x)
 #endif
