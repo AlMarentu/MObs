@@ -1250,7 +1250,15 @@ void SqlGenerator::readObject(mobs::ObjectBase &o) {
   o.traverse(es);
   sqldb.finishReading();
   detailVec.splice(detailVec.end(), es.detailVec);
+}
 
+void SqlGenerator::readObjectKeys(mobs::ObjectBase &o) {
+  ExtractSql es(sqldb, mobs::ConvObjToString());
+  DetailInfo di(nullptr, tableName(), {});
+  es.current = di;
+  sqldb.startReading();
+  o.traverseKey(es);
+  sqldb.finishReading();
 }
 
 std::string SqlGenerator::selectStatementArray(DetailInfo &di) {

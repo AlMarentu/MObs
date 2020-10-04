@@ -135,6 +135,7 @@ public:
 
   std::string selectStatementFirst(bool keys = false);
   void readObject(mobs::ObjectBase &obj);
+  void readObjectKeys(ObjectBase &o);
 
   std::string selectStatementArray(DetailInfo &di);
   void readObject(const DetailInfo &di);
@@ -164,6 +165,7 @@ private:
   std::list<DetailInfo> detailVec{};
   bool querywJoin = false;
   std::list<ObjectBase *> m_deleteLater;
+
 };
 
 class ElementNamesData;

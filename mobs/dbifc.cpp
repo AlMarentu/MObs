@@ -357,19 +357,19 @@ void DbTransaction::finish(bool good) {
         dti.dbCon->endTransaction(this, dti.tdb);
       else
         dti.dbCon->rollbackTransaction(this, dti.tdb);
-    } catch (std::exception &e) {
+    } catch (mobs::locked_error &e) {
       error = true;
       if (good) {
-        LOG(LM_ERROR, "TRANSACTION FINISH FAILED " << e.what());
+        LOG(LM_ERROR, "TRANSACTION FINISH FAILED WITH LOCK " << e.what());
         msg += " ";
         msg += e.what();
       }
       else
         LOG(LM_DEBUG, "Transaction rollback " << e.what());
-    } catch (mobs::locked_error &e) {
+    } catch (std::exception &e) {
       error = true;
       if (good) {
-        LOG(LM_ERROR, "TRANSACTION FINISH FAILED WITH LOCK " << e.what());
+        LOG(LM_ERROR, "TRANSACTION FINISH FAILED " << e.what());
         msg += " ";
         msg += e.what();
       }
@@ -459,7 +459,6 @@ DatabaseInterface::DatabaseInterface(std::shared_ptr<DatabaseConnection> dbi, st
 bool DatabaseInterface::load(ObjectBase &obj) {
   if (not dbCon->load(*this, obj))
     return false;
-//  if (not keysOnly)
   obj.loaded(); // Callback
   if (obj.hasFeature(DbAuditTrail))
     obj.startAudit();
@@ -532,8 +531,11 @@ void DatabaseInterface::retrieve(ObjectBase &obj, std::shared_ptr<mobs::DbCursor
   if (not cursor->valid())
     throw std::runtime_error("DatabaseInterface: cursor is not valid");
   dbCon->retrieve(*this, obj, cursor);
-  if (obj.hasFeature(DbAuditTrail))
-    obj.startAudit();
+  if (not cursor->keysOnly()) {
+    obj.loaded(); // Callback
+    if (obj.hasFeature(DbAuditTrail))
+      obj.startAudit();
+  }
 }
 
 void DatabaseInterface::dropAll(const ObjectBase &obj) {

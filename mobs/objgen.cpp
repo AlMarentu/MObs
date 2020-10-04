@@ -622,6 +622,34 @@ void ObjectBase::traverseKey(ObjTravConst &trav) const
   trav.doObjEnd(*this);
 }
 
+void ObjectBase::traverseKey(ObjTrav &trav)
+{
+  trav.m_keyMode = true;
+  // Element-Liste nach Key-Nummer sortieren
+  multimap<int, const MlistInfo *> tmp;
+  for (auto const &m:mlist)
+  {
+    if (m.mem and m.mem->keyElement() > 0)
+      tmp.insert(make_pair(m.mem->keyElement(), &m));
+    if (m.obj and m.obj->keyElement() > 0)
+      tmp.insert(make_pair(m.obj->keyElement(), &m));
+  }
+  // Key-Elemente jetzt in richtiger Reihenfolge durchgehen
+  trav.m_keyMode = true;
+//  if (not wasParentMode and not trav.doObjBeg(*this))
+  if (not trav.doObjBeg(*this))
+    return;
+  for (auto const &i:tmp)
+  {
+    auto &m = *i.second;
+    if (m.mem and (trav.withVersionField or not m.mem->isVersionField()))
+      trav.doMem(*m.mem);
+    if (m.obj)
+      m.obj->traverseKey(trav);
+  }
+  trav.doObjEnd(*this);
+}
+
 
 void MemBaseVector::traverseKey(ObjTravConst &trav) const {
 //  if (trav.parentMode) {

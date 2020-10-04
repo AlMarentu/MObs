@@ -959,17 +959,19 @@ public:
 class Cursor : public virtual mobs::DbCursor {
   friend class mobs::MongoDatabaseConnection;
 public:
-  explicit Cursor(mongocxx::cursor &&c, std::shared_ptr<DatabaseConnection> dbi, std::string dbName) :
-          cursor(std::move(c)), it(cursor.begin()), dbCon(std::move(dbi)), databaseName(std::move(dbName)) { }
+  explicit Cursor(mongocxx::cursor &&c, std::shared_ptr<DatabaseConnection> dbi, std::string dbName, bool keysOnly) :
+          cursor(std::move(c)), it(cursor.begin()), dbCon(std::move(dbi)), databaseName(std::move(dbName)), isKeysOnly(keysOnly) { }
   ~Cursor() override = default;;
   bool eof() override  { return it == cursor.end(); }
   bool valid() override { return not eof(); }
+  bool keysOnly() const override { return isKeysOnly; }
   void operator++() override { if (eof()) return; it.operator++(); cnt++; }
 private:
   mongocxx::cursor cursor;
   mongocxx::cursor::iterator it;
   std::shared_ptr<DatabaseConnection> dbCon;  // verhindert das Zerstören der Connection
   std::string databaseName;  // unused
+  bool isKeysOnly;
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1165,18 +1167,16 @@ MongoDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, bool qbe
   mongocxx::options::count c_opt = mongocxx::options::count().skip(dbi.getQuerySkip());
   if (dbi.getQueryLimit())
     c_opt = c_opt.limit(dbi.getQueryLimit());
-#if 0
-  // Projektion macht hier keinen Sinn
-  if (not dbi.getCountCursor()) {
+  if (not dbi.getCountCursor() and dbi.getKeysOnly()) {
+    // Projektion auf Key-Elemente
     BsonElements bo(mobs::ConvObjToString().exportWoNull());
     bo.index = true;
     ObjectBase *o2 = obj.createNew();
-    o2.traverse(bo);
+    o2->traverseKey(bo);
     delete o2;
     LOG(LM_DEBUG, "Projection " << collectionName(obj) << " " << bo.result());
     f_opt = f_opt.projection(bo.value());
   }
-#endif
   // Sortierung
   std::string sortLog;
   if (sort and not dbi.getCountCursor()) {
@@ -1202,7 +1202,7 @@ MongoDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, bool qbe
 
     if (dbi.getCountCursor())
       return std::make_shared<CountCursor>(col.count_documents(bq.value(), c_opt));
-    return std::make_shared<Cursor>(col.find(bq.value(), f_opt), dbi.getConnection(), dbi.database());
+    return std::make_shared<Cursor>(col.find(bq.value(), f_opt), dbi.getConnection(), dbi.database(), dbi.getKeysOnly());
   } else {
     MongoQuery qgen(query);
     if (not qgen.lookUp.empty()) {
@@ -1216,7 +1216,7 @@ MongoDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, bool qbe
 //    auto doc = bsoncxx::from_json(q); doc.view()
     if (dbi.getCountCursor())
       return std::make_shared<CountCursor>(col.count_documents(qgen.value(), c_opt));
-    return std::make_shared<Cursor>(col.find(qgen.value(), f_opt), dbi.getConnection(), dbi.database());
+    return std::make_shared<Cursor>(col.find(qgen.value(), f_opt), dbi.getConnection(), dbi.database(), dbi.getKeysOnly());
   }
 }
 

@@ -561,8 +561,8 @@ class InformixCursor : public virtual mobs::DbCursor {
   friend class mobs::InformixDatabaseConnection;
 public:
   explicit InformixCursor(int conNr, std::shared_ptr<DatabaseConnection> dbi,
-                       std::string dbName) :
-          dbCon(std::move(dbi)), databaseName(std::move(dbName)), m_conNr(conNr) {
+                       std::string dbName, bool keysOnly) :
+          dbCon(std::move(dbi)), databaseName(std::move(dbName)), isKeysOnly(keysOnly), m_conNr(conNr) {
     static int n = 0;
     m_cursNr = ++n;
     buf[0] = '\0';
@@ -573,6 +573,7 @@ public:
   }
   bool eof() override  { return not descPtr; }
   bool valid() override { return not eof(); }
+  bool keysOnly() const override { return isKeysOnly; }
   void operator++() override {
     const int NOMOREROWS=100;
     if (eof())
@@ -653,6 +654,7 @@ private:
   }
   std::shared_ptr<DatabaseConnection> dbCon;  // verhindert das Zerstören der Connection
   std::string databaseName;  // unused
+  bool isKeysOnly;
   int m_conNr;
   int m_cursNr = 0;
   int fldCnt = 0;
@@ -717,7 +719,7 @@ bool InformixDatabaseConnection::load(DatabaseInterface &dbi, ObjectBase &obj) {
   mobs::SqlGenerator gsql(obj, sd);
   string s = gsql.selectStatementFirst();
   LOG(LM_DEBUG, "SQL: " << s);
-  auto cursor = std::make_shared<InformixCursor>(conNr, dbi.getConnection(), dbi.database());
+  auto cursor = std::make_shared<InformixCursor>(conNr, dbi.getConnection(), dbi.database(), false);
   cursor->open(s);
   if (cursor->eof()) {
     LOG(LM_DEBUG, "NOW ROWS FOUND");
@@ -960,10 +962,13 @@ InformixDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, bool 
     sqlLimit += STRSTR(" LIMIT " << dbi.getQueryLimit());
 
   string s;
+  SqlGenerator::QueryMode qm = dbi.getKeysOnly() ? SqlGenerator::Keys : SqlGenerator::Normal;
+  if (dbi.getCountCursor())
+    qm = SqlGenerator::Count;
   if (qbe)
-    s = gsql.queryBE(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, sort, nullptr, sqlLimit);
+    s = gsql.queryBE(qm, sort, nullptr, sqlLimit);
   else
-    s = gsql.query(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, sort, query, "", sqlLimit);
+    s = gsql.query(qm, sort, query, "", sqlLimit);
 // TODO  s += " LOCK IN SHARE MODE WAIT 10 "; / NOWAIT
   LOG(LM_INFO, "SQL: " << s);
   if (dbi.getCountCursor()) {
@@ -974,7 +979,7 @@ InformixDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, bool 
     return std::make_shared<CountCursor>(cnt);
   }
 
-  auto cursor = std::make_shared<InformixCursor>(conNr, dbi.getConnection(), dbi.database());
+  auto cursor = std::make_shared<InformixCursor>(conNr, dbi.getConnection(), dbi.database(), dbi.getKeysOnly());
   cursor->open(s);
   if (cursor->eof()) {
     LOG(LM_DEBUG, "NOW ROWS FOUND");
@@ -998,13 +1003,16 @@ InformixDatabaseConnection::retrieve(DatabaseInterface &dbi, ObjectBase &obj, st
   obj.clear();
   sd.descriptor = curs->descPtr;
   sd.fldCnt = curs->fldCnt;
-  gsql.readObject(obj);
+  if (curs->isKeysOnly)
+    gsql.readObjectKeys(obj);
+  else
+    gsql.readObject(obj);
 
   while (not gsql.eof()) {
     SqlGenerator::DetailInfo di;
     string s = gsql.selectStatementArray(di);
     LOG(LM_DEBUG, "SQL " << s);
-    auto curs2 = std::make_shared<InformixCursor>(conNr, dbi.getConnection(), dbi.database());
+    auto curs2 = std::make_shared<InformixCursor>(conNr, dbi.getConnection(), dbi.database(), false);
     curs2->open(s);
     sd.descriptor = curs2->descPtr;
     sd.fldCnt = curs2->fldCnt;

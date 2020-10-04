@@ -97,6 +97,9 @@ public:
   /// Aktuelle Position, bei eof() oder withCountCursor, Anzahl der Datensätze
   size_t pos() const { return cnt; }
 
+  /// ist Cursor im KeysOnly-Modus
+  virtual bool keysOnly() const { return false; }
+
 protected:
   /// \private
   size_t cnt = 0;
@@ -308,6 +311,13 @@ public:
     return d;
   }
 
+  /// Erzeuge ein Duplikat mit der Option \c keysOnly mit der nur noch die Key-Elemente bei einer Query gelesen werden
+  DatabaseInterface withKeysOnly() {
+    DatabaseInterface d(*this);
+    d.keysOnly = true;
+    return d;
+  }
+
   /// Erzeuge ein Duplikat mit der Option, die ersten skip Objekte einer Query zu überspringen
   DatabaseInterface withQuerySkip(size_t skipCnt) {
     DatabaseInterface d(*this);
@@ -344,6 +354,9 @@ public:
   /// Abfrage DirtyRead
   bool getDirtyRead() const { return dirtyRead; }
 
+  /// Abfrage keys only
+  bool getKeysOnly() const { return keysOnly; }
+
   /// Abfrage Transaktion
   DbTransaction *getTransaction() const { return transaction; }
 
@@ -357,6 +370,7 @@ private:
   std::shared_ptr<DatabaseConnection> dbCon;
   std::string databaseName;
   bool countCursor = false;
+  bool keysOnly = false;
   bool dirtyRead = false;
   size_t skip = 0;
   size_t limit = 0;

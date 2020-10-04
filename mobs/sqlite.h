@@ -35,10 +35,9 @@
 
 namespace mobs {
 
-  /** \brief Datenbank-Verbindung zu einer MariaDB.
+  /** \brief Datenbank-Verbindung zu einer SQLite DB.
    *
-   * MariaDB is a registered trademarks of MariaDB.
-   * \see www.mariadb.com
+   * \see www.sqlite.org
    */
   class SQLiteDatabaseConnection : virtual public DatabaseConnection, public ConnectionInformation {
   public:

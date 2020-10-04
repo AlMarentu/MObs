@@ -158,7 +158,7 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 #define XMLATTR mobs::XmlAsAttr ///< Bei XML-Ausgabe als Attribute ausgeben (nur MemberVariable, nur von erstem Element fortlaufend)
 #define EMBEDDED mobs::Embedded ///< Bei Ausgabe als Attribute/Traversierung werden die Member des Objektes direkt, auf ser selben Ebene, serialisiert
 #define DBCOMPACT mobs::DbCompact ///< In der Datenbank wird der MOBSENUM oder der Zeit-Wert numerisch gespeichert
-#define DBDETAIL mobs::DbDetail ///< In der Datenbank wird dieses Subelement in einer Detail Table abgelegt, muss also seperat gespeichert werden
+#define DBDETAIL mobs::DbDetail ///< In der Datenbank wird dieses Subelement in einer Detail Table abgelegt, muss also separat gespeichert werden
 #define DBJSON mobs::DbJson ///< In nicht dokumentbasierten Datenbanken wird das Unterobjekt als Text im JSON-Format abgelegt
 #define VERSIONFIELD mobs::DbVersionField ///< In diesem Feld wird die Objektversion gespeichert, 0 entspricht noch nicht gespeichert
 #define AUDITTRAIL mobs::DbAuditTrail ///< für dieses Objekt wird automatisch ein Audit Trail mitgeführt
@@ -463,6 +463,8 @@ public:
   void traverse(ObjTravConst &trav) const;
   /// Starte Traversierung der Key-Elemente in der durch das keyElement angegebenen Reihenfolge
   void traverseKey(ObjTravConst &trav) const;
+  /// Starte Traversierung (nicht const) der Key-Elemente in der durch das keyElement angegebenen Reihenfolge
+  void traverseKey(ObjTrav &trav);
   /// liefert den Typ des Objektes
   virtual std::string getObjectName() const { return ""; }
 protected:
@@ -999,9 +1001,14 @@ public:
   bool inArray() const { return m_arrayIndex != SIZE_MAX; }
   /// Ist das Element Teil eines Vektors, wird die Index-Position angezeigt, ansonsten ist der Wert \c SIZE_MAX
   size_t arrayIndex() const { return m_arrayIndex; }
+  /// ist true, wenn ein \c traversKey durchgeführt wird
+  bool inKeyMode() const { return m_keyMode; }
+  /// Traversiere im key-Mode(traverseKeys) auch die Versionselemente
+  bool withVersionField = false;
 
 private:
-    size_t m_arrayIndex = SIZE_MAX;
+  size_t m_arrayIndex = SIZE_MAX;
+  bool m_keyMode = false;
 };
 
 /// Basisklasse zum rekursiven Durchlauf über eine  \c const  Objektstruktur

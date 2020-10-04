@@ -273,11 +273,13 @@ class MariaCursor : public virtual mobs::DbCursor {
   friend class mobs::MariaDatabaseConnection;
 public:
   explicit MariaCursor(MYSQL_RES *result, unsigned int fldCnt, std::shared_ptr<DatabaseConnection> dbi,
-                       std::string dbName) :
-          result(result), fldCnt(fldCnt), dbCon(std::move(dbi)), databaseName(std::move(dbName)) {  row = mysql_fetch_row(result); }
+                       std::string dbName, bool keysOnly) :
+          result(result), fldCnt(fldCnt), dbCon(std::move(dbi)), databaseName(std::move(dbName)), isKeysOnly(keysOnly)
+  {  row = mysql_fetch_row(result); }
   ~MariaCursor() override { if (result) mysql_free_result(result); result = nullptr; }
   bool eof() override  { return not row; }
   bool valid() override { return not eof(); }
+  bool keysOnly() const override { return isKeysOnly; }
   void operator++() override {
     if (eof()) return;
     row = mysql_fetch_row(result);
@@ -296,7 +298,7 @@ private:
   std::shared_ptr<DatabaseConnection> dbCon;  // verhindert das Zerstören der Connection
   std::string databaseName;  // unused
   MYSQL_ROW row = nullptr;
-
+  bool isKeysOnly;
 };
 
 }
@@ -374,7 +376,7 @@ bool MariaDatabaseConnection::load(DatabaseInterface &dbi, ObjectBase &obj) {
   if (result == nullptr)
     throw mysql_exception(u8"load store failed", connection);
   unsigned int sz = mysql_field_count(connection);
-  auto cursor = std::make_shared<MariaCursor>(result, sz, dbi.getConnection(), dbi.database());
+  auto cursor = std::make_shared<MariaCursor>(result, sz, dbi.getConnection(), dbi.database(), false);
   if (cursor->row == nullptr and mysql_errno(connection))
     throw mysql_exception(u8"load row failed", connection);
   if (not cursor->row) {
@@ -555,10 +557,13 @@ MariaDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, bool qbe
     sqlLimit = STRSTR(" LIMIT " << dbi.getQuerySkip() << ',' << dbi.getQueryLimit());
 
   string s;
+  SqlGenerator::QueryMode qm = dbi.getKeysOnly() ? SqlGenerator::Keys : SqlGenerator::Normal;
+  if (dbi.getCountCursor())
+    qm = SqlGenerator::Count;
   if (qbe)
-    s = gsql.queryBE(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, sort, nullptr, sqlLimit);
+    s = gsql.queryBE(qm, sort, nullptr, sqlLimit);
   else
-    s = gsql.query(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, sort, query, "", sqlLimit);
+    s = gsql.query(qm, sort, query, "", sqlLimit);
   // TODO  s += " LOCK IN SHARE MODE WAIT 10 "; / NOWAIT
 
   LOG(LM_INFO, "SQL: " << s);
@@ -585,7 +590,7 @@ MariaDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, bool qbe
     return std::make_shared<CountCursor>(cnt);
   }
 
-  auto cursor = std::make_shared<MariaCursor>(result, sz, dbi.getConnection(), dbi.database());
+  auto cursor = std::make_shared<MariaCursor>(result, sz, dbi.getConnection(), dbi.database(), dbi.getKeysOnly());
   if (cursor->row == nullptr and mysql_errno(connection))
     throw mysql_exception(u8"query row failed", connection);
   if (not cursor->row) {
@@ -614,7 +619,10 @@ MariaDatabaseConnection::retrieve(DatabaseInterface &dbi, ObjectBase &obj, std::
   obj.clear();
   sd.result = curs->result;
   sd.row = &curs->row;
-  gsql.readObject(obj);
+  if (curs->isKeysOnly)
+    gsql.readObjectKeys(obj);
+  else
+    gsql.readObject(obj);
 
   while (not gsql.eof()) {
     SqlGenerator::DetailInfo di;

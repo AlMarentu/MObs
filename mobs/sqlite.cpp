@@ -292,11 +292,12 @@ public:
 class SQLiteCursor : public virtual mobs::DbCursor {
   friend class mobs::SQLiteDatabaseConnection;
 public:
-  explicit SQLiteCursor(sqlite3_stmt *stmt, std::shared_ptr<DatabaseConnection> dbi, std::string dbName) :
-          stmt(stmt), dbCon(std::move(dbi)), databaseName(std::move(dbName)) { }
+  explicit SQLiteCursor(sqlite3_stmt *stmt, std::shared_ptr<DatabaseConnection> dbi, std::string dbName, bool keysOnly) :
+          stmt(stmt), dbCon(std::move(dbi)), databaseName(std::move(dbName)), isKeysOnly(keysOnly) { }
   ~SQLiteCursor() override { if (stmt) sqlite3_finalize(stmt); stmt = nullptr; }
   bool eof() override  { return not stmt; }
   bool valid() override { return not eof(); }
+  bool keysOnly() const override { return isKeysOnly; }
   void operator++() override {
     if (eof()) return;
     int rc = sqlite3_step(stmt);
@@ -315,6 +316,7 @@ private:
   sqlite3_stmt *stmt = nullptr;
   std::shared_ptr<DatabaseConnection> dbCon;  // verhindert das Zerstören der Connection
   std::string databaseName;  // unused
+  bool isKeysOnly;
 };
 
 }
@@ -369,7 +371,7 @@ bool SQLiteDatabaseConnection::load(DatabaseInterface &dbi, ObjectBase &obj) {
       throw sqlite_exception(u8"step load failed", connection);
     return false;
   }
-  auto cursor = std::make_shared<SQLiteCursor>(ppStmt, dbi.getConnection(), dbi.database());
+  auto cursor = std::make_shared<SQLiteCursor>(ppStmt, dbi.getConnection(), dbi.database(), false);
   retrieve(dbi, obj, cursor);
   return true;
 }
@@ -604,10 +606,13 @@ SQLiteDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, bool qb
     open();
     setConf(dbi);
     string s;
+    SqlGenerator::QueryMode qm = dbi.getKeysOnly() ? SqlGenerator::Keys : SqlGenerator::Normal;
+    if (dbi.getCountCursor())
+      qm = SqlGenerator::Count;
     if (qbe)
-      s = gsql.queryBE(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, sort, nullptr, sqlLimit);
+      s = gsql.queryBE(qm, sort, nullptr, sqlLimit);
     else
-      s = gsql.query(dbi.getCountCursor() ? SqlGenerator::Count : SqlGenerator::Normal, sort, query, "", sqlLimit);
+      s = gsql.query(qm, sort, query, "", sqlLimit);
     // TODO  s += " LOCK IN SHARE MODE WAIT 10 "; / NOWAIT
 
     LOG(LM_INFO, "SQL: " << s);
@@ -634,7 +639,7 @@ SQLiteDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, bool qb
       sqlite3_finalize(ppStmt);
       return std::make_shared<CountCursor>(size_t(cnt));
     }
-    auto cursor = std::make_shared<SQLiteCursor>(ppStmt, dbi.getConnection(), dbi.database());
+    auto cursor = std::make_shared<SQLiteCursor>(ppStmt, dbi.getConnection(), dbi.database(), dbi.getKeysOnly());
     return cursor;
   } catch (mobs::locked_error &e) {
     throw mobs::locked_error(LOGSTR(u8"SQLite query: " << e.what()));
@@ -661,7 +666,10 @@ SQLiteDatabaseConnection::retrieve(DatabaseInterface &dbi, ObjectBase &obj, std:
 
   obj.clear();
   sd.stmt = curs->stmt;
-  gsql.readObject(obj);
+  if (curs->isKeysOnly)
+    gsql.readObjectKeys(obj);
+  else
+    gsql.readObject(obj);
 
   while (not gsql.eof()) {
     SqlGenerator::DetailInfo di;
