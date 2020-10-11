@@ -152,7 +152,7 @@ std::wostream &to_wostream_base64(std::wostream &str, const T &t) { copy_base64(
 
 //template std::wostream &to_wostream_base64<std::vector<u_char>>(std::wostream &, const std::vector<u_char> &);
 
-/// wandelt einen HTML-Character-Code in Unicode um; die Angabe erfolg ohne '&' und ';': Z.B.  "amp" oder "#xd"
+/// wandelt einen HTML-Character-Code in Unicode um; die Ausgabe erfolgt ohne '&' und ';': Z.B.  "amp" oder "#xd"
 wchar_t from_html_tag(const std::wstring &tok);
 
 /// Klasse zum Auswerten vin Base64

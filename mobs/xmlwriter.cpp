@@ -193,14 +193,29 @@ void XmlWriter::writeValue(const std::wstring &value) {
 
 void XmlWriter::writeCdata(const std::wstring &value) {
   data->closeTag();
-  data->buffer << L"<![CDATA[" << value << L"]]>";
+  for (size_t pos1 = 0;;) {
+    size_t pos2 = value.find(L"]]>", pos1);
+    if (pos2 == string::npos)
+      pos2 = value.length();
+    else
+      pos2 += 1;
+    data->buffer << L"<![CDATA[" << value.substr(pos1, pos2-pos1) << L"]]>";
+    if (pos2 == value.length())
+      break;
+    pos1 = pos2;
+  }
   data->hasValue = true;
 }
 
 void XmlWriter::writeBase64(const std::vector<u_char> &value) {
   data->closeTag();
   data->buffer << L"<![CDATA[";
-  to_wostream_base64(data->buffer, value);
+  string lBreak;
+  if (data->indent) {
+    lBreak = "\n";
+    lBreak.resize(data->level * 2 +1, ' ');
+  }
+  copy_base64(value.cbegin(), value.cend(), std::ostreambuf_iterator<wchar_t>(data->buffer), lBreak);
   data->buffer << L"]]>";
   data->hasValue = true;
 }

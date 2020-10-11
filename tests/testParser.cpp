@@ -62,7 +62,7 @@ public:
   void NullTag(const std::string &element) override { LOG(LM_INFO, "NULL"); }
   void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) override { LOG(LM_INFO, "ATTRIBUT " << element); }
   void Value(const std::wstring &value) override { LOG(LM_INFO, "VALUE >" << mobs::to_string(value) << "<"); }
-  void Cdata(const std::wstring &value) override { LOG(LM_INFO, "CDATA >" << mobs::to_string(value) << "<"); }
+  void Cdata(const std::wstring &value) override { LOG(LM_INFO, "CDATA >" << mobs::to_string(value) << "<"); lastCdata = mobs::to_string(value); }
   void Base64(const std::vector<u_char> &base64) override {
     std::string s;
     std::copy(base64.cbegin(), base64.cend(), back_inserter(s));
@@ -74,6 +74,7 @@ public:
   void EndTag(const std::string &element) override { LOG(LM_INFO, "END " << element); }
   void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) override { LOG(LM_INFO, "PI" << element); }
   std::wistringstream str;
+  std::string lastCdata;
 };
 
 
@@ -135,6 +136,7 @@ TEST(parserTest, jsonStruct1) {
 
 void xparse(string s) { XParser p(s); p.parse(); };
 void xparse(wstring s, bool b64 = false) { XParserW p(s); p.setBase64(b64); p.parse(); };
+std::string xparseCdata(wstring s, bool b64 = false) { XParserW p(s); p.setBase64(b64); p.parse(); return p.lastCdata; };
 
 // aus https://de.wikipedia.org/wiki/Extensible_Markup_Language
 const string x1 = R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -175,6 +177,9 @@ TEST(parserTest, xmlStructW1) {
   EXPECT_NO_THROW(xparse(L"<abc>   <cde/> </abc>"));
   EXPECT_NO_THROW(xparse(L"<ggg>   <!-- sdfsdf --><cde/>  </ggg>"));
   EXPECT_NO_THROW(xparse(L"<abc>   <![CDATA[J]]></abc>"));
+  EXPECT_EQ("J", xparseCdata(L"<abc>   <![CDATA[J]]></abc>"));
+  EXPECT_EQ("AB", xparseCdata(L"<abc>   <![CDATA[A]]><![CDATA[B]]></abc>"));
+  EXPECT_EQ("...]]>...", xparseCdata(L"<abc>   <![CDATA[...]]]>  <![CDATA[]>...]]> </abc>"));
   EXPECT_NO_THROW(xparse(L"<abc>  <cde/> </abc> <!-- sdfs<< df --> "));
   
   EXPECT_ANY_THROW(xparse(L"<abc>  dd <![CDATA[J]]></abc>"));
@@ -183,6 +188,9 @@ TEST(parserTest, xmlStructW1) {
   EXPECT_ANY_THROW(xparse(L"<abc>   <cde/> </abce>"));
   EXPECT_ANY_THROW(xparse(L"<abc a =\"xx\" bcd=\"9999\"/>"));
   EXPECT_ANY_THROW(xparse(L"<abc a=xx bcd=\"9999\"/>"));
+  EXPECT_ANY_THROW(xparse(L"<abc> a  <![CDATA[A]]><![CDATA[B]]></abc>"));
+  EXPECT_ANY_THROW(xparse(L"<abc>   <![CDATA[A]]> x <![CDATA[B]]></abc>"));
+  EXPECT_ANY_THROW(xparse(L"<abc>  <![CDATA[A]]><![CDATA[B]]> kk </abc>"));
 
 }
 

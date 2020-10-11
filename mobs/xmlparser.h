@@ -118,7 +118,7 @@ public:
   /** \brief Callback-Function: Eine Verarbeitungsanweisung z.B, "xml", "encoding", "UTF-8"
    @param element Name des Tags
    @param attribut Name der Verarbeitungsanweisung
-   @param value Inhalz der Verarbeitungsanweisung
+   @param value Inhalt der Verarbeitungsanweisung
    */
   virtual void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::string &value) = 0;
   
@@ -341,7 +341,7 @@ private:
     return decode(p, pos2);
   };
   void clearValue() { posS = posE; }; // der Zwischenraum fand Verwendung
-                                      /// Verwaltet den Zischenraum zwischen den <..Tags..>
+                                      /// Verwaltet den Zwischenraum zwischen den <..Tags..>
   void saveValue() {
     // wenn nicht verwendet, darf es nur white space sein
     if (posS != posE)
@@ -623,11 +623,17 @@ public:
           throw std::runtime_error("missing end tag");
         if (lastKey == element)
         {
-          decode(saved);
-          Value(saved);
+          if (not cdata.empty()) {
+            Cdata(cdata);
+            saveValue();
+          } else {
+            decode(saved);
+            Value(saved);
+          }
           clearValue();
           lastKey = "";
         }
+        cdata.clear();
         EndTag(element);
         if (tags.empty())
           throw std::runtime_error(u8"unexpected closing tag " + element);
@@ -652,17 +658,23 @@ public:
           eat('A');
           eat('[');
           saveValue();  // nur whitespace prüfen
+          cdata.swap(buffer);
           parse2CD();
           if (try64) {
             base64.done();
             Base64(base64data);
           }
-          else
-            Cdata(buffer.substr(2));
+          else {
+            buffer.resize(buffer.length() -2);
+            if (buffer.empty()) {
+              Cdata(buffer);
+              lastKey = "";
+            } else
+              cdata.swap(buffer);
+          }
           base64.clear();
           try64 = false;
           clearValue();
-          lastKey = "";
         }
         else
         {
@@ -703,6 +715,7 @@ public:
               eat('"');
             else
               eat('\'');
+            buffer.clear();
             parse2Char(c);
             decode(buffer);
             v = buffer;
@@ -776,6 +789,7 @@ public:
           eat('"');
         else
           eat('\'');
+        buffer.clear();
         parse2Char(c);
         decode(buffer);
         Attribute(element, a, buffer);
@@ -794,7 +808,7 @@ public:
   };
   
 private:
-  void parse2LT() { parse2Char('<'); }
+  void parse2LT() { buffer.clear(); parse2Char('<'); }
   void parse2GT() {
     buffer.clear();
     if (curr <= 0)
@@ -810,7 +824,6 @@ private:
       throw std::runtime_error("Syntax");
   };
   void parse2Char(wchar_t c) {
-    buffer.clear();
     if (curr == c or curr <= 0)
       return;
     if (try64)
@@ -846,13 +859,9 @@ private:
     }
   };
   void parse2CD() {
-//    pos2 = Xml.find(L"]]>", pos1);
-    buffer.clear();
     for (;;) {
-      std::wstring tmp = buffer;
       base64Start();
       parse2Char(']');
-      buffer = tmp + buffer;
       if (peek() == ']') {
         eat();
         if (peek() == ']') {
@@ -957,6 +966,7 @@ private:
   std::wistream &istr;
   std::wstring buffer;
   std::wstring saved;
+  std::wstring cdata;
   wchar_t curr = 0;
   std::string encoding;
   std::stack<std::string> tags;
