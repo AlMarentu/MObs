@@ -375,18 +375,27 @@ std::string MobsMemberInfoDb::toString(bool *needQuotes) const {
   if (isTime) {
     if (needQuotes)
       *needQuotes = true;
-    if (granularity >= 86400000000) { // nur Datum
-      std::stringstream s;
-      struct tm ts{};
-      toLocalTime(ts);
-      s << std::put_time(&ts, "%F");
-      return s.str();
-    } else {
-      MTime t;
-      if (not from_number(i64, t))
-        throw std::runtime_error("Time Conversion");
-      return to_string_ansi(t);
-    }
+    MTime t;
+    if (not from_number(t64, t))
+      throw std::runtime_error("Time Conversion");
+    MTimeFract f = mobs::MSecond;
+    if (granularity < 10)
+      f = mobs::MF6;
+    else if (granularity < 100)
+      f = mobs::MF5;
+    else if (granularity < 1000)
+      f = mobs::MF4;
+    else if (granularity < 10000)
+      f = mobs::MF3;
+    else if (granularity < 100000)
+      f = mobs::MF2;
+    else if (granularity < 1000000)
+      f = mobs::MF1;
+    else if (granularity < 86400000000)
+      f = mobs::MHour;
+    else if (granularity < 86400000000 * 24)
+      f = mobs::MDay;
+    return to_string_ansi(t, f);
   }
   if (isUnsigned and max == 1) // bool
     return (u64 ? "true" : "false");

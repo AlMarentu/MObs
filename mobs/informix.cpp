@@ -231,6 +231,41 @@ public:
         throw runtime_error("error in setBuffer");
     }
   }
+  std::string memInfoStmt(const MobsMemberInfoDb &mi) override {
+    if (mi.isTime and mi.granularity >= 86400000000) { // nur Datum
+      std::stringstream s;
+      struct tm ts{};
+      mi.toLocalTime(ts);
+//      s << std::put_time(&ts, "%m.%d.%Y");  // TODO
+      s << std::put_time(&ts, "%F 00:00:00");
+      return mobs::to_squote(s.str());
+    }
+    else if (mi.isTime) {
+      MTime t;
+      if (not from_number(mi.t64, t))
+        throw std::runtime_error("Time Conversion");
+      MTimeFract f = mobs::MSecond;
+      if (mi.granularity < 100)
+        f = mobs::MF5;
+      else if (mi.granularity < 1000)
+        f = mobs::MF4;
+      else if (mi.granularity < 10000)
+        f = mobs::MF3;
+      else if (mi.granularity < 100000)
+        f = mobs::MF2;
+      else if (mi.granularity < 1000000)
+        f = mobs::MF1;
+      return mobs::to_squote(to_string_ansi(t, f));
+    }
+    else if (mi.isUnsigned and mi.max == 1) // bool
+      return (mi.u64 ? "'t'" : "'f'");
+
+    bool needQuotes;
+    std::string r = mi.toString(&needQuotes);
+    if (needQuotes)
+      return to_squote(r);
+    return r;
+  }
   std::string valueStmt(const MemberBase &mem, bool compact, bool increment, bool inWhere) override {
     MobsMemberInfo mi;
     mem.memInfo(mi);
@@ -250,10 +285,21 @@ public:
         MTime t;
         if (not from_number(mi.t64, t))
           throw std::runtime_error("Time Conversion");
-        return mobs::to_squote(to_string_ansi(t));
+        MTimeFract f = mobs::MSecond;
+        if (mi.granularity < 100)
+          f = mobs::MF5;
+        else if (mi.granularity < 1000)
+          f = mobs::MF4;
+        else if (mi.granularity < 10000)
+          f = mobs::MF3;
+        else if (mi.granularity < 100000)
+          f = mobs::MF2;
+        else if (mi.granularity < 1000000)
+          f = mobs::MF1;
+        return mobs::to_squote(to_string_ansi(t, f));
       }
       else if (mi.isUnsigned and mi.max == 1) // bool
-        return (mi.u64 ? "1" : "0");
+        return (mi.u64 ? "'t'" : "'f'");
       else if (mem.is_chartype(mobs::ConvToStrHint(compact)))
         return mobs::to_squote(mem.toStr(mobs::ConvToStrHint(compact)));
 

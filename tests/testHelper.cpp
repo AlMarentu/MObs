@@ -95,6 +95,14 @@ public:
     return res.str();
   }
 
+  std::string memInfoStmt(const mobs::MobsMemberInfoDb &mi) override {
+    bool needQuotes;
+    std::string r = mi.toString(&needQuotes);
+    if (needQuotes)
+      return mobs::to_quote(r);
+    return r;
+  }
+
   virtual std::string valueStmt(const mobs::MemberBase &mem, bool compact, bool increment, bool inWhere) override {
     if (useBindVars)
       return "?";

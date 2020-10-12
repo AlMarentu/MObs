@@ -32,6 +32,7 @@
 
 namespace mobs {
 
+class SQLDBdescription;
 class QueryGeneratorData;
 
 /** \brief Klasse zum Erzeugen eines Filters für Datenbankabfragen
@@ -114,7 +115,7 @@ public:
   void createLookup(std::map<const MemberBase *, std::string> &lookUp) const;
 
   /// \private
-  std::string show(const std::map<const MemberBase *, std::string> &lookUp) const;
+  std::string show(const std::map<const MemberBase *, std::string> &lookUp, SQLDBdescription *sqd = nullptr) const;
 
 
 

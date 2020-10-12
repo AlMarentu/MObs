@@ -37,6 +37,8 @@ class QueryGenerator;
 /// Klasse die Datenbank-Typ abhängige Definitionen enthält
 class SQLDBdescription {
 public:
+  /// Konstante DB-Spezifisch in SQL-String wandeln
+  virtual std::string memInfoStmt(const MobsMemberInfoDb &mem) = 0;
 
   /// Aufbau des Tabellennamen
   virtual std::string tableName(const std::string &tabnam) = 0;

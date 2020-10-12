@@ -1313,7 +1313,7 @@ SqlGenerator::query(QueryMode querMode, const QueryOrder *sort, const QueryGener
   if (not join.empty())
     gsjoin.selectJoin = join;
   if (where) {
-    gsjoin.selectWhere = where->show(gsjoin.queryLookUp);
+    gsjoin.selectWhere = where->show(gsjoin.queryLookUp, &sqldb);
   }
   querywJoin = not gsjoin.selectJoin.empty();
   return gsjoin.result(querMode == Count, querMode == Keys);
@@ -1330,7 +1330,7 @@ SqlGenerator::queryBE(QueryMode querMode, const QueryOrder *sort, const QueryGen
   obj.traverse(gsjoin);
   querywJoin = not gsjoin.selectJoin.empty();
   if (where) {
-    gsjoin.selectWhere = where->show(gsjoin.queryLookUp);
+    gsjoin.selectWhere = where->show(gsjoin.queryLookUp, &sqldb);
   }
   return gsjoin.result(querMode == Count, querMode == Keys);
 }

@@ -120,6 +120,18 @@ public:
     return res.str();
   }
 
+  std::string memInfoStmt(const MobsMemberInfoDb &mi) override {
+    if (mi.isTime)
+      return to_squote(mi.toString());
+    else if (mi.isUnsigned and mi.max == 1) // bool
+      return (mi.u64 ? "1" : "0");
+    bool needQuotes;
+    std::string r = mi.toString(&needQuotes);
+    if (needQuotes)
+      return to_squote(r);
+    return r;
+  }
+
   std::string valueStmt(const MemberBase &mem, bool compact, bool increment, bool inWhere) override {
     MobsMemberInfo mi;
     mem.memInfo(mi);

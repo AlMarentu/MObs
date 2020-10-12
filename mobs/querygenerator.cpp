@@ -23,6 +23,7 @@
 #include "querygenerator.h"
 #include "logging.h"
 #include "converter.h"
+#include "helper.h"
 #include <list>
 #include <vector>
 #include <stack>
@@ -121,7 +122,7 @@ void QueryGenerator::add(const MobsMemberInfoDb &mi) {
 }
 
 
-std::string QueryGenerator::show(const std::map<const MemberBase *, std::string> &lookUp) const {
+std::string QueryGenerator::show(const std::map<const MemberBase *, std::string> &lookUp, SQLDBdescription *sqd) const {
   std::stringstream res;
   int params = 0;
   int vars = 0;
@@ -146,11 +147,15 @@ std::string QueryGenerator::show(const std::map<const MemberBase *, std::string>
         case Const: {
           needValues--;
           res << d;
-          bool qoute;
-          std::string r = i.toString(&qoute);
-          if (qoute)
-            r = mobs::to_quote(r);
-          res << r;
+          if (sqd)
+            res << sqd->memInfoStmt(i);
+          else {
+            bool quote;
+            std::string r = i.toString(&quote);
+            if (quote)
+              r = mobs::to_quote(r);
+            res << r;
+          }
           d = valDelim;
           break;
         }
@@ -198,11 +203,15 @@ std::string QueryGenerator::show(const std::map<const MemberBase *, std::string>
         break;
       }
       case Const: {
-        bool qoute;
-        std::string r = i.toString(&qoute);
-        if (qoute and not literal)
-          r = mobs::to_quote(r);
-        res << r;
+        if (sqd)
+          res << sqd->memInfoStmt(i);
+        else {
+          bool quote;
+          std::string r = i.toString(&quote);
+          if (quote and not literal)
+            r = mobs::to_quote(r);
+          res << r;
+        }
         params++;
         break;
       }
