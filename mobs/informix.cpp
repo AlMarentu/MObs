@@ -40,20 +40,14 @@
 #define SQLINFXBIGINT SQLBIGINT
 #endif
 
-#ifdef INFORMIX_DTFMT_BUG
-#define DTCVFMT "%Y-%m-%d %H:%M:%S%F5"
-#else
-#define DTCVFMT "%Y-%m-%d %H:%M:%S.%F5"
-#endif
-
 namespace {
 using namespace mobs;
 using namespace std;
 
-const int ISAM_EXCLUSIVE = -106;
+//const int ISAM_EXCLUSIVE = -106;
 
 string getErrorMsg(int errNum) {
-  string e = "SQL erro:";
+  string e = "SQL error:";
   e += std::to_string(errNum);
   e += ":";
   mint len;
@@ -78,7 +72,26 @@ string getErrorMsg(int errNum) {
   return e;
 }
 
+// Der Formatstring für DateTime mit fraction ist Client-SDK anhängig.
+// Da sich Informix spart, die Versionsnummern des SDK hochzuzählen, hier empirisch ermitteln
+static const char *dtFmt = nullptr;
 
+void setDateTimeFormat() {
+  const char *s = "2001-01-01 01:00:00.00001";
+  dtime_t dt;
+  dt.dt_qual = TU_DTENCODE(TU_YEAR, TU_F5);
+  dtFmt = "%Y-%m-%d %H:%M:%S%F5";
+  LOG(LM_DEBUG, "TRY FMT " << dtFmt);
+  int e = dtcvfmtasc(const_cast<char *>(s), (char *) dtFmt, &dt);
+  if (e == 0)
+    return;
+  dtFmt = "%Y-%m-%d %H:%M:%S.%F5";
+  LOG(LM_DEBUG, "TRY FMT " << dtFmt);
+  e = dtcvfmtasc(const_cast<char *>(s), (char *) dtFmt, &dt);
+  if (e == 0)
+    return;
+  THROW("can't convert to FRAC");
+}
 
 class informix_exception : public std::runtime_error {
 public:
@@ -281,7 +294,9 @@ public:
       else {
         auto dtp = (dtime_t *) sql_var.sqldata;
         dtp->dt_qual = TU_DTENCODE(TU_YEAR, TU_F5);
-        e = dtcvfmtasc(const_cast<char *>(s.c_str()), (char *) DTCVFMT, dtp);
+        if (not dtFmt)
+          setDateTimeFormat();
+        e = dtcvfmtasc(const_cast<char *>(s.c_str()), (char *) dtFmt, dtp);
       }
     } else if (mi.isUnsigned) {
       if (increment) {
@@ -413,8 +428,10 @@ public:
         break;
       }
       case SQLDTIME: {
+        if (not dtFmt)
+          setDateTimeFormat();
         char timebuf[32];
-        e = dttofmtasc((dtime_t *) col.sqldata, timebuf, sizeof(timebuf), (char *) DTCVFMT);
+        e = dttofmtasc((dtime_t *) col.sqldata, timebuf, sizeof(timebuf), (char *) dtFmt);
         if (e)
           throw informix_exception(u8"DateTime Conversion", e);
         LOG(LM_INFO, "DATETIME " << timebuf);
