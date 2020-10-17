@@ -66,9 +66,8 @@ public:
   void Base64(const std::vector<u_char> &base64) override {
     std::string s;
     std::copy(base64.cbegin(), base64.cend(), back_inserter(s));
+    lastCdata = s;
     LOG(LM_INFO, "BASE64 >" << s << "< " << base64.size());
-    if (s != u8"Polyfon zwitschernd aßen Mäxchens Vögel Rüben, Joghurt und Quark")
-      throw std::runtime_error("Ergebnis falsch");
   }
   void StartTag(const std::string &element) override { LOG(LM_INFO, "START " << element); }
   void EndTag(const std::string &element) override { LOG(LM_INFO, "END " << element); }
@@ -196,10 +195,15 @@ TEST(parserTest, xmlStructW1) {
 
 TEST(parserTest, base64) {
   EXPECT_NO_THROW(xparse(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n  biwgSm9naHVydCB1bmQgUXVhcms= ]]>  </abc>"));
-  EXPECT_NO_THROW(xparse(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n  biwgSm9naHVydCB1bmQgUXVhcms= ]]>  </abc>", true));
+  EXPECT_EQ(u8"Polyfon zwitschernd aßen Mäxchens Vögel Rüben, Joghurt und Quark",
+            xparseCdata(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n  biwgSm9naHVydCB1bmQgUXVhcms= ]]>  </abc>", true));
   // missing padding
-  EXPECT_NO_THROW(xparse(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n  biwgSm9naHVydCB1bmQgUXVhcms ]]>  </abc>", true));
+  EXPECT_EQ(u8"Polyfon zwitschernd aßen Mäxchens Vögel Rüben, Joghurt und Quark",
+            xparseCdata(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n  biwgSm9naHVydCB1bmQgUXVhcms ]]>  </abc>", true));
   EXPECT_ANY_THROW(xparse(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n =  biwgSm9naHVydCB1bmQgUXVhcms= ]]>  </abc>", true));
+  EXPECT_EQ("A\n", xparseCdata(L"<abc>   <![CDATA[QQo= ]]>  </abc>", true));
+  EXPECT_NO_THROW(xparseCdata(L"<abc>   <![CDATA[Q+/= ]]>  </abc>", true));
+  EXPECT_ANY_THROW(xparseCdata(L"<abc>   <![CDATA[Q-o= ]]>  </abc>", true));
 }
 
 }

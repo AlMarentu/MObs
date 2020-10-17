@@ -623,7 +623,10 @@ public:
           throw std::runtime_error("missing end tag");
         if (lastKey == element)
         {
-          if (not cdata.empty()) {
+          if (in64) {
+            saveValue();
+            in64 = false;
+          } if (not cdata.empty()) {
             Cdata(cdata);
             saveValue();
           } else {
@@ -663,6 +666,8 @@ public:
           if (try64) {
             base64.done();
             Base64(base64data);
+            cdata.clear();
+            in64 = true;
           }
           else {
             buffer.resize(buffer.length() -2);
@@ -975,6 +980,7 @@ private:
   std::vector<u_char> base64data;
   Base64Reader base64;
   bool try64 = false;
+  bool in64 = false;
   bool useBase64 = false;
   bool running = false;
   bool endOfFile = false;
