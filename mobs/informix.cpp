@@ -102,6 +102,23 @@ public:
 //  std::string error;
 };
 
+// Informix nutzt DBDATE, GL_DATE, USE_DTENV sowie LOCALE für das Datumsformat. Deswegen spezielle Routine
+// z.B.: DBDATE=DMY4.
+std::string formatDate(const struct tm &ts) {
+  int4 i_date;
+  static short mdy[3]; // = { 12, 10, 2007 };
+  mdy[0] = mint(ts.tm_mon + 1);
+  mdy[1] = mint(ts.tm_mday);
+  mdy[2] = mint(ts.tm_year + 1900);
+  int e;
+  if ((e = rmdyjul(mdy, &i_date)))
+    throw informix_exception("Error formatting date ", e);
+  char buf[20];
+  if ((e = rdatestr(i_date, buf)))
+    throw informix_exception("Error formatting date ", e);
+  return buf;
+}
+
 class SQLInformixdescription : public mobs::SQLDBdescription {
 public:
   explicit SQLInformixdescription(const string &dbName) : dbPrefix(dbName + ".") {
@@ -236,8 +253,7 @@ public:
       std::stringstream s;
       struct tm ts{};
       mi.toLocalTime(ts);
-//      s << std::put_time(&ts, "%m.%d.%Y");  // TODO
-      s << std::put_time(&ts, "%F 00:00:00");
+      s << formatDate(ts);
       return mobs::to_squote(s.str());
     }
     else if (mi.isTime) {
@@ -278,7 +294,7 @@ public:
         std::stringstream s;
         struct tm ts{};
         mi.toLocalTime(ts);
-        s << std::put_time(&ts, "%F");
+        s << formatDate(ts);
         return mobs::to_squote(s.str());
       }
       else if (mi.isTime) {
@@ -310,11 +326,9 @@ public:
     descriptor->sqld = fldCnt;
     int e = 0;
     if (mi.isTime and mi.granularity >= 86400000000) { // nur Datum
-      std::stringstream s;
       struct tm ts{};
       mi.toLocalTime(ts);
       LOG(LM_DEBUG, "Informix SqlVar " << mem.getElementName() << ": " << fldCnt - 1 << "=" << std::put_time(&ts, "%F"));
-//      s << std::put_time(&ts, "%F");  // TODO
       sql_var.sqltype = SQLDATE;
       setBuffer(sql_var);
       if (mem.isNull())
