@@ -105,6 +105,7 @@ Dazu stehen die Makros
 * MemVarVector für Vektor von Basisitypen
 * MemVector für Vektoren von Objekt-Klassen
 * MemMobsEnumVar, MOBS_ENUM_DEF und MOBS_ENUM_VAL für enum-definitionen
+* MemEnumVector für Vector von MObs-Enum-Typen
 zur Verfügung
 ~~~~~~~~~~cpp
 MOBS_ENUM_DEF(device,  fax,   sms,   mobil,   privat,   arbeit );
@@ -151,6 +152,10 @@ p.kontakt[3].number("+49 0000 00000");
 std::cout << p.adresse.ort() << " " << p.hobbies[2]();
 ~~~~~~~~~~
 Die Vektoren werden bei Zugriffen automatisch vergrößert, so dass eine Überprüfung entfallen kann.
+Mit der Konstanten mobs::MemBaseVector::nextpos wird der Vektor um ein erweitert und das letzte Element geschrieben.
+~~~~~~~~~~cpp
+p.hobbies[mobs::MemBaseVector::nextpos]("Tauchen");
+~~~~~~~~~~
 
 Werden alternative Namen Schlüsselelemente oder Behandlung von Null-Werten benötigt, existieren die Erweiterungen
 * KEYELEMENT 
@@ -202,7 +207,7 @@ Wird ein Objekt auf null gesetzt, werden alle Unterelemente ebenfalls gelöscht.
 Wird Unterelement eines null-Objektes beschrieben, so wird automatisch der null-Status aufgehoben
 
 ### Serialisierung
-Die Umwandlung von Mobs in einen std::string erfolgt über die .to_string() Metode.
+Die Umwandlung von Mobs in einen std::string erfolgt über die to_string() Methode.
 
 Zur Steuerung des Ausgabeformates können entsprechende Parameter angegeben werden, z.B.:
 ~~~~~~~~~~cpp
@@ -238,7 +243,7 @@ Konfiguriert werden kann:
 * useClearNull() null-Elemente werden beim Einlesen abhängig von "USENULL"  auf null gesetzt. Ansonsten nur gelöscht.
 * useForceNull() null-Elemente werden beim Einlesen unabhängig von "USENULL"   auf null gesetzt.
 
-### Binäre Objekte
+### Binäre Objekte (BLOB)
 
 Als binäres Objekt kann eine MemVar vom Typ std::vector<u_char> verwendet werden. Es ist ratsam, keine zu großen Objekte
 zu speichern, da bei einigen Operationen, wie auch der Zuweisung, der Inhalt umkopiert werden muss. 

@@ -912,8 +912,28 @@ TEST(objgenTest, copyBug) {
 }
 
 
+MOBS_ENUM_DEF(someTypes, K_t1, K_t2, K_t3 );
+
+MOBS_ENUM_VAL(someTypes, "T1", "T2", "T3");
 
 
+class VecEnum : virtual public mobs::ObjectBase {
+public:
+  ObjInit(VecEnum);
+
+//  MemVector(MemMobsEnumVarType(someTypes), art);
+  MemEnumVector(someTypes, art);
+  MemVar(string, s);
+};
+
+TEST(objgenTest, vectorEnum) {
+  VecEnum v;
+  v.s("A");
+  v.art[mobs::MemBaseVector::nextpos](K_t1);
+  v.art[mobs::MemBaseVector::nextpos](K_t2);
+  v.art[mobs::MemBaseVector::nextpos](K_t3);
+  EXPECT_EQ("{art:[\"T1\",\"T2\",\"T3\"],s:\"A\"}", v.to_string(mobs::ConvObjToString()));
+}
 
 #if 0
 TEST(objgenTest, compare) {

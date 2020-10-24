@@ -189,6 +189,11 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 #define MemVarVector(typ, name, ...) MemVector( MemVarType(typ), name, __VA_ARGS__)
 //#define MemVarVector(typ, name) mobs::MemberVector< MemVarType(typ) > name = mobs::MemberVector< MemVarType(typ) >(#name, this)
 
+/*! \brief Deklarations-Makro für eines Vector von Mobs-Enums
+  identisch mit \c MemVector(MemMobsEnumVarType(typ), \c name)
+ @param typ Mobs-Enum-Typ
+ @param name Name
+ */#define MemEnumVector(typ, name, ...) MemVector( MemMobsEnumVarType(typ), name, __VA_ARGS__)
 
 /*! \brief Deklarations-Makro für eine Objekt als Membervariable
  @param typ Objekttyp
