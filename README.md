@@ -16,7 +16,7 @@ In C++-Programmen werden Strukturen jedoch idealerweise in Klassen abgelegt. Dad
 hierarchische Definitionen.
 
 MObs versucht hier die typische C++-Klassenstruktur in die gewünschten Zielstrukturen abzubilden, indem
-- Datei Im- und Exportschnittstellen für XML (in den Zeichensätzen UTF-8, ISO8859-1,9,15, UTF1-6)
+- Datei Im- und Exportschnittstellen für XML (in den Zeichensätzen UTF-8, ISO8859-1,9,15, UTF16)
 - Konvertierroutinen von und nach JSON
 - Datenbankoperationen (MongoDb[^1], MariaDb[^1], Informix[^2])
 angeboten werden.
