@@ -110,8 +110,10 @@ void XmlOut::doMem(const MemberBase &mem)
       mem.memInfo(mi);
       if (mi.isBlob)
         data->writeCdata(value);
-      else
+      else if (data->valueToken.empty())
         data->writeValue(value);
+      else
+        data->writeAttribute(data->valueToken, value);
     }
     data->writeTagEnd();
   }

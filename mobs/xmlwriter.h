@@ -90,6 +90,7 @@ public:
   /// setzte ein XML-Prefix
   void setPrefix(const std::wstring &pf);
 
+  std::wstring valueToken; ///< Wenn nicht leer, dann als Attributname für Values verwenden
   std::wstring version = L"1.0"; ///< Version für Header
   bool standalone = true; ///< Angabe für Header
   bool escapeControl = false; ///< ersetze Zeichen wie "\n" durch "&#xa;"

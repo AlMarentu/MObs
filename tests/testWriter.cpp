@@ -21,6 +21,8 @@
 
 #include "xmlwriter.h"
 #include "xmlwriter.h"
+#include "objgen.h"
+#include "xmlout.h"
 
 #include <stdio.h>
 #include <sstream>
@@ -88,6 +90,58 @@ TEST(writerTest, base64) {
 <aaa><![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJlbiwg
   Sm9naHVydCB1bmQgUXVhcms=]]></aaa>
 )", w.getString());
+}
+
+
+class Adresse : virtual public mobs::ObjectBase {
+public:
+  ObjInit(Adresse);
+
+  MemVar(int, lfdnr, XMLATTR);
+  MemVar(std::string, strasse);
+  MemVar(std::string, plz);
+  MemVar(std::string, ort);
+};
+
+
+
+class Person : virtual public mobs::ObjectBase {
+public:
+  ObjInit(Person);
+
+  MemVar(int, kundennr);
+  MemVar(bool, firma);
+  MemVar(std::string, name);
+  MemVar(std::string, vorname, USENULL);
+  MemObj(Adresse, adresse, USENULL);
+  MemVarVector(std::string, hobbies);
+};
+
+TEST(writerTest, xml) {
+  Person p;
+  p.name("Schmied");
+  p.adresse.ort("Dort");
+  p.adresse.plz("12345");
+  mobs::XmlWriter w;
+  w.valueToken = L"V";
+  mobs::XmlOut xo(&w, mobs::ConvObjToString().doIndent());
+  w.writeHead();
+  p.traverse(xo);
+
+  EXPECT_EQ(R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<root>
+  <kundennr V="0"/>
+  <firma V="false"/>
+  <name V="Schmied"/>
+  <vorname/>
+  <adresse lfdnr="0">
+    <strasse V=""/>
+    <plz V="12345"/>
+    <ort V="Dort"/>
+  </adresse>
+</root>
+)", w.getString());
+
 }
 
 }
