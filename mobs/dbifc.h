@@ -167,8 +167,8 @@ public:
 
 /** \brief Interface um Objekte in Datenbanken zu verwalten
  *
- * Das Interface wird DatabaseManager abgerufen.
- * \see DatabaseManager
+ * Das Interface wird vom DatabaseManager abgerufen.
+ * \see mobs::DatabaseManager
  * Mit Hilfe des Interfaces können Optionen angepasst werden Objekte geladen, gespeichert, gesucht uvm. werden.
  * \code
  * mobs::DatabaseInterface dbi = dbMgr.getDbIfc("my_maria");

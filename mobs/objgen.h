@@ -33,15 +33,19 @@
  Dieses Objekt kann wiederum verschiedene Objekte oder Variablen von Basistypen enthalten.
  Zusätzlich können auch Vektoren dieser beiden Typen existieren.
  \code
+ // Enum-Definition mit zugehörigen Klar-Texten
+ MOBS_ENUM_DEF(device,  fax,   sms,   mobil,   privat,   arbeit );
+ MOBS_ENUM_VAL(device, "Fax", "SMS", "mobil", "privat", "Arbeit" );
+
+ // Objekt-Definition
  class Kontakt : virtual public mobs::ObjectBase {
  public:
    ObjInit(Kontakt); // Makro, das alle nötigen Konstruktoren liefert
-   enum device { fax, sms, mobil, privat, arbeit };
-   
-   /// Art des Kontaktes Fax/Mobil/SMS
-   MemVar(int, art);
+
+   /// Art des Kontaktes
+   MemMobsEnumVar(device, art);
    /// Nummer
-   MemVar(string, number);
+   MemVar(std::string, number);
  };
 
  class Adresse : virtual public mobs::ObjectBase {
@@ -57,13 +61,14 @@
    public:
    ObjInit(Person); // Makro, das alle nötigen Konstruktoren liefert
    
-   MemVar(int,            kundennr);  // int kundennr;
-   MemVar(bool,           firma);     // bool firma;
-   MemVar(std::string,    name);      // std::string name
+   MemVar(int,            kundennr);  // int Membervariable kundennr
+   MemVar(bool,           firma);     // bool Membervariable firma
+   MemVar(std::string,    name);      // std::string Membervariable name
    MemVar(std::string,    vorname);
-   MemObj(Adresse,        adresse);   // Adresse adresse;
-   MemVector(Kontakt,     kontakte);  // vector<Kontakt> kontakte;
+   MemObj(Adresse,        adresse);   // Objekt Membervariable adresse
+   MemVector(Kontakt,     kontakte);  // Member-vector<Kontakt> kontakte;
    MemVarVector(std::string, hobbies);   // vector<std::string> hobbies
+   MemEnumVector(device, kontakteWerbung); // Vektor von ENums
  };
  \endcode
  
@@ -77,18 +82,71 @@
  std::cout << p.adresse.ort() << " " << p.hobbies[2]();
  \endcode
  Die Vektoren werden bei Zugriffen automatisch vergrößert, so dass eine Überprüfung entfallen kann.
- 
+
+\c nextpos fügt eine neues Element am Ende an.
+ \code
+ p.hobbies[MemBaseVector::nextpos]("Lesen");
+ \endcode
+
  Zum Verarbeiten solcher Objekte gibt es verschiedene Methoden:
  \arg Rekursiver Durchlauf mit Hilfe einer Traverse-Klasse
  \arg Füllen über eine sequentiellen Pfad
- \see ObjTravConst
- \see ObjTrav
- \see ObjectNavigator
+ \see mobs::ObjTravConst
+ \see mobs::ObjTrav
+ \see mobs::ObjectNavigator
  
-  Es existieren Klassen, um solche Objekt von und nach XML oder JSON zu wandeln
- 
- \todo Anpassungen um die Zugriffe threadsafe zu gestalten
- 
+ Es existieren Klassen, um solche Objekt von und nach XML oder JSON zu wandeln
+
+ \code
+ mobs::string2Obj("{xx:1,zz:2}", object, mobs::ConvObjFromStr().useExceptUnknown().useIgnoreCase())
+ \endcode
+ Einlesen erfolgt über string2Obj. Über den Modifier mobs::ConvObjFromStr() kan das Verhalten gesteuert werden.
+
+ Die Ausgabe erfolgt über \c to_string(..)
+ \code
+ cout << obj.to_string();
+ string xml = obj.to_string(mobs::ConvObjToString().exportXml().doIndent());
+ \endcode
+
+ Das Datenbank-Interface
+
+ Über das \c mobs::DatabaseInterface könne Objekte in die Datenbank gespeichert bzw. wieder abgerufen werden.
+
+ Das DatabaseInterface wird vom \c mobs::DatabaseManager verwaltet.
+
+ \code
+ main() {
+  mobs::DatabaseManager dbMgr;  // Erzeugt ein Singelton, das den Scope von \c main nicht übersteigen darf
+  // eine oder mehrere Connections definieren
+  dbMgr.addConnection("my_sqlite", mobs::ConnectionInformation("sqlite://sqlite.db", ""));
+  ...
+  auto dbi = DatabaseManager::instance()->getDbIfc("my_sqlite");
+  Person pers;
+  // Query by example
+  pers.adresse.ort("Berlin");
+  // Sucht alle Objekte mit Ort "Berlin"
+  for (auto cursor = dbi.qbe(pers); not cursor->eof(); cursor->next()) {
+   dbi.retrieve(pers, cursor);
+  }
+ \endcode
+ Sortierung ist über \c mobs::QueryOrder möglich; komplexe Queries könne über \c mobs::QueryGenerator erzeugt werden.
+
+ Um Objekte direkt lesen und Schreiben zu können muss ein Primärschlüsse im Objekt definiert werden:
+ \code
+    MemVar(int,  kundennr, KEYELEMENT1);  // int Membervariable kundennr
+ \endcode
+ Ist ein Primärschlüssel definiert, so kann ein Objekt direkt gelesen oder gespeichert werden.
+ \code
+   Person pers;
+   pers.kundennr(12);
+   if (not dbi.load(pers)) {
+     ...
+     dbi.save(pers);
+   }
+ \endcode
+
+ Für Transaktionen steht ein extra Interface \c mobs::DbTransaction zur Verfügung.
+
  */
 
 
