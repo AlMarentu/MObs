@@ -25,6 +25,7 @@
 #define MOBS_CONVERTER_H
 
 #include <string>
+#include <vector>
 #include <locale>
 #include <algorithm>
 
@@ -96,11 +97,12 @@ wchar_t to_base64(int i);
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "hicpp-signed-bitwise"
 template<class InputIt, class OutputIt>
-/// transformer, der Container umkopiert und dabei im Ziel die untersten 8-Bit der Quelle bas64 Kodiert
-/// @param first Quell-Itertor Start
-/// @param last Quell-Iterator Ende
-/// @param d_first Ziel-Insert-Iterator
-/// @param linebreak String, der nach 15 Blöcken ausgegeben wird
+/** \brief transformer, der Container umkopiert und dabei im Ziel die untersten 8-Bit der Quelle bas64 Kodiert
+ * @param first Quell-Iterator Start
+ * @param last Quell-Iterator Ende
+ * @param d_first Ziel-Insert-Iterator
+ * @param linebreak String, der nach 15 Blöcken ausgegeben wird
+ */
 OutputIt copy_base64(InputIt first, InputIt last, OutputIt d_first, const std::string& linebreak = "")
 {
   int i = 0;
@@ -139,35 +141,45 @@ OutputIt copy_base64(InputIt first, InputIt last, OutputIt d_first, const std::s
 }
 #pragma clang diagnostic pop
 
-/// Umwandlung eies Containers mit base64-Inhalt nach \c std::string
+/// Umwandlung eines Containers mit base64-Inhalt nach \c std::string
 template<typename T>
 std::string to_string_base64(const T &t) { std::string u; copy_base64(t.cbegin(), t.cend(), std::back_inserter(u)); return u; }
-/// Umwandlung eies Containers mit base64-Inhalt nach \c std::wstring
+/// Umwandlung eines Containers mit base64-Inhalt nach \c std::wstring
 template<typename T>
 std::wstring to_wstring_base64(const T &t) { std::wstring u; copy_base64(t.cbegin(), t.cend(), std::back_inserter(u)); return u; }
-/// Umwandlung eies Containers mit base64-Inhalt nach \c std::wostream
+/// Umwandlung eines Containers mit base64-Inhalt nach \c std::wostream
 template<typename T>
 std::wostream &to_wostream_base64(std::wostream &str, const T &t) { copy_base64(t.cbegin(), t.cend(), std::ostreambuf_iterator<wchar_t>(str)); return str; }
 
+/** \brief Umwandlung eines base64-Strings in einen Vektor
+ *
+ * @param base64 String mit Base64 inkl. Whitespace
+ * @param v Vektor der dekodierten Daten
+ */
+void from_string_base64(const std::string &base64, std::vector<u_char> &v);
 
 //template std::wostream &to_wostream_base64<std::vector<u_char>>(std::wostream &, const std::vector<u_char> &);
 
 /// wandelt einen HTML-Character-Code in Unicode um; die Ausgabe erfolgt ohne '&' und ';': Z.B.  "amp" oder "#xd"
 wchar_t from_html_tag(const std::wstring &tok);
 
-/// Klasse zum Auswerten vin Base64
+/// Klasse zum Auswerten von Base64
 class Base64Reader {
 public:
   /// Konstruktor übergibt Buffer
   explicit Base64Reader(std::vector<u_char> &v) : base64(v) { start(); }
-  /// nächstes Zeichen parsen
+  /** \brief nächstes Zeichen parsen
+   *
+   * @param c nächstes Base-64 Zeichen; whitespace wird ignoriert
+   * \throws runtime_error im Fehlerfall
+   */
   void put(wchar_t c);
   /// Ende des zu parsenden Textes
   void done();
   /// Neustart
   void clear() { start(); };
 
-  private:
+private:
   void start();
   std::vector<u_char> &base64;
   int b64Value = 0;

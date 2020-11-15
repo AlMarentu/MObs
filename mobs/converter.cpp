@@ -313,6 +313,13 @@ std::string toUpper(const string &tx) {
   return mobs::to_string(mobs::toUpper(mobs::to_wstring(tx)));
 }
 
+void from_string_base64(const string &base64, vector<u_char> &v) {
+  Base64Reader bd(v);
+  for (auto c:base64)
+    bd.put(u_char(c));
+  bd.done();
+}
+
 
 void Base64Reader::start() {
   base64.clear();
