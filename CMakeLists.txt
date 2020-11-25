@@ -8,12 +8,20 @@ endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/mobs)
 
-option(PACKAGE_TESTS "Build the tests" OFF)
+option(PACKAGE_TESTS "Build the tests" ON)
 option(BUILD_DOC "Build Documentation" ON)
 option(BUILD_MONGO_INTERFACE "Build the Mongo database modules" ON)
 option(BUILD_MARIA_INTERFACE "Build the Maria database modules" ON)
 option(BUILD_SQLITE_INTERFACE "Build the SQLite database modules" ON)
 option(BUILD_INFORMIX_INTERFACE "Build the Informix database modules" ON)
+
+find_package(OpenSSL)
+if (OPENSSL_FOUND)
+    # wird hier falsch ausgewertet, deshalb korrekt setzen
+    set(OPENSSL_LIBRARIES /usr/local/opt/openssl/lib/libssl.dylib /usr/local/opt/openssl/lib/libcrypto.dylib)
+    set(OPENSSL_INCLUDE_DIR /usr/local/opt/openssl/include)
+    set(DB_LIBS ${DB_LIBS} ${OPENSSL_LIBRARIES})
+endif()
 
 
 
@@ -28,10 +36,8 @@ add_subdirectory(mobs)
 
 
 
-
-
 add_executable(fileio fileio.cpp)
-target_link_libraries(fileio mobs)
+target_link_libraries(fileio mobs ${OPENSSL_LIBRARIES})
 
 
 
@@ -66,15 +72,8 @@ endif()
 if(BUILD_MONGO_INTERFACE)
     find_package(libmongocxx REQUIRED)
     find_package(libbsoncxx REQUIRED)
-    include_directories(${LIBMONGOCXX_INCLUDE_DIR})
-    include_directories(${LIBBSONCXX_INCLUDE_DIR})
-    include_directories("/usr/local/include/mongocxx/v_noabi")
-    include_directories("/usr/local/include/bsoncxx/v_noabi")
-    include_directories("/usr/local/include/libmongoc-1.0")
-    include_directories("/usr/local/include/libbson-1.0")
-    include_directories("/usr/local/lib")
-
-    set(DB_LIBS ${DB_LIBS} ${LIBMONGOCXX_LIBRARIES} ${LIBBSONCXX_LIBRARIES})
+    include_directories(${LIBMONGOCXX_INCLUDE_DIRS})
+    set(DB_LIBS ${DB_LIBS} ${LIBMONGOCXX_LIBRARIES})
 endif()
 
 
@@ -84,7 +83,8 @@ if(BUILD_MARIA_INTERFACE)
 endif()
 
 if(BUILD_SQLITE_INTERFACE)
-    set(DB_LIBS ${DB_LIBS} sqlite3)
+    find_package(SQLite3 REQUIRED)
+    set(DB_LIBS ${DB_LIBS} ${SQLite3_LIBRARIES})
 endif()
 
 if(BUILD_INFORMIX_INTERFACE)

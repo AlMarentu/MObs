@@ -41,34 +41,40 @@ namespace logging {
 /// @param l Log-Level
 /// @param message Inhalt der Log-Meldung als lambda
 void logMessage(loglevel l, std::function<std::string()> message)
+{
+  char c = ' ';
+  switch(l)
   {
-    char c = ' ';
-    switch(l)
-    {
-      case lm_debug: c = 'D'; break;
-      case lm_trace: c = 'T'; break;
-      case lm_info: c = 'I'; break;
-      case lm_error: c = 'E'; break;
-      case lm_warn: c = 'W'; break;
-    }
-    std::cerr << c << " " << message() << std::endl;
+    case lm_debug: c = 'D'; break;
+    case lm_trace: c = 'T'; break;
+    case lm_info: c = 'I'; break;
+    case lm_error: c = 'E'; break;
+    case lm_warn: c = 'W'; break;
   }
+  std::string tmp;
+  tmp += c;
+  tmp += ' ';
+  tmp += message();
+  std::cerr << tmp << std::endl;
+}
 
 
 
 Trace::Trace (const char *f, std::function<std::string()> str) : fun(f)
-  {
-    if (traceOn)
-      std::cerr << "T B(" << ++lev << ") " << fun
-          << " with " << str() << std::endl;
-  }
+{
+  if (traceOn)
+    std::cerr << "T B(" << ++lev << ") " << fun
+              << " with " << str() << std::endl;
+}
 
-  /// Destruktor
-  Trace::~Trace ()
-  {
-    if (traceOn)
-      std::cerr << "T E(" << lev-- << ") " << fun << std::endl;
-  }
-  int Trace::lev = 0;
-  bool Trace::traceOn = false;
+/// Destruktor
+Trace::~Trace ()
+{
+  if (traceOn)
+    std::cerr << "T E(" << lev-- << ") " << fun << std::endl;
+}
+
+int Trace::lev = 0;
+bool Trace::traceOn = false;
+
 }

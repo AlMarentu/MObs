@@ -820,9 +820,9 @@ private:
       return;
     buffer += curr;
     while ((curr = istr.get()) > 0) {
+//      std::cout << "x " << mobs::to_string(curr);
       if (std::wstring(L"/ <>=\"'?!").find(curr) != std::wstring::npos )
         break;
-//      std::cout << mobs::to_string(curr);
       buffer += curr;
     }
     if (curr < 0)
@@ -890,7 +890,7 @@ private:
     }
   };
   void clearValue() { saved.clear(); }; // der Zwischenraum fand Verwendung
-                                      /// Verwaltet den Zischenraum zwischen den <..Tags..>
+  /// Verwaltet den Zwischenraum zwischen den <..Tags..>
   void saveValue() {
     // wenn nicht verwendet, darf es nur white space sein
     if (not saved.empty())

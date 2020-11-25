@@ -24,6 +24,7 @@
 #include "xmlout.h"
 #include "xmlwriter.h"
 #include "converter.h"
+#include "csb.h"
 #include <map>
 
 
@@ -1038,11 +1039,15 @@ std::string ObjectBase::to_string(const ConvObjToString& cth) const
   }
   else if (cth.toXml())
   {
-    XmlWriter wr(XmlWriter::CS_utf8, cth.withIndentation());
+    stringstream ss;
+    mobs::CryptOstrBuf streambuf(ss);
+    std::wostream xStrOut(&streambuf);
+    XmlWriter wr(xStrOut, XmlWriter::CS_utf8, cth.withIndentation());
     XmlOut xd(&wr, cth);
     wr.writeHead();
     traverse(xd);
-    return wr.getString();
+    streambuf.finalize();
+    return ss.str();
   }
   else
     return "";
@@ -1058,11 +1063,15 @@ std::string MemBaseVector::to_string(const ConvObjToString& cth) const
   }
   else if (cth.toXml())
   {
-    XmlWriter wr(XmlWriter::CS_utf8, cth.withIndentation());
+    stringstream ss;
+    mobs::CryptOstrBuf streambuf(ss);
+    std::wostream xStrOut(&streambuf);
+    XmlWriter wr(xStrOut, XmlWriter::CS_utf8, cth.withIndentation());
     XmlOut xd(&wr, cth);
     wr.writeHead();
     traverse(xd);
-    return wr.getString();
+    streambuf.finalize();
+    return ss.str();
   }
   else
     return "";

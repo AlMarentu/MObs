@@ -50,11 +50,9 @@ public:
 
   void setConFun() {
     std::locale lo;
-    lo = std::locale(buffer.getloc(), new codec_iso8859_1);
-    buffer.imbue(lo);
     switch (cs) {
       case XmlWriter::CS_iso8859_1:
-  //      lo = std::locale(data->buffer.getloc(), new codec_iso8859_1);
+        lo = std::locale(buffer.getloc(), new codec_iso8859_1);
         break;
       case XmlWriter::CS_iso8859_9:
         lo = std::locale(buffer.getloc(), new codec_iso8859_9);
@@ -63,25 +61,30 @@ public:
         lo = std::locale(buffer.getloc(), new codec_iso8859_15);
         break;
       case XmlWriter::CS_utf8_bom:
-        if (buffer.tellp() == 0)  // writing BOM
-          buffer << L'\u00ef' << L'\u00bb' << L'\u00bf';
-        lo = std::locale(buffer.getloc(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
-        break;
       case XmlWriter::CS_utf8:
         lo = std::locale(buffer.getloc(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
         break;
       case XmlWriter::CS_utf16_be:
-        if (buffer.tellp() == 0)  // writing BOM
-          buffer << L'\u00fe' << L'\u00ff';
         lo = std::locale(buffer.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, codecvt_mode(0)>);
         break;
       case XmlWriter::CS_utf16_le:
-        if (buffer.tellp() == 0)  // writing BOM
-          buffer << L'\u00ff' << L'\u00fe';
         lo = std::locale(buffer.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::little_endian>);
         break;
+      default:
+        lo = std::locale(buffer.getloc(), new codec_iso8859_1);
+
     }
     buffer.imbue(lo);
+    if (buffer.tellp() == 0)  // writing BOM
+      switch (cs) {
+        case XmlWriter::CS_utf16_be:
+        case XmlWriter::CS_utf16_le:
+        case XmlWriter::CS_utf8_bom:
+          buffer << L'\ufeff';
+          break;
+        default:
+          break;
+      }
   }
   
   void write(wchar_t c) {
@@ -234,7 +237,7 @@ void XmlWriter::writeTagEnd(bool forceNoNulltag) {
     data->buffer << L"</" << data->prefix << data->elements.top() << '>';
   }
   if (data->indent and level() == 0)
-    data->buffer << '\n';
+    data->buffer << '\n' << flush;
   data->elements.pop();
   data->hasValue = false;
   data->openEnd = false;

@@ -128,7 +128,7 @@ static std::wstring stow(const string &s, bool dontConvert) {
       if (element == "xml" and attribut == "encoding") {
         encoding = mobs::to_string(value);
         
-        // da wstringstream das encoding der loacal ignoriert, hir explizit umstzen wenn Input ei std::string mit undefiniertem Zeichensatz war
+        // da wstringstream das encoding der local ignoriert, hier explizit umsetzen wenn Input ein std::string mit undefiniertem Zeichensatz war
         if (doConversion and encoding != "ISO-8859-1") {
           size_t pos = str.tellg();
           std::wistringstream str2;
