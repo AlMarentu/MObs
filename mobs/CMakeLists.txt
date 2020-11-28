@@ -14,8 +14,6 @@ endif()
 
 
 if(BUILD_MONGO_INTERFACE)
-    find_package(libmongocxx REQUIRED)
-    find_package(libbsoncxx REQUIRED)
     include_directories(${LIBMONGOCXX_INCLUDE_DIRS})
     set(libSrcs ${libSrcs} mongo.cpp mongo.h)
 endif()
@@ -27,13 +25,11 @@ endif()
 
 if(BUILD_MARIA_INTERFACE)
     include_directories("/usr/local/include/mysql")
-
     set(libSrcs ${libSrcs} maria.cpp maria.h)
 endif()
 
 if(BUILD_INFORMIX_INTERFACE)
-    set(INFORMIXDIR /opt/IBM/Informix_Software_Bundle)
-    include_directories(${INFORMIXDIR}/incl)
+    include_directories(${INFORMIX_INCLUDE_DIRS})
     add_custom_command(OUTPUT infxtools.o
             COMMAND INFORMIXDIR=${INFORMIXDIR} ${INFORMIXDIR}/bin/esql -I${CMAKE_SOURCE_DIR}/mobs -c ${CMAKE_SOURCE_DIR}/mobs/infxtools.ec
             MAIN_DEPENDENCY infxtools.ec DEPENDS infxtools.h BYPRODUCTS infxtools.c

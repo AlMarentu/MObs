@@ -6,7 +6,6 @@ if(NOT DEFINED CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 11)
 endif()
 
-include_directories(${CMAKE_SOURCE_DIR}/mobs)
 
 option(PACKAGE_TESTS "Build the tests" ON)
 option(BUILD_DOC "Build Documentation" ON)
@@ -17,12 +16,39 @@ option(BUILD_INFORMIX_INTERFACE "Build the Informix database modules" ON)
 
 find_package(OpenSSL)
 if (OPENSSL_FOUND)
-    # wird hier falsch ausgewertet, deshalb korrekt setzen
-    set(OPENSSL_LIBRARIES /usr/local/opt/openssl/lib/libssl.dylib /usr/local/opt/openssl/lib/libcrypto.dylib)
-    set(OPENSSL_INCLUDE_DIR /usr/local/opt/openssl/include)
+    if (CMAKE_HOST_APPLE)
+        # wird hier falsch ausgewertet, deshalb korrekt setzen
+        set(OPENSSL_LIBRARIES /usr/local/opt/openssl/lib/libssl.dylib /usr/local/opt/openssl/lib/libcrypto.dylib)
+        set(OPENSSL_INCLUDE_DIR /usr/local/opt/openssl/include)
+    endif()
     set(DB_LIBS ${DB_LIBS} ${OPENSSL_LIBRARIES})
 endif()
 
+if(BUILD_INFORMIX_INTERFACE)
+    find_package(informix REQUIRED)
+    include_directories(${INFORMIX_INCLUDE_DIRS})
+    set(DB_LIBS ${DB_LIBS} ${INFORMIX_LIBRARIES})
+endif()
+
+if(BUILD_MONGO_INTERFACE)
+    find_package(libmongocxx REQUIRED)
+    find_package(libbsoncxx REQUIRED)
+    include_directories(${LIBMONGOCXX_INCLUDE_DIRS})
+    set(DB_LIBS ${DB_LIBS} ${LIBMONGOCXX_LIBRARIES})
+endif()
+
+
+if(BUILD_MARIA_INTERFACE)
+    find_library(mariadb mariadb)
+    set(DB_LIBS ${DB_LIBS} ${mariadb})
+endif()
+
+if(BUILD_SQLITE_INTERFACE)
+    find_package(SQLite3 REQUIRED)
+    set(DB_LIBS ${DB_LIBS} ${SQLite3_LIBRARIES})
+endif()
+
+include_directories(${CMAKE_SOURCE_DIR}/mobs)
 
 
 if(PACKAGE_TESTS)
@@ -38,6 +64,11 @@ add_subdirectory(mobs)
 
 add_executable(fileio fileio.cpp)
 target_link_libraries(fileio mobs ${OPENSSL_LIBRARIES})
+
+
+add_executable(db db.cpp)
+target_link_libraries(db mobs)
+target_link_libraries(db ${DB_LIBS})
 
 
 
@@ -69,23 +100,12 @@ endif()
 
 
 
-if(BUILD_MONGO_INTERFACE)
-    find_package(libmongocxx REQUIRED)
-    find_package(libbsoncxx REQUIRED)
-    include_directories(${LIBMONGOCXX_INCLUDE_DIRS})
-    set(DB_LIBS ${DB_LIBS} ${LIBMONGOCXX_LIBRARIES})
-endif()
-
 
 if(BUILD_MARIA_INTERFACE)
     find_library(mariadb mariadb)
     set(DB_LIBS ${DB_LIBS} ${mariadb})
 endif()
 
-if(BUILD_SQLITE_INTERFACE)
-    find_package(SQLite3 REQUIRED)
-    set(DB_LIBS ${DB_LIBS} ${SQLite3_LIBRARIES})
-endif()
 
 if(BUILD_INFORMIX_INTERFACE)
 #    find_library(informix informix)

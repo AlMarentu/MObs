@@ -1,5 +1,5 @@
 
-/** \example Erzeugung von Objekten, Serialisierung in XML-Datei mit anschließendem Einlesen */
+/** \example Erzeugung von Objekten, Serialisierung in XML-Datei mit anschließendem Einlesen; optional mit Verschlüsselung */
 
 
 #include "mobs/logging.h"
@@ -7,7 +7,10 @@
 #include "mobs/xmlout.h"
 #include "mobs/xmlwriter.h"
 #include "mobs/xmlread.h"
+#include "mobs/csb.h"
+#include "mobs/aes.h"
 #include <fstream>
+#include <array>
 
 
 
@@ -93,19 +96,31 @@ int main(int argc, char* argv[])
 // Ausgabe XML
 
     mobs::ConvObjToString cth;
+#ifdef CLASSIC_IOSTREAM
     wofstream xout("gespann.xml", ios::trunc);
+#else
+    ofstream xout("gespann.xml", ios::trunc);
+#endif
     if (not xout.is_open())
       throw runtime_error("File not open");
 
+#ifndef CLASSIC_IOSTREAM
+    // neuen Crypto Streambuffer initialisieren
+    mobs::CryptOstrBuf streambuf(xout, new mobs::CryptBufAes( "12345"));
+    // und wostream damit initialisieren
+    std::wostream x2out(&streambuf);
+    // Base64 Mode aktivieren
+    x2out << mobs::CryptBufBase::base64(true);
+#endif
+
     // Writer-Klasse mit File, und Optionen initialisieren
-    mobs::XmlWriter xf(xout, mobs::XmlWriter::CS_utf16_le, true);
+    mobs::XmlWriter xf(x2out, mobs::XmlWriter::CS_utf16_le, true);
     xf.setPrefix(L"m:"); // optionaler XML Namespace
     mobs::XmlOut xo(&xf, cth);
     // XML-Header
     xf.writeHead();
     // Listen-Tag
     xf.writeTagBegin(L"list");
-
     // Objekt schreiben
     f1.traverse(xo);
     // optionaler Kommentar
@@ -131,15 +146,44 @@ int main(int argc, char* argv[])
     // Listen-Tag schließen
     xf.writeTagEnd();
     // file schließen
+#ifndef CLASSIC_IOSTREAM
+//    x2out << mobs::CryptBufBase::base64(false);
+
+//    x2out << mobs::CryptBufBase::final();
+    // Verschlüsselung finalisieren
+    streambuf.finalize();
+#endif
     xout.close();
 
+    // openssl aes-256-cbc  -d -in cmake-build-debug/gespann.xml   -md sha1 -k 12345
+    // openssl aes-256-cbc  -d -in cmake-build-debug/gespann.xml -a -A  -md sha1 -k 12345
+
+//    return 0;
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
     // File öffnen
+#ifdef CLASSIC_IOSTREAM
     wifstream xin("gespann.xml");
+#else
+    ifstream xin("gespann.xml");
+#endif
     if (not xin.is_open())
       throw runtime_error("in File not open");
 
-    // Import-Klasee mit FIle initialisieren
-    XmlInput xr(xin);
+    // neuen Crypto Streambuffer initialisieren
+    mobs::CryptIstrBuf streambufI(xin, new mobs::CryptBufAes("12345"));
+    // base64 Modus aktivieren
+    streambufI.getCbb()->setBase64(true);
+    // Streambuffer an instream binden
+    std::wistream x2in(&streambufI);
+//  x2in >> mobs::CryptBufBase::base64(true);
+
+
+  // Import-Klasee mit FIle initialisieren
+    XmlInput xr(x2in);
     xr.setPrefix("m:"); // optionaler XML Namespace
 
     while (not xr.eof()) {
