@@ -43,6 +43,8 @@ Erweitert werden dies Funktionen durch eine Klasse mit benamten-Zeigern.
 Mobs-Objekte können in einen Daten-Pool abgelegt, und über einen Schlüsselwert wieder abgerufen werden.
 So kann eine simple In-Memory Datenbank aufgebaut werden oder Objekt-Caches angelegt werden.
 
+Als weitere Module kommen Streambuffer-Erweiterung hinzu die Konvertierung von Base64 sowie 
+Verschlüsselung bereitstellen.
 
 ## MObs Objektdefinition
 
@@ -444,6 +446,32 @@ weitere Info jedes ausgeführte Programm erfasst werden.
 
 Idealerweise sollte dazu auch Objekt-Versionierung aktiviert werden. 
 
+## std::streambuffer Erweiterung
+Sollen Dateien verschlüsselt werden oder nur binäre-Dateien in Base64 verwaltet, kann
+mit den streambuffer-Erweiterung 
+* CryptIstrBuf für lesende streams
+* CryptOstrBuf für schreibende stream
+ein bestehender Stream erweitert werden.
+
+~~~~~~~~~~cpp
+    std::ofstream xout("dateiname", std::ios::trunc);
+
+    // neuen Crypto Streambuffer initialisieren (AES mit Passwort 12345)
+    mobs::CryptOstrBuf streambuf(xout, new mobs::CryptBufAes("12345"));
+    // und wostream damit initialisieren
+    std::wostream x2out(&streambuf);
+    // Base64 Mode aktivieren
+    x2out << mobs::CryptBufBase::base64(true);
+    
+    x2out << ...
+
+    // Verschlüsselung finalisieren
+    streambuf.finalize();
+
+    xout.close();
+~~~~~~~~~~
+
+
 ## Objektverwaltung NamedPool
 Über ein extra Modul können beliebige Objekte in einen Pool abgelegt werden. Der Zugriff erfolgt nur
 über den Objekt-Namen.
@@ -460,6 +488,8 @@ usw. realisieren
 
 ## Installation
 Zum Übersetzen wird ein c++11 Compiler inkl. STL benötigt. Zusätzlich muss die UUID-Lib vorhanden sein.
+
+
 Für die Test-Suite wird googletest benötigt
 Die Entwicklung erfolgt mit clang version 11.0.3
 
@@ -473,9 +503,11 @@ Folgende Defines können angegeben werden:
 - PACKAGE_TESTS
 
 Für die jeweiligen Optionen werden die entsprechenden Zusatzpakete benötigt.
-
-Bei Informix Connect-Client ab ca. 4.10.12 wurde ein BUG in der Datums-Konvertierung entfernt
-hier kann für ältere Versionen INFORMIX_DTFMT_BUG definiert werden
+* SQLite3
+* MariaDB
+* MongoDb
+* Informix connect
+* libOpenSSL
 
 ## Datenbanken
 
