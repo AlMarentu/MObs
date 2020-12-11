@@ -9,7 +9,7 @@ set(libSrcs objgen.cpp objtypes.cpp logging.cpp strtoobj.cpp objpool.cpp xmlwrit
 
 if (OPENSSL_FOUND)
     include_directories(${OPENSSL_INCLUDE_DIR})
-    set(libSrcs ${libSrcs} aes.cpp aes.h)
+    set(libSrcs ${libSrcs} aes.cpp aes.h rsa.cpp rsa.h)
 endif()
 
 

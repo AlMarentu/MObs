@@ -1,5 +1,5 @@
 
-/** \example Erzeugung von Objekten, Serialisierung in XML-Datei mit anschließendem Einlesen; optional mit Verschlüsselung */
+/** \example Erzeugung von Objekten, Serialisierung in XML-Datei mit RSA-Verschlüsselung anschließendem Einlesen */
 
 
 #include "mobs/logging.h"
@@ -70,13 +70,15 @@ public:
   }
   void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, mobs::CryptBufBase *&cryptBufp) override {
     LOG(LM_INFO, "Encryption " << algorithm << " keyName " << keyName << " cipher " << cipher);
-    if (algorithm == "aes-256-cbc")
-      cryptBufp = new mobs::CryptBufAes( "12345");
+    if (algorithm == "rsa-1_5" and keyName == "Det") {
+      vector<u_char> data;
+      mobs::from_string_base64(cipher, data);
+      cryptBufp = new mobs::CryptBufRsa("p2pr.pem", data, "222");
+    }
   }
 
 };
 
-#define CLASSIC_IOSTREAM
 
 int main(int argc, char* argv[])
 {
@@ -104,37 +106,31 @@ int main(int argc, char* argv[])
     f2.haenger[1].achsen(2);
 
 
-// Ausgabe XML
-#if 1
+    // RSA-Schlüssel erzeugen (sollten bereits vorhanden sein)
+    mobs::generateRsaKey("p1pr.pem", "p1pu.pem", "111");
+    mobs::generateRsaKey("p2pr.pem", "p2pu.pem", "222");
+    mobs::generateRsaKey("p3pr.pem", "p3pu.pem", "333");
 
-    mobs::ConvObjToString cth = mobs::ConvObjToString().setEncryptor([](){return new mobs::CryptBufAes( "12345", "john");});
-//    mobs::ConvObjToString cth;
-#ifdef CLASSIC_IOSTREAM
-    wofstream x2out("gespann.xml", ios::trunc);
+
+    // Ausgabe XML
+    mobs::ConvObjToString cth;
+    wofstream x2out("rsa.xml", ios::trunc);
     if (not x2out.is_open())
       throw runtime_error("File not open");
-#else
-    ofstream xout("gespann.xml", ios::trunc);
-    if (not xout.is_open())
-      throw runtime_error("File not open");
-
-    // neuen Crypto Streambuffer initialisieren
-    mobs::CryptOstrBuf streambuf(xout, new mobs::CryptBufAes( "12345"));
-    // und wostream damit initialisieren
-    std::wostream x2out(&streambuf);
-    // Base64 Mode aktivieren
-    x2out << mobs::CryptBufBase::base64(true);
-#endif
 
     // Writer-Klasse mit File, und Optionen initialisieren
     mobs::XmlWriter xf(x2out, mobs::XmlWriter::CS_utf8, true);
-    xf.setPrefix(L"m:"); // optionaler XML Namespace
     mobs::XmlOut xo(&xf, cth);
     // XML-Header
     xf.writeHead();
-    xf.writeAttribute(L"xmlns", L"abc.xml");
     // Listen-Tag
     xf.writeTagBegin(L"list");
+
+    std::list<mobs::CryptBufRsa::PubKey> pks;
+    pks.emplace_back("p1pu.pem", "Charlie");
+    pks.emplace_back("p2pu.pem", "Det");
+    pks.emplace_back("p3pu.pem", "Egon");
+    xf.startEncrypt(new mobs::CryptBufRsa(pks));
 
     // Objekt schreiben
     f1.traverse(xo);
@@ -163,49 +159,22 @@ int main(int argc, char* argv[])
     // Listen-Tag schließen
     xf.writeTagEnd();
     // file schließen
-#ifdef CLASSIC_IOSTREAM
     x2out.close();
-#else
-//    x2out << mobs::CryptBufBase::base64(false);
 
-//    x2out << mobs::CryptBufBase::final();
-    // Verschlüsselung finalisieren
-    streambuf.finalize();
-    xout.close();
 
-    // openssl aes-256-cbc  -d -in cmake-build-debug/gespann.xml   -md sha1 -k 12345
-    // openssl aes-256-cbc  -d -in cmake-build-debug/gespann.xml -a -A  -md sha1 -k 12345
-#endif
-
-//    return 0;
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
     LOG(LM_INFO, "Datei Erzeugt");
-#endif
 
     // File öffnen
-#ifdef CLASSIC_IOSTREAM
-    wifstream x2in("gespann.xml");
+
+    wifstream x2in("rsa.xml");
     if (not x2in.is_open())
       throw runtime_error("in File not open");
-#else
-    ifstream xin("gespann.xml");
-    if (not xin.is_open())
-      throw runtime_error("in File not open");
 
-    // neuen Crypto Streambuffer initialisieren
-    mobs::CryptIstrBuf streambufI(xin, new mobs::CryptBufAes("12345"));
-    // base64 Modus aktivieren
-    streambufI.getCbb()->setBase64(true);
-    // Streambuffer an instream binden
-    std::wistream x2in(&streambufI);
-//  x2in >> mobs::CryptBufBase::base64(true);
-#endif
-
-  // Import-Klasee mit FIle initialisieren
+    // Import-Klasee mit FIle initialisieren
     XmlInput xr(x2in);
-    xr.setPrefix("m:"); // optionaler XML Namespace
 
     while (not xr.eof()) {
       // File parsen
@@ -214,12 +183,7 @@ int main(int argc, char* argv[])
     }
 
     // fertig
-#ifdef CLASSIC_IOSTREAM
     x2in.close();
-#else
-    xin.close();
-#endif
-
 
   }
   catch (exception &e)

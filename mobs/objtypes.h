@@ -471,10 +471,11 @@ public:
   static const ConvFromStrHint &convFromStrHintExplizit;
 
 };
-
+class CryptBufBase;
 /// Ausgabeformat für \c to_string() Methode von Objekten
 class ConvObjToString : virtual public ConvToStrHint {
 public:
+  using EncrypFun = std::function<mobs::CryptBufBase*()>;
   ConvObjToString() : ConvToStrHint(false) {}
   /// \private
   bool toXml() const { return xml; }
@@ -488,6 +489,8 @@ public:
   bool modOnly() const { return modified; }
   /// \private
   bool skipVersion() const { return skipVers; }
+  /// \private
+  EncrypFun getEncFun() const { return encryptor; }
   /// Ausgabe als XML-Datei
   ConvObjToString exportXml() const { ConvObjToString c(*this); c.xml = true; return c; }
   /// Ausgabe als JSON
@@ -512,13 +515,15 @@ public:
   ConvObjToString exportModified() const { ConvObjToString c(*this); c.modified = true; return c; }
   /// Überspringe Versions-Elemente
   ConvObjToString exportSkipVersion() const { ConvObjToString c(*this); c.skipVers = true; return c; }
+  /// setze Encrypt-Function
+  ConvObjToString setEncryptor(EncrypFun e) const { ConvObjToString c(*this); c.encryptor = e; return c; }
 private:
   bool xml = false;
   bool quotes = false;
   bool onull = false;
   bool modified = false;
   bool skipVers = false;
-
+  EncrypFun encryptor = nullptr;
 };
 
 /// Konfiguration für \c string2Obj

@@ -20,7 +20,7 @@
 
 /** \file aes.h
  *
- *  \brief Plugins uns Funktionen für AES-Verschlüsselung
+ *  \brief Plugins und Funktionen für AES-Verschlüsselung
  */
 
 #ifndef MOBS_AES_H
@@ -37,6 +37,10 @@ class CryptBufAesData;
  * Dient als Plugin für mobs::CryptIstrBuf oder mobs::CryptOstrBuf
  *
  * Methode: openssl aes-256-cbc -md sha1
+ *
+ * entspricht dem Aufruf
+ * openssl aes-256-cbc  -d -in file.xml  -md sha1 -k password
+ * Bei base64-Format mit zusätzlichem Parametern -a -A
  */
 class CryptBufAes : public CryptBufBase {
 public:
@@ -45,10 +49,24 @@ public:
   using Traits = std::char_traits<char_type>;
   using int_type = typename Base::int_type;
 
-  explicit CryptBufAes(const std::string &pass);
+  /** \brief Konstruktor für Verschlüsselung mit AES-256
+   *
+   * Es wird die Verschlüsselungsmethode aes-256-cb mit sha1 gehashter Passphrase verwendet
+   * es wird das Prefix "SALTED__" und ein 8-Zeichen Salt vorangestellt
+   * @param pass Passwort
+   * @param id Id des Empfängers (falls für Export benötigt)
+   */
+  explicit CryptBufAes(const std::string &pass, const std::string &id = "");
   ~CryptBufAes() override;
+  /// Bezeichnung der Verschlüsselung
+  std::string name() const override { return u8"aes-256-cbc"; }
+  /// Anzahl der Empfänger-Ids ist immer 1
+  size_t recipients() const override { return 1; }
+  /// liefert bei pos==0 die Id des des Empfängers wie im Konstruktor angegeben
+  std::string getRecipientId(size_t pos) const override;
 
-  /// \private
+
+    /// \private
   int_type overflow(int_type ch) override;
   /// \private
   int_type underflow() override;

@@ -63,6 +63,7 @@ void MemberBase::doConfig(MemVarCfg c)
 {
   switch(c) {
     case DbCompact:
+    case XmlEncrypt:
     case LengthBase ... LengthEnd:
     case XmlAsAttr: m_config.push_back(c); break;
     case InitialNull: nullAllowed(true); m_null = true; break;
@@ -145,6 +146,7 @@ void MemBaseVector::doConfig(MemVarCfg c)
     case ColNameBase ... ColNameEnd:
     case LengthBase ... LengthEnd:
     case DbJson:
+    case XmlEncrypt:
     case DbDetail: m_config.push_back(c); break; // für Vector selbst
     case DbCompact:
     case InitialNull: m_c.push_back(c); break; // für Member-Elemente
@@ -222,6 +224,7 @@ void ObjectBase::doConfig(MemVarCfg c)
     case PrefixBase ... PrefixEnd:
     case LengthBase ... LengthEnd:
     case DbJson:
+    case XmlEncrypt:
     case Embedded: m_config.push_back(c); break;
     case InitialNull: nullAllowed(true); break;
     case Key1 ... Key5: m_key = c - Key1 + 1; break;
@@ -255,6 +258,7 @@ void ObjectBase::doConfigObj(MemVarCfg c)
     case VectorNull:
     case DbVersionField:
     case DbJson:
+    case XmlEncrypt:
       break;
   }
 }

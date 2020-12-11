@@ -48,11 +48,22 @@ bool XmlOut::doObjBeg(const ObjectBase &obj)
   if (name.empty())
     name = data->level() == 0 ? L"root": to_wstring(obj.getObjectName());
 
+  ConvObjToString::EncrypFun ef = nullptr;
+  if (data->cryptingLevel() == 0 and obj.hasFeature(XmlEncrypt))
+    ef = cth.getEncFun();
+  if (ef) {
+    CryptBufBase *cbp = ef();
+    data->startEncrypt(cbp);
+  }
+
+
   data->writeTagBegin(name);
 
   if (obj.isNull())
   {
     data->writeTagEnd();
+    if (ef)
+      data->stopEncrypt();
     return false;
   }
   
@@ -64,6 +75,8 @@ void XmlOut::doObjEnd(const ObjectBase &obj)
 {
   elements.pop();
   data->writeTagEnd();
+  if (data->cryptingLevel() and data->cryptingLevel() == data->level())
+    data->stopEncrypt();
 }
 
 bool XmlOut::doArrayBeg(const MemBaseVector &vec)
@@ -91,8 +104,11 @@ void XmlOut::doMem(const MemberBase &mem)
     name = elements.top();
   if (name.empty())
     name = to_wstring(mem.getName(cth));
+  ConvObjToString::EncrypFun ef = nullptr;
+  if (data->cryptingLevel() == 0 and mem.hasFeature(XmlEncrypt))
+    ef = cth.getEncFun();
 
-  if (mem.hasFeature(XmlAsAttr) and data->attributeAllowed())
+  if (mem.hasFeature(XmlAsAttr) and data->attributeAllowed() and not ef)
   {
     if (not mem.isNull())
     {
@@ -102,6 +118,10 @@ void XmlOut::doMem(const MemberBase &mem)
   }
   else
   {
+    if (ef) {
+      CryptBufBase *cbp = ef();
+      data->startEncrypt(cbp);
+    }
     data->writeTagBegin(name);
     if (not mem.isNull())
     {
@@ -116,6 +136,8 @@ void XmlOut::doMem(const MemberBase &mem)
         data->writeAttribute(data->valueToken, value);
     }
     data->writeTagEnd();
+    if (ef)
+      data->stopEncrypt();
   }
 }
 

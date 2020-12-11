@@ -203,7 +203,7 @@ namespace mobs {
 
 /// \private
 enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Embedded, DbCompact, DbDetail, DbVersionField, DbAuditTrail,
-                 Key1, Key2, Key3, Key4, Key5, DbJson,
+                 Key1, Key2, Key3, Key4, Key5, DbJson, XmlEncrypt,
                  AltNameBase = 1000, AltNameEnd = 1999,
                  ColNameBase = 2000, ColNameEnd = 3999,
                  PrefixBase = 4000, PrefixEnd = 4999,
@@ -214,6 +214,7 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 #define USENULL mobs::InitialNull ///< Element wir mit \c null vorinitialisiert
 #define USEVECNULL mobs::VectorNull ///< Bei Vektoren wird der Vector selbst mit \c null vorinitialisiert
 #define XMLATTR mobs::XmlAsAttr ///< Bei XML-Ausgabe als Attribute ausgeben (nur MemberVariable, nur von erstem Element fortlaufend)
+#define XMLENCRYPT mobs::XmlEncrypt ///< Bei XML-Ausgabe verschlüsselt ausgeben
 #define EMBEDDED mobs::Embedded ///< Bei Ausgabe als Attribute/Traversierung werden die Member des Objektes direkt, auf ser selben Ebene, serialisiert
 #define DBCOMPACT mobs::DbCompact ///< In der Datenbank wird der MOBSENUM oder der Zeit-Wert numerisch gespeichert
 #define DBDETAIL mobs::DbDetail ///< In der Datenbank wird dieses Subelement in einer Detail Table abgelegt, muss also separat gespeichert werden

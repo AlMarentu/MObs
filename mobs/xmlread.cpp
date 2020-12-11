@@ -111,7 +111,7 @@ static std::wstring stow(const string &s, bool dontConvert) {
     }
     void EndTag(const std::string &element) override {
       if (obj) {
-        if (tagPath().size() == levelStart)
+        if (currentLevel() == levelStart)
         {
           parent->filled(obj, error);
           obj = nullptr;
@@ -153,13 +153,17 @@ static std::wstring stow(const string &s, bool dontConvert) {
         }
       }
     }
-    
+    void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, mobs::CryptBufBase *&cryptBufp) override {
+      parent->Encrypt(algorithm, keyName, cipher, cryptBufp);
+    }
+
+
     void setObj(ObjectBase *o) {
       obj = o;
       reset();  // ObjectNavigator zurücksetzen
       if (obj)
         pushObject(*obj);
-      levelStart = tagPath().size();
+      levelStart = currentLevel();
     }
     
     XmlReader *parent;

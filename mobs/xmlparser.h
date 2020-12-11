@@ -30,6 +30,7 @@
 #include "logging.h"
 #include "objtypes.h"
 #include "converter.h"
+#include "csb.h"
 
 #include<stack>
 #include<exception>
@@ -466,6 +467,7 @@ void ProcessingInstruction(const std::string &element, const std::string &attrib
 */
 
 
+class CryptBufBase;
 
 class XmlParserW  {
 public:
@@ -487,7 +489,7 @@ public:
     wchar_t c;
     w += curr;
     for (int i = 0; i < 50; i++) {
-      if ((c = istr.get()) <= 0)
+      if ((c = get()) <= 0)
         break;
       else
         w += c;
@@ -495,10 +497,16 @@ public:
 //    std::cerr << mobs::to_string(w) << std::endl;
     return to_string(w);
   };
-  /** \brief zugriff auf den Stack der Element-Struktur
+//  /** \brief zugriff auf den Stack der Element-Struktur
+//   */
+//  const std::stack<std::string> &tagPath() const { return tags; };
+  /** \brief aktuelle Ebene des Baums
+   *
+   * @return Level 1 = root
    */
-  const std::stack<std::string> &tagPath() const { return tags; };
-  
+  size_t currentLevel() const { return tags.size(); };
+  std::string currentXmlns() const { return tags.empty() ? "" : tags.top().xmlns; };
+
   /** \brief Callback-Function: Ein Tag ohne Inhalt, impliziert EndTag(..)
    @param element Name des Elementes
    */
@@ -537,454 +545,576 @@ public:
    @param value Inhalt der Verarbeitungsanweisung
    */
   virtual void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) = 0;
-  
-  /// ist beim Parsen das Ende erreicht
-  bool eof() const { return endOfFile; }
-  /// verlasse bein nächsten End-Tag den parser
-  void stop() { running = false; }
-  /// Aktiviere automatische base64 erkennung
-  /// \see Base64
-  void setBase64(bool b) { useBase64 = b; }
-  /// Starte den Parser
-  void parse() {
-    TRACE("");
+  /** \brief Callback-Funktion: Ein Element "EncryptedData" wurde gefunden und ein decrypt-Modul wird benötogt
+   *
+   * Es wird  "https://www.w3.org/2001/04/xmlenc#Element" unterstützt
+   * Bei mehreren Recipients muss nur bei einer Id eine Entschlüsselungs-Klasse zurückgeliefert werden.
+   * Bei unbekannten Recipients kann nullptr zurückgegeben werden.
+   * @param algorithm Algorithmus um xmlns bereinigt zB.: aes-256-cbc, oder "https://www.w3.org/2001/04/xmlenc#aes-256-cbc"/
+   * @param keyName KeyInfo-Element
+   * @param cipher Schlüssel, falls vorhanden
+   * @param cryptBufp ein mit new erzeugtes Encryption-Module; wird automatisch freigegeben
+   */
+  virtual void Encrypt(const std::string &algorithm, const std::string &keyName,  const std::string &cipher, CryptBufBase *&cryptBufp) = 0;
+
+/// ist beim Parsen das Ende erreicht
+bool eof() const { return endOfFile; }
+/// verlasse bein nächsten End-Tag den parser
+void stop() { running = false; }
+/// Aktiviere automatische base64 Erkennung
+/// \see Base64
+void setBase64(bool b) { useBase64 = b; }
+/// Starte den Parser
+void parse() {
+  TRACE("");
+  if (not running)
+  {
+    std::locale lo1 = std::locale(istr.getloc(), new codec_iso8859_1);
+    istr.imbue(lo1);
+
+    eat();  // erstes Zeichen einlesen
+    /// BOM bearbeiten
+    if (curr == 0xff)
+    {
+      std::locale lo;
+      if ((curr = istr.get()) != 0xfe)
+        throw std::runtime_error(u8"Error in BOM");
+      lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::little_endian>);
+      istr.imbue(lo);
+      encoding = u8"UTF-16"; // (LE)
+      eat();
+    }
+    else if (curr == 0xfe)
+    {
+      std::locale lo;
+      if ((curr = istr.get()) != 0xff)
+        throw std::runtime_error(u8"Error in BOM");
+      lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::codecvt_mode(0)>);
+      istr.imbue(lo);
+      encoding = u8"UTF-16"; // (BE)
+      eat();
+    }
+    else if (curr == 0xef)
+    {
+      std::locale lo;
+      if ((curr = istr.get()) == 0xbb and (curr = istr.get()) == 0xbf)
+        lo = std::locale(istr.getloc(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
+      else
+        throw std::runtime_error(u8"Error in BOM");
+      encoding = u8"UTF-8";
+      istr.imbue(lo);
+      eat();
+    }
+
+    buffer.clear();
+    parse2LT();
+    if (curr != '<')
+      THROW(u8"Syntax Head");
+    // BOM überlesen
+    if (not buffer.empty() and buffer != L"\u00EF\u00BB\u00BF" and buffer != L"\ufeff")
+    {
+//        for (auto c:buffer) std::cerr << '#' <<  int(c) << std::endl;
+      THROW("invalid begin of File");
+    }
+    buffer.clear();
+    running = true;
+  }
+  // eigentliches Parsing
+  while (curr == '<')
+  {
     if (not running)
     {
-      std::locale lo1 = std::locale(istr.getloc(), new codec_iso8859_1);
-      istr.imbue(lo1);
-
-      eat();  // erstes Zeichen einlesen
-              /// BOM bearbeiten
-      if (curr == 0xff)
-      {
-        std::locale lo;
-        if ((curr = istr.get()) != 0xfe)
-          throw std::runtime_error(u8"Error in BOM");
-        lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::little_endian>);
-        istr.imbue(lo);
-        encoding = u8"UTF-16"; // (LE)
-        eat();
-      }
-      else if (curr == 0xfe)
-      {
-        std::locale lo;
-        if ((curr = istr.get()) != 0xff)
-          throw std::runtime_error(u8"Error in BOM");
-        lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::codecvt_mode(0)>);
-        istr.imbue(lo);
-        encoding = u8"UTF-16"; // (BE)
-        eat();
-      }
-      else if (curr == 0xef)
-      {
-        std::locale lo;
-        if ((curr = istr.get()) == 0xbb and (curr = istr.get()) == 0xbf)
-          lo = std::locale(istr.getloc(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
-        else
-          throw std::runtime_error(u8"Error in BOM");
-        encoding = u8"UTF-8";
-        istr.imbue(lo);
-        eat();
-      }
-      
-      buffer.clear();
-      parse2LT();
-      if (curr != '<')
-        throw std::runtime_error(u8"Syntax Head");
-      // BOM überlesen
-      if (not buffer.empty() and buffer != L"\u00EF\u00BB\u00BF" and buffer != L"\ufeff")
-      {
-//        for (auto c:buffer) std::cerr << '#' <<  int(c) << std::endl;
-        throw std::runtime_error("invalid begin of File");
-      }
-      buffer.clear();
       running = true;
+      return;
     }
-    // eigentliches Parsing
-    while (curr == '<')
-    {
-      if (not running)
-      {
-        running = true;
-        return;
-      }
-      saveValue();
+    saveValue();
 //      saved = buffer;
-      eat('<');
-      
-      if (peek() == '/')
-      {
-        // Parse End-Tag
-        eat();
-        parse2GT();
-        decode(buffer);
-        std::string element = to_string(buffer);
-        if (element.empty())
-          throw std::runtime_error("missing end tag");
-        if (lastKey == element)
-        {
-          if (in64) {
-            saveValue();
-            in64 = false;
-          } if (not cdata.empty()) {
-            Cdata(cdata);
-            saveValue();
-          } else {
-            decode(saved);
-            Value(saved);
-          }
-          clearValue();
-          lastKey = "";
-        }
-        cdata.clear();
-        EndTag(element);
-        if (tags.empty())
-          throw std::runtime_error(u8"unexpected closing tag " + element);
-        if (tags.top() != element)
-          throw std::runtime_error(u8"unmatching tag " + element + " expected " + tags.top());
-        tags.pop();
-        eat('>');
-        parse2LT();
-        continue;
-      }
-      else if (peek() == '!')
-      {
-        eat();
-        // Parse CDATA Element
-        if (peek() == '[')
-        {
-          eat('[');
-          eat('C');
-          eat('D');
-          eat('A');
-          eat('T');
-          eat('A');
-          eat('[');
-          saveValue();  // nur whitespace prüfen
-          cdata.swap(buffer);
-          parse2CD();
-          if (try64) {
-            base64.done();
-            Base64(base64data);
-            cdata.clear();
-            in64 = true;
-          }
-          else {
-            buffer.resize(buffer.length() -2);
-            if (buffer.empty()) {
-              Cdata(buffer);
-              lastKey = "";
-            } else
-              cdata.swap(buffer);
-          }
-          base64.clear();
-          try64 = false;
-          clearValue();
-        }
-        else
-        {
-          // Parse Kommentar
-          eat('-');
-          eat('-');
-          parse2Com();
-        }
-        eat('>');
-        parse2LT();
-        continue;
-      }
-      else if (peek() == '?')
-      {
-        // Parse Verarbeitungsanweisung
-        eat();
-        parse2GT();
-        decode(buffer);
-        std::string element = to_string(buffer);
-        for (;;)
-        {
-          if (peek() == '?')
-          {
-            eat();
-            ProcessingInstruction(element, "", L"");
-            break;
-          }
-          eat(' ');
-          parse2GT();
-          decode(buffer);
-          std::string a = to_string(buffer);
-          std::wstring v;
-          if (peek() == '=')
-          {
-            eat('=');
-            wchar_t c = peek();
-            if (c == '"')
-              eat('"');
-            else
-              eat('\'');
-            buffer.clear();
-            parse2Char(c);
-            decode(buffer);
-            v = buffer;
-            eat(c);
-          }
-          if (element == u8"xml" and a == u8"encoding" and not v.empty())
-          {
-            if (encoding.empty())
-            {
-              encoding = mobs::to_string(v);
-              if (encoding == u8"UTF-8")
-              {
-                std::locale lo = std::locale(istr.getloc(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
-                istr.imbue(lo);
-              }
-              else if (encoding == u8"ISO-8859-15")
-              {
-                std::locale lo = std::locale(istr.getloc(), new codec_iso8859_15);
-                istr.imbue(lo);
-              }
-              else if (encoding == u8"ISO-8859-9")
-              {
-                std::locale lo = std::locale(istr.getloc(), new codec_iso8859_9);
-                istr.imbue(lo);
-              }
-              else if (encoding != u8"ISO-8859-1")
-                LOG(LM_WARNING, u8"unknown encoding: " << encoding << " using ISO-8859-1");
-            }
-            else if (encoding != mobs::to_string(v))
-              LOG(LM_WARNING, u8"encoding mismatch: " << encoding << " " << mobs::to_string(v));
+    eat('<');
 
-          }
-          ProcessingInstruction(element, a, v);
-        }
-        eat('>');
-        parse2LT();
-        continue;
-      }
-      // Parse Element-Beginn
+    if (peek() == '/')
+    {
+      // Parse End-Tag
+      eat();
       parse2GT();
       decode(buffer);
       std::string element = to_string(buffer);
       if (element.empty())
-        throw std::runtime_error("missing begin tag ");
-      tags.push(element);
-      StartTag(element);
+        THROW("missing end tag");
+      if (lastKey == element)
+      {
+        if (in64) {
+          saveValue();
+          in64 = false;
+        } if (not cdata.empty()) {
+          if (xmlEncState <= 0)
+            Cdata(cdata);
+          saveValue();
+        } else {
+          decode(saved);
+          if (xmlEncState > 0) {
+            LOG(LM_INFO, "XV " << element << " " << xmlEncState);
+            if (element == u8"CipherValue") {
+              if (xmlEncState == 5) {
+                if (not encryptedData.cryptBufp)
+                  encryptedData.cipher = to_string(saved);
+              } else if (xmlEncState == 4) {
+                std::stringstream ss(to_string(saved));
+//              LOG(LM_DEBUG, "DATA " << ss.str());
+                if (not encryptedData.cryptBufp)
+                  THROW("no suitable decryption found");
+                mobs::CryptIstrBuf streambuf(ss, encryptedData.cryptBufp);
+                std::wistream xStrIn(&streambuf);
+                streambuf.getCbb()->setBase64(true);
+                encryptedData.data.clear();
+                encryptedData.data << xStrIn.rdbuf();
+//              LOG(LM_DEBUG, "DATA2 " << to_string(encryptedData.data.str()));
+                if (xStrIn.bad())
+                  THROW("encryption error");
+                encryptedData.data.seekg(0);
+              }
+            } else if (element == u8"KeyName" and xmlEncState == 4) {
+              if (not encryptedData.cryptBufp)
+                encryptedData.keyName = to_string(saved);
+            }
+
+          } else if (xmlEncState <= 0)
+            Value(saved);
+        }
+        clearValue();
+        lastKey = "";
+      }
+      cdata.clear();
+      if (xmlEncState <= 0)
+        EndTag(element);
+      else {
+        xmlEncState--;
+        if (element == u8"EncryptedData") {
+          // Wenn CipherData vollständig dann nach EncryptedData den encoded Buffer einfügen
+          xmlEncState = -1;
+//        LOG(LM_DEBUG, "encrypting element " << xmlEncState);
+        } else if (element == u8"KeyInfo") {
+          if (not encryptedData.cryptBufp) {
+            Encrypt(encryptedData.algorithm, encryptedData.keyName, encryptedData.cipher, encryptedData.cryptBufp);
+            if (not encryptedData.cryptBufp) { // keine encryption, weitersuchen
+              encryptedData.keyName = "";
+              encryptedData.cipher = "";
+            }
+          }
+        }
+      }
+      if (tags.empty())
+        THROW(u8"unexpected closing tag " + element);
+      if (tags.top().element != element) {
+//        while ((curr = get()) > 0) ;
+        THROW(u8"unmatching tag " + element + " expected " + tags.top().element);
+      }
+      tags.pop();
+      eat('>');
+      parse2LT();
+      continue;
+    }
+    else if (peek() == '!')
+    {
+      eat();
+      // Parse CDATA Element
+      if (peek() == '[')
+      {
+        eat('[');
+        eat('C');
+        eat('D');
+        eat('A');
+        eat('T');
+        eat('A');
+        eat('[');
+        saveValue();  // nur whitespace prüfen
+        cdata.swap(buffer);
+        parse2CD();
+        if (try64) {
+          base64.done();
+          Base64(base64data);
+          cdata.clear();
+          in64 = true;
+        }
+        else {
+          buffer.resize(buffer.length() -2);
+          if (buffer.empty()) {
+            if (xmlEncState <= 0)
+              Cdata(buffer);
+            lastKey = "";
+          } else
+            cdata.swap(buffer);
+        }
+        base64.clear();
+        try64 = false;
+        clearValue();
+      }
+      else
+      {
+        // Parse Kommentar
+        eat('-');
+        eat('-');
+        parse2Com();
+      }
+      eat('>');
+      parse2LT();
+      continue;
+    }
+    else if (peek() == '?')
+    {
+      // Parse Verarbeitungsanweisung
+      eat();
+      parse2GT();
+      decode(buffer);
+      std::string element = to_string(buffer);
       for (;;)
       {
-        if (peek() == '>')  // Ende eines Starttags
+        if (peek() == '?')
         {
           eat();
-          parse2LT();
-          break;
-        }
-        else if (peek() == '/') // Leertag
-        {
-          eat();
-          eat('>');
-          NullTag(element);
-          tags.pop();
-          parse2LT();
+          ProcessingInstruction(element, "", L"");
           break;
         }
         eat(' ');
         parse2GT();
         decode(buffer);
         std::string a = to_string(buffer);
-        eat('=');
-        wchar_t c = peek();
-        if (c == '"')
-          eat('"');
-        else
-          eat('\'');
-        buffer.clear();
-        parse2Char(c);
-        decode(buffer);
-        Attribute(element, a, buffer);
-        eat(c);
+        std::wstring v;
+        if (peek() == '=')
+        {
+          eat('=');
+          wchar_t c = peek();
+          if (c == '"')
+            eat('"');
+          else
+            eat('\'');
+          buffer.clear();
+          parse2Char(c);
+          decode(buffer);
+          v = buffer;
+          eat(c);
+        }
+        if (element == u8"xml" and a == u8"encoding" and not v.empty())
+        {
+          if (encoding.empty())
+          {
+            encoding = mobs::to_string(v);
+            if (encoding == u8"UTF-8")
+            {
+              std::locale lo = std::locale(istr.getloc(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
+              istr.imbue(lo);
+            }
+            else if (encoding == u8"ISO-8859-15")
+            {
+              std::locale lo = std::locale(istr.getloc(), new codec_iso8859_15);
+              istr.imbue(lo);
+            }
+            else if (encoding == u8"ISO-8859-9")
+            {
+              std::locale lo = std::locale(istr.getloc(), new codec_iso8859_9);
+              istr.imbue(lo);
+            }
+            else if (encoding != u8"ISO-8859-1")
+              LOG(LM_WARNING, u8"unknown encoding: " << encoding << " using ISO-8859-1");
+          }
+          else if (encoding != mobs::to_string(v))
+            LOG(LM_WARNING, u8"encoding mismatch: " << encoding << " " << mobs::to_string(v));
+
+        }
+        ProcessingInstruction(element, a, v);
       }
-      lastKey = element;
+      eat('>');
+      parse2LT();
+      continue;
     }
-    saveValue();
-    if (curr != -1)
-      throw std::runtime_error(u8"Syntax error");
-    // nur noch für check Whitespace bis eof
-    saveValue();
-    if (not tags.empty())
-      throw std::runtime_error(u8" expected tag at EOF: " + tags.top());
-    endOfFile = true;
-  };
-  
-private:
-  void parse2LT() { buffer.clear(); parse2Char('<'); }
-  void parse2GT() {
-    buffer.clear();
-    if (curr <= 0)
-      return;
-    buffer += curr;
-    while ((curr = istr.get()) > 0) {
-//      std::cout << "x " << mobs::to_string(curr);
-      if (std::wstring(L"/ <>=\"'?!").find(curr) != std::wstring::npos )
+    // Parse Element-Beginn
+    parse2GT();
+    decode(buffer);
+    std::string element = to_string(buffer);
+    if (element.empty())
+      THROW("missing begin tag");
+    tags.emplace(element, currentXmlns());
+    if (xmlEncState == 0 and element == u8"EncryptedData") {
+//      LOG(LM_DEBUG, "encrypting element " << xmlEncState);
+      xmlEncState = 1;
+      encryptedData = EncryptedData();
+    } else if (xmlEncState > 0) {
+      xmlEncState++;
+      if (xmlEncState == 2 and (element != u8"KeyInfo" and element != u8"CipherData" and element != u8"EncryptionMethod"))
+        THROW("invalid encryption element");
+    }
+    else
+      StartTag(element);
+    for (;;)
+    {
+      if (peek() == '>')  // Ende eines Starttags
+      {
+        eat();
+        parse2LT();
         break;
-      buffer += curr;
+      }
+      else if (peek() == '/') // Leertag
+      {
+        eat();
+        eat('>');
+        if (xmlEncState <= 0)
+          NullTag(element);
+        tags.pop();
+        parse2LT();
+        break;
+      }
+      eat(' ');
+      parse2GT();
+      decode(buffer);
+      std::string a = to_string(buffer);
+      eat('=');
+      wchar_t c = peek();
+      if (c == '"')
+        eat('"');
+      else
+        eat('\'');
+      buffer.clear();
+      parse2Char(c);
+      decode(buffer);
+      // XML-Namespace Tags verarbeiten
+      if (a == u8"xmlns" and (buffer.substr(0, 18) == L"http://www.w3.org/" or
+                              buffer.substr(0, 19) == L"https://www.w3.org/")) {
+        tags.top().xmlns = to_string(buffer);
+        LOG(LM_DEBUG, "XML-namespace " << currentXmlns());
+      }
+      else if (xmlEncState > 0 ) {
+        LOG(LM_INFO, "XmlEnc Att " << element << " " << xmlEncState);
+        if (xmlEncState == 1 and element == u8"EncryptedData" and a == u8"Type" and
+            buffer == L"https://www.w3.org/2001/04/xmlenc#Element") {
+//          LOG(LM_DEBUG, "encrypting element " << xmlEncState);
+        } else if (xmlEncState == 2 and element == u8"EncryptionMethod" and a == u8"Algorithm") {
+          std::string t = to_string(buffer);
+          std::string ns = currentXmlns();
+          if (not ns.empty() and t.substr(0, ns.length()) == ns)
+            encryptedData.algorithm = t.substr(ns.length());
+          else
+            encryptedData.algorithm = t;
+        }
+      }
+      else
+        Attribute(element, a, buffer);
+      eat(c);
     }
-    if (curr < 0)
-      throw std::runtime_error("Syntax");
-  };
-  void parse2Char(wchar_t c) {
-    if (curr == c or curr <= 0)
-      return;
+    lastKey = element;
+  }
+  saveValue();
+  if (curr != -1)
+    THROW(u8"Syntax error");
+  // nur noch für check Whitespace bis eof
+  saveValue();
+  if (not tags.empty())
+    THROW(u8" expected tag at EOF: " + tags.top().element);
+  endOfFile = true;
+};
+
+private:
+void parse2LT() { buffer.clear(); parse2Char('<'); }
+void parse2GT() {
+  buffer.clear();
+  if (curr <= 0)
+    return;
+  buffer += curr;
+  while ((curr = get()) > 0) {
+//      std::cout << "x " << mobs::to_string(curr);
+    if (std::wstring(L"/ <>=\"'?!").find(curr) != std::wstring::npos )
+      break;
+    buffer += curr;
+  }
+  if (curr < 0)
+    THROW("Syntax");
+};
+void parse2Char(wchar_t c) {
+  if (curr == c or curr <= 0)
+    return;
+  if (try64)
+    base64.put(curr);
+  else
+    buffer += curr;
+  while ((curr = get()) > 0) {
+    if (curr == c)
+      break;
     if (try64)
       base64.put(curr);
     else
       buffer += curr;
-    while ((curr = istr.get()) > 0) {
-      if (curr == c)
-        break;
-      if (try64)
-        base64.put(curr);
-      else
-        buffer += curr;
-    }
-  };
-  void parse2Com() {
-    for (;;) {
-      parse2Char('-');
+  }
+};
+void parse2Com() {
+  for (;;) {
+    parse2Char('-');
+    if (peek() == '-') {
+      eat();
       if (peek() == '-') {
-        eat();
-        if (peek() == '-') {
-          for (;;) {
-            eat();
-            if (peek() == '>')
-              return;
-            if (peek() != '-')
-              break;
-          }
+        for (;;) {
+          eat();
+          if (peek() == '>')
+            return;
+          if (peek() != '-')
+            break;
         }
       }
-      if (peek() < 0)
-        throw std::runtime_error("Syntax");
     }
-  };
-  void parse2CD() {
-    for (;;) {
-      base64Start();
-      parse2Char(']');
+    if (peek() < 0)
+      THROW("Syntax");
+  }
+};
+void parse2CD() {
+  for (;;) {
+    base64Start();
+    parse2Char(']');
+    if (peek() == ']') {
+      eat();
       if (peek() == ']') {
-        eat();
-        if (peek() == ']') {
-          for (;;) {
-            eat();
-            if (peek() == '>')
-              return;
-            if (try64)
-              throw std::runtime_error("base64 error");
-            base64.clear();
-            if (peek() != ']')
-              break;
-          }
+        for (;;) {
+          eat();
+          if (peek() == '>')
+            return;
+          if (try64)
+            THROW("base64 error");
+          base64.clear();
+          if (peek() != ']')
+            break;
         }
       }
-      if (try64)
-        throw std::runtime_error("base64 error");
-      base64.clear();
-      if (peek() < 0)
-        throw std::runtime_error("Syntax");
     }
-  };
-  void clearValue() { saved.clear(); }; // der Zwischenraum fand Verwendung
-  /// Verwaltet den Zwischenraum zwischen den <..Tags..>
-  void saveValue() {
-    // wenn nicht verwendet, darf es nur white space sein
-    if (not saved.empty())
-    {
-      size_t p = saved.find_first_not_of(L" \n\r\t");
-      if (p != std::wstring::npos)
-        throw std::runtime_error(u8"unexpected char");
-    }
-    saved = buffer;
-  };
-  void eat(wchar_t c) {
-    buffer += curr;
-    if (curr != c)
-      throw std::runtime_error(u8"Expected " + mobs::to_string(c) + " got " + mobs::to_string(curr));
-    curr = istr.get();
-//    pos1++;
-  };
-  void eat() {
-//    pos1++;
-    buffer += curr;
-    curr = istr.get();
-  };
-  wchar_t peek() const {
-    if (curr < 0)
-      throw std::runtime_error(u8"unexpected EOF");
-    //cerr << "Peek " << Xml[pos1] << " " << pos1 << endl;
-    return curr;
-  };
-  /// Wandelt einen Teilstring aus Xml von der HTML-Notation in ASCII zurück
-  void decode(std::wstring &buf) {
-    std::wstring result;
-    size_t posS = 0;
-    size_t posE = buf.length();
-    for (;;) {
-      size_t pos = buf.find('&', posS);
-      if (pos < posE) // & gefunden
-      {
-        result += std::wstring(&buf[posS], pos-posS);
-        posS = pos +1;
-        pos = buf.find(';', posS);
-        if (pos < posE and pos < posS + 16) // Token &xxxx; gefunden
-        {
-          std::wstring tok = std::wstring(&buf[posS], pos-posS);
-          //          std::cerr << "TOK " << tok << std::endl;
-          wchar_t c = from_html_tag(tok);
-          if (c)
-          {
-            result += c;
-            posS = pos +1;
-            continue;
-          }
-        }
-        // wenn nichts passt dann einfach übernehmen
-        result += '&';
-      }
-      else if (conFun) // Wandlung bei ISO-Zeichensätzen
-      {
-        wchar_t (*cf)(wchar_t) = conFun;
-        std::transform(buf.cbegin()+posS, buf.cbegin()+posE, std::back_inserter(result),
-        [cf](const wchar_t c) -> wchar_t { return (c <= 127) ? c : cf(c); });
-        break;
-      }
-      else
-      {
-        result += std::wstring(&buf[posS], posE-posS);
-        break;
-      }
-    }
-    buf = result;
-  }
-  void base64Start() {
-    if (not useBase64)
-      return;
+    if (try64)
+      THROW("base64 error");
     base64.clear();
-    try64 = true;
+    if (peek() < 0)
+      THROW("Syntax");
   }
-  
-  std::wistream &istr;
-  std::wstring buffer;
-  std::wstring saved;
-  std::wstring cdata;
-  wchar_t curr = 0;
-  std::string encoding;
-  std::stack<std::string> tags;
-  std::string lastKey;
-  wchar_t (*conFun)(wchar_t) = nullptr;
-  std::vector<u_char> base64data;
-  Base64Reader base64;
-  bool try64 = false;
-  bool in64 = false;
-  bool useBase64 = false;
-  bool running = false;
-  bool endOfFile = false;
-  
+};
+void clearValue() { saved.clear(); }; // der Zwischenraum fand Verwendung
+/// Verwaltet den Zwischenraum zwischen den <..Tags..>
+void saveValue() {
+  // wenn nicht verwendet, darf es nur white space sein
+  if (not saved.empty())
+  {
+    size_t p = saved.find_first_not_of(L" \n\r\t");
+    if (p != std::wstring::npos)
+      THROW(u8"unexpected char");
+  }
+  saved = buffer;
+};
+void eat(wchar_t c) {
+  buffer += curr;
+  if (curr != c)
+    THROW(u8"Expected " << mobs::to_string(c) << " got " << mobs::to_string(curr));
+  curr = get();
+//    pos1++;
+};
+void eat() {
+//    pos1++;
+  buffer += curr;
+  curr = get();
+};
+wchar_t peek() const {
+  if (curr < 0)
+    THROW(u8"unexpected EOF");
+  //cerr << "Peek " << Xml[pos1] << " " << pos1 << endl;
+  return curr;
+};
+/// Wandelt einen Teilstring aus Xml von der HTML-Notation in ASCII zurück
+void decode(std::wstring &buf) {
+  std::wstring result;
+  size_t posS = 0;
+  size_t posE = buf.length();
+  for (;;) {
+    size_t pos = buf.find('&', posS);
+    if (pos < posE) // & gefunden
+    {
+      result += std::wstring(&buf[posS], pos-posS);
+      posS = pos +1;
+      pos = buf.find(';', posS);
+      if (pos < posE and pos < posS + 16) // Token &xxxx; gefunden
+      {
+        std::wstring tok = std::wstring(&buf[posS], pos-posS);
+        //          std::cerr << "TOK " << tok << std::endl;
+        wchar_t c = from_html_tag(tok);
+        if (c)
+        {
+          result += c;
+          posS = pos +1;
+          continue;
+        }
+      }
+      // wenn nichts passt dann einfach übernehmen
+      result += '&';
+    }
+    else if (conFun) // Wandlung bei ISO-Zeichensätzen
+    {
+      wchar_t (*cf)(wchar_t) = conFun;
+      std::transform(buf.cbegin()+posS, buf.cbegin()+posE, std::back_inserter(result),
+      [cf](const wchar_t c) -> wchar_t { return (c <= 127) ? c : cf(c); });
+      break;
+    }
+    else
+    {
+      result += std::wstring(&buf[posS], posE-posS);
+      break;
+    }
+  }
+  buf = result;
+}
+void base64Start() {
+  if (not useBase64)
+    return;
+  base64.clear();
+  try64 = true;
+}
+wchar_t get() const {
+  wchar_t c;
+  if (xmlEncState == -1) {
+    if (encryptedData.data.bad())
+      THROW("decryption failed");
+    if (encryptedData.data.get(c).eof())
+    {
+      xmlEncState = 0;
+      c = istr.get();
+    }
+//    std::cout << " " << mobs::to_string(c) ;
+  } else {
+    c = istr.get();
+//    std::cout << " x" << mobs::to_string(c); // << " " << istr.tellg() << ".";
+  }
+  return c;
+}
+class Level {
+public:
+  Level(const std::string &e, const std::string &x) : element(e), xmlns(x) {}
+  std::string element;
+  std::string xmlns;
+};
+struct EncryptedData {
+  std::string algorithm;
+  std::string keyName;
+  std::string cipher;
+  CryptBufBase *cryptBufp = nullptr;
+  mutable std::wstringstream data;
+};
+std::wistream &istr;
+std::wstring buffer;
+std::wstring saved;
+std::wstring cdata;
+wchar_t curr = 0;
+std::string encoding;
+std::stack<Level> tags;
+std::string lastKey;
+wchar_t (*conFun)(wchar_t) = nullptr;
+std::vector<u_char> base64data;
+Base64Reader base64;
+EncryptedData encryptedData;
+mutable int xmlEncState = 0;
+bool try64 = false;
+bool in64 = false;
+bool useBase64 = false;
+bool running = false;
+bool endOfFile = false;
+
 };
 
 

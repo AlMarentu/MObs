@@ -65,6 +65,8 @@ add_subdirectory(mobs)
 add_executable(fileio fileio.cpp)
 target_link_libraries(fileio mobs ${OPENSSL_LIBRARIES})
 
+add_executable(rsafile rsafile.cpp)
+target_link_libraries(rsafile mobs ${OPENSSL_LIBRARIES})
 
 add_executable(db db.cpp)
 target_link_libraries(db mobs)

@@ -36,16 +36,22 @@ namespace mobs {
 
 class XmlWriterData {
 public:
-  XmlWriterData(std::wostream &str, XmlWriter::charset c, bool i) : buffer(str), cs(c), indent(i) { setConFun(); }
+  XmlWriterData(std::wostream &str, XmlWriter::charset c, bool i) : buffer(str), wostr(&str), cs(c), indent(i) { setConFun(); }
   XmlWriterData(XmlWriter::charset c, bool i) : cs(c), indent(i) { }
   std::wostream &buffer = wstrBuff;
+  std::wostream *wostr = &wstrBuff;
   XmlWriter::charset cs;
   int level = 0;
+  int cryptLevel = 0;
   bool indent;
+  bool indentSave = false;
   bool openEnd = false;
+  bool inHeader = false;
   bool hasValue = false;
   std::wstring prefix;
   stack<wstring> elements;
+  CryptOstrBuf *cryptBufp = nullptr;
+  stringstream cryptss;
   wstringstream wstrBuff; // buffer für u8-Ausgabe in std::string
 
   void setConFun() {
@@ -91,20 +97,24 @@ public:
 //    if (conFun and (c & ~0x7f))
 //      buffer << wchar_t(conFun(c));
 //    else
-      buffer << c;
+      *wostr << c;
   }
   void writeIndent() {
     if (indent)
     {
       wstring s;
       s.resize(level * 2, ' ');
-      buffer << s;
+      *wostr << s;
     }
   }
   void closeTag() {
     if (openEnd)
     {
-      buffer << '>';
+      if (inHeader) {
+        *wostr << '?';
+        inHeader = false;
+      }
+      *wostr << '>';
       openEnd = false;
     }
   }
@@ -129,6 +139,7 @@ XmlWriter::~XmlWriter() {
 }
 
 int XmlWriter::level() const { return data->level; }
+int XmlWriter::cryptingLevel() const { return data->cryptLevel; }
 bool XmlWriter::attributeAllowed() const { return data->openEnd; }
 
 
@@ -146,19 +157,19 @@ void XmlWriter::writeHead() {
 
   data->buffer << "<?xml";
   data->openEnd = true;
+  data->inHeader = true;
   writeAttribute(L"version", version);
   writeAttribute(L"encoding", encoding);
-  writeAttribute(L"standalone", standalone ? L"yes":L"no");
-  data->buffer << "?>";
-  data->openEnd = false;
+  if (standalone)
+    writeAttribute(L"standalone", L"yes");
 }
 
 void XmlWriter::writeTagBegin(const std::wstring &tag) {
   data->closeTag();
   if (data->indent)
-    data->buffer << '\n';
+    *data->wostr << '\n';
   data->writeIndent();
-  data->buffer << '<' << data->prefix << tag;
+  *data->wostr << '<' << data->prefix << tag;
   data->openEnd = true;
   data->elements.push(tag);
   data->level++;
@@ -167,17 +178,17 @@ void XmlWriter::writeTagBegin(const std::wstring &tag) {
 void XmlWriter::writeAttribute(const std::wstring &attribute, const std::wstring &value) {
   if (not data->openEnd)
     LOG(LM_WARNING, "XmlWriter::writeAttribute error");
-  data->buffer << ' ' << attribute << '=' << '"';
+  *data->wostr << ' ' << attribute << '=' << '"';
   for (const auto c:value)
     switch (c)
     {
-      case '<': data->buffer << L"&lt;"; break;
-      case '"': data->buffer << L"&quot;"; break;
-      case '&': data->buffer << L"&amp;"; break;
-      case 0 ... 0x1f: data->buffer << L"&#x" << hex << int(c) << L';'; break;
+      case '<': *data->wostr << L"&lt;"; break;
+      case '"': *data->wostr << L"&quot;"; break;
+      case '&': *data->wostr << L"&amp;"; break;
+      case 0 ... 0x1f: *data->wostr << L"&#x" << hex << int(c) << L';'; break;
       default: data->write(c);
     }
-  data->buffer << '"';
+  *data->wostr << '"';
 }
 
 void XmlWriter::writeValue(const std::wstring &value) {
@@ -185,10 +196,10 @@ void XmlWriter::writeValue(const std::wstring &value) {
   for (const auto c:value)
     switch (c)
     {
-      case '<': data->buffer << L"&lt;"; break;
-      case '>': data->buffer << L"&gt;"; break;
-      case '&': data->buffer << L"&amp;"; break;
-      case 0 ... 0x1f: if (escapeControl) { data->buffer << L"&#x" << hex << int(c) << L';'; break; }
+      case '<': *data->wostr << L"&lt;"; break;
+      case '>': *data->wostr << L"&gt;"; break;
+      case '&': *data->wostr << L"&amp;"; break;
+      case 0 ... 0x1f: if (escapeControl) { *data->wostr << L"&#x" << hex << int(c) << L';'; break; }
       default: data->write(c);
     }
   data->hasValue = true;
@@ -202,7 +213,7 @@ void XmlWriter::writeCdata(const std::wstring &value) {
       pos2 = value.length();
     else
       pos2 += 1;
-    data->buffer << L"<![CDATA[" << value.substr(pos1, pos2-pos1) << L"]]>";
+    *data->wostr << L"<![CDATA[" << value.substr(pos1, pos2-pos1) << L"]]>";
     if (pos2 == value.length())
       break;
     pos1 = pos2;
@@ -212,14 +223,14 @@ void XmlWriter::writeCdata(const std::wstring &value) {
 
 void XmlWriter::writeBase64(const std::vector<u_char> &value) {
   data->closeTag();
-  data->buffer << L"<![CDATA[";
+  *data->wostr << L"<![CDATA[";
   string lBreak;
   if (data->indent) {
     lBreak = "\n";
     lBreak.resize(data->level * 2 +1, ' ');
   }
-  copy_base64(value.cbegin(), value.cend(), std::ostreambuf_iterator<wchar_t>(data->buffer), lBreak);
-  data->buffer << L"]]>";
+  copy_base64(value.cbegin(), value.cend(), std::ostreambuf_iterator<wchar_t>(*data->wostr), lBreak);
+  *data->wostr << L"]]>";
   data->hasValue = true;
 }
 
@@ -228,16 +239,16 @@ void XmlWriter::writeTagEnd(bool forceNoNulltag) {
     throw runtime_error("XmlWriter::writeTagEnd unbalanced");
   data->level--;
   if (data->openEnd and not forceNoNulltag)
-    data->buffer << L"/>";
+    *data->wostr << L"/>";
   else {
     if (data->indent and not data->hasValue) {
-      data->buffer << '\n';
+      *data->wostr << '\n';
       data->writeIndent();
     }
-    data->buffer << L"</" << data->prefix << data->elements.top() << '>';
+    *data->wostr << L"</" << data->prefix << data->elements.top() << '>';
   }
   if (data->indent and level() == 0)
-    data->buffer << '\n' << flush;
+    *data->wostr << '\n' << flush;
   data->elements.pop();
   data->hasValue = false;
   data->openEnd = false;
@@ -246,18 +257,18 @@ void XmlWriter::writeTagEnd(bool forceNoNulltag) {
 void XmlWriter::writeComment(const std::wstring &value, bool inNewLine) {
   data->closeTag();
   if (data->indent and inNewLine) {
-    data->buffer << '\n';
+    *data->wostr << '\n';
     data->writeIndent();
   }
-  data->buffer << L"<!-- ";
+  *data->wostr << L"<!-- ";
   for (const auto c:value)
     switch (c)
     {
-      case '<': data->buffer << L"&lt;"; break;
-      case '>': data->buffer << L"&gt;"; break;
+      case '<': *data->wostr << L"&lt;"; break;
+      case '>': *data->wostr << L"&gt;"; break;
       default: data->write(c);
     }
-  data->buffer << L" -->";
+  *data->wostr << L" -->";
 }
 
 void XmlWriter::setPrefix(const std::wstring &pf) {
@@ -303,6 +314,74 @@ string XmlWriter::getString() const
 }
 
 
+void XmlWriter::startEncrypt(CryptBufBase *cbbp) {
+  if (data->cryptBufp or not cbbp or data->level == 0)
+    THROW("invalid state encryption");
+  data->cryptLevel = data->level;
+  std::wstring pfx;
+  data->prefix.swap(pfx);
+  writeTagBegin(L"EncryptedData");
+  writeAttribute(L"Type", L"https://www.w3.org/2001/04/xmlenc#Element");
+  writeAttribute(L"xmlns", L"https://www.w3.org/2001/04/xmlenc#");
+  writeTagBegin(L"EncryptionMethod");
+  writeAttribute(L"Algorithm", L"https://www.w3.org/2001/04/xmlenc#" + to_wstring(cbbp->name()));
+  writeTagEnd();
+  size_t rcpt = cbbp->recipients();
+  for (auto i = 0; i < rcpt; i++) {
+    writeTagBegin(L"KeyInfo");
+    writeAttribute(L"xmlns", L"https://www.w3.org/2000/09/xmldsig#");
+    writeTagBegin(L"KeyName");
+    string k = cbbp->getRecipientId(i);
+    if (not k.empty())
+      writeValue(to_wstring(k));
+    writeTagEnd();
+    string c = cbbp->getRecipientKeyBase64(i);
+    if (not c.empty()) {
+      writeTagBegin(L"CipherData");
+      writeTagBegin(L"CipherValue");
+      writeValue(to_wstring(c));
+      writeTagEnd();
+      writeTagEnd();
+    }
+    writeTagEnd();
+  }
+  writeTagBegin(L"CipherData");
+  writeTagBegin(L"CipherValue");
+  data->prefix.swap(pfx);
+  data->indentSave = data->indent;
+  data->indent = false;
+  data->closeTag();
+  data->cryptss.str("");
+  data->cryptss.clear();
+  data->cryptBufp = new CryptOstrBuf(data->cryptss, cbbp);
+  data->wostr = new std::wostream(data->cryptBufp);
+  *data->wostr << mobs::CryptBufBase::base64(true);
+}
+
+void XmlWriter::stopEncrypt() {
+  if (not data->cryptBufp)
+    return;
+  data->cryptBufp->finalize();
+  const string &buf = data->cryptss.str();
+//  copy(buf.cbegin(), buf.cend(), std::ostreambuf_iterator<wchar_t>(*data->wostr));
+
+  for (auto c:buf)
+    data->buffer.put(c);
+  delete data->wostr;
+  delete data->cryptBufp;
+  data->cryptBufp = nullptr;
+  data->cryptss.clear();
+  data->wostr = &data->buffer;
+
+  std::wstring pfx;
+  data->prefix.swap(pfx);
+  writeTagEnd();
+  data->indent = data->indentSave;
+  writeTagEnd();
+  writeTagEnd();
+  data->prefix.swap(pfx);
+  data->cryptLevel = 0;
+}
 
 
 }

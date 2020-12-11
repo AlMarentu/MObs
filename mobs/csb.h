@@ -51,17 +51,40 @@ public:
   CryptBufBase();
 
   ~CryptBufBase() override;
+
+  /// Bezeichnung des Algorithmus der Verschlüsselung
+  virtual std::string name() const { return ""; }
+  /** \brief Anzahl der Empfänger für diese Verschlüsselung
+   *
+   * @return Anzahl der vorhandenen Empfängereinträage
+   */
+  virtual size_t recipients() const { return 0; }
+  /** \brief Abfrage der Id des Empfängers
+   *
+   * @param pos Nr. des Empfänger-Eintrages 0..(recipients() -1)
+   * @return Id
+   */
+  virtual std::string getRecipientId(size_t pos) const {return ""; }
+  /** \brief Key zum Entschlüsseln der Nachricht eines Empfängers
+   *
+   * @param pos Nr. des Empfänger-Eintrages 0..(recipients() -1)
+   * @return Schlüssel in base64, falls vorhanden
+   */
+  virtual std::string getRecipientKeyBase64(size_t pos) const { return ""; }
+
   /// \private
   int_type overflow(int_type ch) override;
   /// \private
   int_type underflow() override;
 
+  /// Ausgabe abschließen
   virtual void finalize();
 
   /// \private
   virtual bool finished();
 
-  /*** \brief (de-)aktiviert den Base64-Modus
+  /** \brief (de-)aktiviert den Base64-Modus
+   *
    * @param on Base64 einschalten
    */
   void setBase64(bool on);
@@ -93,6 +116,8 @@ protected:
   std::streamsize doRead(char *s, std::streamsize count);
   /// \private
   bool isGood() const;
+  /// \private
+  void setBad();
 
 private:
   void setOstr(std::ostream &ostr);
@@ -174,7 +199,7 @@ public:
    * @param ostr std::ostream in den die Daten geschrieben werden
    * @param cbbp Plugin für Verschlüsselung, bei Fehlen wird CryptBufBase verwendet
    */
-    explicit CryptOstrBuf(std::ostream &ostr, CryptBufBase *cbbp = nullptr);
+  explicit CryptOstrBuf(std::ostream &ostr, CryptBufBase *cbbp = nullptr);
   ~CryptOstrBuf() override;
   /// \private
   int_type overflow(int_type ch) override;

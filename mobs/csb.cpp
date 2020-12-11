@@ -367,6 +367,13 @@ public:
     std::string linebreak;
   };
 
+  void setBad()  {
+    if (inStb)
+      inStb->setstate(std::ios_base::failbit);
+    if (outStb)
+      outStb->setstate(std::ios_base::failbit);
+  }
+
   bool isGood() const  {
     if (inStb)
       return inStb->good();
@@ -671,6 +678,11 @@ std::streamsize CryptBufBase::xsputn(const CryptBufBase::char_type *s, std::stre
 bool CryptBufBase::isGood() const {
   TRACE("");
   return data->isGood();
+}
+
+void CryptBufBase::setBad() {
+  TRACE("");
+  return data->setBad();
 }
 
 void CryptBufBase::setBase64(bool on) {

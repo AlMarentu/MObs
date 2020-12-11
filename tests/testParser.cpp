@@ -72,6 +72,8 @@ public:
   void StartTag(const std::string &element) override { LOG(LM_INFO, "START " << element); }
   void EndTag(const std::string &element) override { LOG(LM_INFO, "END " << element); }
   void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) override { LOG(LM_INFO, "PI" << element); }
+  void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, mobs::CryptBufBase *&cryptBufp) { };
+
   std::wistringstream str;
   std::string lastCdata;
 };

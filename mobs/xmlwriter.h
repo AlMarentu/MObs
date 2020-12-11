@@ -27,6 +27,7 @@
 
 #include "logging.h"
 #include "objtypes.h"
+#include "csb.h"
 
 #include<stack>
 #include<exception>
@@ -81,6 +82,8 @@ public:
   void writeComment(const std::wstring &comment, bool inNewLine = true);
   /// Anzeige der aktuellen Ebene
   int level() const;
+  /// Anzeige der Ebene ab der Verschlüsselung aktiv ist, sonst 0
+  int cryptingLevel() const;
   /// an dieser Stelle darf ein Attribute verwendet werden
   bool attributeAllowed() const;
   /// lesen des XML-Ergebnisses im gewählten Charset, nur bei Verwendung des internen Buffers
@@ -89,6 +92,9 @@ public:
   void clearString();
   /// setzte ein XML-Prefix
   void setPrefix(const std::wstring &pf);
+
+  void startEncrypt(CryptBufBase *cbbp);
+  void stopEncrypt();
 
   std::wstring valueToken; ///< Wenn nicht leer, dann als Attributname für Values verwenden
   std::wstring version = L"1.0"; ///< Version für Header

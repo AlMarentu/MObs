@@ -27,6 +27,7 @@
 #pragma ide diagnostic ignored "UnusedGlobalDeclarationInspection"
 namespace mobs {
 
+class CryptBufBase;
 class XmlReadData;
 /// KLasse um Objekte aus XML einzulesen
 /// \throw runtime_error wenn in der Struktur des XML ein Fehler ist
@@ -65,8 +66,17 @@ public:
   /// @param obj Zeiger auf das mit \c fill übergebene Objekt
   /// @param error ist bei Fehler gefüllt, ansonsten leer
   virtual void filled(ObjectBase *obj, const std::string &error) = 0;
+  /** \brief Callback-Funktion: Ein Element "EncryptedData" wurde gefunden und ein decrypt-Modul wird benötigt
+   *
+   * Es wird  "https://www.w3.org/2001/04/xmlenc#Element" unterstützt
+   * @param algorithm Algorithmus um xmlns bereinigt zB.: aes-256-cbc, oder "https://www.w3.org/2001/04/xmlenc#aes-256-cbc"/
+   * @param keyName KeyInfo-Element
+   * @param cryptBufp ein mit new erzeugtes Encryption-Module; wird automatisch freigegeben
+   */
+  virtual void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, mobs::CryptBufBase *&cryptBufp) { };
 
-  /// setzte ein XML-Prefix
+
+    /// setzte ein XML-Prefix
   void setPrefix(const std::string &pf);
   /// entferne das Prefix
   /// \throw runtime_error falls das prefix nicht übereinstimmt

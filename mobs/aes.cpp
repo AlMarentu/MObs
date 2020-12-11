@@ -73,7 +73,8 @@ public:
     // plaintext. We use a single iteration (the 6th parameter).
     key.fill(0);
     iv.fill(0);
-    EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha1(), &salt[0], (u_char*)passwd.c_str(), passwd.length(), 1, &key[0], &iv[0]);
+    if (not EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha1(), &salt[0], (u_char*)passwd.c_str(), passwd.length(), 1, &key[0], &iv[0]))
+      throw openssl_exception();
   }
 
   void newSalt()
@@ -90,14 +91,16 @@ public:
   std::array<u_char, KEYBUFLEN> key;
   EVP_CIPHER_CTX *ctx = nullptr;
   std::string passwd;
+  std::string id;
 //  bool finishing = false;
 };
 
 
-mobs::CryptBufAes::CryptBufAes(const std::string &pass) : CryptBufBase() {
+mobs::CryptBufAes::CryptBufAes(const std::string &pass, const std::string &id) : CryptBufBase() {
   TRACE("");
   data = new mobs::CryptBufAesData;
   data->passwd = pass;
+  data->id = id;
 }
 
 
@@ -158,12 +161,13 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::underflow() {
     }
     return Traits::to_int_type(*Base::gptr());
   } catch (std::exception &e) {
-    LOG(LM_ERROR, "EEE " << e.what());
+    LOG(LM_ERROR, "Exception " << e.what());
     if (data->ctx) {
       EVP_CIPHER_CTX_free(data->ctx);
       data->ctx = nullptr;
     }
-    throw e;
+    setBad();
+    return Traits::eof();
   }
 }
 
@@ -243,8 +247,9 @@ void mobs::CryptBufAes::openSalt() {
   LOG(LM_INFO, "Writing salt " << 8 + data->salt.size());
 }
 
-
-
+std::string mobs::CryptBufAes::getRecipientId(size_t pos) const {
+  return data->id;
+}
 
 
 std::string mobs::to_aes_string(const std::string &s, const std::string &pass) {
