@@ -177,6 +177,27 @@ private:
 };
 
 
+/** \brief istream-buffer der einen wistream einliest, bis ein für Base64 ungültiges Zeichen kommt
+ *
+ * wird für das Auswerten verschlüsselter Elemente im XML-Streams verwendet.
+ */
+class Base64IstBuf : public std::basic_streambuf<char> {
+public:
+  using Base = std::basic_streambuf<char>;
+  using char_type = typename Base::char_type;
+  using Traits = std::char_traits<char_type>;
+  using int_type = typename Base::int_type;
+
+  /// Konstruktor mit Übergabe des zu verarbeitenden wistream
+  explicit Base64IstBuf(std::wistream &istr);
+
+  /// \private
+  int_type underflow() override;
+
+private:
+  std::wistream &inStb;
+  char_type ch{};
+};
 
 
 

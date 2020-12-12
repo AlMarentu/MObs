@@ -25,34 +25,41 @@
 
 #include <openssl/ssl.h>
 #include <openssl/rand.h>
-#include <openssl/err.h>
+//#include <openssl/err.h>
 #include <vector>
 
 
 #define KEYBUFLEN 32
 #define INPUT_BUFFER_LEN 1024
 
+namespace mobs_internal {
+
+// -> rsa.cpp
+std::string openSslGetError();
+
+}
+
 namespace {
 
-std::string getError() {
-  u_long e;
-  std::string res = "OpenSSL: ";
-  while ((e = ERR_get_error())) {
-    static bool errLoad = false;
-    if (not errLoad) {
-      errLoad = true;
-//      ERR_load_crypto_strings(); // nur crypto-fehler laden
-      SSL_load_error_strings(); // NOLINT(hicpp-signed-bitwise)
-      atexit([](){ ERR_free_strings(); });
-    }
-    res += ERR_error_string(e, nullptr);
-  }
-  return res;
-}
+//std::string getError() {
+//  u_long e;
+//  std::string res = "OpenSSL: ";
+//  while ((e = ERR_get_error())) {
+//    static bool errLoad = false;
+//    if (not errLoad) {
+//      errLoad = true;
+////      ERR_load_crypto_strings(); // nur crypto-fehler laden
+//      SSL_load_error_strings(); // NOLINT(hicpp-signed-bitwise)
+//      atexit([](){ ERR_free_strings(); });
+//    }
+//    res += ERR_error_string(e, nullptr);
+//  }
+//  return res;
+//}
 
 class openssl_exception : public std::runtime_error {
 public:
-  openssl_exception() : std::runtime_error(getError()) {
+  openssl_exception() : std::runtime_error(mobs_internal::openSslGetError()) {
     LOG(LM_DEBUG, "openssl: " << what());
   }
 };
@@ -137,7 +144,7 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::underflow() {
       else
         data->finished = true;
       if (not data->ctx) {
-        LOG(LM_INFO, "AES init");
+//        LOG(LM_INFO, "AES init");
         if (sz >= 16 and std::string((char *) &buf[0], 8) == "Salted__") {
           memcpy(&data->salt[0], start + 8, 8);
           start += 16;
@@ -161,7 +168,7 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::underflow() {
       len += lenf;
       //    EVP_CIPHER_CTX_reset(data->ctx);
       EVP_CIPHER_CTX_free(data->ctx);
-      LOG(LM_INFO, "AES done");
+//      LOG(LM_INFO, "AES done");
       data->ctx = nullptr;
     }
     Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[len]);

@@ -35,9 +35,12 @@
 #define KEYBUFLEN 32
 #define INPUT_BUFFER_LEN 1024
 
-namespace {
+namespace mobs_internal {
 
-std::string getError() {
+std::string openSslGetError();
+
+
+std::string openSslGetError() {
   u_long e;
   std::string res = "OpenSSL: ";
   while ((e = ERR_get_error())) {
@@ -46,16 +49,20 @@ std::string getError() {
       errLoad = true;
 //      ERR_load_crypto_strings(); // nur crypto-fehler laden
       SSL_load_error_strings(); // NOLINT(hicpp-signed-bitwise)
-      atexit([](){ ERR_free_strings(); });
+      atexit([]() { ERR_free_strings(); });
     }
     res += ERR_error_string(e, nullptr);
   }
   return res;
 }
 
+}
+
+namespace {
+
 class openssl_exception : public std::runtime_error {
 public:
-  openssl_exception() : std::runtime_error(getError()) {
+  openssl_exception() : std::runtime_error(mobs_internal::openSslGetError()) {
     LOG(LM_DEBUG, "openssl: " << what());
   }
 };
@@ -80,7 +87,7 @@ public:
   }
 
 
-  RSA *readPrivateKey(const std::string &file, const std::string &passphrase) {
+  static RSA *readPrivateKey(const std::string &file, const std::string &passphrase) {
     BIO *bp = BIO_new(BIO_s_file());;
     if (not bp)
       return nullptr;
@@ -98,7 +105,7 @@ public:
     return rsaPrivKey;
   }
 
-  RSA *readPupliceKey(const std::string &file) {
+  static RSA *readPupliceKey(const std::string &file) {
     BIO *bp = BIO_new(BIO_s_file());;
     if (not bp)
       return nullptr;
@@ -107,7 +114,7 @@ public:
 
     // Load the RSA key from the BIO
     RSA* rsaPubKey = nullptr;
-    if (not PEM_read_bio_RSAPublicKey( bp, &rsaPubKey, NULL, NULL )) {
+    if (not PEM_read_bio_RSAPublicKey( bp, &rsaPubKey, nullptr, nullptr )) {
       BIO_free( bp );
       throw openssl_exception();
     }
@@ -256,7 +263,6 @@ mobs::CryptBufRsa::int_type mobs::CryptBufRsa::underflow() {
       data->finished = true;
     u_char *start = &buf[0];
     if (data->init) {
-      data->init = false;
       int is = EVP_CIPHER_iv_length(EVP_aes_256_cbc());
       if (sz < is)
         THROW("data missing");
@@ -265,23 +271,10 @@ mobs::CryptBufRsa::int_type mobs::CryptBufRsa::underflow() {
         throw openssl_exception();
       start += is;
       sz -= is;
+      data->init = false;
     }
-    if (not data->ctx) {
+    if (not data->ctx)
       THROW("context is invalid");
-//        LOG(LM_INFO, "AES init");
-//
-//        RSA *rsaPrivKey = data->readPrivateKey(data->keykile, data->passphrase);
-//        EVP_PKEY *priv_key = EVP_PKEY_new();
-//        if (1 != EVP_PKEY_set1_RSA(priv_key, rsaPrivKey))
-//          throw openssl_exception();
-//
-//
-//        if (not(data->ctx = EVP_CIPHER_CTX_new()))
-//          throw openssl_exception();
-////        if (1 != EVP_DecryptInit_ex(data->ctx, EVP_aes_256_cbc(), nullptr, &data->key[0], &data->iv[0]))
-//        if (1 != EVP_OpenInit(data->ctx, EVP_aes_256_cbc(), &data->cipher[0], data->cipher.size(), &data->iv[0], priv_key))
-//          throw openssl_exception();
-    }
     int len = 0;
 //      if (1 != EVP_DecryptUpdate(data->ctx, (u_char *) &data->buffer[0], &len, start, sz))
     if (1 != EVP_OpenUpdate(data->ctx, (u_char *) &data->buffer[0], &len, start, sz))
@@ -295,7 +288,7 @@ mobs::CryptBufRsa::int_type mobs::CryptBufRsa::underflow() {
       len += lenf;
       //    EVP_CIPHER_CTX_reset(data->ctx);
       EVP_CIPHER_CTX_free(data->ctx);
-      LOG(LM_INFO, "AES done");
+//      LOG(LM_DEBUG, "AES done");
       data->ctx = nullptr;
     }
     Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[len]);
@@ -306,12 +299,13 @@ mobs::CryptBufRsa::int_type mobs::CryptBufRsa::underflow() {
     }
     return Traits::to_int_type(*Base::gptr());
   } catch (std::exception &e) {
-    LOG(LM_ERROR, "EEE " << e.what());
+    LOG(LM_ERROR, "Encryption error " << (data->init ? u8"in init ": u8"") << e.what());
     if (data->ctx) {
       EVP_CIPHER_CTX_free(data->ctx);
       data->ctx = nullptr;
     }
-    throw e;
+    setBad();
+    return Traits::eof();
   }
 }
 
@@ -334,7 +328,7 @@ mobs::CryptBufRsa::int_type mobs::CryptBufRsa::overflow(mobs::CryptBufRsa::int_t
     if (1 != EVP_SealUpdate(data->ctx, start, &len, (u_char *)(Base::pbase()),
                                std::distance(Base::pbase(), Base::pptr())))
       throw openssl_exception();
-     len +=  start - &buf[0];
+     len +=  int(start - &buf[0]);
 //      LOG(LM_INFO, "Writing " << len << "  was " << std::distance(Base::pbase(), Base::pptr()) << std::string(Base::pbase(), std::distance(Base::pbase(), Base::pptr())));
     doWrite((char *)(&buf[0]), len);
     CryptBufBase::setp(data->buffer.begin(), data->buffer.end()); // buffer zurücksetzen
@@ -357,7 +351,7 @@ void mobs::CryptBufRsa::finalize() {
 //    EVP_CIPHER_CTX_reset(data->ctx);
     EVP_CIPHER_CTX_free(data->ctx);
     data->ctx = nullptr;
-    LOG(LM_INFO, "Writing. " << len);
+//    LOG(LM_DEBUG, "Writing. " << len);
     doWrite(reinterpret_cast<char *>(&buf[0]), len);
   }
   CryptBufBase::finalize();

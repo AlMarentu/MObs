@@ -449,49 +449,20 @@ public:
       char *it = s;
       if (count > C_IN_BUF_SZ)
         count = C_IN_BUF_SZ;
-      if (only64) {
-        if (only64done)
-          return 0;
-        // Zeichenweise bis zu Ende das Base64-Elementes lesen
-        while (std::distance(s, it) < count) {
-          char c;
-          if (inStb->get(c).eof()) {
-            if (b64Cnt > 0)
-              for (; b64Cnt < 4; b64Cnt++)
-                b64get(u_char('='), it);
-            only64done = true;
-            LOG(LM_INFO, "got EOF");
-            break;
-          }
-          int v = from_base64(c);
-          if (v >= 0)
-            b64get(u_char(c), it);
-          else {
-            inStb->unget();
-            if (b64Cnt > 0)
-              for (; b64Cnt < 4; b64Cnt++)
-                b64get(u_char('='), it);
-            only64done = true;
-            break;
-          }
-        }
-      } else {
-        size_t c2 = count / 3 * 4;
-        std::array<char, C_IN_BUF_SZ / 3 * 4 + 1> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
-        inStb->read(&buf[0], c2);
-        auto sr = inStb->gcount();
-        char *cp = &buf[0];
-        if (sr)
-          for (size_t i = 0; i < sr; i++)
-            b64get(u_char(*cp++), it);
-        else {
-          if (b64Cnt > 0)
-            for (; b64Cnt < 4; b64Cnt++)
-              b64get(u_char('='), it);
-          only64done = true;
-        }
+      size_t c2 = count / 3 * 4;
+      std::array<char, C_IN_BUF_SZ / 3 * 4 + 1> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
+      inStb->read(&buf[0], c2);
+      auto sr = inStb->gcount();
+      char *cp = &buf[0];
+      if (sr)
+        for (size_t i = 0; i < sr; i++)
+          b64get(u_char(*cp++), it);
+      else {
+        if (b64Cnt > 0)
+          for (; b64Cnt < 4; b64Cnt++)
+            b64get(u_char('='), it);
       }
-      LOG(LM_INFO, "READ " << std::distance(s, it));
+//      LOG(LM_INFO, "READ " << std::distance(s, it));
       return std::distance(s, it);
     }  else {
       inStb->read(s, count);
@@ -560,8 +531,6 @@ public:
   std::istream *inStb = nullptr;
   std::array<CryptBufBase::char_type, C_IN_BUF_SZ> buffer;
   bool use64 = false;
-  bool only64 = false; // lese bis zum Ende des Base64-Inputs
-  bool only64done = false; // Ende des Base64-Inputs erreicht
   bool bad = false;
 
   int b64Value = 0;
@@ -709,6 +678,33 @@ void CryptBufBase::setBase64(bool on) {
 
 bool CryptBufBase::bad() const {
   return data->bad;
+}
+
+
+
+
+
+
+
+
+
+Base64IstBuf::Base64IstBuf(std::wistream &istr) : Base(), inStb(istr) {
+  TRACE("");
+  Base::setg(&ch, &ch, &ch);
+}
+
+Base64IstBuf::int_type Base64IstBuf::underflow() {
+  TRACE("");
+  wchar_t c;
+  if (inStb.get(c).eof())
+    return Traits::eof();
+  if (c == '=' or from_base64(c) >= 0) {
+    ch = char(c);
+    Base::setg(&ch, &ch, &ch+1);
+    return Traits::to_int_type(ch);
+  }
+  inStb.unget();
+  return Traits::eof();
 }
 
 
