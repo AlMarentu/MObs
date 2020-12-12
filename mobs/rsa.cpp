@@ -166,6 +166,7 @@ class Receipt {
   EVP_PKEY *priv_key = nullptr;
   std::vector<u_char> cipher;
   bool init = true;
+  bool finished = false;
 };
 
 
@@ -235,14 +236,24 @@ mobs::CryptBufRsa::int_type mobs::CryptBufRsa::underflow() {
   TRACE("");
 //  std::cout << "underflow3 " << "\n";
   try {
-    if (finished())
+    if (data->finished)
       return Traits::eof();
     std::array<u_char, INPUT_BUFFER_LEN + EVP_MAX_BLOCK_LENGTH> buf{}; // NOLINT(cppcoreguidelines-pro-type-member-init)
 
-    size_t sz = doRead((char *) &buf[0], buf.size());
+    size_t sz = doRead((char *) &buf[0], buf.size() - EVP_MAX_BLOCK_LENGTH);
     // Input Buffer wenigsten halb voll kriegen
-    while (sz < buf.size() / 2 and not CryptBufBase::finished())
-      sz += doRead((char *) &buf[sz], buf.size() - sz);
+    if (sz) {
+      while (sz < buf.size() / 2) {
+        auto szt = doRead((char *) &buf[sz], buf.size() - sz);
+        if (not szt) {
+          data->finished = true;
+          break;
+        }
+        sz += szt;
+      }
+    }
+    else
+      data->finished = true;
     u_char *start = &buf[0];
     if (data->init) {
       data->init = false;
@@ -277,9 +288,11 @@ mobs::CryptBufRsa::int_type mobs::CryptBufRsa::underflow() {
       throw openssl_exception();
 //    LOG(LM_DEBUG, "GC2 = " << sz << " " << len << " " << std::string(&data->buffer[0], len));
 
-    if (len == 0 and CryptBufBase::finished()) {
-      if (1 != EVP_OpenFinal(data->ctx, (u_char *) &data->buffer[0], &len))
+    if (data->finished) {
+      int lenf = 0;
+      if (1 != EVP_OpenFinal(data->ctx, (u_char *) &data->buffer[len], &lenf))
         throw openssl_exception();
+      len += lenf;
       //    EVP_CIPHER_CTX_reset(data->ctx);
       EVP_CIPHER_CTX_free(data->ctx);
       LOG(LM_INFO, "AES done");
@@ -348,14 +361,6 @@ void mobs::CryptBufRsa::finalize() {
     doWrite(reinterpret_cast<char *>(&buf[0]), len);
   }
   CryptBufBase::finalize();
-}
-
-bool mobs::CryptBufRsa::finished() {
-  TRACE("");
-//  std::cout << "finished3\n";
-  if (not CryptBufBase::finished())
-    return false;
-  return (not data->ctx);
 }
 
 

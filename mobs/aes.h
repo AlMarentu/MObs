@@ -73,8 +73,6 @@ public:
 
   /// \private
   void finalize() override;
-  /// \private
-  bool finished() override;
 
   void openSalt();
 

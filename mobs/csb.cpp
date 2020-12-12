@@ -98,6 +98,13 @@ CryptIstrBuf::~CryptIstrBuf() {
   delete data;
 }
 
+
+bool CryptIstrBuf::bad() const {
+  if (data->cbb and data->cbb->bad())
+    return true;
+  return false;
+}
+
 CryptIstrBuf::int_type CryptIstrBuf::underflow() {
   TRACE("");
   try {
@@ -106,8 +113,6 @@ CryptIstrBuf::int_type CryptIstrBuf::underflow() {
 //    std::cout << "underflow\n";
     std::streamsize sz = 0;
     if (data->cbb) {
-      if (data->inStb.eof() and data->cbb->finished())
-        return Traits::eof();
       sz = data->cbb->sgetn(&buf[0], buf.size());
     } else {
       if (data->inStb.eof())
@@ -116,6 +121,10 @@ CryptIstrBuf::int_type CryptIstrBuf::underflow() {
       if (sen) {
         data->inStb.read(&buf[0], buf.size());
         sz = data->inStb.gcount();
+        if (not sz) {
+          Base::setg(data->buffer.begin(), data->buffer.begin(), data->buffer.begin());
+          return Traits::eof();
+        }
       }
     }
 //    std::cout << "GC = " << sz << "  " << std::string(&buf[0], sz) << std::endl;
@@ -368,8 +377,9 @@ public:
   };
 
   void setBad()  {
-    if (inStb)
-      inStb->setstate(std::ios_base::failbit);
+    bad = true;
+//    if (inStb)
+//      inStb->setstate(std::ios_base::failbit);
     if (outStb)
       outStb->setstate(std::ios_base::failbit);
   }
@@ -391,19 +401,10 @@ public:
   void b64Start() {
     b64Cnt = 0;
     b64Value = 0;
-    b64Finishing = false;
   }
 
-  bool b64Finished()  {
-    b64Finishing = (b64Cnt > 0 and b64Cnt < 4);
-    LOG(LM_INFO, "b64Finishing = " << b64Finishing);
-    return not b64Finishing;
 
-//    if (b64Cnt > 0 and b64Cnt < 4)
-//      b64Put('=');
-  }
-
-  void b64Put(u_char c, CryptBufBase::char_type *&it) {
+  void b64get(u_char c, CryptBufBase::char_type *&it) {
     int v = from_base64(c);
     if (v < 0) {
       if (c == '=') { // padding
@@ -441,37 +442,58 @@ public:
   }
 
   std::streamsize doRead(char *s, std::streamsize count)  {
-    if (not inStb)
+    std::istream::sentry sen(*inStb);
+    if (not sen)
       return 0;
-
     if (use64) {
       char *it = s;
-      if (b64Finishing) {
-        b64Finishing = false;
-        for (; b64Cnt < 4; b64Cnt++)
-          b64Put(u_char('='), it);
-        return std::distance(s, it);
-      }
       if (count > C_IN_BUF_SZ)
         count = C_IN_BUF_SZ;
-      size_t c2 = count / 3 * 4;
-      std::array<char, C_IN_BUF_SZ / 3 * 4 + 1> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
-      std::istream::sentry sen(*inStb);
-      if (not sen)
-        return 0;
-      inStb->read(&buf[0], c2);
-      auto sr = inStb->gcount();
-
-      char *cp = &buf[0];
-//      chsr *end = &buffer[count];
-      for (size_t i = 0; i < sr; i++)
-        b64Put(u_char(*cp++), it);
-
+      if (only64) {
+        if (only64done)
+          return 0;
+        // Zeichenweise bis zu Ende das Base64-Elementes lesen
+        while (std::distance(s, it) < count) {
+          char c;
+          if (inStb->get(c).eof()) {
+            if (b64Cnt > 0)
+              for (; b64Cnt < 4; b64Cnt++)
+                b64get(u_char('='), it);
+            only64done = true;
+            LOG(LM_INFO, "got EOF");
+            break;
+          }
+          int v = from_base64(c);
+          if (v >= 0)
+            b64get(u_char(c), it);
+          else {
+            inStb->unget();
+            if (b64Cnt > 0)
+              for (; b64Cnt < 4; b64Cnt++)
+                b64get(u_char('='), it);
+            only64done = true;
+            break;
+          }
+        }
+      } else {
+        size_t c2 = count / 3 * 4;
+        std::array<char, C_IN_BUF_SZ / 3 * 4 + 1> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
+        inStb->read(&buf[0], c2);
+        auto sr = inStb->gcount();
+        char *cp = &buf[0];
+        if (sr)
+          for (size_t i = 0; i < sr; i++)
+            b64get(u_char(*cp++), it);
+        else {
+          if (b64Cnt > 0)
+            for (; b64Cnt < 4; b64Cnt++)
+              b64get(u_char('='), it);
+          only64done = true;
+        }
+      }
+      LOG(LM_INFO, "READ " << std::distance(s, it));
       return std::distance(s, it);
     }  else {
-      std::istream::sentry sen(*inStb);
-      if (not sen)
-        return 0;
       inStb->read(s, count);
       return inStb->gcount();
     }
@@ -538,10 +560,12 @@ public:
   std::istream *inStb = nullptr;
   std::array<CryptBufBase::char_type, C_IN_BUF_SZ> buffer;
   bool use64 = false;
+  bool only64 = false; // lese bis zum Ende des Base64-Inputs
+  bool only64done = false; // Ende des Base64-Inputs erreicht
+  bool bad = false;
 
   int b64Value = 0;
   int b64Cnt = 0;
-  bool b64Finishing = false;
   Base64Info b64;
 };
 
@@ -572,11 +596,11 @@ void CryptBufBase::setIstr(std::istream &istr) {
 CryptBufBase::int_type CryptBufBase::underflow() {
   TRACE("");
 //  std::cout << "underflow\n";
-  if (not data->b64Finishing and data->isEof())
-    return Traits::eof();
   size_t sz = data->doRead(&data->buffer[0], data->buffer.size());
   Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[sz]);
   std::cout << "GC2 = " << sz << "  ";
+  if (not sz)
+    return Traits::eof();
   return Traits::to_int_type(*Base::gptr());
 }
 
@@ -655,17 +679,6 @@ void CryptBufBase::finalize() {
   }
 }
 
-bool CryptBufBase::finished() {
-  TRACE("");
-//  std::cout << "finished2\n";
-  if (not data->isEof())
-    return false;
-  if (Base::gptr() < Base::egptr())
-    return false;
-  if (data->use64)
-    return data->b64Finished();
-  return true;
-}
 
 std::streamsize CryptBufBase::xsputn(const CryptBufBase::char_type *s, std::streamsize count) {
   TRACE(PARAM(count));
@@ -689,11 +702,14 @@ void CryptBufBase::setBase64(bool on) {
   TRACE("");
   if (data->outStb and data->use64 != on and seekoff(0, std::ios_base::cur, std::ios_base::out) > 0)
     finalize();
+  if (on and not data->use64)
+    data->b64Start();
   data->use64 = on;
-  if (not on)
-    data->b64Finishing = false;
 }
 
+bool CryptBufBase::bad() const {
+  return data->bad;
+}
 
 
 }

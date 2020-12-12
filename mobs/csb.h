@@ -80,14 +80,14 @@ public:
   /// Ausgabe abschließen
   virtual void finalize();
 
-  /// \private
-  virtual bool finished();
-
   /** \brief (de-)aktiviert den Base64-Modus
    *
    * @param on Base64 einschalten
    */
   void setBase64(bool on);
+
+  /// Abfrage des Status
+  bool bad() const;
 
   /// \private
   class base64 {
@@ -161,6 +161,9 @@ public:
 
   /// Zugriff auf den Stream-Buffer des Plugins (ist immer gültig)
   CryptBufBase *getCbb();
+
+  /// Abfrage des Status
+  bool bad() const;
 
 protected:
 //  pos_type seekpos(pos_type pos, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override;

@@ -87,8 +87,6 @@ public:
 
   /// \private
   void finalize() override;
-  /// \private
-  bool finished() override;
 
   /** \brief Anzahl der Empfänger für diese Verschlüsselung
     *

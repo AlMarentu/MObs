@@ -92,7 +92,7 @@ public:
   EVP_CIPHER_CTX *ctx = nullptr;
   std::string passwd;
   std::string id;
-//  bool finishing = false;
+  bool finished = false;
 };
 
 
@@ -116,16 +116,26 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::underflow() {
   TRACE("");
 //  std::cout << "underflow3 " << "\n";
   try {
-    if (finished())
+    if (data->finished)
       return Traits::eof();
     std::array<u_char, INPUT_BUFFER_LEN + EVP_MAX_BLOCK_LENGTH> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
     int len;
     {
       u_char *start = &buf[0];
-      size_t sz = doRead((char *) &buf[0], buf.size());
+      size_t sz = doRead((char *) &buf[0], buf.size() - EVP_MAX_BLOCK_LENGTH);
       // Input Buffer wenigsten halb voll kriegen
-      while (sz < buf.size() / 2 and not CryptBufBase::finished())
-        sz += doRead((char *) &buf[sz], buf.size() - sz);
+      if (sz) {
+        while (sz < buf.size() / 2) {
+          auto szt = doRead((char *) &buf[sz], buf.size() - sz);
+          if (not szt) {
+            data->finished = true;
+            break;
+          }
+          sz += szt;
+        }
+      }
+      else
+        data->finished = true;
       if (not data->ctx) {
         LOG(LM_INFO, "AES init");
         if (sz >= 16 and std::string((char *) &buf[0], 8) == "Salted__") {
@@ -144,9 +154,11 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::underflow() {
       if (1 != EVP_DecryptUpdate(data->ctx, (u_char *) &data->buffer[0], &len, start, sz))
         throw openssl_exception();
     }
-    if (len == 0 and CryptBufBase::finished()) {
-      if (1 != EVP_DecryptFinal_ex(data->ctx, (u_char *) &data->buffer[0], &len))
+    if (data->finished) {
+      int lenf;
+      if (1 != EVP_DecryptFinal_ex(data->ctx, (u_char *) &data->buffer[len], &lenf))
         throw openssl_exception();
+      len += lenf;
       //    EVP_CIPHER_CTX_reset(data->ctx);
       EVP_CIPHER_CTX_free(data->ctx);
       LOG(LM_INFO, "AES done");
@@ -229,14 +241,6 @@ void mobs::CryptBufAes::finalize() {
     doWrite(reinterpret_cast<char *>(&buf[0]), len);
   }
   CryptBufBase::finalize();
-}
-
-bool mobs::CryptBufAes::finished() {
-  TRACE("");
-//  std::cout << "finished3\n";
-    if (not CryptBufBase::finished())
-      return false;
-    return (not data->ctx);
 }
 
 void mobs::CryptBufAes::openSalt() {
