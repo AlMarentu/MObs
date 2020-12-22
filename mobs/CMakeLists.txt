@@ -6,6 +6,9 @@ set(libSrcs objgen.cpp objtypes.cpp logging.cpp strtoobj.cpp objpool.cpp xmlwrit
         jsonparser.h objgen.h objstore.h union.h xmlout.h xmlread.h dbifc.h helper.h mchrono.h  queryorder.h
         querygenerator.h csb.h)
 
+if (UNIX)
+    set(libSrcs ${libSrcs} tcpstream.cpp tcpstream.h)
+endif()
 
 if (OPENSSL_FOUND)
     include_directories(${OPENSSL_INCLUDE_DIR})
