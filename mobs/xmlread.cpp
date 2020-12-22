@@ -205,6 +205,8 @@ void XmlReader::setBase64(bool b) { data->setBase64(b); }
 void XmlReader::parse() { data->parse(); }
 bool XmlReader::eof() const { return data->eof(); }
 void XmlReader::stop() { data->stop(); }
+void XmlReader::readTillEof(bool s) { data->readTillEof(s); }
+
 //  XmlReadData(const std::string &input, const ConvObjFromStr &c) : XmlParserW(str), str(to_wstring(input)) { cfs = c; };
 
 

@@ -84,9 +84,11 @@ public:
   /// Aktiviere automatische base64 erkennung
   /// \see Base64
   void setBase64(bool b);
+  /// Einstellung: Lese bis EOF, ansonsten stoppe beim letzten Ene-Tag
+  void readTillEof(bool s);
   /// ist beim Parsen das Ende erreicht
   bool eof() const;
-  /// verlasse bein nächsten End-Tag den parser
+  /// verlasse beim nächsten End-Tag den parser
   void stop();
   /// parse den Input (weiter)
   void parse();

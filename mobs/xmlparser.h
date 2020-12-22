@@ -556,9 +556,11 @@ public:
    */
   virtual void Encrypt(const std::string &algorithm, const std::string &keyName,  const std::string &cipher, CryptBufBase *&cryptBufp) = 0;
 
+  /// Einstellung: Lese bis EOF
+  void readTillEof(bool s) {  reedEof = s; }
 /// ist beim Parsen das Ende erreicht
 bool eof() const { return endOfFile; }
-/// verlasse bein nächsten End-Tag den parser
+/// verlasse beim nächsten End-Tag den parser
 void stop() { running = false; }
 /// Aktiviere automatische base64 Erkennung
 /// \see Base64
@@ -671,6 +673,7 @@ void parse() {
       if (xmlEncState <= 0)
         EndTag(element);
       else {
+//        LOG(LM_DEBUG, "EEE element " << element << " " << xmlEncState);
         xmlEncState--;
         if (element == u8"EncryptedData") {
           // Wenn CipherData vollständig dann wieder alles auf normal
@@ -694,6 +697,8 @@ void parse() {
       }
       tags.pop();
       eat('>');
+      if (not reedEof and tags.empty())
+        return;
       parse2LT();
       continue;
     }
@@ -818,12 +823,13 @@ void parse() {
       THROW("missing begin tag");
     tags.emplace(element, currentXmlns());
     if (xmlEncState == 0 and element == u8"EncryptedData") {
-//      LOG(LM_DEBUG, "encrypting element " << xmlEncState);
       xmlEncState = 1;
+//      LOG(LM_DEBUG, "encrypting element " << xmlEncState);
       encryptedData = EncryptedData();
     } else if (xmlEncState > 0) {
       xmlEncState++;
-      if (xmlEncState == 4 and element == "CipherValue") {
+//      LOG(LM_DEBUG, "III element " << element << " " << xmlEncState);
+      if (xmlEncState == 3 and element == "CipherValue") {
         LOG(LM_DEBUG, "START CRYPT " << encryptedData.keyName);
         if (not encryptedData.cryptBufp)
           THROW("no suitable decryption found");
@@ -857,7 +863,9 @@ void parse() {
       {
         eat();
         eat('>');
-        if (xmlEncState <= 0)
+        if (xmlEncState > 0)
+          xmlEncState--;
+        else
           NullTag(element);
         tags.pop();
         parse2LT();
@@ -1091,6 +1099,9 @@ wchar_t get() const {
       c = istr.get();
     }
   } else {
+//    std::wistream::sentry s(istr);
+//    if (not s)
+//      THROW("bad stream");
     c = istr.get();
 //    std::cout << " x" << mobs::to_string(c); // << " " << istr.tellg() << ".";
   }
@@ -1129,6 +1140,7 @@ bool try64 = false;
 bool in64 = false;
 bool useBase64 = false;
 bool running = false;
+bool reedEof = true;
 bool endOfFile = false;
 
 };
