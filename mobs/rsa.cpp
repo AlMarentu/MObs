@@ -62,10 +62,11 @@ namespace {
 
 class openssl_exception : public std::runtime_error {
 public:
-  openssl_exception() : std::runtime_error(mobs_internal::openSslGetError()) {
+  openssl_exception(const std::string &log = "") : std::runtime_error(log + " " + mobs_internal::openSslGetError()) {
     LOG(LM_DEBUG, "openssl: " << what());
   }
 };
+
 
 }
 
@@ -99,7 +100,7 @@ public:
     // wenn nullptr statt passphrase, wird auf der Konsole nachgefragt
     if (not PEM_read_bio_RSAPrivateKey( bp, &rsaPrivKey, nullptr, (void *)passphrase.c_str() )) {
       BIO_free( bp );
-      throw openssl_exception();
+      throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
     }
     BIO_free( bp );
     return rsaPrivKey;
@@ -116,7 +117,7 @@ public:
     RSA* rsaPubKey = nullptr;
     if (not PEM_read_bio_RSAPublicKey( bp, &rsaPubKey, nullptr, nullptr )) {
       BIO_free( bp );
-      throw openssl_exception();
+      throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
     }
     BIO_free( bp );
     return rsaPubKey;
@@ -125,7 +126,7 @@ public:
   void initPubkeys(const std::list<CryptBufRsa::PubKey> &pupkeys) {
 
     if (not(ctx = EVP_CIPHER_CTX_new()))
-      throw openssl_exception();
+      throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
 
     for (auto &k:pupkeys) {
       RSA *rsaPupKey = readPupliceKey(k.filename);
@@ -133,7 +134,7 @@ public:
         THROW("can't load public key " << k.filename);
       EVP_PKEY *pub_key = EVP_PKEY_new();
       if (1 != EVP_PKEY_set1_RSA(pub_key, rsaPupKey))
-        throw openssl_exception();
+        throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
 
       reciepients.emplace_back(pub_key, k.id);
     }
@@ -149,7 +150,7 @@ public:
 
     if (not EVP_SealInit(ctx, EVP_aes_256_cbc(), &encrypted_key[0], &encrypted_key_len[0], &iv[0],
                          &pub_keys[0], reciepients.size()))
-      throw openssl_exception();
+      throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
 //  RSA_free(rsaPupKey);
     for (size_t i = 0; i < reciepients.size(); i++)
       reciepients[i].cipher.resize(encrypted_key_len[i]);
@@ -200,10 +201,10 @@ mobs::CryptBufRsa::CryptBufRsa(const std::string &filename, const std::vector<u_
   RSA *rsaPrivKey = data->readPrivateKey(filename, passphrase);
   data->priv_key = EVP_PKEY_new();
   if (1 != EVP_PKEY_set1_RSA(data->priv_key, rsaPrivKey))
-    throw openssl_exception();
+    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
 
   if (not (data->ctx = EVP_CIPHER_CTX_new()))
-    throw openssl_exception();
+    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
 //  memcpy(&data->iv[0], &g_iv[0], KEYBUFLEN);
 }
 
@@ -268,7 +269,7 @@ mobs::CryptBufRsa::int_type mobs::CryptBufRsa::underflow() {
         THROW("data missing");
       memcpy(&data->iv[0], start, is);
       if (1 != EVP_OpenInit(data->ctx, EVP_aes_256_cbc(), &data->cipher[0], data->cipher.size(), &data->iv[0], data->priv_key))
-        throw openssl_exception();
+        throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
       start += is;
       sz -= is;
       data->init = false;
@@ -278,13 +279,13 @@ mobs::CryptBufRsa::int_type mobs::CryptBufRsa::underflow() {
     int len = 0;
 //      if (1 != EVP_DecryptUpdate(data->ctx, (u_char *) &data->buffer[0], &len, start, sz))
     if (1 != EVP_OpenUpdate(data->ctx, (u_char *) &data->buffer[0], &len, start, sz))
-      throw openssl_exception();
+      throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
 //    LOG(LM_DEBUG, "GC2 = " << sz << " " << len << " " << std::string(&data->buffer[0], len));
 
     if (data->finished) {
       int lenf = 0;
       if (1 != EVP_OpenFinal(data->ctx, (u_char *) &data->buffer[len], &lenf))
-        throw openssl_exception();
+        throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
       len += lenf;
       //    EVP_CIPHER_CTX_reset(data->ctx);
       EVP_CIPHER_CTX_free(data->ctx);
@@ -327,7 +328,7 @@ mobs::CryptBufRsa::int_type mobs::CryptBufRsa::overflow(mobs::CryptBufRsa::int_t
     }
     if (1 != EVP_SealUpdate(data->ctx, start, &len, (u_char *)(Base::pbase()),
                                std::distance(Base::pbase(), Base::pptr())))
-      throw openssl_exception();
+      throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
      len +=  int(start - &buf[0]);
 //      LOG(LM_INFO, "Writing " << len << "  was " << std::distance(Base::pbase(), Base::pptr()) << std::string(Base::pbase(), std::distance(Base::pbase(), Base::pptr())));
     doWrite((char *)(&buf[0]), len);
@@ -347,7 +348,7 @@ void mobs::CryptBufRsa::finalize() {
     std::array<u_char, EVP_MAX_BLOCK_LENGTH> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
     int len;
     if (1 != EVP_SealFinal(data->ctx, &buf[0], &len))
-      throw openssl_exception();
+      throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
 //    EVP_CIPHER_CTX_reset(data->ctx);
     EVP_CIPHER_CTX_free(data->ctx);
     data->ctx = nullptr;
@@ -364,23 +365,78 @@ void mobs::generateRsaKey(const std::string &filePriv, const std::string &filePu
   unsigned long	e = RSA_F4;
 
   if (1 != BN_set_word(bne,e))
-    throw openssl_exception();
+    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
   if (not RSA_generate_key_ex(rsa, 2048, bne, nullptr))
-    throw openssl_exception();
+    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
   BN_free(bne);
   BIO	*bp_public = BIO_new_file(filePup.c_str(), "w+");
   if (1 != PEM_write_bio_RSAPublicKey(bp_public, rsa))
-    throw openssl_exception();
+    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
   BIO_free_all(bp_public);
   BIO	*bp_private = BIO_new_file(filePriv.c_str(), "w+");
 
 //  if (1 != PEM_write_bio_RSAPrivateKey(bp_private, rsa, nullptr, nullptr, 0, nullptr, nullptr)) // unverschlüsselte Ausgabe
   if (1 != PEM_write_bio_RSAPrivateKey(bp_private, rsa, EVP_des_ede3_cbc(), nullptr, 0, nullptr, (void *)passphrase.c_str()))
-    throw openssl_exception();
+    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
   BIO_free_all(bp_private);
 
 //  cout <<  RSA_check_key(rsa) << endl;
 
   RSA_free(rsa);
+}
+
+// T TODO v2.0 RSA_PKCS1_OAEP_PADDING
+void
+mobs::decryptPublicRsa(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePup) {
+  RSA* rsaPubKey = mobs::CryptBufRsaData::readPupliceKey(filePup);
+  if (not rsaPubKey)
+    THROW(u8"can't load pub key");
+  sessionKey.resize(RSA_size(rsaPubKey));
+  int sz = RSA_public_decrypt(cipher.size(), &cipher[0], &sessionKey[0], rsaPubKey, RSA_PKCS1_PADDING);
+  if (sz < 0)
+    throw openssl_exception(LOGSTR("mobs::decryptPublicRsa"));
+  sessionKey.resize(sz);
+  RSA_free(rsaPubKey);
+}
+
+void
+mobs::encryptPrivateRsa(const std::vector<u_char> &sessionKey, std::vector<u_char> &cipher, const std::string &filePriv,
+                        const std::string &passphrase) {
+  RSA* rsaPrivKey = mobs::CryptBufRsaData::readPrivateKey(filePriv, passphrase);
+  if (not rsaPrivKey)
+    THROW(u8"can't load priv key");
+  if (sessionKey.size() >= RSA_size(rsaPrivKey) - 41)
+    THROW(u8"array to big");
+  cipher.resize(RSA_size(rsaPrivKey));
+  if (0 > RSA_private_encrypt(sessionKey.size(), &sessionKey[0], &cipher[0], rsaPrivKey, RSA_PKCS1_PADDING))
+    throw openssl_exception(LOGSTR("mobs::encryptPrivateRsa"));
+  RSA_free(rsaPrivKey);
+}
+
+void
+mobs::decryptPrivateRsa(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePriv,
+                        const std::string &passphrase) {
+  RSA* rsaPrivKey = mobs::CryptBufRsaData::readPrivateKey(filePriv, passphrase);
+  if (not rsaPrivKey)
+    THROW(u8"can't load priv key");
+  sessionKey.resize(RSA_size(rsaPrivKey));
+  int sz = RSA_private_decrypt(cipher.size(), &cipher[0], &sessionKey[0], rsaPrivKey, RSA_PKCS1_PADDING);
+  if (sz < 0)
+    throw openssl_exception(LOGSTR("mobs::decryptPrivateRsa"));
+  sessionKey.resize(sz);
+  RSA_free(rsaPrivKey);
+}
+
+void
+mobs::encryptPublicRsa(const std::vector<u_char> &sessionKey, std::vector<u_char> &cipher, const std::string &filePup) {
+  RSA* rsaPubKey = mobs::CryptBufRsaData::readPupliceKey(filePup);
+  if (not rsaPubKey)
+    THROW(u8"can't load pub key");
+  if (sessionKey.size() >= RSA_size(rsaPubKey) - 41)
+    THROW(u8"array to big");
+  cipher.resize(RSA_size(rsaPubKey));
+  if (0 > RSA_public_encrypt(sessionKey.size(), &sessionKey[0], &cipher[0], rsaPubKey, RSA_PKCS1_PADDING))
+    throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
+  RSA_free(rsaPubKey);
 }
 

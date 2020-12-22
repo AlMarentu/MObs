@@ -28,6 +28,7 @@
 
 
 #include <utility>
+#include <list>
 
 
 #include "csb.h"
@@ -129,6 +130,40 @@ private:
  */
 void generateRsaKey(const std::string &filePriv, const std::string &filePup, const std::string &passphrase);
 
+/** \brief Verschlüsselung eine Keys mit einem public Key
+ *
+ * Der zu verschlüsselnde Buffer darf maximal 214 Zeichen lang sein
+ * @param sessionKey zu verschlüsselnde Zeichenkette
+ * @param cipher verschlüsseltes Ergebnis
+ * @param filePup Dateipfad eines public Keys
+ */
+void encryptPublicRsa(const std::vector<u_char> &sessionKey, std::vector<u_char> &cipher, const std::string &filePup);
+
+/** \brief Entschlüsselung mit einem private Key
+ *
+ * @param cipher verschlüsselte Eingabe
+ * @param sessionKey entschlüsselte Zeichenkette
+ * @param filePup Dateipfad eines private Keys
+ * @param passphrase Kennwort zum private Key
+*/
+void decryptPrivateRsa(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePriv, const std::string &passphrase);
+
+/** \brief Verschlüsselung eine Keys mit einem private Key
+ *
+ * Der zu verschlüsselnde Buffer darf maximal 214 Zeichen lang sein
+ * @param sessionKey zu verschlüsselnde Zeichenkette
+ * @param cipher verschlüsseltes Ergebnis
+ * @param filePup Dateipfad eines private Keys
+ * @param passphrase Kennwort zum private Key
+ */void encryptPrivateRsa(const std::vector<u_char> &sessionKey, std::vector<u_char> &cipher, const std::string &filePriv, const std::string &passphrase);
+
+/** \brief Entschlüsselung mit einem public Key
+ *
+ * @param cipher verschlüsselte Eingabe
+ * @param sessionKey entschlüsselte Zeichenkette
+ * @param filePup Dateipfad eines public Keys
+ */
+ void decryptPublicRsa(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePup);
 
 }
 

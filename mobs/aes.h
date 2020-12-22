@@ -55,9 +55,36 @@ public:
    * es wird das Prefix "SALTED__" und ein 8-Zeichen Salt vorangestellt
    * @param pass Passwort
    * @param id Id des Empfängers (falls für Export benötigt)
+   * @param writeIV schreibe IV zu Beginn des Ausgabestroms
    */
   explicit CryptBufAes(const std::string &pass, const std::string &id = "");
+  /** \brief Konstruktor für Verschlüsselung mit AES-256 und passphrase
+   *
+   * Key unf IV sind vorgegeben, Ver- und Entschlüsselung möglich
+   * @param key 32-Byte Schlüssel (key_size())
+   * @param iv Initialer Vektor der Größe iv_size()
+   * @param id Id des Empfängers (falls für Export benötigt)
+   * @param writeIV wenn true, wird der iv am Anfang der Ausgebe gesetzt
+   */
+  explicit CryptBufAes(const std::vector<u_char> &key, const std::vector<u_char> &iv, const std::string &id = "", bool writeIV = false);
+  /** \brief Konstruktor für Verschlüsselung mit AES-256
+   *
+   * der IV wird aus dem Beginn der Cipher extrahiert, nur für Entschlüsselung geeignet
+   * @param key key 32-Byte Schlüssel (key_size())
+   * @param id  Id des Empfängers (nur informativ)
+   */
+  explicit CryptBufAes(const std::vector<u_char> &key, const std::string &id = "");
   ~CryptBufAes() override;
+  /// Länge des keys
+  static size_t key_size() { return 32; };
+  /// Länge des iv
+  static size_t iv_size();
+  /** \brief fülle alle Elemente des Vektors mit Zufallszahlen
+   *
+   * @param rand Vektor mit entsprechender Größe
+   */
+  static void getRand(std::vector<u_char> &rand);
+
   /// Bezeichnung der Verschlüsselung
   std::string name() const override { return u8"aes-256-cbc"; }
   /// Anzahl der Empfänger-Ids ist immer 1
@@ -82,6 +109,7 @@ protected:
 
 private:
   CryptBufAesData *data;
+
 };
 
 /** \brief verschlüsselt einen String mit AES und gibt ihn Base64 aus
@@ -99,6 +127,7 @@ std::string to_aes_string(const std::string &s, const std::string &pass);
  * @param s zu entschlüsselnder Text in base64
  * @param pass Passphrase
  * @return Klartext
+ * \throw runtime_error im Fehlerfall
  */
 std::string from_aes_string(const std::string &s, const std::string &pass);
 
