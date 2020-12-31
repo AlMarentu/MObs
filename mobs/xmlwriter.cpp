@@ -383,5 +383,9 @@ void XmlWriter::stopEncrypt() {
   data->cryptLevel = 0;
 }
 
+void XmlWriter::sync() {
+  *data->wostr << flush;
+}
+
 
 }

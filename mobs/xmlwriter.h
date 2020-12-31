@@ -95,6 +95,7 @@ public:
 
   void startEncrypt(CryptBufBase *cbbp);
   void stopEncrypt();
+  void sync();
 
   std::wstring valueToken; ///< Wenn nicht leer, dann als Attributname für Values verwenden
   std::wstring version = L"1.0"; ///< Version für Header
