@@ -156,6 +156,9 @@ static std::wstring stow(const string &s, bool dontConvert) {
     void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, mobs::CryptBufBase *&cryptBufp) override {
       parent->Encrypt(algorithm, keyName, cipher, cryptBufp);
     }
+    void EncryptionFinished() override {
+      parent->EncryptionFinished();
+    }
 
 
     void setObj(ObjectBase *o) {
@@ -204,6 +207,7 @@ void XmlReader::setPrefix(const std::string &pf) { data->prefix = pf; }
 void XmlReader::setBase64(bool b) { data->setBase64(b); }
 void XmlReader::parse() { data->parse(); }
 bool XmlReader::eof() const { return data->eof(); }
+bool XmlReader::eot() const { return data->eot(); }
 void XmlReader::stop() { data->stop(); }
 void XmlReader::readTillEof(bool s) { data->readTillEof(s); }
 

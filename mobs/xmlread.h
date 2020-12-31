@@ -73,8 +73,10 @@ public:
    * @param keyName KeyInfo-Element
    * @param cryptBufp ein mit new erzeugtes Encryption-Module; wird automatisch freigegeben
    */
-  virtual void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, mobs::CryptBufBase *&cryptBufp) { };
+  virtual void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, mobs::CryptBufBase *&cryptBufp) { }
 
+  /// Encryption-Element abgeschlossen
+  virtual void EncryptionFinished() { }
 
     /// setzte ein XML-Prefix
   void setPrefix(const std::string &pf);
@@ -86,8 +88,10 @@ public:
   void setBase64(bool b);
   /// Einstellung: Lese bis EOF, ansonsten stoppe beim letzten Ene-Tag
   void readTillEof(bool s);
-  /// ist beim Parsen das Ende erreicht
+  /// ist beim Parsen das Ende der Datei erreicht
   bool eof() const;
+  /// ist beim Parsen das letzte Tag erreicht
+  bool eot() const;
   /// verlasse beim nächsten End-Tag den parser
   void stop();
   /// parse den Input (weiter)

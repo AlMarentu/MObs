@@ -39,7 +39,7 @@
 
 namespace mobs {
 
-/*! \class XmlParser
+/** \class XmlParser
  \brief Einfacher XML-Parser.
  Virtuelle Basisklasse mit Callback-Funktionen. Die Tags werden nativ geparst,
  es erfolgt keine Zeichenumwandlung (\&lt; usw.); Die werde werden implace zurückgeliefert
@@ -435,7 +435,7 @@ private:
 
 
 
-/*! \class XmlParserW
+/** \class XmlParserW
 \brief  XML-Parser  der mit wstream arbeitet.
 Virtuelle Basisklasse mit Callback-Funktionen. Die Tags werden nativ geparst,
 es erfolgt eine Zeichenumwandlung (\&lt; usw.);
@@ -470,7 +470,7 @@ class CryptBufBase;
 
 class XmlParserW  {
 public:
-  /*! Konstruktor der XML-Parser Basisklasse für std::wstring
+  /** Konstruktor der XML-Parser Basisklasse für std::wstring
    
      es kann z.B. ein \c std::wifstream dienen oder ein \c std::wistringstream übergeben werden
           Als Zeichensätze sind UTF-8, UTF-16, ISO8859-1, -9 und -15 erlaubt; Dateien dürfen mit einem BOM beginnen
@@ -555,13 +555,17 @@ public:
    * @param cryptBufp ein mit new erzeugtes Encryption-Module; wird automatisch freigegeben
    */
   virtual void Encrypt(const std::string &algorithm, const std::string &keyName,  const std::string &cipher, CryptBufBase *&cryptBufp) = 0;
+  /// Encryption-Element abgeschlossen
+  virtual void EncryptionFinished() { }
 
   /// Einstellung: Lese bis EOF
   void readTillEof(bool s) {  reedEof = s; }
-/// ist beim Parsen das Ende erreicht
+/// ist beim Parsen das Ende der Datei erreicht
 bool eof() const { return endOfFile; }
+/// ist beim Parsen das letzte Tag erreicht
+bool eot() const { return running and tags.empty(); }
 /// verlasse beim nächsten End-Tag den parser
-void stop() { running = false; }
+void stop() { paused = true; }
 /// Aktiviere automatische base64 Erkennung
 /// \see Base64
 void setBase64(bool b) { useBase64 = b; }
@@ -620,14 +624,14 @@ void parse() {
     buffer.clear();
     running = true;
   }
+  if (paused) {
+    paused = false;
+    eat('>');
+    parse2LT();
+  }
   // eigentliches Parsing
   while (curr == '<')
   {
-    if (not running)
-    {
-      running = true;
-      return;
-    }
     saveValue();
 //      saved = buffer;
     eat('<');
@@ -678,7 +682,8 @@ void parse() {
         if (element == u8"EncryptedData") {
           // Wenn CipherData vollständig dann wieder alles auf normal
           xmlEncState = 0;
-//        LOG(LM_DEBUG, "encrypting element " << xmlEncState);
+          EncryptionFinished();
+//          LOG(LM_DEBUG, "encrypting element " << xmlEncState);
         } else if (element == u8"KeyInfo") {
           if (not encryptedData.cryptBufp) {
             Encrypt(encryptedData.algorithm, encryptedData.keyName, encryptedData.cipher, encryptedData.cryptBufp);
@@ -696,9 +701,11 @@ void parse() {
         THROW(u8"unmatching tag " + element + " expected " + tags.top().element);
       }
       tags.pop();
-      eat('>');
       if (not reedEof and tags.empty())
+        paused = true;
+      if (paused)
         return;
+      eat('>');
       parse2LT();
       continue;
     }
@@ -744,6 +751,8 @@ void parse() {
         eat('-');
         parse2Com();
       }
+      if (paused)
+        return;
       eat('>');
       parse2LT();
       continue;
@@ -811,6 +820,8 @@ void parse() {
         }
         ProcessingInstruction(element, a, v);
       }
+      if (paused)
+        return;
       eat('>');
       parse2LT();
       continue;
@@ -855,6 +866,8 @@ void parse() {
     {
       if (peek() == '>')  // Ende eines Starttags
       {
+        if (paused)
+          return;
         eat();
         parse2LT();
         break;
@@ -862,12 +875,14 @@ void parse() {
       else if (peek() == '/') // Leertag
       {
         eat();
-        eat('>');
         if (xmlEncState > 0)
           xmlEncState--;
         else
           NullTag(element);
         tags.pop();
+        if (paused)
+          return;
+        eat('>');
         parse2LT();
         break;
       }
@@ -1140,6 +1155,7 @@ bool try64 = false;
 bool in64 = false;
 bool useBase64 = false;
 bool running = false;
+bool paused = false;
 bool reedEof = true;
 bool endOfFile = false;
 
