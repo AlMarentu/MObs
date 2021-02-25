@@ -40,6 +40,7 @@ TEST(cryptTest, aes1) {
   EXPECT_EQ("Guten Tag", mobs::from_aes_string("U2FsdGVkX19ACrvmZL5NXmtnoX4yH4wJkOTSYk+ZCSM=", "12345"));
   EXPECT_EQ("", mobs::from_aes_string("U2FsdGVkX18kKGguEw9kaylIrxvjzwnl5ncwmab9WoQ=", "12345"));
   EXPECT_EQ("Otto", mobs::from_aes_string(mobs::to_aes_string("Otto", "12345"), "12345"));
+  ASSERT_NO_THROW(mobs::to_aes_string("", "12345"));
   EXPECT_EQ("", mobs::from_aes_string(mobs::to_aes_string("", "12345"), "12345"));
   EXPECT_ANY_THROW(mobs::from_aes_string("U2FsdGVkX19ACrvmZL5NXmtnoX4yH4wJkOTSYk+ZCSM=", "11111"));
   EXPECT_ANY_THROW(mobs::from_aes_string("", "12345"));

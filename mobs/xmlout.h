@@ -50,6 +50,9 @@ public:
   /// \private
   void doMem(const MemberBase &mem) override;
 
+  /// schreibe darunterliegenden Buffer
+  void sync();
+
 protected:
   /// \private
   const ConvObjToString cth;

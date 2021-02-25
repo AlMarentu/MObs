@@ -391,7 +391,9 @@ mobs::decryptPublicRsa(const std::vector<u_char> &cipher, std::vector<u_char> &s
   RSA* rsaPubKey = mobs::CryptBufRsaData::readPupliceKey(filePup);
   if (not rsaPubKey)
     THROW(u8"can't load pub key");
-  sessionKey.resize(RSA_size(rsaPubKey));
+  if (cipher.size() != RSA_size(rsaPubKey))
+    THROW(u8"cipher must have size of " << RSA_size(rsaPubKey));
+  sessionKey.resize(RSA_size(rsaPubKey), 0);
   int sz = RSA_public_decrypt(cipher.size(), &cipher[0], &sessionKey[0], rsaPubKey, RSA_PKCS1_PADDING);
   if (sz < 0)
     throw openssl_exception(LOGSTR("mobs::decryptPublicRsa"));
@@ -407,7 +409,7 @@ mobs::encryptPrivateRsa(const std::vector<u_char> &sessionKey, std::vector<u_cha
     THROW(u8"can't load priv key");
   if (sessionKey.size() >= RSA_size(rsaPrivKey) - 41)
     THROW(u8"array to big");
-  cipher.resize(RSA_size(rsaPrivKey));
+  cipher.resize(RSA_size(rsaPrivKey), 0);
   if (0 > RSA_private_encrypt(sessionKey.size(), &sessionKey[0], &cipher[0], rsaPrivKey, RSA_PKCS1_PADDING))
     throw openssl_exception(LOGSTR("mobs::encryptPrivateRsa"));
   RSA_free(rsaPrivKey);
@@ -419,7 +421,9 @@ mobs::decryptPrivateRsa(const std::vector<u_char> &cipher, std::vector<u_char> &
   RSA* rsaPrivKey = mobs::CryptBufRsaData::readPrivateKey(filePriv, passphrase);
   if (not rsaPrivKey)
     THROW(u8"can't load priv key");
-  sessionKey.resize(RSA_size(rsaPrivKey));
+  if (cipher.size() != RSA_size(rsaPrivKey))
+    THROW(u8"cipher must have size of " << RSA_size(rsaPrivKey));
+  sessionKey.resize(RSA_size(rsaPrivKey), 0);
   int sz = RSA_private_decrypt(cipher.size(), &cipher[0], &sessionKey[0], rsaPrivKey, RSA_PKCS1_PADDING);
   if (sz < 0)
     throw openssl_exception(LOGSTR("mobs::decryptPrivateRsa"));
@@ -434,7 +438,7 @@ mobs::encryptPublicRsa(const std::vector<u_char> &sessionKey, std::vector<u_char
     THROW(u8"can't load pub key");
   if (sessionKey.size() >= RSA_size(rsaPubKey) - 41)
     THROW(u8"array to big");
-  cipher.resize(RSA_size(rsaPubKey));
+  cipher.resize(RSA_size(rsaPubKey), 0);
   if (0 > RSA_public_encrypt(sessionKey.size(), &sessionKey[0], &cipher[0], rsaPubKey, RSA_PKCS1_PADDING))
     throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
   RSA_free(rsaPubKey);

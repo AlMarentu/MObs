@@ -76,6 +76,8 @@ public:
   void writeCdata(const std::wstring &value);
   /// Schreibe ein CDATA-Element mit Base64
   void writeBase64(const std::vector<u_char> &value);
+  /// Schreibe ein CDATA-Element mit Base64
+  void writeBase64(const u_char *value, uint64_t size);
   /// Schreibe eine Ende-Tag
   void writeTagEnd(bool forceNoNulltag = false);
   /// Schreibe einen Kommentar
@@ -92,10 +94,14 @@ public:
   void clearString();
   /// setzte ein XML-Prefix
   void setPrefix(const std::wstring &pf);
-
+  /// Encryption aktivieren \see moba::CryptBufBase
   void startEncrypt(CryptBufBase *cbbp);
+  /// Encryption wieder beenden
   void stopEncrypt();
+  /// darunter liegenden Buffer flushen
   void sync();
+  /// ein Zeichen in den Ausgabe-Stream schreiben
+  void putc(wchar_t c);
 
   std::wstring valueToken; ///< Wenn nicht leer, dann als Attributname für Values verwenden
   std::wstring version = L"1.0"; ///< Version für Header

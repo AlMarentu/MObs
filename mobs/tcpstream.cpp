@@ -82,6 +82,8 @@ int TcpAccept::initService(const std::string &service) {
     int para = 1;
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &para, sizeof(para)) < 0)
       LOG(LM_ERROR, "setsockopt SO_REUSEADDR " << strerror(errno));
+    if (setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &para, sizeof(para)) < 0)
+      LOG(LM_ERROR, "setsockopt SO_NOSIGPIPE " << strerror(errno));
     int tries = 3;
     for (int i = 1; ; i++) {
       if (bind(fd, p->ai_addr, p->ai_addrlen) == -1)
@@ -179,7 +181,7 @@ public:
     if (fd < 0 or bad)
       return 0;
     auto res = read(fd, &rdBuf[0], rdBuf.size());
-    LOG(LM_INFO, "READ " << res << " " << (res > 0 ? std::string(&rdBuf[0], res) : std::string()));
+    LOG(LM_DEBUG, "READ TCP " << res);
     if (res < 0) {
       LOG(LM_ERROR, "read error");
       bad = true;
@@ -197,9 +199,11 @@ public:
     TcpStBuf::char_type *cp = &wrBuf[0];
     while (sz > 0) {
       auto res = write(fd, cp, sz);
-//      LOG(LM_INFO, "WRITE " << res << " " << std::string(cp, res));
+      LOG(LM_INFO, "WRITE TCP " << res );
       if (res <= 0) {
         LOG(LM_ERROR, "write error");
+        if (res == -1 and errno == EPIPE)
+          LOG(LM_ERROR, "got sigpipe");
         bad = true;
         break;
       }

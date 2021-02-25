@@ -175,6 +175,7 @@ void CryptIstrBuf::imbue(const std::locale &loc) {
     char *bp;
     const char_type *bit;
     std::mbstate_t state{};
+//    bool ncv = std::use_facet<std::codecvt<char_type, char, std::mbstate_t>>(lo).always_noconv();
     std::use_facet<std::codecvt<char_type, char, std::mbstate_t>>(lo).out(state, Base::gptr(), Base::egptr(), bit,
                                                                          &buf[0], &buf[sizeof(buf)], bp);
     if (bit != Base::egptr())
@@ -182,6 +183,7 @@ void CryptIstrBuf::imbue(const std::locale &loc) {
     data->state = std::mbstate_t{};
     const char *bp2;
     char_type *bit2;
+//    ncv = std::use_facet<std::codecvt<char_type, char, std::mbstate_t>>(lo).always_noconv();
     std::use_facet<std::codecvt<char_type, char, std::mbstate_t>>(loc).in(data->state, &buf[0], bp, bp2,
                                                                          &data->buffer[0],
                                                                          &data->buffer[INPUT_BUFFER_SIZE], bit2);
@@ -198,6 +200,10 @@ CryptBufBase *CryptIstrBuf::getCbb() {
   if (not data->cbb)
     LOG(LM_ERROR, "NO CBB");
   return data->cbb;
+}
+
+std::istream &CryptIstrBuf::getIstream() {
+  return data->inStb;
 }
 
 
@@ -288,8 +294,11 @@ CryptOstrBuf::int_type CryptOstrBuf::overflow(CryptOstrBuf::int_type ch) {
 int CryptOstrBuf::sync() {
   TRACE("");
   overflow(Traits::eof());
-  if (data->cbb)
-    return data->cbb->pubsync();
+  if (data->cbb) {
+    if  (data->cbb->pubsync() < 0)
+      return -1;
+  }
+  data->outStb.flush();
   return data->outStb.good() ? 0: -1;
 }
 
@@ -338,6 +347,10 @@ void CryptOstrBuf::imbue(const std::locale &loc) {
 
 CryptBufBase *CryptOstrBuf::getCbb() {
   return data->cbb;
+}
+
+std::ostream &CryptOstrBuf::getOstream() {
+  return data->outStb;
 }
 
 // für Manipulator

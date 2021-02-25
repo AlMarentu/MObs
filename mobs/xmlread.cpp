@@ -172,7 +172,7 @@ static std::wstring stow(const string &s, bool dontConvert) {
     XmlReader *parent;
     std::wistringstream str;
     ObjectBase *obj = nullptr;
-    size_t levelStart{};
+    size_t levelStart = 0;
     std::string error;
     std::string encoding;
     std::string prefix;
@@ -210,6 +210,7 @@ bool XmlReader::eof() const { return data->eof(); }
 bool XmlReader::eot() const { return data->eot(); }
 void XmlReader::stop() { data->stop(); }
 void XmlReader::readTillEof(bool s) { data->readTillEof(s); }
+size_t XmlReader::level() const { return data->currentLevel(); }
 
 //  XmlReadData(const std::string &input, const ConvObjFromStr &c) : XmlParserW(str), str(to_wstring(input)) { cfs = c; };
 

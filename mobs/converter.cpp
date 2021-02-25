@@ -147,6 +147,10 @@ codec_iso8859_1::result codec_iso8859_1::do_in (state_type& state,
   return ok;
 }
 
+bool codec_iso8859_1::do_always_noconv() const noexcept {
+  return false;
+}
+
 codec_iso8859_9::result codec_iso8859_9::do_out(mbstate_t& state,
                                                 const wchar_t* from,
                                                 const wchar_t* from_end,
@@ -179,6 +183,10 @@ codec_iso8859_9::result codec_iso8859_9::do_in (state_type& state,
   to_next = to;
   from_next = from;
   return ok;
+}
+
+bool codec_iso8859_9::do_always_noconv() const noexcept {
+  return false;
 }
 
 codec_iso8859_15::result codec_iso8859_15::do_out(mbstate_t& state,
@@ -215,7 +223,9 @@ codec_iso8859_15::result codec_iso8859_15::do_in (state_type& state,
   return ok;
 }
 
-
+bool codec_iso8859_15::do_always_noconv() const noexcept {
+  return false;
+}
 
 
 int from_base64(wchar_t c) {

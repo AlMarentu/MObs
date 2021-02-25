@@ -66,6 +66,9 @@ public:
   /// \private
   result do_in (state_type& state, const char* from, const char* from_end, const char*& from_next,
                         wchar_t* to, wchar_t* to_limit, wchar_t*& to_next) const override;
+
+protected:
+  bool do_always_noconv() const noexcept override;
 };
 /// codec für wfstream
 class codec_iso8859_9 : virtual public std::codecvt<wchar_t, char, std::mbstate_t> {
@@ -76,6 +79,8 @@ public:
   /// \private
   result do_in (state_type& state, const char* from, const char* from_end, const char*& from_next,
                         wchar_t* to, wchar_t* to_limit, wchar_t*& to_next) const override;
+protected:
+  bool do_always_noconv() const noexcept override;
 };
 /// codec für wfstream
 class codec_iso8859_15 : virtual public std::codecvt<wchar_t, char, std::mbstate_t> {
@@ -86,6 +91,8 @@ public:
   /// \private
   result do_in (state_type& state, const char* from, const char* from_end, const char*& from_next,
                         wchar_t* to, wchar_t* to_limit, wchar_t*& to_next) const override;
+protected:
+  bool do_always_noconv() const noexcept override;
 };
 
 

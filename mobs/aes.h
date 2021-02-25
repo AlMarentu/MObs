@@ -110,6 +110,7 @@ protected:
 private:
   CryptBufAesData *data;
 
+  void ctxInit();
 };
 
 /** \brief verschlüsselt einen String mit AES und gibt ihn Base64 aus

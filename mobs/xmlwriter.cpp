@@ -221,6 +221,19 @@ void XmlWriter::writeCdata(const std::wstring &value) {
   data->hasValue = true;
 }
 
+void XmlWriter::writeBase64(const u_char *value, uint64_t size) {
+  data->closeTag();
+  *data->wostr << L"<![CDATA[";
+  string lBreak;
+  if (data->indent) {
+    lBreak = "\n";
+    lBreak.resize(data->level * 2 +1, ' ');
+  }
+  copy_base64(&value[0], &value[size], std::ostreambuf_iterator<wchar_t>(*data->wostr), lBreak);
+  *data->wostr << L"]]>";
+  data->hasValue = true;
+}
+
 void XmlWriter::writeBase64(const std::vector<u_char> &value) {
   data->closeTag();
   *data->wostr << L"<![CDATA[";
@@ -353,7 +366,15 @@ void XmlWriter::startEncrypt(CryptBufBase *cbbp) {
   data->closeTag();
   data->cryptss.str("");
   data->cryptss.clear();
-  data->cryptBufp = new CryptOstrBuf(data->cryptss, cbbp);
+  // Wenn Ziel-Stream bereits ein mobs::CryptOstrBuf ist, dann statt in temporärem stream direkt in den Ziel-stream schreiben
+  // spart hier einen Zwischenpuffer und die Latenz dessen Ein-/Ausgabe
+  auto r = dynamic_cast<mobs::CryptOstrBuf *>(data->buffer.rdbuf());
+  if (r) {
+    data->buffer.flush();
+    data->cryptBufp = new CryptOstrBuf(r->getOstream(), cbbp);
+  } else {
+    data->cryptBufp = new CryptOstrBuf(data->cryptss, cbbp);
+  }
   data->wostr = new std::wostream(data->cryptBufp);
   *data->wostr << mobs::CryptBufBase::base64(true);
 }
@@ -364,7 +385,7 @@ void XmlWriter::stopEncrypt() {
   data->cryptBufp->finalize();
   const string &buf = data->cryptss.str();
 //  copy(buf.cbegin(), buf.cend(), std::ostreambuf_iterator<wchar_t>(*data->wostr));
-
+  // Wenn auf den Ziel-Buffer des mobs::CryptOstrBuf geschrieben wurde, ist buf hier leer
   for (auto c:buf)
     data->buffer.put(c);
   delete data->wostr;
@@ -385,6 +406,10 @@ void XmlWriter::stopEncrypt() {
 
 void XmlWriter::sync() {
   *data->wostr << flush;
+}
+
+void XmlWriter::putc(wchar_t c) {
+  data->buffer.put(c);
 }
 
 

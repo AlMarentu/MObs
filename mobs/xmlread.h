@@ -90,8 +90,10 @@ public:
   void readTillEof(bool s);
   /// ist beim Parsen das Ende der Datei erreicht
   bool eof() const;
-  /// ist beim Parsen das letzte Tag erreicht
+  /// ist beim Parsen das letzte Tag erreicht (level() == 0)
   bool eot() const;
+  /// Parse-Level - root-element ist level 1
+  size_t level() const;
   /// verlasse beim nächsten End-Tag den parser
   void stop();
   /// parse den Input (weiter)

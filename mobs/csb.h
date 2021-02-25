@@ -126,6 +126,27 @@ private:
   CryptBufBaseData *data;
 };
 
+/** \brief Stream-Buffer zur Basisklasse CryptBufBase als null-device
+ *
+ * Ignoriert jegliche Ausgabe, liefert leere Eingabe. Kann verwendet werden um einen verschlüsseltes Element zu ignorieren.
+ */
+class CryptBufNull : public CryptBufBase {
+public:
+  using Base = std::basic_streambuf<char>;
+  using char_type = typename Base::char_type;
+  using Traits = std::char_traits<char_type>;
+  using int_type = typename Base::int_type;
+
+  CryptBufNull() = default;
+  ~CryptBufNull() override {};
+  /// Bezeichnung des Algorithmus der Verschlüsselung
+  std::string name() const override { return u8"null"; }
+
+  /// \private
+  int_type overflow(int_type ch) override { return ch; };
+  /// \private
+  int_type underflow() override { return Traits::eof(); };
+};
 
 
 class CryptIstrBufData;
@@ -158,6 +179,8 @@ public:
 
   /// \private
   int_type underflow() override;
+
+  std::istream &getIstream();
 
   /// Zugriff auf den Stream-Buffer des Plugins (ist immer gültig)
   CryptBufBase *getCbb();
@@ -227,6 +250,8 @@ public:
   ~CryptOstrBuf() override;
   /// \private
   int_type overflow(int_type ch) override;
+
+  std::ostream &getOstream();
 
   /** \brief Schließe des Stream ab.
    *

@@ -112,7 +112,7 @@ void XmlOut::doMem(const MemberBase &mem)
   {
     if (not mem.isNull())
     {
-      const wstring &value = to_wstring(mem.toStr(cth));
+      const wstring &value = to_wstring(std::move(mem.toStr(cth)));
       data->writeAttribute(to_wstring(name), value);
     }
   }
@@ -125,21 +125,22 @@ void XmlOut::doMem(const MemberBase &mem)
     data->writeTagBegin(name);
     if (not mem.isNull())
     {
-      const wstring &value = to_wstring(mem.toStr(cth));
       MobsMemberInfo mi;
       mem.memInfo(mi);
       if (mi.isBlob)
-        data->writeCdata(value);
+        data->writeBase64((const u_char *)mi.blob, mi.u64);
       else if (data->valueToken.empty())
-        data->writeValue(value);
+        data->writeValue(to_wstring(mem.toStr(cth)));
       else
-        data->writeAttribute(data->valueToken, value);
+        data->writeAttribute(data->valueToken, to_wstring(std::move(mem.toStr(cth))));
     }
     data->writeTagEnd();
     if (ef)
       data->stopEncrypt();
   }
 }
+
+void XmlOut::sync() { data->sync(); }
 
 
 }

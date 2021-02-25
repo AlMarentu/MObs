@@ -70,7 +70,7 @@ public:
    * @param keys Liste mit private-key-file - Id - Paaren
    */
   explicit CryptBufRsa(const std::list<PubKey> &keys);
-  /** \brief Konstruktor für Entschlüsselung mit dem pub-ley
+  /** \brief Konstruktor für Entschlüsselung mit dem pub-key
    *
    * @param filename Dateiname des private-keys im PEM-Format
    * @param cipher Schlüssel in base64 Format
@@ -91,7 +91,7 @@ public:
 
   /** \brief Anzahl der Empfänger für diese Verschlüsselung
     *
-    * @return Anzahl der vorhandenen Empfängereinträage
+    * @return Anzahl der vorhandenen Empfängereinträge
     */
   size_t recipients() const override;
   /** \brief Abfrage der Id des Empfängers

@@ -59,7 +59,7 @@ namespace {
 
 class openssl_exception : public std::runtime_error {
 public:
-  openssl_exception(const std::string &log = "") : std::runtime_error(log + " " + mobs_internal::openSslGetError()) {
+  explicit openssl_exception(const std::string &log = "") : std::runtime_error(log + " " + mobs_internal::openSslGetError()) {
     LOG(LM_DEBUG, "openssl: " << what());
   }
 };
@@ -225,22 +225,28 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::underflow() {
   }
 }
 
+
+void mobs::CryptBufAes::ctxInit() {
+  if (not data->ctx) {
+    if (data->salted) {
+      LOG(LM_INFO, "AES init");
+      openSalt();
+      data->initAES();
+    }
+    if (not (data->ctx = EVP_CIPHER_CTX_new()))
+      throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
+    if (1 != EVP_EncryptInit_ex(data->ctx, EVP_aes_256_cbc(), nullptr, &data->key[0], &data->iv[0]))
+      throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
+  }
+}
+
 mobs::CryptBufAes::int_type mobs::CryptBufAes::overflow(mobs::CryptBufAes::int_type ch) {
   TRACE("");
 //  std::cout << "overflow3 " << int(ch) << "\n";
-  if (Base::pbase() != Base::pptr()) {
-    if (not data->ctx) {
-      if (data->salted) {
-        LOG(LM_INFO, "AES init");
-        openSalt();
-        data->initAES();
-      }
-      if (not (data->ctx = EVP_CIPHER_CTX_new()))
-        throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
-      if (1 != EVP_EncryptInit_ex(data->ctx, EVP_aes_256_cbc(), nullptr, &data->key[0], &data->iv[0]))
-        throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
-    }
 
+  ctxInit();
+
+  if (Base::pbase() != Base::pptr()) {
     int len;
     std::array<u_char, INPUT_BUFFER_LEN + EVP_MAX_BLOCK_LENGTH> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
     size_t ofs = 0;
@@ -249,8 +255,8 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::overflow(mobs::CryptBufAes::int_t
       ofs = iv_size();
       memcpy(&buf[0], &data->iv[0], ofs);
     }
-    size_t  s = std::distance(Base::pbase(), Base::pptr());
-    char *cp =  (Base::pbase());
+//    size_t  s = std::distance(Base::pbase(), Base::pptr());
+//    char *cp =  (Base::pbase());
     if (1 != EVP_EncryptUpdate(data->ctx, &buf[ofs], &len, (u_char *)(Base::pbase()),
                                std::distance(Base::pbase(), Base::pptr())))
       throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
@@ -273,17 +279,12 @@ void mobs::CryptBufAes::finalize() {
   TRACE("");
 //  std::cout << "finalize3\n";
   // bei leerer Eingabe, hier Verschlüsselung beginnen
-  if (not data->ctx) {
-    if (data->salted) {
-      LOG(LM_INFO, "AES init");
-      openSalt();
-      data->initAES();
-    }
-    if (not (data->ctx = EVP_CIPHER_CTX_new()))
-      throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
-    if (1 != EVP_EncryptInit_ex(data->ctx, EVP_aes_256_cbc(), nullptr, &data->key[0], &data->iv[0]))
-      throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
+  ctxInit();
+  if (data->initIV) {
+    data->initIV = false;
+    doWrite((char *)(&data->iv[0]), iv_size());
   }
+  pubsync();
   if (data->ctx) {
     std::array<u_char, EVP_MAX_BLOCK_LENGTH> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
     int len;

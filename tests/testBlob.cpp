@@ -94,7 +94,7 @@ TEST(blobTest, create) {
     EXPECT_EQ("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><root><id>1</id><bin><![CDATA[MsWapVqlWqVapVq", d.to_string(mobs::ConvObjToString().exportXml()).substr(0, 100));
     string r = d.to_string(mobs::ConvObjToString().exportXml().doIndent());
 //    cerr << r << std::endl;
-    EXPECT_EQ("\n  pVqlWqVapVqlWqVapVqlWqVapVqlWqVapVqlWqVapVqlWqVapVqlWqVapVqlWqVapVql\n  WqVapQ==]]></bin>\n</root>\n", r.substr(r.length() -100));
+    EXPECT_EQ(" pVqlWqVapVqlWqVapVqlWqVapVqlWqVapVqlWqVapVqlWqVapVqlWqVapVqlWqVapVql\n    WqVapQ==]]></bin>\n</root>\n", r.substr(r.length() -100));
     
 
     
