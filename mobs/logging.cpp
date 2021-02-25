@@ -20,6 +20,7 @@
 
 
 #include <iostream>
+#include <iomanip>
 #include "logging.h"
 
 /*! \def PARAM(x)
@@ -36,12 +37,18 @@
 
 namespace logging {
 
+loglevel currentLevel = lm_trace;
+
+
 /// \brief Logmeldung ausgeben, interne Funktion, bitte Makro LOG() verwenden
 /// \see LOG(l, x)
 /// @param l Log-Level
 /// @param message Inhalt der Log-Meldung als lambda
 void logMessage(loglevel l, std::function<std::string()> message)
 {
+  if (l < currentLevel)
+    return;
+
   char c = ' ';
   switch(l)
   {
@@ -55,7 +62,17 @@ void logMessage(loglevel l, std::function<std::string()> message)
   tmp += c;
   tmp += ' ';
   tmp += message();
-  std::cerr << tmp << std::endl;
+  for (auto c:tmp) {
+    switch(c) {
+      case '\n': std::cerr << "<NL>"; break;
+      case '\r': std::cerr << "<CR>"; break;
+      case '\0' ... 0x09:
+      case 0x0b:
+      case 0x0e ... 0x1f: std::cerr << '<' << std::hex << std::setfill('0') << std::setw(2) << int(u_char(c)) << '>'; break;
+      default: std::cerr << c;
+    }
+  }
+  std::cerr  << std::endl;
 }
 
 

@@ -51,6 +51,8 @@ typedef enum {
   lm_error = 5
 } loglevel;
 
+extern loglevel currentLevel;
+
 /// Interne Klasse für Tracing, bitte Makro TRACE verwenden
 class Trace {
 public:
