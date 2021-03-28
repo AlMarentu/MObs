@@ -113,7 +113,18 @@ CryptIstrBuf::int_type CryptIstrBuf::underflow() {
 //    std::cout << "underflow\n";
     std::streamsize sz = 0;
     if (data->cbb) {
-      sz = data->cbb->sgetn(&buf[0], buf.size());
+      std::streamsize rd = buf.size();
+      auto av = data->cbb->in_avail();
+      if (av == 0) {
+        if (data->cbb->underflow() != CryptBufBase::Traits::eof())
+          av = data->cbb->in_avail();
+      }
+      if (av > 0) {
+        rd = av;
+        LOG(LM_DEBUG, "READSOME CIB " << av);
+      }
+      sz = data->cbb->sgetn(&buf[0], rd);
+
     } else {
       if (data->inStb.eof())
         return Traits::eof();
@@ -134,7 +145,7 @@ CryptIstrBuf::int_type CryptIstrBuf::underflow() {
                                                                          &data->buffer[0],
                                                                          &data->buffer[INPUT_BUFFER_SIZE], bit);
     if (bp != &buf[sz])
-      LOG(LM_ERROR, u8"read buffer to small");
+      LOG(LM_ERROR, u8"read buffer to small " << std::distance(&buf[0], (char *)bp) << " " << sz);
     Base::setg(&data->buffer[0], &data->buffer[0], bit);
     if (Base::gptr() == Base::egptr())
       return Traits::eof();
@@ -260,6 +271,7 @@ CryptOstrBuf::int_type CryptOstrBuf::overflow(CryptOstrBuf::int_type ch) {
         std::streamsize sz = std::distance(&buf[0], bp);
         std::streamsize wr = 0;
         while (wr < sz) {
+          LOG(LM_DEBUG, "OUTSTB write " << sz - wr);
           wr += data->cbb->sputn(&buf[wr], sz - wr);
         }
       }
@@ -455,6 +467,8 @@ public:
   }
 
   std::streamsize doRead(char *s, std::streamsize count)  {
+    if (readLimit == 0)
+      return 0;
     std::istream::sentry sen(*inStb);
     if (not sen)
       return 0;
@@ -464,8 +478,13 @@ public:
         count = C_IN_BUF_SZ;
       size_t c2 = count / 3 * 4;
       std::array<char, C_IN_BUF_SZ / 3 * 4 + 1> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
-      inStb->read(&buf[0], c2);
-      auto sr = inStb->gcount();
+      if (readLimit >= 0 and readLimit < c2)
+        c2 = readLimit;
+      if (c2)
+        inStb->read(&buf[0], c2);
+      auto sr = c2 ? inStb->gcount() : 0;
+      if (readLimit >= 0)
+        readLimit -= sr;
       char *cp = &buf[0];
       if (sr)
         for (size_t i = 0; i < sr; i++)
@@ -475,11 +494,34 @@ public:
           for (; b64Cnt < 4; b64Cnt++)
             b64get(u_char('='), it);
       }
-//      LOG(LM_INFO, "READ " << std::distance(s, it));
+      LOG(LM_DEBUG, "CSB READ " << std::distance(s, it));
       return std::distance(s, it);
     }  else {
+      if (readLimit >= 0 and readLimit < count)
+        count = readLimit;
+      auto av = inStb->rdbuf()->in_avail();
+      if (av == 0 and readLimit < 0) {
+        LOG(LM_DEBUG, "READSOME at end");
+        inStb->peek();
+        av = inStb->rdbuf()->in_avail();
+      }
+      LOG(LM_DEBUG, "READSOME " << av << " soll " << count);
+      if (av > 0 and av < count and readLimit == -1)
+        count = av;
       inStb->read(s, count);
-      return inStb->gcount();
+      std::streamsize n = inStb->gcount();
+
+//      inStb->get(s, count, L'\0');
+//      std::streamsize n = inStb->readsome(s, count);
+//      if (n > 0) {
+//        LOG(LM_DEBUG, "READSOME " << n);
+//        if (readLimit >= 0)
+//          readLimit -= n;
+//        return n;
+//      }
+      if (readLimit >= 0)
+        readLimit -= n;
+      return n;
     }
   }
 
@@ -549,6 +591,7 @@ public:
   int b64Value = 0;
   int b64Cnt = 0;
   Base64Info b64;
+  std::streamsize readLimit = -1;
 };
 
 
@@ -580,7 +623,7 @@ CryptBufBase::int_type CryptBufBase::underflow() {
 //  std::cout << "underflow\n";
   size_t sz = data->doRead(&data->buffer[0], data->buffer.size());
   Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[sz]);
-  std::cout << "GC2 = " << sz << "  ";
+//  std::cout << "GC2 = " << sz << "  ";
   if (not sz)
     return Traits::eof();
   return Traits::to_int_type(*Base::gptr());
@@ -693,12 +736,13 @@ bool CryptBufBase::bad() const {
   return data->bad;
 }
 
+void CryptBufBase::setReadLimit(std::streamsize bytes) {
+  data->readLimit = bytes;
+}
 
-
-
-
-
-
+std::streamsize CryptBufBase::getLimitRemain() const {
+  return data->readLimit;
+}
 
 
 Base64IstBuf::Base64IstBuf(std::wistream &istr) : Base(), inStb(istr) {

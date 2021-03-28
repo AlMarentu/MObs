@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2020,2021 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -89,6 +89,23 @@ public:
   /// Abfrage des Status
   bool bad() const;
 
+  /// Übergeordneten Ausgabe-stream setzen
+  void setOstr(std::ostream &ostr);
+
+  /// Übergeordneten Eingabe-stream setzen
+  void setIstr(std::istream &istr);
+
+  /** \brief Anzahl der zu lesenden Bytes begrnzen
+   *
+   * Nachdem die Anzahl bytes die aus dem übergeordneten Buffer gelesen
+   * wurde, geht der Stream in den end-of-ile-Zustand
+   * @param bytes Anzahl oder -1 für unbegrenzt
+   */
+  void setReadLimit(std::streamsize bytes = -1);
+
+  /// Anzahl der noch zu lesenden Bytes, falls begrenzt
+  std::streamsize getLimitRemain() const;
+
   /// \private
   class base64 {
     template <typename T>
@@ -119,16 +136,12 @@ protected:
   /// \private
   void setBad();
 
-private:
-  void setOstr(std::ostream &ostr);
-  void setIstr(std::istream &istr);
-
   CryptBufBaseData *data;
 };
 
 /** \brief Stream-Buffer zur Basisklasse CryptBufBase als null-device
  *
- * Ignoriert jegliche Ausgabe, liefert leere Eingabe. Kann verwendet werden um einen verschlüsseltes Element zu ignorieren.
+ * Ignoriert jegliche Ausgabe, liefert leere Eingabe. Kann verwendet werden um eine verschlüsseltes Element zu ignorieren.
  */
 class CryptBufNull : public CryptBufBase {
 public:
