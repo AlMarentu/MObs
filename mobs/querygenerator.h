@@ -169,7 +169,12 @@ QueryGenerator &operator<<(QueryGenerator &g, bool b);
 
 
 
-
+/** \brief Construct Query Info
+ *
+ * @param oper one of { "=", "<", "<=", ">", ">=", "<>", " LIKE " };
+ * @param value value to compare
+ * @return InfoObject
+ */
 template<typename T, class C>
 QueryInfo Member<T, C>::Qi(const char *oper, const T &value) const {
 QueryInfo t(this, oper);
