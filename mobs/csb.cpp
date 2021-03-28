@@ -112,7 +112,7 @@ CryptIstrBuf::int_type CryptIstrBuf::underflow() {
     std::locale lo = this->getloc();
 //    std::cout << "underflow\n";
     std::streamsize sz = 0;
-    if (data->cbb) {
+    if (data->cbb) { // wird der buffer nicht explizit auf null gesetzt ist immer einer vorhanden
       std::streamsize rd = buf.size();
       auto av = data->cbb->in_avail();
       if (av == 0) {
@@ -124,11 +124,10 @@ CryptIstrBuf::int_type CryptIstrBuf::underflow() {
         LOG(LM_DEBUG, "READSOME CIB " << av);
       }
       sz = data->cbb->sgetn(&buf[0], rd);
-
     } else {
       if (data->inStb.eof())
         return Traits::eof();
-      std::istream::sentry sen(data->inStb);
+      std::istream::sentry sen(data->inStb, true);
       if (sen) {
         data->inStb.read(&buf[0], buf.size());
         sz = data->inStb.gcount();
@@ -145,7 +144,7 @@ CryptIstrBuf::int_type CryptIstrBuf::underflow() {
                                                                          &data->buffer[0],
                                                                          &data->buffer[INPUT_BUFFER_SIZE], bit);
     if (bp != &buf[sz])
-      LOG(LM_ERROR, u8"read buffer to small " << std::distance(&buf[0], (char *)bp) << " " << sz);
+      LOG(LM_ERROR, u8"charset locale conversion error " << std::distance(&buf[0], (char *)bp) << " " << sz);
     Base::setg(&data->buffer[0], &data->buffer[0], bit);
     if (Base::gptr() == Base::egptr())
       return Traits::eof();
@@ -469,7 +468,7 @@ public:
   std::streamsize doRead(char *s, std::streamsize count)  {
     if (readLimit == 0)
       return 0;
-    std::istream::sentry sen(*inStb);
+    std::istream::sentry sen(*inStb, true);
     if (not sen)
       return 0;
     if (use64) {
@@ -508,8 +507,22 @@ public:
       LOG(LM_DEBUG, "READSOME " << av << " soll " << count);
       if (av > 0 and av < count and readLimit == -1)
         count = av;
-      inStb->read(s, count);
-      std::streamsize n = inStb->gcount();
+      std::streamsize n;
+      if (Traits::eq(delimiter, Traits::eof())) {
+        inStb->read(s, count);
+        n = inStb->gcount();
+      } else {
+        char d = Traits::to_char_type(delimiter);
+        for (n = 0; n < count; n++,s++) {
+          if (not inStb->get(*s).good())
+            break;
+          if (*s == d) {
+            LOG(LM_INFO, "delimiter found at " << n);
+            inStb->unget();
+            break;
+          }
+        }
+      }
 
 //      inStb->get(s, count, L'\0');
 //      std::streamsize n = inStb->readsome(s, count);
@@ -581,12 +594,14 @@ public:
     }
   }
 
+  using Traits = std::char_traits<CryptBufBase::char_type>;
 
   std::ostream *outStb = nullptr;
   std::istream *inStb = nullptr;
   std::array<CryptBufBase::char_type, C_IN_BUF_SZ> buffer;
   bool use64 = false;
   bool bad = false;
+  int delimiter = Traits::eof();
 
   int b64Value = 0;
   int b64Cnt = 0;
@@ -742,6 +757,14 @@ void CryptBufBase::setReadLimit(std::streamsize bytes) {
 
 std::streamsize CryptBufBase::getLimitRemain() const {
   return data->readLimit;
+}
+
+void CryptBufBase::setReadDelimiter(CryptBufBase::char_type c) {
+  data->delimiter = Traits::to_int_type(c);
+}
+
+void CryptBufBase::setReadDelimiter() {
+  data->delimiter = Traits::eof();
 }
 
 

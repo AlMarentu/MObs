@@ -103,6 +103,17 @@ public:
    */
   void setReadLimit(std::streamsize bytes = -1);
 
+  /** \brief setze Trennzeichen
+   *
+   * Über ein Trennzeichen, kann das Leseverhalten des Buffers gesteuert werden, so dass ein read_avail() nur bis zum
+   * Trenner liest. Der Delimiter wird zurückgeliefert immer zu Beginn der Folgeblocks geliefert
+   * @param delim unsigned char des Trenners oder Traits::eof() für aus
+   */
+  void setReadDelimiter(char_type c);
+
+  ///  Delimiter-Funktion abschalten
+  void setReadDelimiter();
+
   /// Anzahl der noch zu lesenden Bytes, falls begrenzt
   std::streamsize getLimitRemain() const;
 
@@ -170,7 +181,7 @@ class CryptIstrBufData;
  * Die Umwandlung des Datenstromes von Base64 ist standardmäßig,
  * für Verschlüsselte Daten werden Plugins benötigt.
  *
- * Wird mit imbue die locale geändert, wenn bereits der Lesebuffer gefüllt ist,
+ * Wird mit imbue die locale geändert, wenn bereits der Lese-Buffer gefüllt ist,
  * so muss der Buffer nach neuer Kodierung immer noch ausreichend sein. Auch darf zuvor kein Zeichensatz
  * verwendet worden sein, der Multibyte-Character verwendet.
  * ISO nach beliebig geht, UTF8 bzw UTF16 darf nicht mehr geändert werden

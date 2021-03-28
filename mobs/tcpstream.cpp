@@ -181,7 +181,8 @@ public:
     if (fd < 0 or bad)
       return 0;
     auto res = read(fd, &rdBuf[0], rdBuf.size());
-    LOG(LM_DEBUG, "READ TCP " << res);
+//    LOG(LM_DEBUG, "READ TCP " << res << " " << std::string(&rdBuf[0], res));
+//    LOG(LM_DEBUG, "READ TCP " << res);
     if (res < 0) {
       LOG(LM_ERROR, "read error");
       bad = true;
@@ -224,8 +225,8 @@ public:
 
   int fd = -1;
   bool bad = false;
-  std::array<TcpStBuf::char_type, 2048> rdBuf;
-  std::array<TcpStBuf::char_type, 2048> wrBuf;
+  std::array<TcpStBuf::char_type, 8192> rdBuf;
+  std::array<TcpStBuf::char_type, 8192> wrBuf;
   std::streamsize rdPos = 0;
   std::streamsize wrPos = 0;
   struct sockaddr remoteAddr{};
@@ -390,6 +391,8 @@ void tcpstream::shutdown(std::ios_base::openmode which) {
   auto *tp = dynamic_cast<TcpStBuf *>(rdbuf());
   if (not tp) THROW("bad cast");
   tp->shutdown(which);
+  if (tp->bad())
+    setstate(std::ios_base::badbit);
 }
 
 std::string tcpstream::getRemoteHost() const {

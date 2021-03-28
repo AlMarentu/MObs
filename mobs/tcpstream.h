@@ -176,7 +176,7 @@ public:
   /// liefert remote ip bei passiver Verbindung
   std::string getRemoteIp() const;
 
-  };
+};
 
 
 }
