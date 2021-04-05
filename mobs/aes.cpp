@@ -260,7 +260,7 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::overflow(mobs::CryptBufAes::int_t
     if (1 != EVP_EncryptUpdate(data->ctx, &buf[ofs], &len, (u_char *)(Base::pbase()),
                                std::distance(Base::pbase(), Base::pptr())))
       throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
-    LOG(LM_INFO, "Writing " << len << "  was " << std::distance(Base::pbase(), Base::pptr()));
+//    LOG(LM_DEBUG, "Writing " << len << "  was " << std::distance(Base::pbase(), Base::pptr()));
     len +=  ofs;
     doWrite((char *)(&buf[0]), len);
 //      std::cout << "overflow2 schreibe " << std::distance(Base::pbase(), Base::pptr()) << "\n";

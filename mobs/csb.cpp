@@ -504,7 +504,7 @@ public:
         inStb->peek();
         av = inStb->rdbuf()->in_avail();
       }
-      LOG(LM_DEBUG, "READSOME " << av << " soll " << count);
+//      LOG(LM_DEBUG, "READSOME " << av << " soll " << count);
       if (av > 0 and av < count and readLimit == -1)
         count = av;
       std::streamsize n;

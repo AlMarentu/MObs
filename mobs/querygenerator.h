@@ -189,12 +189,39 @@ else {
 return t;
 }
 
+/** \brief Construct Query Info shortcut for equal
+ *
+ * @param value value to compare
+ * @return InfoObject
+ */
+template<typename T, class C>
+QueryInfo Member<T, C>::QiEq(const T &value) const {
+  QueryInfo t(this, "=");
+  MobsMemberInfo mi;
+  memInfo(mi, value);
+  if (mi.isNumber())
+    t.content.emplace_back(mi);
+  else {
+    ConvToStrHint cth(hasFeature(mobs::DbCompact));
+    t.content.emplace_back(C::c_to_string(value, cth));
+  }
+  return t;
+}
+
 template<typename T, class C>
 QueryInfo Member<T, C>::Qi(const char *oper, const char *val) const {
 T t;
 if (not this->c_string2x(val, t, ConvFromStrHint::convFromStrHintExplizit))
   throw std::runtime_error("fromStrExplizit input error (Qi)");
 return Qi(oper, t);
+}
+
+template<typename T, class C>
+QueryInfo Member<T, C>::QiEq(const char *val) const {
+  T t;
+  if (not this->c_string2x(val, t, ConvFromStrHint::convFromStrHintExplizit))
+    throw std::runtime_error("fromStrExplizit input error (Qi)");
+  return Qi("=", t);
 }
 
 template<typename T, class C>
