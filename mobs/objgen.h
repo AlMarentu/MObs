@@ -770,6 +770,22 @@ public:
    */
   QueryInfo Qi(const char *oper, const T &value) const;
 
+  /** \brief Erzeuge eine Query-Bedingung: MemberVariable == "Konstante"
+   *
+   * Ist äquivalent zu Qi("=", valuee)
+   * @param value Vergleichswert vom Typ der Membervariablen
+   * @return QueryInfo für QueryGenerator::operator<<()
+   */
+  QueryInfo QiEq(const T &value) const;
+
+  /** \brief Erzeuge eine Query-Bedingung: MemberVariable == "Konstante"
+   *
+   * Ist äquivalent zu Qi("=", valuee)
+   * @param value Vergleichswert vom Typ der Membervariablen
+   * @return QueryInfo für QueryGenerator::operator<<()
+   */
+  QueryInfo QiEq(const char *value) const;
+
   /** \brief Erzeuge eine Query-Bedingung: MemberVariable "oper" "Konstante"
    *
    * Als Vergleichsoperatoren sind =, ==, !=, <>, >, <, >=, <= zugelassen
@@ -899,7 +915,8 @@ public:
   ObjectBase *getObjInfo(size_t i) override { if (i >= size()) return nullptr; return dynamic_cast<ObjectBase *>(werte[i]); }
   const ObjectBase *getObjInfo(size_t i) const override { if (i >= size()) return nullptr; return dynamic_cast<const ObjectBase *>(werte[i]); }
   std::string contentObjName() const override { return T::objName(); }
-
+  /// Setz-Operator
+  void operator()(const MemberVector<T> &other) { doCopy(other); }
 
 //  void push_back(const T &t) { operator[](size()) = t; }
 //  benötigt Member::operator= und Member::Member(const T &t)
