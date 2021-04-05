@@ -177,16 +177,16 @@ QueryGenerator &operator<<(QueryGenerator &g, bool b);
  */
 template<typename T, class C>
 QueryInfo Member<T, C>::Qi(const char *oper, const T &value) const {
-QueryInfo t(this, oper);
-MobsMemberInfo mi;
-memInfo(mi, value);
-if (mi.isNumber())
-  t.content.emplace_back(mi);
-else {
-  ConvToStrHint cth(hasFeature(mobs::DbCompact));
-  t.content.emplace_back(C::c_to_string(value, cth));
-}
-return t;
+  QueryInfo t(this, oper);
+  MobsMemberInfo mi;
+  memInfo(mi, value);
+  if (mi.isNumber())
+    t.content.emplace_back(mi);
+  else {
+    ConvToStrHint cth(hasFeature(mobs::DbCompact));
+    t.content.emplace_back(C::c_to_string(value, cth));
+  }
+  return t;
 }
 
 /** \brief Construct Query Info shortcut for equal
@@ -210,10 +210,10 @@ QueryInfo Member<T, C>::QiEq(const T &value) const {
 
 template<typename T, class C>
 QueryInfo Member<T, C>::Qi(const char *oper, const char *val) const {
-T t;
-if (not this->c_string2x(val, t, ConvFromStrHint::convFromStrHintExplizit))
-  throw std::runtime_error("fromStrExplizit input error (Qi)");
-return Qi(oper, t);
+  T t;
+  if (not this->c_string2x(val, t, ConvFromStrHint::convFromStrHintExplizit))
+    throw std::runtime_error("fromStrExplizit input error (Qi)");
+  return Qi(oper, t);
 }
 
 template<typename T, class C>
