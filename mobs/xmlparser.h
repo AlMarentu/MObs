@@ -1114,13 +1114,15 @@ wchar_t get() const {
       tags.emplace(u8"CipherData", currentXmlns());
       tags.emplace(u8"CipherValue", currentXmlns());
 
+        c = istr.get();
+      }
+    } else {
+      std::wistream::sentry s(istr, true);
+      if (not s)
+        THROW("bad stream");
       c = istr.get();
-    }
-  } else {
-//    std::wistream::sentry s(istr);
-//    if (not s)
-//      THROW("bad stream");
-    c = istr.get();
+//    if (istr.eof())
+//      std::cout << "EOF";
 //    std::cout << " x" << mobs::to_string(c); // << " " << istr.tellg() << ".";
   }
   return c;
