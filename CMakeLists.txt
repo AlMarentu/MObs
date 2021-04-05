@@ -14,40 +14,6 @@ option(BUILD_MARIA_INTERFACE "Build the Maria database modules" ON)
 option(BUILD_SQLITE_INTERFACE "Build the SQLite database modules" ON)
 option(BUILD_INFORMIX_INTERFACE "Build the Informix database modules" ON)
 
-find_package(OpenSSL)
-if (OPENSSL_FOUND)
-    if (CMAKE_HOST_APPLE)
-        # wird hier falsch ausgewertet, deshalb korrekt setzen
-        set(OPENSSL_LIBRARIES /usr/local/opt/openssl/lib/libssl.dylib /usr/local/opt/openssl/lib/libcrypto.dylib)
-        set(OPENSSL_INCLUDE_DIR /usr/local/opt/openssl/include)
-    endif()
-    set(DB_LIBS ${DB_LIBS} ${OPENSSL_LIBRARIES})
-endif()
-
-if(BUILD_INFORMIX_INTERFACE)
-    find_package(informix REQUIRED)
-    include_directories(${INFORMIX_INCLUDE_DIRS})
-    set(DB_LIBS ${DB_LIBS} ${INFORMIX_LIBRARIES})
-endif()
-
-if(BUILD_MONGO_INTERFACE)
-    find_package(libmongocxx REQUIRED)
-    find_package(libbsoncxx REQUIRED)
-    include_directories(${LIBMONGOCXX_INCLUDE_DIRS})
-    set(DB_LIBS ${DB_LIBS} ${LIBMONGOCXX_LIBRARIES})
-endif()
-
-
-if(BUILD_MARIA_INTERFACE)
-    find_library(mariadb mariadb)
-    set(DB_LIBS ${DB_LIBS} ${mariadb})
-endif()
-
-if(BUILD_SQLITE_INTERFACE)
-    find_package(SQLite3 REQUIRED)
-    set(DB_LIBS ${DB_LIBS} ${SQLite3_LIBRARIES})
-endif()
-
 include_directories(${CMAKE_SOURCE_DIR}/mobs)
 
 
@@ -63,14 +29,13 @@ add_subdirectory(mobs)
 
 
 add_executable(fileio fileio.cpp)
-target_link_libraries(fileio mobs ${OPENSSL_LIBRARIES})
+target_link_libraries(fileio mobs)
 
 add_executable(rsafile rsafile.cpp)
-target_link_libraries(rsafile mobs ${OPENSSL_LIBRARIES})
+target_link_libraries(rsafile mobs)
 
 add_executable(db db.cpp)
 target_link_libraries(db mobs)
-target_link_libraries(db ${DB_LIBS})
 
 
 
@@ -103,24 +68,16 @@ endif()
 
 
 
-if(BUILD_MARIA_INTERFACE)
-    find_library(mariadb mariadb)
-    set(DB_LIBS ${DB_LIBS} ${mariadb})
-endif()
+add_executable(fileio2 fileio2.cpp)
+target_link_libraries(fileio2 mobs)
+
+add_executable(aes2 aes2.cpp)
+include_directories(${OPENSSL_INCLUDE_DIR})
+target_link_libraries(aes2 mobs)
 
 
-if(BUILD_INFORMIX_INTERFACE)
-#    find_library(informix informix)
-#        MESSAGE(FATAL_ERROR "BOOM ${informix}")
-    set(INFORMIXDIR /opt/IBM/Informix_Software_Bundle)
-    link_directories(${INFORMIXDIR}/lib ${INFORMIXDIR}/lib/esql)
-    set(DB_LIBS ${DB_LIBS} ixsql ixasf ixgen ixos ixgls ${INFORMIXDIR}/lib/esql/checkapi.o)
-
-#    add_link_options("LINKER:-rpath,${INFORMIXDIR}/lib/esql")
-endif()
-
-add_executable(db db.cpp)
-target_link_libraries(db mobs)
-target_link_libraries(db ${DB_LIBS})
-
-
+#get_cmake_property(_variableNames VARIABLES)
+#list (SORT _variableNames)
+#foreach (_variableName ${_variableNames})
+#    message(STATUS "${_variableName}=${${_variableName}}")
+#endforeach()

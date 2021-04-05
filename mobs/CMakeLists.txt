@@ -10,28 +10,45 @@ if (UNIX)
     set(libSrcs ${libSrcs} tcpstream.cpp tcpstream.h)
 endif()
 
+find_package(OpenSSL)
 if (OPENSSL_FOUND)
+    if (CMAKE_HOST_APPLE)
+        # wird hier falsch ausgewertet, deshalb korrekt setzen
+        set(OPENSSL_LIBRARIES /usr/local/opt/openssl/lib/libssl.dylib /usr/local/opt/openssl/lib/libcrypto.dylib)
+        set(OPENSSL_INCLUDE_DIR /usr/local/opt/openssl/include)
+    endif()
+    set(EXTRA_LIBS ${EXTRA_LIBS} ${OPENSSL_LIBRARIES})
+
     include_directories(${OPENSSL_INCLUDE_DIR})
     set(libSrcs ${libSrcs} aes.cpp aes.h rsa.cpp rsa.h)
 endif()
 
 
 if(BUILD_MONGO_INTERFACE)
+    find_package(libmongocxx REQUIRED)
+    find_package(libbsoncxx REQUIRED)
+    set(EXTRA_LIBS ${EXTRA_LIBS} ${LIBMONGOCXX_LIBRARIES})
     include_directories(${LIBMONGOCXX_INCLUDE_DIRS})
     set(libSrcs ${libSrcs} mongo.cpp mongo.h)
 endif()
 
 
 if(BUILD_SQLITE_INTERFACE)
+    find_package(SQLite3 REQUIRED)
+    set(EXTRA_LIBS ${EXTRA_LIBS} ${SQLite3_LIBRARIES})
     set(libSrcs ${libSrcs} sqlite.cpp sqlite.h)
 endif()
 
 if(BUILD_MARIA_INTERFACE)
+    find_library(mariadb mariadb)
+    set(EXTRA_LIBS ${EXTRA_LIBS} ${mariadb})
     include_directories("/usr/local/include/mysql")
     set(libSrcs ${libSrcs} maria.cpp maria.h)
 endif()
 
+
 if(BUILD_INFORMIX_INTERFACE)
+    find_package(informix REQUIRED)
     include_directories(${INFORMIX_INCLUDE_DIRS})
     add_custom_command(OUTPUT infxtools.o
             COMMAND INFORMIXDIR=${INFORMIXDIR} ${INFORMIXDIR}/bin/esql -I${CMAKE_SOURCE_DIR}/mobs -c ${CMAKE_SOURCE_DIR}/mobs/infxtools.ec
@@ -39,12 +56,15 @@ if(BUILD_INFORMIX_INTERFACE)
             COMMENT generating esql)
 
     set(libSrcs ${libSrcs} informix.cpp informix.h infxtools.o)
+    set(EXTRA_LIBS ${EXTRA_LIBS} ${INFORMIX_LIBRARIES})
 endif()
 
 
-
-
-add_library(mobs STATIC ${libSrcs})
+#add_library(mobs STATIC ${libSrcs})
+add_library(mobs SHARED ${libSrcs})
+set_target_properties(mobs PROPERTIES VERSION ${PROJECT_VERSION})
+set_target_properties(mobs PROPERTIES SOVERSION 0)
+target_link_libraries(mobs ${EXTRA_LIBS})
 
 if(BUILD_MONGO_INTERFACE)
     target_compile_definitions(mobs PUBLIC USE_MONGO)
