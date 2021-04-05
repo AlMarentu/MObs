@@ -100,6 +100,8 @@ public:
   void parse();
   /// Objekt aus Daten füllen
   void fill(ObjectBase *obj);
+  /// Referenz auf verwendeten input stream
+  std::wistream &getIstr();
   private:
     XmlReadData *data;
 //  XmlReadData(const std::string &input, const ConvObjFromStr &c) : XmlParserW(str), str(to_wstring(input)) { cfs = c; };

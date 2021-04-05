@@ -560,22 +560,25 @@ public:
 
   /// Einstellung: Lese bis EOF
   void readTillEof(bool s) {  reedEof = s; }
-/// ist beim Parsen das Ende der Datei erreicht
-bool eof() const { return endOfFile; }
-/// ist beim Parsen das letzte Tag erreicht
-bool eot() const { return running and tags.empty(); }
-/// verlasse beim nächsten End-Tag den parser
-void stop() { paused = true; }
-/// Aktiviere automatische base64 Erkennung
-/// \see Base64
-void setBase64(bool b) { useBase64 = b; }
-/// Starte den Parser
-void parse() {
-  TRACE("");
-  if (not running)
-  {
-    std::locale lo1 = std::locale(istr.getloc(), new codec_iso8859_1);
-    istr.imbue(lo1);
+  /// ist beim Parsen das Ende der Datei erreicht
+  bool eof() const { return endOfFile; }
+  /// ist beim Parsen das letzte Tag erreicht
+  bool eot() const { return running and tags.empty(); }
+  /// verlasse beim nächsten End-Tag den parser
+  void stop() { paused = true; }
+  /// Aktiviere automatische base64 Erkennung
+  /// \see Base64
+  void setBase64(bool b) { useBase64 = b; }
+  /// Referenz auf input stream
+  std::wistream &getIstr() { return istr; };
+
+  /// Starte den Parser
+  void parse() {
+    TRACE("");
+    if (not running)
+    {
+      std::locale lo1 = std::locale(istr.getloc(), new codec_iso8859_1);
+      istr.imbue(lo1);
 
     eat();  // erstes Zeichen einlesen
     /// BOM bearbeiten
