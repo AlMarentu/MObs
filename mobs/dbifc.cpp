@@ -569,4 +569,19 @@ size_t DatabaseInterface::maxAuditChangesValueSize() const {
 }
 
 
+void DatabaseConnection::uploadFile(DatabaseInterface &dbi, const std::string &id, std::istream &source) {
+  THROW("not implemented");
+}
+
+std::string DatabaseConnection::uploadFile(DatabaseInterface &dbi, std::istream &source) {
+  THROW("not implemented");
+}
+
+void DatabaseConnection::downloadFile(DatabaseInterface &dbi, const std::string &id, std::ostream &dest) {
+  THROW("not implemented");
+}
+
+void DatabaseConnection::deleteFile(DatabaseInterface &dbi, const std::string &id) {
+  THROW("not implemented");
+}
 }

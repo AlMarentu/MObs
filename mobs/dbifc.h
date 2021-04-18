@@ -32,6 +32,8 @@
 #include <utility>
 #include <functional>
 #include <memory>
+#include <iostream>
+
 
 
 namespace mobs {
@@ -113,6 +115,9 @@ class DatabaseConnection {
 public:
   virtual ~DatabaseConnection() = default;
 
+  /// Name des DB-Interfaces
+  virtual std::string connectionType() const = 0;
+
   /// \private
   virtual bool load(DatabaseInterface &dbi, ObjectBase &obj) = 0;
 
@@ -145,6 +150,44 @@ public:
   /// \private
   virtual size_t maxAuditChangesValueSize(const DatabaseInterface &dbi) const = 0;
 
+  /** \brief BLOB mittels vorhandener Id in Datenbank ablegen
+   *
+   * Diese Funktion ist derzeit nur bei mongoDb implementiert
+   * @param dbi DatabaseInterface
+   * @param id Id des neuen Blobs (datenbankspezifisch)
+   * @param source Stream aus dem die Datei gelesen wird
+   * \throws exception im Fehlerfall
+   */
+  virtual void uploadFile(DatabaseInterface &dbi, const std::string &id, std::istream &source);
+
+  /** \brief BLOB in Datenbank ablegen
+   *
+   * Diese Funktion ist derzeit nur bei mongoDb implementiert
+   * @param dbi DatabaseInterface
+   * @param source Stream aus dem die Datei gelesen wird
+   * @return id, unter der die Datei abgelegt wurde
+   * \throws exception im Fehlerfall
+   */
+  virtual std::string uploadFile(DatabaseInterface &dbi, std::istream &source);
+
+  /** \brief BLOB aus Datenbank zurücklesen
+   *
+   * Diese Funktion ist derzeit nur bei mongoDb implementiert
+   * @param dbi DatabaseInterface
+   * @param id Id des BLOBs
+   * @param dest
+   * \throws exception im Fehlerfall
+   */
+  virtual void downloadFile(DatabaseInterface &dbi, const std::string &id, std::ostream &dest);
+
+  /** \brief BLOB aus Datenbank löschen
+   *
+   * Diese Funktion ist derzeit nur bei mongoDb implementiert
+   * @param dbi DatabaseInterface
+   * @param id Id des BLOBs
+   * \throws exception im Fehlerfall
+   */
+  virtual void deleteFile(DatabaseInterface &dbi, const std::string &id);
 };
 
 /// Container für die Information zu einer Datenbankverbindung

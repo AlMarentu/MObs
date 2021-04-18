@@ -50,6 +50,8 @@ namespace mobs {
 
     /// \private
     void open();
+    /// Typ der Datenbank
+    std::string connectionType() const override { return u8"SQLite"; }
     /// \private
     bool load(DatabaseInterface &dbi, ObjectBase &obj) override;
     /// \private

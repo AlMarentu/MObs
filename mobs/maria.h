@@ -50,6 +50,8 @@ namespace mobs {
             DatabaseConnection(), ConnectionInformation(connectionInformation) { };
     ~MariaDatabaseConnection() override;
 
+    /// Typ der Datenbank
+    std::string connectionType() const override { return u8"Maria"; }
     /// \private
     void open();
     /// \private

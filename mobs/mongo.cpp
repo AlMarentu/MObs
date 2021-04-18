@@ -1302,4 +1302,53 @@ size_t MongoDatabaseConnection::maxAuditChangesValueSize(const DatabaseInterface
   return 0;   // do not split AuditChanges values
 }
 
+void MongoDatabaseConnection::uploadFile(DatabaseInterface &dbi, const std::string &id, std::istream &source) {
+  open();
+  LOG(LM_DEBUG, "UPLOAD FILE " << dbi.database() << "." << id);
+
+  mongocxx::database db = client[dbi.database()];
+  auto gridfs_bucket = db.gridfs_bucket();
+  types::b_oid val{};
+  val.value = oid(id);
+  bsoncxx::types::value ai(val);
+
+  gridfs_bucket.upload_from_stream_with_id(ai,	"", &source);
+}
+
+std::string MongoDatabaseConnection::uploadFile(DatabaseInterface &dbi, std::istream &source) {
+  open();
+  LOG(LM_DEBUG, "UPLOAD FILE " << dbi.database());
+
+  mongocxx::database db = client[dbi.database()];
+  auto gridfs_bucket = db.gridfs_bucket();
+  auto result = gridfs_bucket.upload_from_stream(	"", &source);
+  return result.id().get_oid().value.to_string();
+}
+
+void MongoDatabaseConnection::downloadFile(DatabaseInterface &dbi, const std::string &id, std::ostream &dest) {
+  open();
+  LOG(LM_DEBUG, "DOWNLOAD FILE " << dbi.database() << "." << id);
+
+  mongocxx::database db = client[dbi.database()];
+  auto gridfs_bucket = db.gridfs_bucket();
+  types::b_oid val{};
+  val.value = oid(id);
+  bsoncxx::types::value ai(val);
+
+  gridfs_bucket.download_to_stream(ai, &dest);
+}
+
+void MongoDatabaseConnection::deleteFile(DatabaseInterface &dbi, const std::string &id) {
+  open();
+  LOG(LM_DEBUG, "DELETE FILE " << dbi.database() << "." << id);
+
+  mongocxx::database db = client[dbi.database()];
+  auto gridfs_bucket = db.gridfs_bucket();
+  types::b_oid val{};
+  val.value = oid(id);
+  bsoncxx::types::value ai(val);
+
+  gridfs_bucket.delete_file(ai);
+}
+
 }

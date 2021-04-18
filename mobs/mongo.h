@@ -50,6 +50,9 @@ namespace mobs {
             DatabaseConnection(), ConnectionInformation(connectionInformation) { };
     ~MongoDatabaseConnection() override = default;
 
+    /// Typ der Datenbank
+    std::string connectionType() const override { return u8"Mongo"; }
+
     /// \private
     void open();
     /// \private
@@ -75,6 +78,15 @@ namespace mobs {
     void rollbackTransaction(DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) override;
     /// \private
     size_t maxAuditChangesValueSize(const DatabaseInterface &dbi) const override;
+
+    /// \private
+    void uploadFile(DatabaseInterface &dbi, const std::string &id, std::istream &source) override;
+    /// \private
+    std::string uploadFile(DatabaseInterface &dbi, std::istream &source) override;
+    /// \private
+    void downloadFile(DatabaseInterface &dbi, const std::string &id, std::ostream &dest) override;
+    /// \private
+    void deleteFile(DatabaseInterface &dbi, const std::string &id) override;
 
     // ------------------------------
 

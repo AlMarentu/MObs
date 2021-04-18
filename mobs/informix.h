@@ -50,6 +50,8 @@ public:
 
   /// \private
   void open();
+  /// Typ der Datenbank
+  std::string connectionType() const override { return u8"Informix"; }
   /// \private
   bool load(DatabaseInterface &dbi, ObjectBase &obj) override;
   /// \private
