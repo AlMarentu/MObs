@@ -92,6 +92,26 @@ public:
   /// liefert bei pos==0 die Id des des Empfängers wie im Konstruktor angegeben
   std::string getRecipientId(size_t pos) const override;
 
+  /** \brief ermittle einen Hash-Wert über die bearbeiteten Daten
+   *
+   * als Algorithmen sind alle der ssh-lib zugelassenen erlaubt.
+   * zB.: "sha1", "sha244", "md5", ...
+   * Erlaubte Werte: openssl list-message-digest-commands
+   * @param algo Algorithmus zur Hashwert-Ermittlung
+   */
+  void hashAlgorithm(const std::string &algo);
+
+  /** \brief Ausgabe des ermittelten Hash-Wertes
+   *
+   * @return Hash-Wert als Byte-Array
+   */
+  const std::vector<u_char> &hash() const;
+
+ /** \brief Ausgabe des ermittelten Hash-Wertes
+   *
+   * @return Hash-Wert als string
+   */
+  std::string hashStr() const;
 
     /// \private
   int_type overflow(int_type ch) override;
@@ -111,6 +131,7 @@ private:
   CryptBufAesData *data;
 
   void ctxInit();
+
 };
 
 /** \brief verschlüsselt einen String mit AES und gibt ihn Base64 aus

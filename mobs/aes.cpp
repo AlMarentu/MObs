@@ -25,8 +25,10 @@
 
 #include <openssl/ssl.h>
 #include <openssl/rand.h>
+#include <openssl/evp.h>
 //#include <openssl/err.h>
 #include <vector>
+#include <iomanip>
 
 
 #define KEYBUFLEN 32
@@ -72,6 +74,8 @@ public:
   {
     if (ctx)
       EVP_CIPHER_CTX_free(ctx);
+    if (mdctx)
+      EVP_MD_CTX_free(mdctx);
   }
   void initAES()
   {
@@ -91,12 +95,25 @@ public:
       throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
   }
 
+  void md_init() {
+    if (not md_algo.empty()) {
+      md = EVP_get_digestbyname(md_algo.c_str());
+      if (not md)
+        THROW("hash algorithm " << md_algo << " not available");
+      mdctx = EVP_MD_CTX_new();
+      EVP_DigestInit_ex(mdctx, md, nullptr);
+    }
+  }
 
   std::array<mobs::CryptBufAes::char_type, INPUT_BUFFER_LEN> buffer;
   std::array<u_char, 8> salt{};
   std::array<u_char, KEYBUFLEN> iv{};
   std::array<u_char, KEYBUFLEN> key{};
+  std::vector<u_char> md_value{}; // hash-wert
   EVP_CIPHER_CTX *ctx = nullptr;
+  EVP_MD_CTX *mdctx = nullptr; // hash context
+  const EVP_MD *md = nullptr; // hash algo
+  std::string md_algo;
   std::string passwd;
   std::string id;
   bool initIV = false;  // iv aus stream lesen
@@ -104,7 +121,20 @@ public:
   bool finished = false;
 };
 
+const std::vector<u_char> &mobs::CryptBufAes::hash() const {
+  return data->md_value;
+}
 
+std::string mobs::CryptBufAes::hashStr() const {
+  std::stringstream x;
+  for (auto c:data->md_value)
+    x << std::hex << std::setfill('0') << std::setw(2) << u_int(c);
+  return x.str();
+}
+
+void mobs::CryptBufAes::hashAlgorithm(const std::string &algo) {
+  data->md_algo = algo;
+}
 
 void mobs::CryptBufAes::getRand(std::vector<u_char> &rand) {
   int r = RAND_bytes(&rand[0], rand.size());
@@ -190,6 +220,7 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::underflow() {
           throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
         if (1 != EVP_DecryptInit_ex(data->ctx, EVP_aes_256_cbc(), nullptr, &data->key[0], &data->iv[0]))
           throw openssl_exception(LOGSTR(""));
+        data->md_init();
         data->initIV = false;
       }
 
@@ -205,6 +236,15 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::underflow() {
       EVP_CIPHER_CTX_free(data->ctx);
 //      LOG(LM_INFO, "AES done");
       data->ctx = nullptr;
+    }
+    if (data->mdctx) {
+      EVP_DigestUpdate(data->mdctx, &data->buffer[0], len);
+      if (data->finished) {
+        data->md_value.resize(EVP_MAX_MD_SIZE);
+        u_int md_len;
+        EVP_DigestFinal_ex(data->mdctx, &data->md_value[0], &md_len);
+        data->md_value.resize(md_len);
+      }
     }
     Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[len]);
 //    std::cout << "GC2 = " << len << " ";
@@ -237,6 +277,7 @@ void mobs::CryptBufAes::ctxInit() {
       throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
     if (1 != EVP_EncryptInit_ex(data->ctx, EVP_aes_256_cbc(), nullptr, &data->key[0], &data->iv[0]))
       throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
+    data->md_init();
   }
 }
 
@@ -255,6 +296,9 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::overflow(mobs::CryptBufAes::int_t
       ofs = iv_size();
       memcpy(&buf[0], &data->iv[0], ofs);
     }
+    if (data->mdctx)
+      EVP_DigestUpdate(data->mdctx, (u_char *)Base::pbase(), std::distance(Base::pbase(), Base::pptr()));
+
 //    size_t  s = std::distance(Base::pbase(), Base::pptr());
 //    char *cp =  (Base::pbase());
     if (1 != EVP_EncryptUpdate(data->ctx, &buf[ofs], &len, (u_char *)(Base::pbase()),
@@ -295,6 +339,12 @@ void mobs::CryptBufAes::finalize() {
     data->ctx = nullptr;
     LOG(LM_INFO, "Writing. " << len);
     doWrite(reinterpret_cast<char *>(&buf[0]), len);
+    if (data->mdctx) {
+      data->md_value.resize(EVP_MAX_MD_SIZE);
+      u_int md_len;
+      EVP_DigestFinal_ex(data->mdctx, &data->md_value[0], &md_len);
+      data->md_value.resize(md_len);
+    }
   }
   CryptBufBase::finalize();
 }

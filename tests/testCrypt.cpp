@@ -23,6 +23,8 @@
 #include "aes.h"
 #include "rsa.h"
 #include "rsa.h"
+#include "digest.h"
+#include "digest.h"
 #include "objtypes.h"
 
 #include <stdio.h>
@@ -128,6 +130,60 @@ TEST(cryptTest, rsa2) {
   unlink("pub.pem");
 
 }
+
+TEST(cryptTest, digest1) {
+
+  std::stringstream ss;
+  auto md = new mobs::CryptBufDigest("sha1");
+  mobs::CryptOstrBuf streambuf(ss, md);
+  std::wostream xStrOut(&streambuf);
+  xStrOut << L"Fischers Fritz fischt frische Fische";
+  streambuf.finalize();
+
+  EXPECT_EQ(ss.str(), "Fischers Fritz fischt frische Fische");
+  EXPECT_EQ(md->hashStr(), "fa24fbd0c280509e2171aa5958b06b313a57e70e");
+
+}
+
+TEST(cryptTest, digest2) {
+  std::stringstream ss("Fischers Fritz fischt frische Fische");
+  auto md = new mobs::CryptBufDigest("sha1");
+  mobs::CryptIstrBuf streambuf(ss, md);
+  std::wistream xStrIn(&streambuf);
+  std::string res;
+  wchar_t c;
+  while (not xStrIn.get(c).eof())
+    res += u_char(c);
+  ASSERT_FALSE(streambuf.bad());
+  EXPECT_EQ(res, "Fischers Fritz fischt frische Fische");
+  EXPECT_EQ(md->hashStr(), "fa24fbd0c280509e2171aa5958b06b313a57e70e");
+}
+
+
+TEST(cryptTest, digest3) {
+  mobs::digestStream ds("sha1");
+  ASSERT_FALSE(ds.bad());
+  ds << "Fischers Fritz fischt frische Fische";
+  EXPECT_EQ(ds.hashStr(), "fa24fbd0c280509e2171aa5958b06b313a57e70e");
+  EXPECT_TRUE(ds.eof());
+  EXPECT_EQ(ds.hashStr(), "fa24fbd0c280509e2171aa5958b06b313a57e70e");
+  EXPECT_TRUE(ds.eof());
+
+  mobs::digestStream dsx("gibsnich");
+  EXPECT_TRUE(dsx.bad());
+
+}
+
+TEST(cryptTest, digest4) {
+  std::string s = "Fischers Fritz fischt frische Fische";
+  EXPECT_EQ(mobs::hash_value(s), "fa24fbd0c280509e2171aa5958b06b313a57e70e");
+  std::vector<u_char> buf(s.begin(), s.end());
+  EXPECT_EQ(mobs::hash_value(buf), "fa24fbd0c280509e2171aa5958b06b313a57e70e");
+
+  EXPECT_ANY_THROW(mobs::hash_value(buf, "gibsnich"));
+  EXPECT_ANY_THROW(mobs::hash_value(s, "gibsnich"));
+}
+
 
 }
 

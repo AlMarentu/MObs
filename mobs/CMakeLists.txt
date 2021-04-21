@@ -20,7 +20,7 @@ if (OPENSSL_FOUND)
     set(EXTRA_LIBS ${EXTRA_LIBS} ${OPENSSL_LIBRARIES})
 
     include_directories(${OPENSSL_INCLUDE_DIR})
-    set(libSrcs ${libSrcs} aes.cpp aes.h rsa.cpp rsa.h)
+    set(libSrcs ${libSrcs} aes.cpp aes.h rsa.cpp rsa.h digest.cpp digest.h)
 endif()
 
 
