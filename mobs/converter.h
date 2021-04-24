@@ -193,7 +193,11 @@ private:
   int b64Cnt = 0;
 };
 
-
+/** \brief Erzeuge UUID Version 4 mit pseudo-Zufallszahlen
+ *
+ * @return UUID nach RFC 4122
+ */
+std::string gen_uuid_v4_p();
 
 
 }

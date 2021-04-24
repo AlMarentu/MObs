@@ -26,6 +26,7 @@
 
 #include <sstream>
 #include <vector>
+#include <random>
 
 
 using namespace std;
@@ -433,6 +434,39 @@ bool StrConv<std::vector<u_char>>::c_from_blob(const void *p, uint64_t sz, vecto
 bool StrConv<std::vector<u_char>>::c_to_blob(const vector<u_char> &t, const void *&p, uint64_t &sz) {
   p = (void *)&t[0]; sz = t.size();
   return true;
+}
+
+
+
+std::string gen_uuid_v4_p() {
+  static std::random_device rd;
+  static std::mt19937 gen(rd());
+  std::uniform_int_distribution<> dis(0, 15);
+  std::uniform_int_distribution<> dis2(8, 11);
+  std::stringstream ss;
+  int i;
+  ss << std::hex;
+  for (i = 0; i < 8; i++) {
+    ss << dis(gen);
+  }
+  ss << '-';
+  for (i = 0; i < 4; i++) {
+    ss << dis(gen);
+  }
+  ss << "-4"; // Version 4
+  for (i = 0; i < 3; i++) {
+    ss << dis(gen);
+  }
+  ss << '-';
+  ss << dis2(gen); // enthält Variante Bit 1 0 x ...
+  for (i = 0; i < 3; i++) {
+    ss << dis(gen);
+  }
+  ss << '-';
+  for (i = 0; i < 12; i++) {
+    ss << dis(gen);
+  };
+  return ss.str();
 }
 
 
