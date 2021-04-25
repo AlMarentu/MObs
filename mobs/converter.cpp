@@ -27,6 +27,7 @@
 #include <sstream>
 #include <vector>
 #include <random>
+#include <iomanip>
 
 
 using namespace std;
@@ -469,5 +470,18 @@ std::string gen_uuid_v4_p() {
   return ss.str();
 }
 
+std::string timeOffsetToStr(long gmtoff) {
+  std::stringstream s;
+  if (gmtoff) {
+    s << (gmtoff> 0 ? '+' : '-');
+    if (gmtoff < 0)
+      gmtoff = - gmtoff;
+    s << std::setw(2)  << std::setfill('0') << gmtoff / 3600 << ':'
+      << std::setw(2)  << std::setfill('0')<< (gmtoff % 3600) / 60;
+  }
+  else
+    s << 'Z';
+  return s.str();
+}
 
 }

@@ -340,5 +340,24 @@ TEST(charsetTest, upperLower) {
 
 }
 
+TEST(charsetTest, uuid) {
+  std::string uuid = gen_uuid_v4_p();
+  EXPECT_EQ(36, uuid.length());
+  EXPECT_NE(uuid, gen_uuid_v4_p());
+  EXPECT_EQ('-', uuid[8]);
+  EXPECT_EQ('-', uuid[13]);
+  EXPECT_EQ('4', uuid[14]);
+  EXPECT_EQ('-', uuid[18]);
+  EXPECT_EQ('-', uuid[23]);
+}
+
+TEST(charsetTest, timeoff) {
+  EXPECT_EQ("+02:00", timeOffsetToStr(120*60));
+  EXPECT_EQ("-01:30", timeOffsetToStr(-90*60));
+  EXPECT_EQ("+01:06", timeOffsetToStr(66*60));
+  EXPECT_EQ("Z", timeOffsetToStr(0));
+
+}
+
 }
 

@@ -36,6 +36,13 @@
 
 namespace mobs {
 
+/** \brief Wandelt einen time offset in +hh:mm oder Z um
+ *
+ * @param gmtoff Offset zu UTC in Sekunden
+ * @return Zeit Offset im Format ISO 8601
+ */
+std::string timeOffsetToStr(long gmtoff);
+
 /// \brief wandelt einen Text in Kleinbuchstaben anhand der Locale der Rechners
 std::wstring toLower(const std::wstring &);
 /// \brief wandelt einen Text in Großbuchstaben anhand der Locale der Rechners
