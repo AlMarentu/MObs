@@ -195,7 +195,7 @@ public:
       compact = true;
     string name = mem.getName(cth);
     size_t last = useName.size() -1;
-    uint pos;
+    u_int pos;
     int dir;
     if (sort and sort->sortInfo(mem, pos, dir)) {
       selectOrder[pos] = STRSTR(useName[last] << '.' << name << (dir > 0? "": " descending"));
@@ -309,7 +309,7 @@ public:
   string masterName;
   string selectKeysXtra;  ///< für orderInSelect
   string selectFieldXtra; ///< für orderInSelect
-  map<uint, string>  selectOrder;
+  map<u_int, string>  selectOrder;
   bool noJoin = false;  // ersetze joinGenerierung
   const QueryOrder *sort = nullptr;
   const QueryGenerator *queryGen = nullptr;
@@ -738,7 +738,7 @@ public:
   };
 
   void completeInsert() {
-    for (uint i = 0; i < fields; i++)
+    for (u_int i = 0; i < fields; i++)
       res << delimiter() << '?';
   }
   string result() { return res.str(); }
@@ -765,7 +765,7 @@ private:
   stringstream res2;
   stringstream res3;
   SQLDBdescription &sqldb;
-  uint fields = 0;
+  u_int fields = 0;
 };
 
 
@@ -1359,7 +1359,7 @@ public:
   ConvObjToString cth;
   std::stack<std::string> names{};
   const QueryOrder *sort = nullptr;
-  std::map<uint, std::pair<std::string, int>> selectOrder;
+  std::map<u_int, std::pair<std::string, int>> selectOrder;
   std::map<const MemberBase *, std::string> *lookUp = nullptr;
 };
 
@@ -1413,7 +1413,7 @@ void ElementNames::doArrayEnd(const MemBaseVector &vec) {
 void ElementNames::doMem(const MemberBase &mem) {
   if (data->sort) {
     int dir;
-    uint pos;
+    u_int pos;
     if (inArray() and arrayIndex() > 0)
       return;
     if (data->sort->sortInfo(mem, pos, dir))

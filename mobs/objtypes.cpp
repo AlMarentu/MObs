@@ -431,26 +431,47 @@ const ConvFromStrHint &ConvFromStrHint::convFromStrHintExplizit = ConvFromStrHin
 void MobsMemberInfo::toLocalTime(struct ::tm &ts) const {
   std::chrono::system_clock::time_point tp{};
   tp += std::chrono::microseconds(t64);
+#ifdef __MINGW32__
+  time_t time = std::chrono::system_clock::to_time_t(tp);
+  localtime_s(&ts, &time);
+#else
   time_t time = std::chrono::system_clock::to_time_t(tp);
   ::localtime_r(&time, &ts);
+#endif
 }
 
 void MobsMemberInfo::toGMTime(struct ::tm &ts) const {
   std::chrono::system_clock::time_point tp{};
   tp += std::chrono::microseconds(t64);
+#ifdef __MINGW32__
+  time_t time = std::chrono::system_clock::to_time_t(tp);
+  gmtime_s(&ts, &time);
+#else
   time_t time = std::chrono::system_clock::to_time_t(tp);
   ::gmtime_r(&time, &ts);
+#endif
 }
 
 void MobsMemberInfo::fromLocalTime(tm &ts) {
   ts.tm_isdst = -1;
-  std::time_t t = ::timelocal(&ts);
+#ifdef __MINGW32__
+  time_t t;
+  localtime_s(&ts, &t);
+#else
+  std::time_t t;
+  t = ::timelocal(&ts);
+#endif
   std::chrono::system_clock::time_point tp = std::chrono::system_clock::from_time_t(t);
   setTime(std::chrono::duration_cast<std::chrono::microseconds>(tp.time_since_epoch()).count());
 }
 
 void MobsMemberInfo::fromGMTime(tm &ts) {
+#ifdef __MINGW32__
+  time_t t;
+  gmtime_s(&ts, &t);
+#else
   std::time_t t = ::timegm(&ts);
+#endif
   std::chrono::system_clock::time_point tp = std::chrono::system_clock::from_time_t(t);
   setTime(std::chrono::duration_cast<std::chrono::microseconds>(tp.time_since_epoch()).count());
 }

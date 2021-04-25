@@ -29,6 +29,9 @@
 #include <locale>
 #include <algorithm>
 
+#ifdef __MINGW32__
+typedef unsigned char u_char;
+#endif
 
 /** \file converter.h
  \brief Hilfsklassen für codecs und base64 */

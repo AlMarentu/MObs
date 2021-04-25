@@ -144,7 +144,7 @@ TEST(dateTimeTest, mtime) {
 //  EXPECT_EQ("1583-01-01T15:30:00Z", to_string_gmt(t));
 
 
-  cerr << to_string_ansi(std::chrono::system_clock::now());
+  //cerr << to_string_ansi(std::chrono::system_clock::now());
 
 }
 

@@ -20,6 +20,7 @@
 
 
 #include "unixtime.h"
+#include "converter.h"
 
 #include <iostream>
 #include <iomanip>
@@ -41,8 +42,12 @@ UxTime::UxTime(int year, int month, int day, int hour, int minute, int second) {
   ts.tm_hour = hour;
   ts.tm_min = minute;
   ts.tm_sec = second;
-  ts.tm_gmtoff = 0;
-  m_time = ::timelocal(&ts);
+#ifdef __MINGW32__
+  m_time = ::mktime(&ts);
+#else
+   ts.tm_gmtoff = 0;
+   m_time = ::timelocal(&ts);
+#endif
 }
 
 UxTime::UxTime(const std::string& s) {
@@ -64,7 +69,9 @@ UxTime::UxTime(const std::string& s) {
   parseInt2(ts.tm_min, cp);
   parseChar(':', cp);
   parseInt2(ts.tm_sec, cp);
-  ts.tm_gmtoff = 0;
+#ifndef __MINGW32__
+    ts.tm_gmtoff = 0;
+#endif
 
   if (*cp)
   {
@@ -72,37 +79,48 @@ UxTime::UxTime(const std::string& s) {
     parseOff(off, cp);
     if (*cp)
       throw std::runtime_error(u8"extra characters at end");
-    m_time = ::timegm(&ts) - off;
+#ifdef __MINGW32__
+      m_time = _mkgmtime(&ts) - off;
+#else
+      m_time = ::timegm(&ts) - off;
+#endif
   }
   else
   {
     cerr << "---" << endl;
+#ifdef __MINGW32__
+      m_time = mktime(&ts);
+#else
     m_time = ::timelocal(&ts);
+#endif
   }
 }
 
 
-  std::string UxTime::toISO8601() const {
+std::string UxTime::toISO8601() const {
   struct ::tm ts{};
+  std::stringstream s;
+  long gmtoff = 0;
+#ifdef __MINGW32__
+  localtime_s(&ts, &m_time);
+  s << put_time(&ts, "%Y-%m-%dT%H:%M:%S");
+  struct tm ptmgm;
+  gmtime_s(&ptmgm, &m_time);
+  time_t gm = mktime(&ptmgm);
+  gmtoff = m_time -gm;
+  if (ptmgm.tm_isdst > 0)
+    gmtoff += 60 * 60;
+#else
   ::localtime_r(&m_time, &ts);
+  s << put_time(&ts, "%FT%T");
+  gmtoff = ts.tm_gmtoff;
+#endif
 
   // 2007-04-05T12:30:00+02:00
-  std::stringstream s;
-  s << put_time(&ts, "%FT%T%z");
-#if 0
-  s << std::setfill('0') << std::setw(4) << ts.tm_year + 1900 << '-'
-    << std::setw(2) << ts.tm_mon +1 << '-' << std::setw(2) << ts.tm_mday << 'T'
-    << std::setw(2) << ts.tm_hour << ':' << std::setw(2) << ts.tm_min << ':' << std::setw(2) << ts.tm_sec
-  << (ts.tm_gmtoff >= 0 ? '+': '-');
-  long int off = abs(ts.tm_gmtoff);
-  s << std::setw(2) << off / 3600;
-  off = off % 3600;
-  s << ':' << std::setw(2) << off % 60;
-#endif
-  string res = s.str();
-  if (res.length() == 24)
-    res.insert(22, u8":");
-  return res;
+
+  if (ptmgm.tm_isdst >= 0)
+    s << mobs::timeOffsetToStr(gmtoff);
+  return s.str();
 }
 
 

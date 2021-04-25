@@ -28,6 +28,7 @@
 #include <vector>
 #include <stack>
 #include <sstream>
+#include <cstring>
 
 namespace mobs {
 

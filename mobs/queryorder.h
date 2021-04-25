@@ -71,7 +71,7 @@ public:
   void add(const mobs::MemberBase &mem);
 
   /// \private
-  bool sortInfo(const mobs::MemberBase &mem, uint &pos, int &dir) const;
+  bool sortInfo(const mobs::MemberBase &mem, u_int &pos, int &dir) const;
 
   /// \private
   void directionAsc(bool);

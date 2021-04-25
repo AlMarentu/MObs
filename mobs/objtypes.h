@@ -31,11 +31,17 @@
 #include <vector>
 #include <list>
 #include <limits>
+#include <functional>
 #ifndef INT_MAX
 #include <limits.h>
 #endif
 #ifndef SIZE_T_MAX
 #define SIZE_T_MAX std::numeric_limits<size_t>::max() ///< Maximum des Typs size_t
+#endif
+#ifdef __MINGW32__
+typedef unsigned char u_char;
+typedef unsigned int u_int;
+typedef unsigned long u_long;
 #endif
 
 

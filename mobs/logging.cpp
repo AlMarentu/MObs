@@ -23,6 +23,10 @@
 #include <iomanip>
 #include "logging.h"
 
+#ifdef __MINGW32__
+typedef unsigned char u_char;
+#endif
+
 /*! \def PARAM(x)
  \brief Hilfs-Makro für TRACE, stellt Parameternamen vor Inhalt.
  */

@@ -27,6 +27,11 @@
 #define MOBS_AES_H
 
 #include "csb.h"
+#include <vector>
+
+#ifdef __MINGW32__
+typedef unsigned char u_char;
+#endif
 
 namespace mobs {
 
