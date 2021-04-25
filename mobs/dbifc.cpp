@@ -39,10 +39,12 @@
 #include "helper.h"
 #include "mchrono.h"
 #include "audittrail.h"
+#include "converter.h"
 #include <iomanip>
 #include <sstream>
-#include <unistd.h> // getuid
-#include <uuid/uuid.h>
+#ifndef __MINGW32__
+#include <unistd.h>
+#endif
 
 namespace mobs {
 namespace {
@@ -257,14 +259,9 @@ void DbTransaction::setJobId(const std::string &id) {
 }
 
 const std::string &DbTransaction::getJobId() {
-  if (DbTransactionData::s_jobId.empty()) {
-    uuid_t uuid;
-    uuid_generate_time(uuid); // effiziente Methode die mac-Adresse enthält, sollte aber kein Datenschutzproblem sein
-    std::stringstream s;
-    for (auto c:uuid)
-      s << std::hex << std::setw(2) << std::setfill('0') << uint(c);
-    DbTransactionData::s_jobId = s.str();
-  }  return DbTransactionData::s_jobId;
+  if (DbTransactionData::s_jobId.empty())
+    DbTransactionData::s_jobId = gen_uuid_v4_p();
+  return DbTransactionData::s_jobId;
 }
 
 void DbTransaction::setComment(const std::string &comment) {
@@ -302,8 +299,10 @@ void DbTransaction::writeAuditTrail() {
     for (auto a:dti.audit) {
       LOG(LM_DEBUG, "Writing audit");
       a.second.time(startTime());
+#ifndef __MINGW32__
       if (DbTransactionData::s_uid < 0)
         DbTransactionData::s_uid = getuid();
+#endif
       a.second.userId(DbTransactionData::s_uid);
       a.second.jobId(DbTransaction::getJobId());
       if (not data->comment.empty())

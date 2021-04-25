@@ -28,12 +28,12 @@ class QuerySortData {
 public:
   class SortInfo {
   public:
-    uint pos;
+    u_int pos;
     int sort;
   };
 
   std::map<const mobs::MemberBase *, QuerySortData::SortInfo> info;
-  uint cnt = 0;
+  u_int cnt = 0;
   bool asc = true;
 };
 
@@ -42,7 +42,7 @@ QueryOrder::SortSwitch QueryOrder::ascending{};
 QueryOrder::SortSwitch QueryOrder::descending{};
 
 
-bool QueryOrder::sortInfo(const mobs::MemberBase &mem, uint &pos, int &dir) const {
+bool QueryOrder::sortInfo(const mobs::MemberBase &mem, u_int &pos, int &dir) const {
   auto i = data->info.find(&mem);
   if (i == data->info.end())
     return false;

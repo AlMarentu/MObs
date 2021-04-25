@@ -31,6 +31,7 @@
 #include "mchrono.h"
 
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <utility>
 #include <vector>

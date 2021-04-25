@@ -432,25 +432,41 @@ void MobsMemberInfo::toLocalTime(struct ::tm &ts) const {
   std::chrono::system_clock::time_point tp{};
   tp += std::chrono::microseconds(t64);
   time_t time = std::chrono::system_clock::to_time_t(tp);
-  ::localtime_r(&time, &ts);
+#ifdef __MINGW32__
+  localtime_s(&ts, &time);
+#else
+  localtime_r(&time, &ts);
+#endif
 }
 
 void MobsMemberInfo::toGMTime(struct ::tm &ts) const {
   std::chrono::system_clock::time_point tp{};
   tp += std::chrono::microseconds(t64);
   time_t time = std::chrono::system_clock::to_time_t(tp);
-  ::gmtime_r(&time, &ts);
+#ifdef __MINGW32__
+  gmtime_s(&ts, &time);
+#else
+  gmtime_r(&time, &ts);
+#endif
 }
 
 void MobsMemberInfo::fromLocalTime(tm &ts) {
   ts.tm_isdst = -1;
-  std::time_t t = ::timelocal(&ts);
+#ifdef __MINGW32__
+  std::time_t t = mktime(&ts); // TODO Timezone korrekt?
+#else
+  std::time_t t = timelocal(&ts);
+#endif
   std::chrono::system_clock::time_point tp = std::chrono::system_clock::from_time_t(t);
   setTime(std::chrono::duration_cast<std::chrono::microseconds>(tp.time_since_epoch()).count());
 }
 
 void MobsMemberInfo::fromGMTime(tm &ts) {
-  std::time_t t = ::timegm(&ts);
+#ifdef __MINGW32__
+  std::time_t t = _mkgmtime(&ts);
+#else
+  std::time_t t = timegm(&ts);
+#endif
   std::chrono::system_clock::time_point tp = std::chrono::system_clock::from_time_t(t);
   setTime(std::chrono::duration_cast<std::chrono::microseconds>(tp.time_since_epoch()).count());
 }

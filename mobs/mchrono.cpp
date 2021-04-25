@@ -21,6 +21,7 @@
 
 #include "mchrono.h"
 #include "objtypes.h"
+#include "converter.h"
 #include "logging.h"
 
 #include <sstream>
@@ -90,12 +91,20 @@ size_t TimeHelper::read(const std::string &s, mobs::MTime &t) {
   std::time_t ti;
   if (*cp == '-' or *cp == '+' or *cp == 'Z') {
     long off = parseOff(cp);
-    ti = ::timegm(&ts);
+#ifdef __MINGW32__
+    ti = _mkgmtime(&ts);
+#else
+    ti = timegm(&ts);
+#endif
     if (ti == -1)
       return 0;
     ti -= off;
   } else {
-    ti = ::timelocal(&ts);
+#ifdef __MINGW32__
+    ti = mktime(&ts);
+#else
+    ti = timelocal(&ts);
+#endif
     if (ti == -1)
       return 0;
   }
@@ -196,7 +205,11 @@ bool string2x(const std::string &str, MDate &t) {
   if (s.fail())
     return false;
   ts.tm_isdst = -1;
-  std::time_t ti = ::timelocal(&ts);
+#ifdef __MINGW32__
+  std::time_t ti = mktime(&ts);
+#else
+  std::time_t ti = timelocal(&ts);
+#endif
   std::chrono::system_clock::time_point tp = std::chrono::system_clock::from_time_t(ti);
   t = std::chrono::time_point_cast<MDays>(tp);
 //  i64 = std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()).count();
@@ -207,8 +220,12 @@ std::string to_string(MDate t) {
   std::stringstream s;
   struct tm ts{};
   time_t time = std::chrono::system_clock::to_time_t(t);
-  ::localtime_r(&time, &ts);
-  s << std::put_time(&ts, "%F");
+#ifdef __MINGW32__
+  localtime_s(&ts, &time);
+#else
+  localtime_r(&time, &ts);
+#endif
+  s << std::put_time(&ts, "%Y-%m-%d");
   return s.str();
 }
 
@@ -279,35 +296,59 @@ bool string2x(const std::string &str, MTime &t) {
 
 
 std::string to_string_iso8601(MTime t, MTimeFract f) {
+#ifdef __MINGW32__
+  static const char *fmt[] = {"%Y", "%Y-%m", "%Y-%m-%d", "%Y-%m-%dT%H", "%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S",
+                              "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S"};
+#else
   static const char *fmt[] = {"%Y", "%Y-%m", "%F", "%FT%H", "%FT%H:%M", "%FT%T", "%FT%T", "%FT%T", "%FT%T", "%FT%T", "%FT%T", "%FT%T"};
+#endif
   std::stringstream s;
   struct tm ts{};
   time_t time;
+  long gmtoff = 0;
   int us;
-  TimeHelper::split(t, time, us);
-  ::localtime_r(&time, &ts);
+   TimeHelper::split(t, time, us);
+#ifdef __MINGW32__
+  localtime_s(&ts, &m_time);
+  s << put_time(&ts, "%Y-%m-%dT%H:%M:%S");
+  struct tm ptmgm;
+  gmtime_s(&ptmgm, &m_time);
+  time_t gm = mktime(&ptmgm);
+  gmtoff = m_time -gm;
+  if (ptmgm.tm_isdst > 0)
+    gmtoff += 60 * 60;
+#else
+  localtime_r(&time, &ts);
+  gmtoff = ts.tm_gmtoff;
+#endif
   s << std::put_time(&ts, fmt[f]);
   if (f >= MF1) {
     for (MTimeFract i = MF6; i > f; i = MTimeFract((int)i -1))
       us = us / 10;
     s << '.' << std::setfill('0') << std::setw(f - MSecond) << us;
   }
-  if (f < MHour)
-    return s.str();
-  s << std::put_time(&ts, "%z");
-  std::string res = s.str();
-  res.insert(res.length() -2, u8":");
-  return res;
+  if (f >= MHour)
+    s << mobs::timeOffsetToStr(gmtoff);
+  return s.str();
 }
 
 std::string to_string_ansi(MTime t, MTimeFract f) {
+#ifdef __MINGW32__
+  static const char *fmt[] = {"%Y", "%Y-%m", "%Y-%m-%d", "%Y-%m-%d %H", "%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S",
+                              "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S"};
+#else
   static const char *fmt[] = {"%Y", "%Y-%m", "%F", "%F %H", "%F %H:%M", "%F %T", "%F %T", "%F %T", "%F %T", "%F %T", "%F %T", "%F %T"};
+#endif
   std::stringstream s;
   struct tm ts{};
   time_t time;
   int us;
   TimeHelper::split(t, time, us);
-  ::localtime_r(&time, &ts);
+#ifdef __MINGW32__
+  localtime_s(&ts, &time);
+#else
+  localtime_r(&time, &ts);
+#endif
   s << std::put_time(&ts, fmt[f]);
   if (f >= MF1) {
     for (MTimeFract i = MF6; i > f; i = MTimeFract((int)i -1))
@@ -318,13 +359,22 @@ std::string to_string_ansi(MTime t, MTimeFract f) {
 }
 
 std::string to_string_gmt(MTime t, MTimeFract f) {
+#ifdef __MINGW32__
+  static const char *fmt[] = {"%Y", "%Y-%m", "%Y-%m-%d", "%Y-%m-%dT%H", "%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S",
+                              "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S"};
+#else
   static const char *fmt[] = {"%Y", "%Y-%m", "%F", "%FT%H", "%FT%H:%M", "%FT%T", "%FT%T", "%FT%T", "%FT%T", "%FT%T", "%FT%T", "%FT%T"};
+#endif
   std::stringstream s;
   struct tm ts{};
   time_t time;
   int us;
   TimeHelper::split(t, time, us);
-  ::gmtime_r(&time, &ts);
+#ifdef __MINGW32__
+  gmtime_s(&ts, &time);
+#else
+  gmtime_r(&time, &ts);
+#endif
   s << std::put_time(&ts, fmt[f]);
   if (f >= MF1) {
     for (MTimeFract i = MF6; i > f; i = MTimeFract((int)i -1))

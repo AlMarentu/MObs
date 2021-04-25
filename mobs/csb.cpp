@@ -395,7 +395,7 @@ public:
   public:
 
     int i = 0;
-    uint a = 0;
+    unsigned int a = 0;
     int l = 0;
     std::string linebreak;
   };

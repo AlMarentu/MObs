@@ -24,6 +24,7 @@
 
 #include <sstream>
 #include <string>
+#include <functional>
 
 /** \file logging.h
 \brief Hilfsfunktionen und Makros für logging und tracing
