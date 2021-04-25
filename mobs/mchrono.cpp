@@ -86,7 +86,6 @@ size_t TimeHelper::read(const std::string &s, mobs::MTime &t) {
         micros = parseMicro(++cp);
     }
   }
-  ts.tm_gmtoff = 0;
   ts.tm_isdst = -1;
   std::time_t ti;
   if (*cp == '-' or *cp == '+' or *cp == 'Z') {
@@ -94,6 +93,7 @@ size_t TimeHelper::read(const std::string &s, mobs::MTime &t) {
 #ifdef __MINGW32__
     ti = _mkgmtime(&ts);
 #else
+    ts.tm_gmtoff = 0;
     ti = timegm(&ts);
 #endif
     if (ti == -1)
@@ -307,16 +307,13 @@ std::string to_string_iso8601(MTime t, MTimeFract f) {
   time_t time;
   long gmtoff = 0;
   int us;
-   TimeHelper::split(t, time, us);
+  TimeHelper::split(t, time, us);
 #ifdef __MINGW32__
-  localtime_s(&ts, &m_time);
-  s << put_time(&ts, "%Y-%m-%dT%H:%M:%S");
-  struct tm ptmgm;
-  gmtime_s(&ptmgm, &m_time);
-  time_t gm = mktime(&ptmgm);
-  gmtoff = m_time -gm;
-  if (ptmgm.tm_isdst > 0)
-    gmtoff += 60 * 60;
+  localtime_s(&ts, &time);
+  time_t gm = _mkgmtime(&ts);
+  gmtoff = gm - time;
+  if (ts.tm_isdst > 0)
+    gmtoff -= 60 * 60;
 #else
   localtime_r(&time, &ts);
   gmtoff = ts.tm_gmtoff;

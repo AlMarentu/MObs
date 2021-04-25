@@ -263,6 +263,7 @@ TEST(objtypeTest, times) {
   mobs::MobsMemberInfo mi;
   mi.setTime(1577199660000000);
 
+#ifndef __MINGW32__
   {
     std::stringstream s;
     struct tm ts{};
@@ -270,11 +271,12 @@ TEST(objtypeTest, times) {
     s << std::put_time(&ts, "%FT%T%z");
     EXPECT_EQ(u8"2019-12-24T16:01:00+0100", s.str());
   }
+#endif
   {
     std::stringstream s;
     struct tm ts{};
     mi.toGMTime(ts);
-    s << std::put_time(&ts, "%FT%TZ");
+    s << std::put_time(&ts, "%Y-%m-%dT%H:%M:%SZ");
     EXPECT_EQ(u8"2019-12-24T15:01:00Z", s.str());
   }
 
@@ -332,6 +334,7 @@ TEST(objtypeTest, historic) {
   mobs::MobsMemberInfo mi;
   mi.setTime(-1577199660000000);
 
+#ifndef __MINGW32__
   {
     std::stringstream s;
     struct tm ts{};
@@ -339,11 +342,12 @@ TEST(objtypeTest, historic) {
     s << std::put_time(&ts, "%FT%T%z");
     EXPECT_EQ(u8"1920-01-09T09:59:00+0100", s.str());
   }
+#endif
   {
     std::stringstream s;
     struct tm ts{};
     mi.toGMTime(ts);
-    s << std::put_time(&ts, "%FT%TZ");
+    s << std::put_time(&ts, "%Y-%m-%dT%H:%M:%SZ");
     EXPECT_EQ(u8"1920-01-09T08:59:00Z", s.str());
   }
 

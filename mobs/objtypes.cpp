@@ -144,7 +144,7 @@ bool string2x(const std::string &str, wchar_t &t) {
   char32_t c;
   if (not string2x(str, c))
     return false;
-  if (numeric_limits<wchar_t>::digits <= 16 and (c & 0xffff00))
+  if (numeric_limits<wchar_t>::digits <= 16 and (c & 0xff0000))
     return false;
   t = c;
   return true;
