@@ -65,7 +65,7 @@ public:
     if (not md_algo.empty()) {
       md = EVP_get_digestbyname(md_algo.c_str());
       if (not md)
-        THROW("hash algorithm " << md_algo << " not available");
+        THROW("hash algorithm '" << md_algo << "' not available");
       mdctx = EVP_MD_CTX_new();
       if (not EVP_DigestInit_ex(mdctx, md, nullptr))
         throw openssl_exception(LOGSTR("mobs::CryptBufDigest"));
@@ -113,9 +113,8 @@ mobs::CryptBufDigest::int_type mobs::CryptBufDigest::underflow() {
   TRACE("");
 //  std::cout << "underflow3 " << "\n";
   try {
-    if (data->finished)
+    if (data->finished or not isGood())
       return Traits::eof();
-
     size_t sz = doRead((char *) &data->buffer[0], data->buffer.size());
     // Input Buffer wenigsten halb voll kriegen
     if (sz) {
@@ -132,59 +131,55 @@ mobs::CryptBufDigest::int_type mobs::CryptBufDigest::underflow() {
       data->finished = true;
     if (not data->mdctx)
       data->md_init();
-
-
-    if (data->mdctx) {
+    if (sz)
       EVP_DigestUpdate(data->mdctx, &data->buffer[0], sz);
-      if (data->finished) {
-        data->md_value.resize(EVP_MAX_MD_SIZE);
-        u_int md_len;
-        EVP_DigestFinal_ex(data->mdctx, &data->md_value[0], &md_len);
-        data->md_value.resize(md_len);
-      }
-    }
     Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[sz]);
-//    std::cout << "GC2 = " << len << " ";
-    if (sz == 0) {
-      if (data->mdctx)
-        throw std::runtime_error("Keine Daten obwohl Quelle nicht leer");
-      return Traits::eof();
+    if (data->finished) {
+      data->md_value.resize(EVP_MAX_MD_SIZE);
+      u_int md_len;
+      EVP_DigestFinal_ex(data->mdctx, &data->md_value[0], &md_len);
+      data->md_value.resize(md_len);
     }
-    return Traits::to_int_type(*Base::gptr());
+//    std::cout << "GC2 = " << len << " ";
+    if (sz)
+      return Traits::to_int_type(*Base::gptr());
   } catch (std::exception &e) {
     LOG(LM_ERROR, "Exception " << e.what());
     setBad();
-    return Traits::eof();
   }
+  return Traits::eof();
 }
 
 
 mobs::CryptBufDigest::int_type mobs::CryptBufDigest::overflow(mobs::CryptBufDigest::int_type ch) {
   TRACE("");
-  if (not data->mdctx)
-    data->md_init();
-
-  if (Base::pbase() != Base::pptr()) {
-    if (data->mdctx)
-      EVP_DigestUpdate(data->mdctx, (u_char *)Base::pbase(), std::distance(Base::pbase(), Base::pptr()));
-    doWrite(Base::pbase(), std::distance(Base::pbase(), Base::pptr()));
-
-    CryptBufBase::setp(data->buffer.begin(), data->buffer.end()); // buffer zurücksetzen
-  }
-
-  if (not Traits::eq_int_type(ch, Traits::eof()))
-    Base::sputc(ch);
   if (isGood())
-    return ch;
+    try {
+      if (not data->mdctx)
+        data->md_init();
+
+      if (Base::pbase() != Base::pptr()) {
+        if (data->mdctx)
+          EVP_DigestUpdate(data->mdctx, (u_char *) Base::pbase(), std::distance(Base::pbase(), Base::pptr()));
+        doWrite(Base::pbase(), std::distance(Base::pbase(), Base::pptr()));
+
+        CryptBufBase::setp(data->buffer.begin(), data->buffer.end()); // buffer zurücksetzen
+      }
+
+      if (not Traits::eq_int_type(ch, Traits::eof()))
+        Base::sputc(ch);
+      if (isGood())
+        return ch;
+    } catch (std::exception &e) {
+      LOG(LM_ERROR, "Exception " << e.what());
+      setBad();
+    }
   return Traits::eof();
 }
 
 void mobs::CryptBufDigest::finalize() {
+  LOG(LM_INFO, "CryptBufDigest::finalize");
   TRACE("");
-//  std::cout << "finalize3\n";
-  // bei leerer Eingabe, hier Verschlüsselung beginnen
-  if (not data->mdctx)
-    data->md_init();
   pubsync();
   if (data->mdctx) {
     data->md_value.resize(EVP_MAX_MD_SIZE);
@@ -204,7 +199,7 @@ public:
   using Traits = std::char_traits<char_type>;
   using int_type = typename Base::int_type;
 
-  explicit Digest(const std::string &algo = "sha1") {
+  explicit Digest(const std::string &algo = "sha1") : algorithm(algo) {
     TRACE("");
     md = EVP_get_digestbyname(algo.c_str());
     if (md) {
@@ -273,6 +268,8 @@ public:
 
   bool good() const { return mdctx or not md_value.empty(); }
 
+  const std::string algorithm;
+
 private:
   std::array<mobs::CryptBufDigest::char_type, 2048> buffer;
   std::vector<u_char> md_value{}; // hash-wert
@@ -308,6 +305,44 @@ std::string mobs::digestStream::hashStr() {
   clear(tp->good() ? std::ios::eofbit : std::ios::badbit);
   return tp->hashStr();
 }
+
+std::string mobs::digestStream::uuid() {
+  TRACE("");
+  auto *tp = dynamic_cast<Digest *>(rdbuf());
+  if (not tp) THROW("bad cast");
+  clear(tp->good() ? std::ios::eofbit : std::ios::badbit);
+  if (not tp->good())
+    THROW("can't create hash");
+  auto it = tp->hash().begin();
+  std::stringstream ss;
+  int i;
+  ss << std::hex;
+  for (i = 0; i < 4; i++) {
+    ss << std::setfill('0') << std::setw(2) << u_int(*it++);
+  }
+  ss << '-';
+  for (i = 0; i < 2; i++) {
+    ss << std::setfill('0') << std::setw(2) << u_int(*it++);
+  }
+  ss << '-';
+  if (tp->algorithm == "sha1")
+    ss << '5';
+  else if (tp->algorithm == "md5")
+    ss << '3';
+  else
+    THROW("uuid: only sha1 or md5 allowed");
+  ss << std::setw(1) << (u_int(*it++) & 0xf);
+  ss << std::setfill('0') << std::setw(2) << u_int(*it++);
+  ss << '-';
+  ss << std::setfill('0') << std::setw(2) << (( u_int(*it++) & 0x5f) | 0x80);
+  ss << std::setfill('0') << std::setw(2) << u_int(*it++);
+  ss << '-';
+  for (i = 0; i < 6; i++) {
+    ss << std::setfill('0') << std::setw(2) << u_int(*it++);
+  };
+  return ss.str();
+}
+
 
 
 std::string mobs::hash_value(const std::string &s, const std::string &algo) {

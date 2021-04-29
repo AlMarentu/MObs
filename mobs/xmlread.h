@@ -112,7 +112,8 @@ public:
 class XmlRead : public XmlReader {
 public:
   /// Alles initialisieren
-  XmlRead(const std::string &str, ObjectBase &obj, const ConvObjFromStr &c) : XmlReader(str, c), object(obj) { }
+  XmlRead(const std::string &str, ObjectBase &obj, const ConvObjFromStr &c) :
+          XmlReader(str, c), object(obj), decrypFun(c.getDecFun()) { }
   /// \private
   void StartTag(const std::string &element) override {
     if (element == "root") {
@@ -125,11 +126,17 @@ public:
     if (not error.empty())
       throw std::runtime_error(error);
   }
+  void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, mobs::CryptBufBase *&cryptBufp) override {
+    if (decrypFun)
+      cryptBufp = decrypFun(algorithm, keyName);
+  }
+
   /// wurde überhaupt eine Wurzel gefunden
   bool found() const { return done; }
 private:
   ObjectBase &object;
   bool done = false;
+  ConvObjFromStr::DecrypFun decrypFun;
 };
 
 }

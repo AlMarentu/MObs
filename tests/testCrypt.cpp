@@ -26,11 +26,13 @@
 #include "digest.h"
 #include "digest.h"
 #include "objtypes.h"
+#include "objgen.h"
 
 #include <stdio.h>
 #include <sstream>
 #include <gtest/gtest.h>
 
+#include "logging.h"
 using namespace std;
 
 
@@ -145,18 +147,82 @@ TEST(cryptTest, digest1) {
 
 }
 
+TEST(cryptTest, digest1e) {
+  std::stringstream ss;
+  auto md = new mobs::CryptBufDigest("gibtsnich");
+  mobs::CryptOstrBuf streambuf(ss, md);
+  std::wostream xStrOut(&streambuf);
+  EXPECT_TRUE(xStrOut.good());
+  EXPECT_FALSE(xStrOut.eof());
+  // Fehler im overflow
+  for (int i = 1; i < 300; i++)
+    xStrOut << L"Fischers Fritz fischt frische Fische";
+  EXPECT_FALSE(xStrOut.good());
+  streambuf.finalize();
+}
+
+TEST(cryptTest, digest1ee) {
+  std::stringstream ss;
+  auto md = new mobs::CryptBufDigest("gibtsnich");
+  mobs::CryptOstrBuf streambuf(ss, md);
+  std::wostream xStrOut(&streambuf);
+  EXPECT_TRUE(xStrOut.good());
+  EXPECT_FALSE(xStrOut.eof());
+  xStrOut << L"Fischers Fritz fischt frische Fische";
+  // Fehler im flush
+  xStrOut.flush();
+  EXPECT_FALSE(xStrOut.good());
+}
+
 TEST(cryptTest, digest2) {
   std::stringstream ss("Fischers Fritz fischt frische Fische");
   auto md = new mobs::CryptBufDigest("sha1");
   mobs::CryptIstrBuf streambuf(ss, md);
   std::wistream xStrIn(&streambuf);
+  EXPECT_TRUE(xStrIn.good());
   std::string res;
   wchar_t c;
-  while (not xStrIn.get(c).eof())
+  while (not xStrIn.get(c).eof()) {
     res += u_char(c);
-  ASSERT_FALSE(streambuf.bad());
+  }
+
+  EXPECT_TRUE(xStrIn.eof());
+  EXPECT_FALSE(xStrIn.bad());
+  EXPECT_FALSE(streambuf.bad());
   EXPECT_EQ(res, "Fischers Fritz fischt frische Fische");
   EXPECT_EQ(md->hashStr(), "fa24fbd0c280509e2171aa5958b06b313a57e70e");
+}
+
+TEST(cryptTest, faileof) {
+  std::wstringstream ss(L"Fischers Fritz fischt frische Fische");
+  std::string res;
+  wchar_t c;
+  while (not ss.get(c).eof()) {
+    res += u_char(c);
+  }
+  EXPECT_TRUE(ss.eof());
+  EXPECT_FALSE(ss.bad());
+  EXPECT_TRUE(ss.fail());
+  EXPECT_EQ(res, "Fischers Fritz fischt frische Fische");
+}
+
+TEST(cryptTest, digest2e) {
+  std::stringstream ss("Fischers Fritz fischt frische Fische");
+  auto md = new mobs::CryptBufDigest("gibtsnicht");
+  mobs::CryptIstrBuf streambuf(ss, md);
+  std::wistream xStrIn(&streambuf);
+  EXPECT_TRUE(xStrIn.good());
+  std::string res;
+  wchar_t c;
+  while (not xStrIn.get(c).eof()) {
+    LOG(LM_INFO, "FAIL " << xStrIn.fail());
+    res += u_char(c);
+  }
+  EXPECT_TRUE(streambuf.bad());
+  EXPECT_FALSE(xStrIn.bad());
+  EXPECT_TRUE(xStrIn.fail());
+  EXPECT_TRUE(xStrIn.eof());
+  EXPECT_FALSE(xStrIn.good());
 }
 
 
@@ -184,6 +250,78 @@ TEST(cryptTest, digest4) {
   EXPECT_ANY_THROW(mobs::hash_value(s, "gibsnich"));
 }
 
+TEST(cryptTest, uuid) {
+  mobs::digestStream ds("md5");
+  std::vector<u_char> domain({0x6b, 0xa7, 0xb8, 0x10, 0x9d, 0xad, 0x11, 0xd1, 0x80, 0xb4, 0x00, 0xc0, 0x4f, 0xd4, 0x30, 0xc8});
+  ds << string((char *)&domain[0], domain.size());
+  ds << "www.example.org";
+  std::string uuid = ds.uuid();
+  EXPECT_EQ(36, uuid.length());
+  EXPECT_EQ('-', uuid[8]);
+  EXPECT_EQ('-', uuid[13]);
+  EXPECT_EQ('3', uuid[14]);
+  EXPECT_EQ('-', uuid[18]);
+  EXPECT_EQ('-', uuid[23]);
+
+  mobs::digestStream ds2;
+  ds2 << string((char *)&domain[0], domain.size());
+  ds2 << "www.example.org";
+  EXPECT_EQ("74738ff5-5367-5958-9aee-98fffdcd1876", ds2.uuid());
+
+}
+
+//Objektdefinitionen
+class Fahrzeug : virtual public mobs::ObjectBase
+{
+public:
+  ObjInit(Fahrzeug);
+  MemVar(string, typ);
+  MemVar(int, achsen, USENULL);
+  MemVar(bool, antrieb);
+};
+
+class Gespann : virtual public mobs::ObjectBase
+{
+public:
+  ObjInit(Gespann);
+  MemVar(int, id, KEYELEMENT1);
+  MemVar(string, typ);
+  MemVar(string, fahrer, XMLENCRYPT);
+  MemObj(Fahrzeug, zugmaschine);
+  MemVector(Fahrzeug, haenger);
+};
+
+
+TEST(cryptTest, xml) {
+  Gespann f1, f2;
+
+  f1.id(1);
+  f1.typ("Brauereigespann");
+  f1.fahrer("Otto");
+  f1.zugmaschine.typ("Sechsspänner");
+  f1.zugmaschine.achsen(0);
+  f1.zugmaschine.antrieb(true);
+  f1.haenger[0].typ("Bräuwagen");
+  f1.haenger[0].achsen(2);
+
+  mobs::ConvObjToString cth = mobs::ConvObjToString().exportXml().setEncryptor([](){return new mobs::CryptBufAes( "12345", "john");});
+  string x = f1.to_string(cth);
+  LOG(LM_INFO, x);
+  EXPECT_EQ(string::npos, x.find("Otto"));
+  EXPECT_NE(string::npos, x.find("EncryptedData"));
+  EXPECT_NE(string::npos, x.find("zugmaschine"));
+
+  mobs::ConvObjFromStr cfs = mobs::ConvObjFromStr().useXml().setDecryptor([&](const string& alg, const string& key) {
+    EXPECT_EQ("aes-256-cbc", alg);
+    EXPECT_EQ("john", key);
+    return new mobs::CryptBufAes( "12345");
+  });
+  ASSERT_NO_THROW(mobs::string2Obj(x, f2, cfs));
+  EXPECT_EQ("Brauereigespann", f2.typ());
+  EXPECT_EQ("Otto", f2.fahrer());
+
+
+}
 
 }
 

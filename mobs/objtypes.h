@@ -535,6 +535,7 @@ private:
 /// Konfiguration für \c string2Obj
 class ConvObjFromStr : virtual public ConvFromStrHint {
 public:
+  using DecrypFun = std::function<mobs::CryptBufBase*(const std::string &algorithm, const std::string &keyName)>;
   /// Enums für Behandlung NULL-Werte
   enum Nulls { ignore, omit, clear, force, except };
   /// Eingabe ist im XML-Format
@@ -555,6 +556,8 @@ public:
   virtual bool caseinsensitive() const { return ignCase; };
   /// Null-Werte behandeln
   virtual enum Nulls nullHandling() const { return null; };
+  /// \private
+  DecrypFun getDecFun() const { return decryptor; }
   /// Verwenden den XML-Parser
   ConvObjFromStr useXml() const { ConvObjFromStr c(*this); c.xml = true; return c; }
   /// Werte in Kurzform akzeptieren (zB. Zahl anstatt enum-Text)
@@ -583,6 +586,8 @@ public:
   ConvObjFromStr useExceptUnknown() const {  ConvObjFromStr c(*this); c.exceptUnk = true; return c; }
   /// ignoriere beim Einlesen die Groß-/Kleinschreibung der Elementnamen
   ConvObjFromStr useIgnoreCase() const {  ConvObjFromStr c(*this); c.ignCase = true; return c; }
+  /// setze Decrypt-Function
+  ConvObjFromStr setDecryptor(DecrypFun d) const { ConvObjFromStr c(*this); c.decryptor = d; return c; }
 protected:
   /// \private
   bool xml = false;
@@ -602,7 +607,8 @@ protected:
   bool ignCase = false;
   /// \private
   enum Nulls null = ignore;
-
+  /// \private
+  DecrypFun decryptor = nullptr;
 };
 
 ///Template für Hilfsfunktion zum Konvertieren eines Datentyps in einen unsigned int

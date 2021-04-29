@@ -681,7 +681,7 @@ public:
                   if (not encryptedData.cryptBufp)
                     encryptedData.cipher = to_string(saved);
                 }
-              } else if (element == u8"KeyName" and xmlEncState == 4) {
+              } else if (element == u8"KeyName" and xmlEncState == 3) {
                 if (not encryptedData.cryptBufp)
                   encryptedData.keyName = to_string(saved);
               }
@@ -1120,6 +1120,7 @@ private:
 //      maxRead--;
     if (encryptedData.istr) {
       c = encryptedData.istr->get();
+//      std::cout << " e" << mobs::to_string(c); // << " " << istr.tellg() << ".";
       if (encryptedData.istr->eof()) {
 //      LOG(LM_INFO, "ENC FIN");
         if (encryptedData.cBuf->bad())

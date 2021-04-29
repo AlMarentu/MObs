@@ -181,7 +181,10 @@ public:
     if (fd < 0 or bad)
       return 0;
     auto res = read(fd, &rdBuf[0], rdBuf.size());
-//    LOG(LM_DEBUG, "READ TCP " << res << " " << std::string(&rdBuf[0], res));
+//    if (res < 200)
+//      LOG(LM_INFO, "READ TCP " << res << " " << std::string(&rdBuf[0], res));
+//    else
+//      LOG(LM_INFO, "READ TCP " << res << " " << std::string(&rdBuf[0], 100) << " ... " << std::string(&rdBuf[res-100], 100));
 //    LOG(LM_DEBUG, "READ TCP " << res);
     if (res < 0) {
       LOG(LM_ERROR, "read error");
@@ -240,6 +243,8 @@ TcpStBuf::TcpStBuf() : Base() {
 TcpStBuf::TcpStBuf(TcpAccept &accept) {
   data = new TcpStBufData;
   data->fd = accept.acceptConnection(data->remoteAddr, data->addrLen);
+  if (data->fd == -1)
+    data->bad = true;
   Base::setp(data->wrBuf.begin(), data->wrBuf.end());
 }
 

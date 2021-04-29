@@ -105,7 +105,7 @@ public:
     }
   }
 
-  std::array<mobs::CryptBufAes::char_type, INPUT_BUFFER_LEN> buffer;
+  std::array<mobs::CryptBufAes::char_type, INPUT_BUFFER_LEN + EVP_MAX_BLOCK_LENGTH> buffer;
   std::array<u_char, 8> salt{};
   std::array<u_char, KEYBUFLEN> iv{};
   std::array<u_char, KEYBUFLEN> key{};
@@ -248,12 +248,10 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::underflow() {
     }
     Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[len]);
 //    std::cout << "GC2 = " << len << " ";
-    if (len == 0) {
-      if (data->ctx)
-        throw std::runtime_error("Keine Daten obwohl Quelle nicht leer");
-      return Traits::eof();
-    }
-    return Traits::to_int_type(*Base::gptr());
+    if (len)
+      return Traits::to_int_type(*Base::gptr());
+    if (data->ctx)
+      throw std::runtime_error("Keine Daten obwohl Quelle nicht leer");
   } catch (std::exception &e) {
     LOG(LM_ERROR, "Exception " << e.what());
     if (data->ctx) {
@@ -261,8 +259,8 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::underflow() {
       data->ctx = nullptr;
     }
     setBad();
-    return Traits::eof();
   }
+  return Traits::eof();
 }
 
 
@@ -284,38 +282,41 @@ void mobs::CryptBufAes::ctxInit() {
 mobs::CryptBufAes::int_type mobs::CryptBufAes::overflow(mobs::CryptBufAes::int_type ch) {
   TRACE("");
 //  std::cout << "overflow3 " << int(ch) << "\n";
+  try {
+    ctxInit();
 
-  ctxInit();
-
-  if (Base::pbase() != Base::pptr()) {
-    int len;
-    std::array<u_char, INPUT_BUFFER_LEN + EVP_MAX_BLOCK_LENGTH> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
-    size_t ofs = 0;
-    if (data->initIV) {
-      data->initIV = false;
-      ofs = iv_size();
-      memcpy(&buf[0], &data->iv[0], ofs);
-    }
-    if (data->mdctx)
-      EVP_DigestUpdate(data->mdctx, (u_char *)Base::pbase(), std::distance(Base::pbase(), Base::pptr()));
+    if (Base::pbase() != Base::pptr()) {
+      int len;
+      std::array<u_char, INPUT_BUFFER_LEN + EVP_MAX_BLOCK_LENGTH> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
+      size_t ofs = 0;
+      if (data->initIV) {
+        data->initIV = false;
+        ofs = iv_size();
+        memcpy(&buf[0], &data->iv[0], ofs);
+      }
+      if (data->mdctx)
+        EVP_DigestUpdate(data->mdctx, (u_char *) Base::pbase(), std::distance(Base::pbase(), Base::pptr()));
 
 //    size_t  s = std::distance(Base::pbase(), Base::pptr());
 //    char *cp =  (Base::pbase());
-    if (1 != EVP_EncryptUpdate(data->ctx, &buf[ofs], &len, (u_char *)(Base::pbase()),
-                               std::distance(Base::pbase(), Base::pptr())))
-      throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
+      if (1 != EVP_EncryptUpdate(data->ctx, &buf[ofs], &len, (u_char *) (Base::pbase()),
+                                 std::distance(Base::pbase(), Base::pptr())))
+        throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
 //    LOG(LM_DEBUG, "Writing " << len << "  was " << std::distance(Base::pbase(), Base::pptr()));
-    len +=  ofs;
-    doWrite((char *)(&buf[0]), len);
+      len += ofs;
+      doWrite((char *) (&buf[0]), len);
 //      std::cout << "overflow2 schreibe " << std::distance(Base::pbase(), Base::pptr()) << "\n";
 
-    CryptBufBase::setp(data->buffer.begin(), data->buffer.end()); // buffer zurücksetzen
+      CryptBufBase::setp(data->buffer.begin(), data->buffer.end()); // buffer zurücksetzen
+    }
+    if (not Traits::eq_int_type(ch, Traits::eof()))
+      Base::sputc(ch);
+    if (isGood())
+      return ch;
+  } catch (std::exception &e) {
+    LOG(LM_ERROR, "Exception " << e.what());
+    setBad();
   }
-
-  if (not Traits::eq_int_type(ch, Traits::eof()))
-    Base::sputc(ch);
-  if (isGood())
-    return ch;
   return Traits::eof();
 }
 

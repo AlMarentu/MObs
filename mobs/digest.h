@@ -102,6 +102,15 @@ public:
     * @return Hash-Wert als string
     */
   std::string hashStr();
+
+  /** \brief Ausgabe des ermittelten Hash-Wertes als UUID
+    *
+    * als UUID sind nur 'sha1' (UUID Version 5) oder 'md5' (UUID Version 3) erlaubt.
+    * Die Ausgabe erfolgt nach RFC 4122. Dazu muss zuerst der Identifier des Namensraumes, gefolgt vom Nutzinhalt
+    * gehasht werden.
+    * @return UUID String
+    */
+  std::string uuid();
 };
 
 /** \brief hash wert eines Strings ermitteln
