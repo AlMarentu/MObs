@@ -271,12 +271,14 @@ CryptOstrBuf::int_type CryptOstrBuf::overflow(CryptOstrBuf::int_type ch) {
         std::streamsize wr = 0;
         while (wr < sz) {
           LOG(LM_DEBUG, "OUTSTB write " << sz - wr);
-          wr += data->cbb->sputn(&buf[wr], sz - wr);
+          auto n = data->cbb->sputn(&buf[wr], sz - wr);
+          if (n <= 0)
+            return Traits::eof();
+          wr += n;
         }
       }
       else
         data->outStb.write(&buf[0], std::distance(&buf[0], bp));
-
 #if 0
       // Debug:
       for (auto ip = &buf[0]; ip != bp; ip++) {
@@ -293,6 +295,8 @@ CryptOstrBuf::int_type CryptOstrBuf::overflow(CryptOstrBuf::int_type ch) {
       std::cout << "\n";
 #endif
     }
+    else
+      return Traits::eof();
   }
   if (not Traits::eq_int_type(ch, Traits::eof()))
     Base::sputc(ch);
@@ -315,8 +319,7 @@ int CryptOstrBuf::sync() {
 
 void CryptOstrBuf::finalize() {
   TRACE("");
-//  std::cout << "finalize\n";
-  CryptOstrBuf::sync();
+  pubsync();
   if (data->cbb)
     data->cbb->finalize();
 }
@@ -703,7 +706,7 @@ std::streamsize CryptBufBase::doRead(char *s, std::streamsize count) {
 
 int CryptBufBase::sync() {
   TRACE("");
-//  std::cout << "sync2\n";
+//  LOG(LM_INFO, "CryptBufBase::sync()");
   if (Base::pbase() != Base::pptr())
     overflow(Traits::eof());
   return data->isGood() ? 0: -1;
