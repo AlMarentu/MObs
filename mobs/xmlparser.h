@@ -469,6 +469,7 @@ void ProcessingInstruction(const std::string &element, const std::string &attrib
 class CryptBufBase;
 
 class XmlParserW  {
+  typedef std::char_traits<wchar_t> Traits;
 public:
   /** Konstruktor der XML-Parser Basisklasse für std::wstring
    
@@ -483,15 +484,15 @@ public:
    */
   std::string info(size_t &pos) const {
     pos = istr.tellg();
-//    std::cerr << "CUR = " << curr << " " << pos << std::endl;
+//    std::cerr << "CUR = " << Traits::to_char_type(curr) << " " << pos << std::endl;
     std::wstring w;
-    wchar_t c;
-    w += curr;
+    Traits::char_type c;
+    w += Traits::to_char_type(curr);
     for (int i = 0; i < 50; i++) {
-      if ((c = get()) <= 0)
-        break;
-      else
+      if (Traits::not_eof((c = get())))
         w += c;
+      else
+        break;
     }
 //    std::cerr << mobs::to_string(w) << std::endl;
     return to_string(w);
@@ -616,7 +617,7 @@ public:
 
       buffer.clear();
       parse2LT();
-      if (curr != '<')
+      if (not Traits::eq_int_type(curr, '<'))
         THROW(u8"Syntax Head");
       // BOM überlesen
       if (not buffer.empty() and buffer != L"\u00EF\u00BB\u00BF" and buffer != L"\ufeff")
@@ -648,7 +649,7 @@ public:
 //      }
     }
     // eigentliches Parsing
-    while (curr == '<')
+    while (Traits::eq_int_type(curr, '<'))
     {
       saveValue();
 //      saved = buffer;
@@ -715,7 +716,7 @@ public:
         if (tags.empty())
           THROW(u8"unexpected closing tag " + element);
         if (tags.top().element != element) {
-//        while ((curr = get()) > 0) ;
+//        while (Traits::not_eof((curr = get()))) ;
           THROW(u8"unmatching tag " + element + " expected " + tags.top().element);
         }
         tags.pop();
@@ -798,7 +799,7 @@ public:
           if (peek() == '=')
           {
             eat('=');
-            wchar_t c = peek();
+            auto c = peek();
             if (c == '"')
               eat('"');
             else
@@ -946,7 +947,7 @@ public:
 //    if (inParse2LT)
 //      return;
     saveValue();
-    if (curr != -1)
+    if (Traits::not_eof(curr))
       THROW(u8"Syntax error");
     // nur noch für check Whitespace bis eof
     saveValue();
@@ -959,36 +960,36 @@ private:
   void parse2LT() { buffer.clear(); parse2Char('<'); }
   void parse2GT() {
     buffer.clear();
-    if (curr <= 0)
-      return;
-    buffer += curr;
-    while ((curr = get()) > 0) {
-//      std::cout << "x " << mobs::to_string(curr);
-      if (std::wstring(L"/ <>=\"'?!").find(curr) != std::wstring::npos )
-        break;
-      buffer += curr;
+    if (Traits::not_eof(curr)) {
+      buffer += Traits::to_char_type(curr);
+      while (Traits::not_eof((curr = get()))) {
+//      std::cout << "x " << mobs::to_string(Traits::to_char_type(curr));
+        if (std::wstring(L"/ <>=\"'?!").find(Traits::to_char_type(curr)) != std::wstring::npos)
+          break;
+        buffer += Traits::to_char_type(curr);
+      }
+      if (not Traits::not_eof(curr))
+        THROW("Syntax");
     }
-    if (curr < 0)
-      THROW("Syntax");
   };
-  void parse2Char(wchar_t c) {
-    if (curr == c or curr <= 0)
+  void parse2Char(Traits::char_type c) {
+    if (not Traits::not_eof(curr) or Traits::to_char_type(curr) == c)
       return;
     if (try64)
-      base64.put(curr);
+      base64.put(Traits::to_char_type(curr));
     else
-      buffer += curr;
+      buffer += Traits::to_char_type(curr);
 //    if (maxRead == 0 and c == L'<') {
 //      inParse2LT = true;
 //      return;
 //    }
-    while ((curr = get()) > 0) {
-      if (curr == c)
+    while (Traits::not_eof(curr = get())) {
+      if (Traits::to_char_type(curr) == c)
         break;
       if (try64)
-        base64.put(curr);
+        base64.put(Traits::to_char_type(curr));
       else
-        buffer += curr;
+        buffer += Traits::to_char_type(curr);
     }
   };
   void parse2Com() {
@@ -1006,8 +1007,6 @@ private:
           }
         }
       }
-      if (peek() < 0)
-        THROW("Syntax");
     }
   };
   void parse2CD() {
@@ -1032,8 +1031,6 @@ private:
       if (try64)
         THROW("base64 error");
       base64.clear();
-      if (peek() < 0)
-        THROW("Syntax");
     }
   };
   void clearValue() { saved.clear(); }; // der Zwischenraum fand Verwendung
@@ -1048,23 +1045,22 @@ private:
     }
     saved = buffer;
   };
-  void eat(wchar_t c) {
-    buffer += curr;
-    if (curr != c)
-      THROW(u8"Expected " << mobs::to_string(c) << " got " << mobs::to_string(curr));
+  void eat(Traits::char_type c) {
+    buffer += Traits::to_char_type(curr);
+    if (not Traits::eq_int_type(Traits::to_int_type(c), curr))
+      THROW(u8"Expected " << mobs::to_string(c) << " got " << mobs::to_string(Traits::to_char_type(curr)));
     curr = get();
 //    pos1++;
   };
   void eat() {
 //    pos1++;
-    buffer += curr;
+    buffer += Traits::to_char_type(curr);
     curr = get();
   };
-  wchar_t peek() const {
-    if (curr < 0)
-      THROW(u8"unexpected EOF");
-    //cerr << "Peek " << Xml[pos1] << " " << pos1 << endl;
-    return curr;
+  Traits::char_type peek() const {
+    if (Traits::not_eof(curr))
+      return Traits::to_char_type(curr);
+    THROW(u8"unexpected EOF");
   };
 /// Wandelt einen Teilstring aus Xml von der HTML-Notation in ASCII zurück
   void decode(std::wstring &buf) {
@@ -1114,8 +1110,8 @@ private:
     base64.clear();
     try64 = true;
   }
-  wchar_t get() const {
-    wchar_t c;
+  Traits::int_type get() const {
+    Traits::int_type c;
 //    if (maxRead)
 //      maxRead--;
     if (encryptedData.istr) {
@@ -1171,7 +1167,7 @@ private:
   std::wstring buffer;
   std::wstring saved;
   std::wstring cdata;
-  wchar_t curr = 0;
+  Traits::int_type curr = 0;
   std::string encoding;
   mutable std::stack<Level> tags;
   std::string lastKey;
