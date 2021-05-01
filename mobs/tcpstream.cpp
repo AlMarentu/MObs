@@ -24,12 +24,18 @@
 
 #include <array>
 #include <mutex>
+#include <sys/types.h>
+#ifdef __MINGW32__
+#include <winsock2.h>
+#include <windows.h>
+#include <ws2tcpip.h>
+#else
 #include <netdb.h>
 #include <arpa/inet.h>
-#include <sys/types.h>
 #include <sys/socket.h>
-#include <unistd.h>
 #include <netinet/ip.h>
+#endif
+#include <unistd.h>
 
 static std::string hostIp(const struct sockaddr &sa, socklen_t len)
 {
@@ -55,38 +61,51 @@ static std::string hostName(const struct sockaddr &sa, socklen_t len)
   return host;
 }
 
+#ifdef __MINGW32__
+#undef errno
+#define errno WSAGetLastError()
+#else
+#define closesocket(s) ::close(s)
+#define SOCKET_ERROR -1
+#endif
+
 namespace mobs {
 
-int TcpAccept::initService(const std::string &service) {
+socketHandle TcpAccept::initService(const std::string &service) {
   struct addrinfo hints{};
   struct addrinfo *servinfo;
-
+#ifdef __MINGW32__
+  WinSock::get();
+#endif
   hints.ai_family = PF_UNSPEC; // use AF_INET6 to force IPv6
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_protocol = IPPROTO_TCP;
   hints.ai_flags = AI_PASSIVE; // use my IP address
 
-  int rv;
-  if ((rv = getaddrinfo(nullptr, service.c_str(), &hints, &servinfo)) != 0) {
+  if (auto rv = getaddrinfo(nullptr, service.c_str(), &hints, &servinfo)) {
     LOG(LM_ERROR, "getaddrinfo: " << gai_strerror(rv));
-    return -1;
+    return invalidSocket;
   }
   // loop through all the results and bind to the first we can
   for(auto p = servinfo; p; p = p->ai_next)
     LOG(LM_INFO, "TRY " << hostIp(*p->ai_addr, p->ai_addrlen));
   for(auto p = servinfo; p; p = p->ai_next) {
-    if ((fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
+    if ((fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == invalidSocket) {
       LOG(LM_ERROR, "Fehler bei socket: " <<  strerror(errno));
       continue;
     }
     int para = 1;
-    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &para, sizeof(para)) < 0)
+    char *parp = (char *)&para;
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, parp, sizeof(para)) < 0)
       LOG(LM_ERROR, "setsockopt SO_REUSEADDR " << strerror(errno));
+#ifndef __MINGW32__
     if (setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &para, sizeof(para)) < 0)
       LOG(LM_ERROR, "setsockopt SO_NOSIGPIPE " << strerror(errno));
+    #define SOCKET_ERROR -1
+#endif
     int tries = 3;
     for (int i = 1; ; i++) {
-      if (bind(fd, p->ai_addr, p->ai_addrlen) == -1)
+      if (bind(fd, p->ai_addr, p->ai_addrlen) == SOCKET_ERROR)
       {
         LOG(LM_ERROR, "Fehler bei bind: " <<  strerror(errno) << " " << errno);
         if (errno == EADDRINUSE and i < tries)
@@ -94,31 +113,30 @@ int TcpAccept::initService(const std::string &service) {
           sleep(1);
           continue;
         }
-        close(fd);
-        fd = -1;
+        closesocket(fd);
+        fd = invalidSocket;
       }
       break;
     }
-    if (fd != -1) {
+    if (fd != invalidSocket) {
       LOG(LM_INFO, "CONNECTED " << hostIp(*p->ai_addr, p->ai_addrlen));
       break;
     }
   }
   freeaddrinfo(servinfo);
   if (fd < 0) {
-    return -1;
+    return invalidSocket;
   }
 
-  if (listen(fd, 10) < 0) {
+  if (listen(fd, 10) == SOCKET_ERROR) {
     LOG(LM_ERROR, "Fehler bei listen: " << strerror(errno));
-    return -1;
+    return invalidSocket;
   }
-  LOG(LM_INFO, "FD " << fd);
   return fd;
 }
 
 
-int TcpAccept::acceptConnection(struct sockaddr &addr, size_t &len) const {
+socketHandle TcpAccept::acceptConnection(struct sockaddr &addr, size_t &len) const {
   static std::mutex mutex;
   std::lock_guard<std::mutex> guard(mutex);
 
@@ -127,11 +145,11 @@ int TcpAccept::acceptConnection(struct sockaddr &addr, size_t &len) const {
   int fdneu = ::accept(fd, &addr, &addrLen);
   len = addrLen;
   LOG(LM_INFO, "Accept " << fdneu);
-  if (fdneu >= 0) {
+  if (fdneu != invalidSocket) {
     LOG(LM_INFO, "accept: from Host: " << hostIp(addr, addrLen));
   }
   else
-    LOG(LM_ERROR, "accept failed " << strerror(errno));
+    LOG(LM_ERROR, "accept failed " << errno << " " << strerror(errno));
 
   return fdneu;
 }
@@ -139,73 +157,84 @@ int TcpAccept::acceptConnection(struct sockaddr &addr, size_t &len) const {
 
 class TcpStBufData { // NOLINT(cppcoreguidelines-pro-type-member-init)
 public:
-  void connect(const std::string &host, uint32_t port) {
-    struct sockaddr_in addr{};
-
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    addr.sin_addr.s_addr = inet_addr(host.c_str()); // try if it's an numeric address
-    if (addr.sin_addr.s_addr == INADDR_NONE) {
-      struct hostent *rechner = gethostbyname(host.c_str());
-      if (not rechner) {
-        LOG(LM_ERROR, "can't resolve host " << host);
-        return;
+  void connect(const std::string &host, const std::string &service) {
+#ifdef __MINGW32__
+    WinSock::get();
+#endif
+    struct addrinfo hints, *res, *res0;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = PF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    if (auto error = getaddrinfo(host.c_str(), service.c_str(), &hints, &res0)) {
+      LOG(LM_ERROR, "getaddrinfo: " << gai_strerror(error));
+      return;
+    }
+    fd = invalidSocket;
+    for (res = res0; res; res = res->ai_next) {
+      LOG(LM_INFO, "TRY " << hostIp(*res->ai_addr, res->ai_addrlen));
+      if ((fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) == invalidSocket) {
+        LOG(LM_ERROR, "socket failed " << errno);
+        continue;
       }
-      memcpy((char *) &addr.sin_addr, rechner->h_addr_list[0], sizeof(addr.sin_addr));
+      if (::connect(fd, res->ai_addr, res->ai_addrlen) == SOCKET_ERROR) {
+        if (errno == WSAECONNREFUSED)
+          LOG(LM_ERROR, "connection refused " << hostIp(*res->ai_addr, res->ai_addrlen));
+        else
+          LOG(LM_ERROR, "connect failed " << errno << " " << hostIp(*res->ai_addr, res->ai_addrlen));
+        closesocket(fd);
+        fd = invalidSocket;
+        continue;
+      }
+      break;
     }
-
-    struct protoent *ppe;
-    if (not(ppe = getprotobyname("tcp")))
-      THROW("can't get \"tcp\" protocol entry");
-
-    fd = socket(AF_INET, SOCK_STREAM, ppe->p_proto);
-    if (fd < 0) {
-      LOG(LM_ERROR, "can't bind socket");
-      return;
-    }
-
-    if (::connect(fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+    if (fd == invalidSocket) {
       LOG(LM_ERROR, "can't connect");
-      ::close(fd);
-      fd = -1;
-      bad = true;
       return;
     }
+    LOG(LM_INFO, "Connected " << hostIp(*res->ai_addr, res->ai_addrlen));
 
     int i = 1;
-    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &i, sizeof(i));
-
+    char *parp = (char *)&i;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, parp, sizeof(i));
   }
 
   std::streamsize readBuf() {
-    if (fd < 0 or bad)
+    if (fd == invalidSocket or bad)
       return 0;
+#ifdef __WIN32__
+    auto res = recv(fd, &rdBuf[0], int(rdBuf.size()), 0); // immer < INT_MAX
+#else
     auto res = read(fd, &rdBuf[0], rdBuf.size());
+#endif
+    if (res < 0) {
+      LOG(LM_ERROR, "read error " << errno);
+      bad = true;
+      return 0;
+    }
 //    if (res < 200)
 //      LOG(LM_INFO, "READ TCP " << res << " " << std::string(&rdBuf[0], res));
 //    else
 //      LOG(LM_INFO, "READ TCP " << res << " " << std::string(&rdBuf[0], 100) << " ... " << std::string(&rdBuf[res-100], 100));
 //    LOG(LM_DEBUG, "READ TCP " << res);
-    if (res < 0) {
-      LOG(LM_ERROR, "read error");
-      bad = true;
-      return 0;
-    }
     rdPos += TcpStBuf::off_type(res);
     return res;
   }
 
   void writeBuf(std::streamsize sz) {
-    if (fd < 0)
+    if (fd == invalidSocket)
       bad = true;
     if (bad)
       return;
     TcpStBuf::char_type *cp = &wrBuf[0];
     while (sz > 0) {
+#ifdef __WIN32__
+      auto res = send(fd, cp, int(sz), 0); // buffersize immer < INT_MAX
+#else
       auto res = write(fd, cp, sz);
+#endif
       LOG(LM_INFO, "WRITE TCP " << res );
       if (res <= 0) {
-        LOG(LM_ERROR, "write error");
+        LOG(LM_ERROR, "write error " << errno);
         if (res == -1 and errno == EPIPE)
           LOG(LM_ERROR, "got sigpipe");
         bad = true;
@@ -218,21 +247,21 @@ public:
   }
 
   std::string getRemoteHost() const {
-    return hostName(remoteAddr, addrLen);
+    return hostName((sockaddr &)remoteAddr, addrLen);
   }
 
   std::string getRemoteIp() const {
-    return hostIp(remoteAddr, addrLen);
+    return hostIp((sockaddr &)remoteAddr, addrLen);
   }
 
 
-  int fd = -1;
+  socketHandle fd = invalidSocket;
   bool bad = false;
   std::array<TcpStBuf::char_type, 8192> rdBuf;
   std::array<TcpStBuf::char_type, 8192> wrBuf;
   std::streamsize rdPos = 0;
   std::streamsize wrPos = 0;
-  struct sockaddr remoteAddr{};
+  sockaddr_storage remoteAddr{};
   size_t addrLen = sizeof(remoteAddr);
 };
 
@@ -242,15 +271,15 @@ TcpStBuf::TcpStBuf() : Base() {
 
 TcpStBuf::TcpStBuf(TcpAccept &accept) {
   data = new TcpStBufData;
-  data->fd = accept.acceptConnection(data->remoteAddr, data->addrLen);
-  if (data->fd == -1)
+  data->fd = accept.acceptConnection((sockaddr &)data->remoteAddr, data->addrLen);
+  if (data->fd == invalidSocket)
     data->bad = true;
   Base::setp(data->wrBuf.begin(), data->wrBuf.end());
 }
 
-TcpStBuf::TcpStBuf(const std::string &host, uint32_t port) : Base() {
+TcpStBuf::TcpStBuf(const std::string &host, const std::string &service) : Base() {
   data = new TcpStBufData;
-  data->connect(host, port);
+  data->connect(host, service);
   Base::setp(data->wrBuf.begin(), data->wrBuf.end());
 }
 
@@ -260,14 +289,14 @@ TcpStBuf::~TcpStBuf() {
   delete data;
 }
 
-bool TcpStBuf::open(const std::string &host, uint32_t port) {
-  TRACE(PARAM(host) << PARAM(port));
-  data->connect(host, port);
+bool TcpStBuf::open(const std::string &host, const std::string &service) {
+  TRACE(PARAM(host) << PARAM(service));
+  data->connect(host, service);
   return is_open();
 }
 
 bool TcpStBuf::is_open() const {
-  return data->fd >= 0;
+  return data->fd != invalidSocket;
 }
 
 bool TcpStBuf::bad() const {
@@ -278,11 +307,11 @@ TcpStBuf::int_type TcpStBuf::overflow(TcpStBuf::int_type ch) {
   TRACE(PARAM(ch));
   data->writeBuf(std::distance(Base::pbase(), Base::pptr()));
   Base::setp(data->wrBuf.begin(), data->wrBuf.end()); // buffer zurücksetzen
+  if (bad())
+    return Traits::eof();
   if (not Traits::eq_int_type(ch, Traits::eof()))
-    Base::sputc(ch);
-  if (not bad())
-    return ch;
-  return Traits::eof();
+    Base::sputc(Traits::to_char_type(ch));
+  return ch;
 }
 
 TcpStBuf::int_type TcpStBuf::underflow() {
@@ -298,8 +327,8 @@ bool TcpStBuf::close() {
   pubsync();
   if (bad() or not is_open())
     return false;
-  int res = ::close(data->fd);
-  data->fd = -1;
+  int res = closesocket(data->fd);
+  data->fd = invalidSocket;
   return res == 0;
 }
 
@@ -321,7 +350,7 @@ std::fpos<mbstate_t> TcpStBuf::seekoff(long long int off, std::ios_base::seekdir
       return pos_type(off_type(-1));
     return pos_type(data->wrPos + off_type(std::distance(Base::pbase(), Base::pptr())));
   }
-  return pos_type(off_type(-1));
+  return {off_type(-1)};
 }
 
 void TcpStBuf::shutdown(std::ios_base::openmode which) {
@@ -330,6 +359,11 @@ void TcpStBuf::shutdown(std::ios_base::openmode which) {
   if (bad() or not is_open())
     return;
   int how = 0;
+#ifdef __MINGW32__
+#define SHUT_RDWR SD_BOTH
+#define SHUT_WR SD_SEND
+#define SHUT_RD SD_RECEIVE
+#endif
   if ((which & (std::ios_base::in | std::ios_base::out)) == (std::ios_base::in | std::ios_base::out))
     how = SHUT_RDWR;
   else if (which & std::ios_base::out)
@@ -355,7 +389,8 @@ std::string TcpStBuf::getRemoteIp() const {
 
 tcpstream::tcpstream() : std::iostream ( new TcpStBuf()) {}
 
-tcpstream::tcpstream(const std::string &host, uint32_t port) : std::iostream ( new TcpStBuf(host, port)) {
+tcpstream::tcpstream(const std::string &host, const std::string &service) :
+        std::iostream(new TcpStBuf(host, service)) {
   if (not is_open())
     setstate(std::ios_base::badbit);
 }
@@ -370,10 +405,10 @@ tcpstream::~tcpstream() {
   delete tp;
 }
 
-void tcpstream::open(const std::string &host, uint32_t port) {
+void tcpstream::open(const std::string &host, const std::string &service) {
   auto *tp = dynamic_cast<TcpStBuf *>(rdbuf());
   if (not tp) THROW("bad cast");
-  tp->open(host, port);
+  tp->open(host, service);
   if (not is_open())
     setstate(std::ios_base::badbit);
 }
@@ -413,26 +448,33 @@ std::string tcpstream::getRemoteIp() const {
 }
 
 
-//class SelectData {
-//public:
-//  class Process {
-//  public:
-//
-//  };
-//};
-//
-//int doSelect() {
-//  struct timeval tv;
-//  fd_set fds;
-//  FD_ZERO(&fds);
-//  FD_SET(fdneu, &fds);
-//  tv.tv_sec = 1;
-//  tv.tv_usec = 0;
-//
-//  g_sessions.clear();
-//
-//  res = select(fdneu +1, &fds, NULL, NULL, &tv);
-//}
+#ifdef __MINGW32__
 
+WinSock::WinSock() {
+  WSADATA wsaData;
+  if (auto res = WSAStartup(MAKEWORD(2,2), &wsaData))
+    THROW("WSAStartup failed with error: " << res);
 
+  atexit(WinSock::deleteWinSock);
+}
+
+WinSock::~WinSock() {
+  WSACleanup();
+}
+
+const WinSock *WinSock::get() {
+  if (not winSock)
+    winSock = new WinSock;
+  return winSock;
+}
+
+void WinSock::deleteWinSock() {
+  if (not winSock)
+    return;
+  delete winSock;
+  winSock = nullptr;
+}
+
+WinSock *WinSock::winSock = nullptr;
+#endif
 }

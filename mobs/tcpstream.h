@@ -28,10 +28,31 @@
 #define MOBS_TCPSTREAM_H
 
 #include <iostream>
+#ifdef __MINGW32__
+#include <winsock2.h>
+#endif
 
 struct sockaddr;
 namespace mobs {
 
+#ifdef __MINGW32__
+class WinSock {
+private:
+  WinSock();
+  ~WinSock();
+public:
+  static const WinSock *get();
+  static void deleteWinSock();
+private:
+  static WinSock *winSock;
+};
+
+typedef SOCKET socketHandle;
+const socketHandle invalidSocket = INVALID_SOCKET;
+#else
+typedef int socketHandle;
+const socketHandle invalidSocket = -1;
+#endif
 
 /** \brief Klasse um eine passive TCP-Verbindung zu öffnen
  *
@@ -42,13 +63,13 @@ public:
   /** \brief öffnet eine Port, um eine TCP-Verbindung anzunehmen \see mobs::tcpstream
    *
    * @param service TCP-Port
-   * @return -1 im Fehlerfall
+   * @return socketHandle (betriebssystemabhängig) invalidSocket im Fehlerfall
    */
-  int initService(const std::string &service);
+  socketHandle initService(const std::string &service);
 
 private:
-  int acceptConnection(struct sockaddr &sa, size_t &len) const;
-  int fd = -1;
+  socketHandle acceptConnection(struct sockaddr &sa, size_t &len) const;
+  socketHandle fd = invalidSocket;
 };
 
 class TcpStBufData;
@@ -74,19 +95,19 @@ public:
   /** \brief Konstruktor für TCP-Verbindung
    *
    * @param host Hostname oder IP
-   * @param port Port
+   * @param service Port als Zahl oder als Service-Name (z.B.: "http")
    */
-  TcpStBuf(const std::string &host, uint32_t port);
+  TcpStBuf(const std::string &host, const std::string &service);
 
   ~TcpStBuf() override;
 
   /** \brief offnet eine TCP-Verbindung
    *
    * @param host Host oder IP
-   * @param port Posrt
+   * @param service Port als Zahl oder als Service-Name (z.B.: "http")
    * @return true, wenn Verbindung offen
    */
-  bool open(const std::string &host, uint32_t port);
+  bool open(const std::string &host, const std::string &service);
 
   /** \brief schließt die Verbindung
    *
@@ -145,18 +166,18 @@ public:
   /** \brief Konstruktor für TCP-Verbindung
    *
    * @param host Hostname oder IP
-   * @param port Port
+   * @param service Port
    */
-  tcpstream(const std::string &host, uint32_t port);
+  tcpstream(const std::string &host, const std::string &service);
 
   ~tcpstream() override;
 
   /** \brief offnet eine TCP-Verbindung
    *
    * @param host Hostname oder IP
-   * @param port Port
+   * @param service Port
    */
-  void open(const std::string &host, uint32_t port);
+  void open(const std::string &host, const std::string &service);
 
   /// Schließen einer Verbindung
   void close();
