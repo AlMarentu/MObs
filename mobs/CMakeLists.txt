@@ -1,26 +1,34 @@
 
 set(libSrcs objgen.cpp objtypes.cpp logging.cpp strtoobj.cpp objpool.cpp xmlwriter.cpp audittrail.cpp
         xmlout.cpp xmlread.cpp converter.cpp unixtime.cpp dbifc.cpp helper.cpp mchrono.cpp queryorder.cpp
-        querygenerator.cpp csb.cpp
+        querygenerator.cpp csb.cpp tcpstream.cpp
         converter.h logging.h objpool.h objtypes.h unixtime.h xmlparser.h xmlwriter.h audittrail.h
         jsonparser.h objgen.h objstore.h union.h xmlout.h xmlread.h dbifc.h helper.h mchrono.h  queryorder.h
-        querygenerator.h csb.h)
-
-if (UNIX)
-    set(libSrcs ${libSrcs} tcpstream.cpp tcpstream.h)
-endif()
+        querygenerator.h csb.h tcpstream.h)
 
 find_package(OpenSSL)
 if (OPENSSL_FOUND)
-    if (CMAKE_HOST_APPLE)
-        # wird hier falsch ausgewertet, deshalb korrekt setzen
-        set(OPENSSL_LIBRARIES /usr/local/opt/openssl/lib/libssl.dylib /usr/local/opt/openssl/lib/libcrypto.dylib)
-        set(OPENSSL_INCLUDE_DIR /usr/local/opt/openssl/include)
-    endif()
-    set(EXTRA_LIBS ${EXTRA_LIBS} ${OPENSSL_LIBRARIES})
-
+    if (BUILD_SHARED_LIBS)
+        set(EXTRA_LIBS ${EXTRA_LIBS} ${OPENSSL_LIBRARIES})
+    else()
+        set(EXTRA_LIBS ${EXTRA_LIBS} ${OPENSSL_INCLUDE_DIR}/../lib/libssl.a)
+        set(EXTRA_LIBS ${EXTRA_LIBS} ${OPENSSL_INCLUDE_DIR}/../lib/libcrypto.a)
+    endif ()
     include_directories(${OPENSSL_INCLUDE_DIR})
     set(libSrcs ${libSrcs} aes.cpp aes.h rsa.cpp rsa.h digest.cpp digest.h)
+endif()
+
+
+
+if(BUILD_SQLITE_INTERFACE)
+    set(libSrcs ${libSrcs} sqlite.cpp sqlite.h)
+    if (EXISTS ${CMAKE_SOURCE_DIR}/extern/sqlite-amalgamation/sqlite3.c)
+        include_directories(${CMAKE_SOURCE_DIR}/extern/sqlite-amalgamation)
+        set(libSrcs ${libSrcs} ${CMAKE_SOURCE_DIR}/extern/sqlite-amalgamation/sqlite3.c)
+    else()
+        find_package(SQLite3 REQUIRED)
+        set(EXTRA_LIBS ${EXTRA_LIBS} ${SQLite3_LIBRARIES})
+    endif()
 endif()
 
 
@@ -32,12 +40,6 @@ if(BUILD_MONGO_INTERFACE)
     set(libSrcs ${libSrcs} mongo.cpp mongo.h)
 endif()
 
-
-if(BUILD_SQLITE_INTERFACE)
-    find_package(SQLite3 REQUIRED)
-    set(EXTRA_LIBS ${EXTRA_LIBS} ${SQLite3_LIBRARIES})
-    set(libSrcs ${libSrcs} sqlite.cpp sqlite.h)
-endif()
 
 if(BUILD_MARIA_INTERFACE)
     find_library(mariadb mariadb)
@@ -59,9 +61,13 @@ if(BUILD_INFORMIX_INTERFACE)
     set(EXTRA_LIBS ${EXTRA_LIBS} ${INFORMIX_LIBRARIES})
 endif()
 
+#"C:/Program Files (x86)/mingw-w64/i686-8.1.0-posix-dwarf-rt_v6-rev0/mingw32/i686-w64-mingw32/lib/libws2_32.a" )
+if(CMAKE_HOST_WIN32)
+    # WinSock2
+    set(EXTRA_LIBS ${EXTRA_LIBS} ws2_32)
+endif()
 
-#add_library(mobs STATIC ${libSrcs})
-add_library(mobs SHARED ${libSrcs})
+add_library(mobs  ${libSrcs})
 set_target_properties(mobs PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(mobs PROPERTIES SOVERSION 0)
 target_link_libraries(mobs ${EXTRA_LIBS})
@@ -86,10 +92,15 @@ set_property(TARGET mobs PROPERTY CXX_STANDARD 11)
 set_property(TARGET mobs PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 
-set_target_properties(mobs PROPERTIES PUBLIC_HEADER "converter.h;logging.h;objpool.h;objtypes.h;unixtime.h;xmlparser.h;xmlwriter.h;jsonparser.h;objgen.h;objstore.h;union.h;xmlout.h;xmlread.h;mchrono.h;dbifc.h;mongo.h;csb.h")
+set_target_properties(mobs PROPERTIES PUBLIC_HEADER "converter.h;logging.h;objpool.h;objtypes.h;unixtime.h;xmlparser.h;xmlwriter.h;jsonparser.h;objgen.h;objstore.h;union.h;xmlout.h;xmlread.h;mchrono.h;dbifc.h;mongo.h;csb.h;tcpstream.h")
 install(TARGETS mobs
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
         RUNTIME DESTINATION bin
         PUBLIC_HEADER DESTINATION include/mobs)
 
+get_cmake_property(_variableNames VARIABLES)
+list (SORT _variableNames)
+foreach (_variableName ${_variableNames})
+    message(STATUS "${_variableName}=${${_variableName}}")
+endforeach()

@@ -2,17 +2,27 @@ cmake_minimum_required(VERSION 3.1...3.16)
 project(MObs LANGUAGES CXX)
 project(MObs VERSION 0.1.3)
 
-if(NOT DEFINED CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 11)
+# alternative OpenSSL
+if(CMAKE_HOST_APPLE)
+    # hombrew Version
+    set (CMAKE_PREFIX_PATH /usr/local/opt/openssl)
+elseif(CMAKE_HOST_WIN32)
+    # https://curl.se/windows/dl-7.76.1/openssl-1.1.1k-win32-mingw.zip
+    set (CMAKE_PREFIX_PATH "C:/openssl-1.1.1k-win32-mingw")
 endif()
 
-
+option(BUILD_SHARED_LIBS "Build shared lib" OFF)
 option(PACKAGE_TESTS "Build the tests" ON)
-option(BUILD_DOC "Build Documentation" ON)
-option(BUILD_MONGO_INTERFACE "Build the Mongo database modules" ON)
-option(BUILD_MARIA_INTERFACE "Build the Maria database modules" ON)
+option(BUILD_DOC "Build Documentation" OFF)
+option(BUILD_MONGO_INTERFACE "Build the Mongo database modules" OFF)
+option(BUILD_MARIA_INTERFACE "Build the Maria database modules" OFF)
 option(BUILD_SQLITE_INTERFACE "Build the SQLite database modules" ON)
-option(BUILD_INFORMIX_INTERFACE "Build the Informix database modules" ON)
+option(BUILD_INFORMIX_INTERFACE "Build the Informix database modules" OFF)
+
+
+if(NOT DEFINED CMAKE_CXX_STANDARD)
+    set(CMAKE_CXX_STANDARD 11)
+endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/mobs)
 
@@ -68,12 +78,12 @@ endif()
 
 
 
-add_executable(fileio2 fileio2.cpp)
-target_link_libraries(fileio2 mobs)
+#add_executable(fileio2 fileio2.cpp)
+#target_link_libraries(fileio2 mobs)
 
-add_executable(aes2 aes2.cpp)
-include_directories(${OPENSSL_INCLUDE_DIR})
-target_link_libraries(aes2 mobs)
+#add_executable(aes2 aes2.cpp)
+#include_directories(${OPENSSL_INCLUDE_DIR})
+#target_link_libraries(aes2 mobs)
 
 
 #get_cmake_property(_variableNames VARIABLES)
