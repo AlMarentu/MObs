@@ -177,7 +177,11 @@ public:
         continue;
       }
       if (::connect(fd, res->ai_addr, res->ai_addrlen) == SOCKET_ERROR) {
+#ifdef __MINGW32__
         if (errno == WSAECONNREFUSED)
+#else
+        if (errno == ECONNREFUSED)
+#endif
           LOG(LM_ERROR, "connection refused " << hostIp(*res->ai_addr, res->ai_addrlen));
         else
           LOG(LM_ERROR, "connect failed " << errno << " " << hostIp(*res->ai_addr, res->ai_addrlen));
