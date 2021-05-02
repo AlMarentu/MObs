@@ -337,7 +337,9 @@ int TcpStBuf::sync() {
 }
 
 // wird im state eof or bad vom tcpstream nicht mehr aufgerufen
-std::fpos<mbstate_t> TcpStBuf::seekoff(long off, std::ios_base::seekdir dir, std::ios_base::openmode which) {
+
+std::basic_streambuf<char>::pos_type
+TcpStBuf::seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which) {
   if (which & std::ios_base::in) {
     if ((which & std::ios_base::out) or dir != std::ios_base::cur or off != 0)
       return pos_type(off_type(-1));
