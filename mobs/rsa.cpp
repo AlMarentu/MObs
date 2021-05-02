@@ -30,6 +30,7 @@
 #include <openssl/err.h>
 #include <utility>
 #include <vector>
+#include <cstring>
 
 
 #define KEYBUFLEN 32

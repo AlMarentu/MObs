@@ -29,6 +29,7 @@
 //#include <openssl/err.h>
 #include <vector>
 #include <iomanip>
+#include <cstring>
 
 
 #define KEYBUFLEN 32

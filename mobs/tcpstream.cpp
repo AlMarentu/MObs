@@ -36,6 +36,7 @@
 #include <netinet/ip.h>
 #endif
 #include <unistd.h>
+#include <string.h>
 
 static std::string hostIp(const struct sockaddr &sa, socklen_t len)
 {
@@ -64,6 +65,7 @@ static std::string hostName(const struct sockaddr &sa, socklen_t len)
 #ifdef __MINGW32__
 #undef errno
 #define errno WSAGetLastError()
+#define MSG_NOSIGNAL 0
 #else
 #define closesocket(s) ::close(s)
 #define SOCKET_ERROR -1
@@ -98,7 +100,7 @@ socketHandle TcpAccept::initService(const std::string &service) {
     char *parp = (char *)&para;
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, parp, sizeof(para)) < 0)
       LOG(LM_ERROR, "setsockopt SO_REUSEADDR " << strerror(errno));
-#ifndef __MINGW32__
+#if 0
     if (setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &para, sizeof(para)) < 0)
       LOG(LM_ERROR, "setsockopt SO_NOSIGPIPE " << strerror(errno));
     #define SOCKET_ERROR -1
@@ -205,11 +207,7 @@ public:
   std::streamsize readBuf() {
     if (fd == invalidSocket or bad)
       return 0;
-#ifdef __WIN32__
-    auto res = recv(fd, &rdBuf[0], int(rdBuf.size()), 0); // immer < INT_MAX
-#else
-    auto res = read(fd, &rdBuf[0], rdBuf.size());
-#endif
+    auto res = recv(fd, &rdBuf[0], int(rdBuf.size()), MSG_NOSIGNAL); // immer < INT_MAX
     if (res < 0) {
       LOG(LM_ERROR, "read error " << errno);
       bad = true;
@@ -231,11 +229,7 @@ public:
       return;
     TcpStBuf::char_type *cp = &wrBuf[0];
     while (sz > 0) {
-#ifdef __WIN32__
-      auto res = send(fd, cp, int(sz), 0); // buffersize immer < INT_MAX
-#else
-      auto res = write(fd, cp, sz);
-#endif
+      auto res = send(fd, cp, int(sz), MSG_NOSIGNAL); // buffersize immer < INT_MAX
       LOG(LM_INFO, "WRITE TCP " << res );
       if (res <= 0) {
         LOG(LM_ERROR, "write error " << errno);
@@ -343,7 +337,7 @@ int TcpStBuf::sync() {
 }
 
 // wird im state eof or bad vom tcpstream nicht mehr aufgerufen
-std::fpos<mbstate_t> TcpStBuf::seekoff(long long int off, std::ios_base::seekdir dir, std::ios_base::openmode which) {
+std::fpos<mbstate_t> TcpStBuf::seekoff(long off, std::ios_base::seekdir dir, std::ios_base::openmode which) {
   if (which & std::ios_base::in) {
     if ((which & std::ios_base::out) or dir != std::ios_base::cur or off != 0)
       return pos_type(off_type(-1));
