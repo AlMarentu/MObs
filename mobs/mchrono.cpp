@@ -206,9 +206,9 @@ bool string2x(const std::string &str, MDate &t) {
     return false;
   ts.tm_isdst = -1;
 #ifdef __MINGW32__
-  std::time_t ti = mktime(&ts);
+  std::time_t ti = _mkgmtime(&ts);
 #else
-  std::time_t ti = timelocal(&ts);
+  std::time_t ti = timegm(&ts);
 #endif
   std::chrono::system_clock::time_point tp = std::chrono::system_clock::from_time_t(ti);
   t = std::chrono::time_point_cast<MDays>(tp);
@@ -221,9 +221,9 @@ std::string to_string(MDate t) {
   struct tm ts{};
   time_t time = std::chrono::system_clock::to_time_t(t);
 #ifdef __MINGW32__
-  localtime_s(&ts, &time);
+  gmtime_s(&ts, &time);
 #else
-  localtime_r(&time, &ts);
+  gmtime_r(&time, &ts);
 #endif
   s << std::put_time(&ts, "%Y-%m-%d");
   return s.str();
@@ -255,15 +255,11 @@ bool StrConv<MDate>::c_string2x(const std::string &str, MDate &t, const ConvFrom
 }
 
 bool StrConv<MDate>::c_from_int(int64_t i, MDate &t) {
-  std::chrono::system_clock::time_point tp{}; // sollte genau auf "epoch" stehen
-  tp += MDays(i);
-  t = std::chrono::time_point_cast<MDays>(tp);
-  return true;
+  return mobs::from_number(i, t);
 }
 
 bool StrConv<MDate>::c_to_int64(MDate t, int64_t &i) {
-  i = t.time_since_epoch().count();
-  return true;
+  return mobs::to_int64(t, i);
 }
 
 bool StrConv<MDate>::c_from_mtime(int64_t i, MDate &t) {
@@ -290,6 +286,27 @@ bool string2x(const std::string &str, MTime &t) {
     LOG(LM_DEBUG, "string2x " << e.what());
   }
   return false;
+}
+
+
+MDate MDateNow() {
+  return std::chrono::time_point_cast<MDays>(std::chrono::system_clock::now());
+}
+
+template<>
+bool from_number(int64_t i, MDate &t) {
+  if (i > INT32_MAX or i < INT32_MIN)
+    return false;
+  std::chrono::system_clock::time_point tp{}; // sollte genau auf "epoch" stehen
+  tp += MDays(int32_t(i));
+  t = std::chrono::time_point_cast<MDays>(tp);
+  return true;
+}
+
+template<>
+bool to_int64(MDate t, int64_t &i) {
+  i = t.time_since_epoch().count();
+  return true;
 }
 
 
@@ -408,6 +425,10 @@ template<>
 bool to_int64(MTime t, int64_t &i) {
   i = t.time_since_epoch().count();
   return true;
+}
+
+MTime MTimeNow() {
+  return std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::system_clock::now());
 }
 
 std::wstring StrConv<MTime>::c_to_wstring(const MTime &t, const ConvToStrHint &cth) {

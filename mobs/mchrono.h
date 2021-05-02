@@ -35,6 +35,9 @@ namespace mobs {
 using MDays = std::chrono::duration<int, std::ratio<86400>>;
 using MDate = std::chrono::time_point<std::chrono::system_clock, MDays>;
 
+/// Aktuelles Datum für MDate
+MDate MDateNow();
+
 /// \private
 template <> bool string2x(const std::string &str, MDate &t);
 
@@ -47,6 +50,11 @@ std::string to_string(MDate);
 inline std::wstring to_wstring(MDate t) {
   return to_wstring(to_string(t));
 }
+
+/// Konvertierung Tage nach Epoche in MDate
+template<> bool from_number(int64_t , MDate &t);
+/// Konvertierung MDate nach Tage nach Epoche
+template<> bool to_int64(MDate t, int64_t &i);
 
 
 /// \private
@@ -97,6 +105,9 @@ public:
 
 
 using MTime = std::chrono::time_point<std::chrono::system_clock, std::chrono::microseconds>;
+
+/// Aktuelle Zeit für MTime
+MTime MTimeNow();
 
 /** \brief Konvertiere Zeit-String in Ansi/ISO8601 nach MTime
  *
