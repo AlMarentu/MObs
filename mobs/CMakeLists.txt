@@ -56,7 +56,7 @@ if(BUILD_INFORMIX_INTERFACE)
     find_package(informix REQUIRED)
     include_directories(${INFORMIX_INCLUDE_DIRS})
     add_custom_command(OUTPUT infxtools.o
-            COMMAND INFORMIXDIR=${INFORMIXDIR} ${INFORMIXDIR}/bin/esql -I${CMAKE_SOURCE_DIR}/mobs -c ${CMAKE_SOURCE_DIR}/mobs/infxtools.ec
+            COMMAND INFORMIXDIR=${INFORMIXDIR} ${INFORMIXDIR}/bin/esql -I${CMAKE_CURRENT_SOURCE_DIR} -c ${CMAKE_CURRENT_SOURCE_DIR}/infxtools.ec
             MAIN_DEPENDENCY infxtools.ec DEPENDS infxtools.h BYPRODUCTS infxtools.c
             COMMENT generating esql)
 
@@ -65,7 +65,7 @@ if(BUILD_INFORMIX_INTERFACE)
 endif()
 
 #"C:/Program Files (x86)/mingw-w64/i686-8.1.0-posix-dwarf-rt_v6-rev0/mingw32/i686-w64-mingw32/lib/libws2_32.a" )
-if(CMAKE_HOST_WIN32)
+if(WIN32)
     # WinSock2
     set(EXTRA_LIBS ${EXTRA_LIBS} ws2_32)
 endif()

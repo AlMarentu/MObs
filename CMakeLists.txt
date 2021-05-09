@@ -3,13 +3,14 @@ project(MObs LANGUAGES CXX)
 project(MObs VERSION 0.1.3)
 
 # alternative OpenSSL
-if(CMAKE_HOST_APPLE)
+if(APPLE)
     # hombrew Version
     set (CMAKE_PREFIX_PATH /usr/local/opt/openssl)
-elseif(CMAKE_HOST_WIN32)
+elseif(WIN32)
     # https://curl.se/windows/dl-7.76.1/openssl-1.1.1k-win32-mingw.zip
     set (CMAKE_PREFIX_PATH "C:/openssl-1.1.1k-win32-mingw")
 endif()
+message(STATUS "CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}")
 
 option(BUILD_SHARED_LIBS "Build shared lib" OFF)
 option(PACKAGE_TESTS "Build the tests" ON)
