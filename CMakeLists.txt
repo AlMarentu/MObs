@@ -1,14 +1,14 @@
-cmake_minimum_required(VERSION 3.1...3.16)
+cmake_minimum_required(VERSION 3.1.0)
 project(MObs LANGUAGES CXX)
 project(MObs VERSION 0.1.3)
 
 # alternative OpenSSL
 if(APPLE)
-    # hombrew Version
+    # homebrew Version
     set (CMAKE_PREFIX_PATH /usr/local/opt/openssl)
 elseif(WIN32)
     # https://curl.se/windows/dl-7.76.1/openssl-1.1.1k-win32-mingw.zip
-    set (CMAKE_PREFIX_PATH "C:/openssl-1.1.1k-win32-mingw")
+    # set (CMAKE_PREFIX_PATH "C:/openssl-1.1.1k-win32-mingw")
 endif()
 message(STATUS "CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}")
 

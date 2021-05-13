@@ -8,14 +8,10 @@ set(libSrcs objgen.cpp objtypes.cpp logging.cpp strtoobj.cpp objpool.cpp xmlwrit
 
 find_package(OpenSSL)
 if (OPENSSL_FOUND)
-    if (BUILD_SHARED_LIBS)
-        set(EXTRA_LIBS ${EXTRA_LIBS} ${OPENSSL_LIBRARIES})
-    else()
-        set(EXTRA_LIBS ${EXTRA_LIBS} ${OPENSSL_INCLUDE_DIR}/../lib/libssl.a)
-        set(EXTRA_LIBS ${EXTRA_LIBS} ${OPENSSL_INCLUDE_DIR}/../lib/libcrypto.a)
-    endif ()
     include_directories(${OPENSSL_INCLUDE_DIR})
     set(libSrcs ${libSrcs} aes.cpp aes.h rsa.cpp rsa.h digest.cpp digest.h)
+    message(STATUS "OPENSSL_INCLUDE_DIR=${OPENSSL_INCLUDE_DIR}")
+    set(EXTRA_LIBS ${EXTRA_LIBS} ${OPENSSL_LIBRARIES})
 endif()
 
 
@@ -64,7 +60,6 @@ if(BUILD_INFORMIX_INTERFACE)
     set(EXTRA_LIBS ${EXTRA_LIBS} ${INFORMIX_LIBRARIES})
 endif()
 
-#"C:/Program Files (x86)/mingw-w64/i686-8.1.0-posix-dwarf-rt_v6-rev0/mingw32/i686-w64-mingw32/lib/libws2_32.a" )
 if(WIN32)
     # WinSock2
     set(EXTRA_LIBS ${EXTRA_LIBS} ws2_32)
@@ -74,6 +69,7 @@ add_library(mobs  ${libSrcs})
 set_target_properties(mobs PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(mobs PROPERTIES SOVERSION 0)
 target_link_libraries(mobs ${EXTRA_LIBS})
+message(STATUS "EXTRA_LIBS=${EXTRA_LIBS}")
 
 if(BUILD_MONGO_INTERFACE)
     target_compile_definitions(mobs PUBLIC USE_MONGO)
