@@ -1308,11 +1308,9 @@ void MongoDatabaseConnection::uploadFile(DatabaseInterface &dbi, const std::stri
 
   mongocxx::database db = client[dbi.database()];
   auto gridfs_bucket = db.gridfs_bucket();
-  types::b_oid val{};
-  val.value = oid(id);
-  bsoncxx::types::value ai(val);
-
-  gridfs_bucket.upload_from_stream_with_id(ai,	"", &source);
+  auto doc = make_document(kvp("v", oid(id)));
+  bsoncxx::document::element el = doc.view()["v"];
+  gridfs_bucket.upload_from_stream_with_id(el.get_value(),	"", &source);
 }
 
 std::string MongoDatabaseConnection::uploadFile(DatabaseInterface &dbi, std::istream &source) {
@@ -1331,11 +1329,9 @@ void MongoDatabaseConnection::downloadFile(DatabaseInterface &dbi, const std::st
 
   mongocxx::database db = client[dbi.database()];
   auto gridfs_bucket = db.gridfs_bucket();
-  types::b_oid val{};
-  val.value = oid(id);
-  bsoncxx::types::value ai(val);
-
-  gridfs_bucket.download_to_stream(ai, &dest);
+  auto doc = make_document(kvp("v", oid(id)));
+  bsoncxx::document::element el = doc.view()["v"];
+  gridfs_bucket.download_to_stream(el.get_value(), &dest);
 }
 
 void MongoDatabaseConnection::deleteFile(DatabaseInterface &dbi, const std::string &id) {
@@ -1344,11 +1340,9 @@ void MongoDatabaseConnection::deleteFile(DatabaseInterface &dbi, const std::stri
 
   mongocxx::database db = client[dbi.database()];
   auto gridfs_bucket = db.gridfs_bucket();
-  types::b_oid val{};
-  val.value = oid(id);
-  bsoncxx::types::value ai(val);
-
-  gridfs_bucket.delete_file(ai);
+  auto doc = make_document(kvp("v", oid(id)));
+  bsoncxx::document::element el = doc.view()["v"];
+  gridfs_bucket.delete_file(el.get_value());
 }
 
 }
