@@ -209,6 +209,41 @@ private:
  */
 std::string gen_uuid_v4_p();
 
+class StringFormatterData;
+
+class StringFormatter {
+public:
+  StringFormatter();
+  ~StringFormatter();
+  StringFormatter(const StringFormatter&) = delete;
+
+  /** \brief füge eine Regular Expression und ein dazugehöriges Format ein
+   *
+   * @param regex
+   * @param format
+   * @return id der Formatangabe die hinzugefügt wurde
+   */
+  int insertPattern(const std::wstring &regex, const std::wstring &format);
+
+  /** \brief Prüft beginnend bei der angegebenen Regel, nach einem weiteren Treffer
+   *
+   * Formatangabe:
+   * "%"  Nummer des Matches (1,..,n) "%..." Formatangabe
+   * "%5d", %03d"
+   * "%-05s" füllt links mit '0'
+   * "%-_5s" füllt links mit '_'
+   * "5s" füllt rechts mit ' '
+   * bei 'S' wird in Großbuchstaben gewandelt
+   *
+   * @param input Text der formatiert werden soll
+   * @param result Ergebnis, falls Treffer
+   * @param ruleBegin Regel ab der geprüft werden soll
+   * @return 0, wenn kein Treffer oder Nummer der Regel die verwendet wurde
+   */
+  int format(const std::wstring &input, std::wstring &result, int ruleBegin = 0);
+private:
+  StringFormatterData *data = nullptr;
+};
 
 }
 

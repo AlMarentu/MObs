@@ -25,9 +25,12 @@
 
 
 #include <sstream>
+#include <utility>
 #include <vector>
 #include <random>
 #include <iomanip>
+#include <regex>
+#include <cwchar>
 
 
 using namespace std;
@@ -482,6 +485,149 @@ std::string timeOffsetToStr(long gmtoff) {
   else
     s << 'Z';
   return s.str();
+}
+
+class StringFormatterData {
+public:
+  class Rule {
+  public:
+    Rule(const wstring& re, wstring fo) : regex(re, std::regex_constants::ECMAScript), format(std::move(fo)) {};
+     // TODO icase
+    wregex regex;
+    wstring format;
+  };
+  vector<Rule> rules{};
+};
+
+StringFormatter::StringFormatter() {
+  data = new StringFormatterData;
+}
+
+StringFormatter::~StringFormatter() {
+  delete data;
+}
+
+int StringFormatter::insertPattern(const wstring &regex, const wstring &format) {
+  data->rules.emplace_back(regex, format);
+  return data->rules.size();
+}
+
+int StringFormatter::format(const wstring &input, wstring &result, int ruleBegin) {
+  if (ruleBegin < 1)
+    ruleBegin = 1;
+  for (int i = ruleBegin -1; i < data->rules.size(); i++) {
+    StringFormatterData::Rule &rule = data->rules[i];
+    wsmatch match;
+    if (regex_match(input, match, rule.regex)) {
+      result.clear();
+      wstring cmd;
+      int pos = 0;
+      for(auto c:rule.format) {
+        if (cmd.empty()) {
+          if (c == L'%')
+            cmd += '%';
+          else
+            result += c;
+          continue;
+        }
+        switch (c) {
+          case L'%':
+            if (cmd == L"%") {
+              result += c;
+              cmd.clear();
+              continue;
+            }
+            if (pos > 0)
+              THROW("unmatches '%' in format");
+            try {
+              size_t idx;
+              pos = stoi(cmd.substr(1), &idx);
+              if (idx != cmd.length() -1)
+                throw runtime_error("XX");
+            }
+            catch (exception &e) {
+              THROW("invalid position id in format");
+            }
+            cmd.clear();
+          case L'0' ... L'9':
+          case L'.':
+          case L',':
+          case L'-':
+          case L'+':
+            cmd += c;
+            break;
+          case L'd':
+          case L'x':
+          case L'X':
+            if (pos == 0)
+              THROW("position missing in format");
+            if (pos > match.size())
+              THROW("position out of range in format");
+            int64_t num;
+            try {
+              size_t idx;
+              num = stoll(match[pos].str(), &idx);
+              if (idx != match[pos].str().length())
+                throw runtime_error("XX");
+            }
+            catch (exception &e) {
+              THROW("invalid number");
+            }
+            cmd += c;
+            wchar_t buf[32];
+            swprintf(buf, sizeof(buf), cmd.c_str(), num);
+            result += buf;
+            pos = 0;
+            cmd.clear();
+            break;
+          case L's':
+          case L'S':
+          {
+            wchar_t fill = L' ';
+            if (pos == 0)
+              THROW("position missing in format");
+            if (pos > match.size())
+              THROW("position out of range in format");
+            int len = 0;
+            if (cmd.length() > 2 and cmd[1] != L'-' and (cmd[1] == L'0' or not isdigit(cmd[1]))) {
+              fill = cmd[1];
+              cmd.erase(1, 1);
+            }
+            else if (cmd.length() > 3 and cmd[1] == L'-' and (cmd[2] == L'0' or not isdigit(cmd[2]))) {
+              fill = cmd[2];
+              cmd.erase(2, 1);
+            }
+            try {
+              size_t idx;
+              len = stoi(cmd.substr(1), &idx);
+              if (idx != cmd.length() - 1)
+                throw runtime_error("XX");
+            }
+            catch (exception &e) {
+              THROW("invalid length id in format");
+            }
+            if (match[pos].str().length() > abs(len))
+              THROW("string to long");
+            if (len < 0)
+              result += wstring(size_t(-len - match[pos].str().length()), fill);
+            if (c == L'S')
+              result += toUpper(match[pos].str());
+            else
+              result += match[pos].str();
+            if (len > 0)
+              result += wstring(size_t(len - match[pos].str().length()), fill);
+            pos = 0;
+            cmd.clear();
+            break;
+          }
+          default:
+            cmd += c;
+        }
+      }
+      return i+1;
+    }
+  }
+  return 0;
 }
 
 }

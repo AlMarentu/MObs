@@ -359,5 +359,30 @@ TEST(charsetTest, timeoff) {
 
 }
 
+TEST(charsetTest, stringFormatter) {
+  StringFormatter sf;
+
+  ASSERT_EQ(1, sf.insertPattern(L"(\\d{1,5})-(\\d{1,3})", L"%1%05d.%2%03d"));
+  ASSERT_EQ(2, sf.insertPattern(L"X(.{2,4})", L"%1%4s"));
+  ASSERT_EQ(3, sf.insertPattern(L"Y(.{2,4})", L"%1%_4s"));
+  ASSERT_EQ(4, sf.insertPattern(L"Z(.{2,4})", L"%1%-4s"));
+  ASSERT_EQ(5, sf.insertPattern(L"V(.{2,4})", L"%1%--4s"));
+  ASSERT_EQ(6, sf.insertPattern(L"A(.{2,4})", L"A%1%-_4SX"));
+  std::wstring result;
+  EXPECT_EQ(0, sf.format(L"Q234", result));
+  EXPECT_EQ(1, sf.format(L"23-4", result));
+  EXPECT_EQ(L"00023.004", result);
+  EXPECT_EQ(2, sf.format(L"Xabc", result));
+  EXPECT_EQ(L"abc ", result);
+  EXPECT_EQ(3, sf.format(L"Yuu", result));
+  EXPECT_EQ(L"uu__", result);
+  EXPECT_EQ(4, sf.format(L"Zvv", result));
+  EXPECT_EQ(L"  vv", result);
+  EXPECT_EQ(5, sf.format(L"Vvv", result));
+  EXPECT_EQ(L"--vv", result);
+  EXPECT_EQ(6, sf.format(L"Avv", result));
+  EXPECT_EQ(L"A__VVX", result);
+}
+
 }
 
