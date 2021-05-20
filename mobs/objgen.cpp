@@ -804,7 +804,7 @@ bool ObjectNavigator::setNull() {
 
 bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
   TRACE(PARAM(element) << PARAM(index));
-//  LOG(LM_INFO, "enter " << element << " " << index)
+//  LOG(LM_INFO, "enter " << element << " " << index);
   path.push(element);
 
   if (objekte.empty())
@@ -827,17 +827,15 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
     if (v)
     {
       size_t s = v->size();
-      if (index == SIZE_T_MAX)  // Wenn mit index gearbeitet wird, ist bei SIZE_MAX der Vector selbst gemeint
-      {
+      if (index == SIZE_T_MAX)  // Wenn mit index gearbeitet wird, ist bei SIZE_T_MAX der Vector selbst gemeint
         memVec = v;
-      }
-      if (index < MemBaseVector::nextpos and index < s)
+      else if (index < MemBaseVector::nextpos and index < s)
       {
         s = index;
         if (cfs.shrinkArray())
           v->resize(s+1);
       }
-      else if (index != SIZE_T_MAX)
+      else
       {
         if (index < MemBaseVector::nextpos)
           s = index;
@@ -901,8 +899,10 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
 
 void ObjectNavigator::leave(const std::string &element) {
   TRACE(PARAM(element));
-//  LOG(LM_INFO, "leave " << element)
-  if (memBase)  // letzte Ebene war ein MemberVariable
+//  LOG(LM_INFO, "leave " << element << " " << (path.empty() ? string("--") : path.top()));
+  if (memVec)  // letzte Ebene war der Vector selbst (ohne [])
+    memVec = nullptr;
+  else if (memBase)  // letzte Ebene war ein MemberVariable
     memBase = nullptr;
   else if (objekte.empty() or path.empty())
     throw std::runtime_error(u8"ObjectNavigator: Objektstack underflow");
