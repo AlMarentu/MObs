@@ -561,7 +561,7 @@ int StringFormatter::format(const wstring &input, wstring &result, int ruleBegin
           case L'X':
             if (pos == 0)
               THROW("position missing in format");
-            if (pos > match.size())
+            if (pos >= match.size())
               THROW("position out of range in format");
             int64_t num;
             try {
@@ -571,7 +571,7 @@ int StringFormatter::format(const wstring &input, wstring &result, int ruleBegin
                 throw runtime_error("XX");
             }
             catch (exception &e) {
-              THROW("invalid number");
+              THROW("invalid number " << mobs::to_string(match[pos].str()));
             }
             cmd += c;
             wchar_t buf[32];
@@ -597,16 +597,17 @@ int StringFormatter::format(const wstring &input, wstring &result, int ruleBegin
               fill = cmd[2];
               cmd.erase(2, 1);
             }
-            try {
-              size_t idx;
-              len = stoi(cmd.substr(1), &idx);
-              if (idx != cmd.length() - 1)
-                throw runtime_error("XX");
-            }
-            catch (exception &e) {
-              THROW("invalid length id in format");
-            }
-            if (match[pos].str().length() > abs(len))
+            if (cmd.length() > 1)
+              try {
+                size_t idx;
+                len = stoi(cmd.substr(1), &idx);
+                if (idx != cmd.length() - 1)
+                  throw runtime_error("XX");
+              }
+              catch (exception &e) {
+                THROW("invalid length id in format");
+              }
+            if (len and match[pos].str().length() > abs(len))
               THROW("string to long");
             if (len < 0)
               result += wstring(size_t(-len - match[pos].str().length()), fill);

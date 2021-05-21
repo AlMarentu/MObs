@@ -231,6 +231,9 @@ public:
   std::string connectionName() const;
 
   /** Lade ein Objekt anhand der vorbesetzten Key-Elemente
+   *
+   * Hat das Objekt fas Feature AuditTrail aktiviert, so wird die Überwachung automatisch aktiviert.
+   * Ohne AuditTrail werden auch die modified-Flags nicht zurückgesetzt
    * \return true, wenn ein Objekt geladen werden konnte, false wenn kein passendes Objekt existiert
    * \throw runtime_error wenn ein Fehler auftrat
    */

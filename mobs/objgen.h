@@ -270,12 +270,13 @@ ObjectBase::doCopy(that); }  ObjInit1(objname, __VA_ARGS__ )
  @param objname Name der Klasse (muss von ObjectBase abgeleitet sein)
  */
 #define ObjInit1(objname, ...) \
-objname() : ObjectBase() { std::vector<mobs::MemVarCfg> cv = { __VA_ARGS__ }; for (auto c:cv) doConfigObj(c); doInit(); objname::init(); setModified(false); } \
+objname() : ObjectBase() { std::vector<mobs::MemVarCfg> cv = { __VA_ARGS__ }; doConfClear(); for (auto c:cv) doConfigObj(c); doInit(); objname::init(); setModified(false); } \
 objname(mobs::MemBaseVector *m, mobs::ObjectBase *o, const std::vector<mobs::MemVarCfg> &cv = {}) : ObjectBase(m, o, cv) \
   { doInit(); objname::init(); setModified(false); } \
 objname(const std::string &name, ObjectBase *t, const std::vector<mobs::MemVarCfg> &cv) : ObjectBase(name, t, cv) \
   { if (t) t->regObj(this); doInit(); objname::init(); setModified(false); } \
-objname &operator=(const objname &rhs) { if (this != &rhs) { doCopy(rhs); } return *this; } \
+objname &operator=(const objname &rhs) { doCopy(rhs); return *this; }  \
+void operator()(const objname &other) { doCopy(other); } \
 static ObjectBase *createMe(ObjectBase *parent = nullptr) { if (parent) return new objname(#objname, parent, { }); else return new objname(); } \
 ObjectBase *createNew() const override { return new objname(); } \
 std::string getObjectName() const override { return #objname; } \
@@ -363,7 +364,7 @@ public:
   virtual bool fromStr(const std::string &s, const ConvFromStrHint &) = 0;
   /// Versuch, die  Variable aus einem \c std::wstring einzulesen
   virtual bool fromStr(const std::wstring &s, const ConvFromStrHint &) = 0;
-  /// hole detaillierte Informatiom zu einer Membervariablen /see MobsMemberInfo
+  /// hole detaillierte Information zu einer Membervariablen /see MobsMemberInfo
   virtual void memInfo(MobsMemberInfo &i) const = 0;
   /// Versuch Variable aus Meminfo auszulesen (isFloat/isSigned/isUnsigned/isTime)
   virtual bool fromMemInfo(const MobsMemberInfo &i) = 0;
@@ -378,7 +379,7 @@ public:
   void traverse(ObjTrav &trav);
   /// Starte Traversierung  const
   void traverse(ObjTravConst &trav) const;
-  /// \brief Abfrage ob Memvervariable ein Key-Element oder eine Versionsvariable ist
+  /// \brief Abfrage ob Membervariable ein Key-Element oder eine Versionsvariable ist
   /// @return Position im Schlüssel oder \c 0 wenn kein Schlüsselelement, INT_MAX, bei Versionsvariablen
   int keyElement() const { return m_key; }
   /// Abfrage ob Versionselement
@@ -1152,7 +1153,7 @@ public:
   void pushObject(ObjectBase &obj, const std::string &name = "<obj>");
   /** \brief Suche ein Element in der aktuellen Objektstruktur
    @param element Name des Elementes
-   @param index optonal: Index bei Vectoren; ansosnten wir der Vector um ein Element erweitert
+   @param index optional: Index bei Vectoren; ansonsten wir der Vector um ein Element erweitert
    @return liefert false, wenn das Element nicht existiert
 
    Ist das Element  eine Variable, so Kann über \c member darauf zugegriffen werden. Bei Objekten wird in die neue
@@ -1160,7 +1161,7 @@ public:
    Sind entsprechende Objekte nicht vorhanden, wird trotzdem die Struktur verfolgt und bei Rückkehr in die entsprechende
    Eben die Bearbeitung wieder aufgenommen.
 
-   Wird \c MemBaseVector::next übergeben wird automposatisch erweitert; bei \c SIZE_T_MAX  wird  der Vector selbst betrachtet -> memVec
+   Wird \c MemBaseVector::next übergeben wird automatisch erweitert; bei \c SIZE_T_MAX  wird  der Vector selbst betrachtet -> memVec
    */
   bool enter(const std::string &element, std::size_t index = MemBaseVector::nextpos);
   /// Verlassen einer Ebene in der Objektstruktur
