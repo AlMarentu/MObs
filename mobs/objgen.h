@@ -300,6 +300,8 @@ template <class T>
 class MemberVector;
 class ObjTrav;
 class ObjTravConst;
+class ObjVisitor;
+class ObjVisitorConst;
 class MemberBase;
 class ObjectBase;
 class MemBaseVector;
@@ -371,6 +373,12 @@ public:
   /// natives Kopieren einer Member-Variable
   /// \return true, wenn kopieren erfolgreich (Typ-Gleichheit beider Elemente)
   virtual bool doCopy(const MemberBase *other) = 0;
+  /** \brief natives Kopieren einer Member-Variable wenn unterschiedlich
+   *
+   *  das modified-Flag wir nur bei ungleichheit gesetzt
+   *  \return true, wenn kopieren erfolgreich (Typ-Gleichheit beider Elemente)
+   */
+  virtual bool compareAndCopy(const MemberBase *other) = 0;
   /// Setze Inhalt auf null
   void forceNull() { doAudit(); clear(); setNull(true);}
   /// Setze Inhalt auf leer,
@@ -484,6 +492,8 @@ public:
 
 private:
   virtual void doCopy(const MemBaseVector &other) = 0;
+  virtual void carelessCopy(const MemBaseVector &other) = 0;
+
 
   std::string m_name;
   std::vector<MemVarCfg> m_c; // config für Member
@@ -532,6 +542,11 @@ public:
   void traverseKey(ObjTrav &trav);
   /// liefert den Typ des Objektes
   virtual std::string getObjectName() const { return ""; }
+  /// Aufruf mit Visitor
+  virtual void visit(ObjVisitor &visitor);
+  /// Aufruf mit const Visitor
+  virtual void visit(ObjVisitorConst &visitor) const;
+
 protected:
   /// Callback-Funktion die einmalig im Constructor aufgerufen wird
   virtual void init() { };
@@ -605,10 +620,16 @@ public:
    * \return Zeichenkette, die den kompletten Schlüssel des Objektes repräsentiert
    */
   std::string keyStr(int64_t *version = nullptr) const;
-  /// \brief Kopiere ein Objekt aus einem bereits vorhandenen.
-  /// @param other zu Kopierendes Objekt
-  /// \throw runtime_error Sind die Strukturen nicht identisch, wird eine Exception erzeugt
+  /** \brief Kopiere ein Objekt aus einem bereits vorhandenen.
+   *@param other zu kopierendes Objekt
+   * \throw runtime_error Sind die Strukturen nicht identisch, wird eine Exception erzeugt
+   */
   virtual void doCopy(const ObjectBase &other);
+  /** \brief Kopiere gleichnamige Variablen zwischen Objekten
+   *
+   * @param other zu kopierendes Objekt
+   */
+  void carelessCopy(const ObjectBase &other);
   /// Zeiger auf Vater-Objekt
   ObjectBase *getParentObject() const { return m_parent; }
   /// Abfrage gesetzter  Attribute (nur bei String-Attributen nur Basiswert)
@@ -631,6 +652,8 @@ protected:
   std::vector<std::string> m_confToken; // Liste der Konfigurationstoken
   /// \private
   void doConfigObj(MemVarCfg c);
+  /// \private
+  void doConfClear() { m_altName = Unset; } // Bei Vererbung keinen Namen erben
 
 private:
   std::string m_varNam;
@@ -756,9 +779,13 @@ public:
   /// Versuche ein Member nativ zu kopieren
   bool doCopy(const MemberBase *other) override { auto t = dynamic_cast<const Member<T, C> *>(other); if (t) doCopy(*t); return t != nullptr; }
   /// \private
+  bool compareAndCopy(const MemberBase *other) override { auto t = dynamic_cast<const Member<T, C> *>(other); if (t) carelessCopy(*t); return t != nullptr; }
+  /// \private
   std::string auditEmpty() const override { return C::c_to_string(C::c_empty(), ConvToStrHint(hasFeature(mobs::DbCompact))); }
   /// \private
   void inline doCopy(const Member<T, C> &other) { if (other.isNull()) forceNull(); else operator()(other()); }
+ /// \private
+  void inline carelessCopy(const Member<T, C> &other);
 
   // definitionen Qi* in querygenerator.h
 
@@ -964,6 +991,11 @@ protected:
   void doCopy(const MemberVector<T> &other);
   /// \private
   void doCopy(const MemBaseVector &other) override;
+  /// \private
+  void carelessCopy(const MemberVector<T> &other);
+  /// \private
+  void carelessCopy(const MemBaseVector &other) override;
+
 private:
   // Vector von Heap-Elementen verwenden, da sonst Probleme beim Reorg
   std::vector<T *> werte;
@@ -1136,6 +1168,20 @@ private:
   size_t m_arrayIndex = SIZE_MAX;
 };
 
+/// Basisklasse eines Visitors
+class ObjVisitor {
+public:
+  virtual ~ObjVisitor() = default;
+  virtual void visit(ObjectBase &obj) = 0;
+};
+
+/// Basisklasse eines Visitors
+class ObjVisitorConst {
+public:
+  virtual ~ObjVisitorConst() = default;
+  virtual void visit(const ObjectBase &obj) = 0;
+};
+
 /// Basisklasse zum sequentiellen Einfügen von Daten in ein Objekt
 class ObjectNavigator  {
 public:
@@ -1288,6 +1334,34 @@ void MemberVector<T>::doCopy(const MemBaseVector &other)
   if (not t)
     throw std::runtime_error("MemberVector::doCopy invalid");
   doCopy(*t);
+}
+
+template<class T>
+void MemberVector<T>::carelessCopy(const MemberVector<T> &other)
+{
+  resize(other.size());
+  size_t i = 0;
+  for (auto const w:other.werte)
+    operator[](i++).carelessCopy(*w);
+}
+
+template<class T>
+void MemberVector<T>::carelessCopy(const MemBaseVector &other)
+{
+  const auto *t = dynamic_cast<const MemberVector<T> *>(&other);
+  if (t)
+    carelessCopy(*t);
+}
+
+
+template<typename T, class C>
+void inline Member<T, C>::carelessCopy(const Member <T, C> &other) {
+  if (other.isNull()) {
+    if (isModified() or not isNull())
+      forceNull();
+  }
+  else if (isModified() or operator()() != other())
+    operator()(other());
 }
 
 

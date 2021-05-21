@@ -430,6 +430,8 @@ public:
 
 void ObjectBase::doCopy(const ObjectBase &other)
 {
+  if (this == &other)
+    return;
   ConvFromStrHintDoCopy cfh;
   if (getObjectName() != other.getObjectName())
     throw runtime_error(u8"ObjectBase::doCopy: invalid Type");
@@ -438,11 +440,13 @@ void ObjectBase::doCopy(const ObjectBase &other)
     forceNull();
     return;
   }
+  if (mlist.empty() and hasFeature(Embedded))
+    throw runtime_error(u8"ObjectBase::doCopy: embedded element not allowed");
   auto src = other.mlist.begin();
   for (auto const &m:mlist)
   {
     if (src == other.mlist.end())
-      throw runtime_error(u8"ObjectBase::doCopy: invalid Element (num)");
+      throw runtime_error(u8"ObjectBase::doCopy: invalid Element (source missing)");
     if (m.mem)
     {
       if (not src->mem)
@@ -467,8 +471,52 @@ void ObjectBase::doCopy(const ObjectBase &other)
     src++;
   }
   if (src != other.mlist.end())
-    throw runtime_error(u8"ObjectBase::doCopy: invalid Element (num2)");
+    throw runtime_error(u8"ObjectBase::doCopy: invalid Element (target missing)");
 }
+
+void ObjectBase::carelessCopy(const ObjectBase &other) {
+  if (this == &other)
+    return;
+  ConvFromStrHintDoCopy cfh;
+  if (other.isNull()) {
+    if (getObjectName() == other.getObjectName() and not isNull())
+      forceNull();
+    return;
+  }
+  if (mlist.empty() and hasFeature(Embedded)) {
+    LOG(LM_INFO, u8"ObjectBase::doCopy: embedded element not allowed");
+    return;
+  }
+  for (auto const &src:other.mlist)
+    for (auto const &m:mlist) {
+      if (src.mem and m.mem and src.mem->m_name == m.mem->m_name) {
+        if (src.mem->isNull()) {
+          if (isModified() or not m.mem->isNull())
+            m.mem->forceNull();
+        } else if (not m.mem->compareAndCopy(src.mem)) {
+          string tmp = src.mem->toStr(ConvToStrHint(true));
+          if (isModified() or m.mem->toStr(ConvToStrHint(true)) != tmp)
+            m.mem->fromStr(tmp, cfh); // Fallback auf String umkopieren
+        }
+        break;
+      }
+      if (m.vec and src.vec and src.vec->m_name == m.vec->m_name) {
+        if (src.vec->isNull()) {
+          if (not m.vec->isNull())
+            m.vec->forceNull();
+        } else
+          m.vec->carelessCopy(*src.vec);
+        break;
+      }
+      if (m.obj and src.obj and src.obj->m_varNam == m.obj->m_varNam) {
+        // null handling in ObjectBase::carelessCopy
+        m.obj->carelessCopy(*src.obj);
+        break;
+      }
+    }
+}
+
+
 
 
 
@@ -653,6 +701,14 @@ void ObjectBase::traverseKey(ObjTrav &trav)
       m.obj->traverseKey(trav);
   }
   trav.doObjEnd(*this);
+}
+
+void ObjectBase::visit(ObjVisitor &visitor) {
+  visitor.visit(*this);
+}
+
+void ObjectBase::visit(ObjVisitorConst &visitor) const {
+  visitor.visit(*this);
 }
 
 
