@@ -215,7 +215,7 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 #define USEVECNULL mobs::VectorNull ///< Bei Vektoren wird der Vector selbst mit \c null vorinitialisiert
 #define XMLATTR mobs::XmlAsAttr ///< Bei XML-Ausgabe als Attribute ausgeben (nur MemberVariable, nur von erstem Element fortlaufend)
 #define XMLENCRYPT mobs::XmlEncrypt ///< Bei XML-Ausgabe verschlüsselt ausgeben
-#define EMBEDDED mobs::Embedded ///< Bei Ausgabe als Attribute/Traversierung werden die Member des Objektes direkt, auf ser selben Ebene, serialisiert
+#define EMBEDDED mobs::Embedded ///< Bei Ausgabe als Attribute/Traversierung werden die Member des Objektes direkt, auf der selben Ebene, serialisiert
 #define DBCOMPACT mobs::DbCompact ///< In der Datenbank wird der MOBSENUM oder der Zeit-Wert numerisch gespeichert
 #define DBDETAIL mobs::DbDetail ///< In der Datenbank wird dieses Subelement in einer Detail Table abgelegt, muss also separat gespeichert werden
 #define DBJSON mobs::DbJson ///< In nicht dokumentbasierten Datenbanken wird das Unterobjekt als Text im JSON-Format abgelegt
@@ -276,6 +276,7 @@ objname(mobs::MemBaseVector *m, mobs::ObjectBase *o, const std::vector<mobs::Mem
 objname(const std::string &name, ObjectBase *t, const std::vector<mobs::MemVarCfg> &cv) : ObjectBase(name, t, cv) \
   { if (t) t->regObj(this); doInit(); objname::init(); setModified(false); } \
 objname &operator=(const objname &rhs) { doCopy(rhs); return *this; }  \
+objname &operator=(objname &&rhs) noexcept = delete; \
 void operator()(const objname &other) { doCopy(other); } \
 static ObjectBase *createMe(ObjectBase *parent = nullptr) { if (parent) return new objname(#objname, parent, { }); else return new objname(); } \
 ObjectBase *createNew() const override { return new objname(); } \

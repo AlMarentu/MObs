@@ -46,6 +46,8 @@ namespace mobs {
     /// \private
     explicit SQLiteDatabaseConnection(const ConnectionInformation &connectionInformation) :
             DatabaseConnection(), ConnectionInformation(connectionInformation) { };
+    /// \private
+    SQLiteDatabaseConnection(const SQLiteDatabaseConnection &) = delete;
     ~SQLiteDatabaseConnection() override;
 
     /// \private

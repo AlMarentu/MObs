@@ -56,6 +56,9 @@ class NamedObjPool
 public:
   NamedObjPool();
   ~NamedObjPool();
+  NamedObjPool(const NamedObjPool &) = delete;
+  NamedObjPool &operator=(const NamedObjPool &) = delete;
+
   /// \private
   void assign(const std::string &objName, std::shared_ptr<NamedObject> obj);
   /// \private

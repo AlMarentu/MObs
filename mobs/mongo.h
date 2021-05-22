@@ -48,6 +48,8 @@ namespace mobs {
     /// \private
     explicit MongoDatabaseConnection(const ConnectionInformation &connectionInformation) :
             DatabaseConnection(), ConnectionInformation(connectionInformation) { };
+    /// \private
+    MongoDatabaseConnection(const MongoDatabaseConnection &) = delete;
     ~MongoDatabaseConnection() override = default;
 
     /// Typ der Datenbank

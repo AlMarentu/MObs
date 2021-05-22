@@ -296,7 +296,7 @@ void DbTransaction::doAuditDestroy(const ObjectBase &obj, const DatabaseInterfac
 void DbTransaction::writeAuditTrail() {
   for (auto &i:data->connections) {
     auto dti = i.second;
-    for (auto a:dti.audit) {
+    for (auto &a:dti.audit) {
       LOG(LM_DEBUG, "Writing audit");
       a.second.time(startTime());
 #ifndef __MINGW32__

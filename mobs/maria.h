@@ -46,6 +46,8 @@ namespace mobs {
     /// \private
     friend DatabaseManagerData;
     /// \private
+    MariaDatabaseConnection(const MariaDatabaseConnection &) = delete;
+    /// \private
     explicit MariaDatabaseConnection(const ConnectionInformation &connectionInformation) :
             DatabaseConnection(), ConnectionInformation(connectionInformation) { };
     ~MariaDatabaseConnection() override;

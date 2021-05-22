@@ -46,6 +46,8 @@ public:
   /// \private
   explicit InformixDatabaseConnection(const ConnectionInformation &connectionInformation) :
           DatabaseConnection(), ConnectionInformation(connectionInformation) { };
+  /// \private
+  InformixDatabaseConnection(const InformixDatabaseConnection &) = delete;
   ~InformixDatabaseConnection() override;
 
   /// \private
