@@ -837,7 +837,7 @@ public:
 
 };
 
-class ObjE3 : virtual public mobs::ObjectBase {
+class ObjE3 : public mobs::ObjectBase {
 public:
   ObjInit(ObjE3);
 
@@ -846,16 +846,29 @@ public:
   MemVar(int, zz);
 };
 
+class ObjE3b : public ObjE1 {
+public:
+  ObjInit(ObjE3b);
+
+  MemVar(int, xx);
+  MemVar(int, zz);
+};
+
 
 TEST(objgenTest, embedded) {
   ObjE2 e2;
   ObjE3 e3;
+  ObjE3b e4;
 
   EXPECT_NO_THROW(mobs::string2Obj("{xx:1,aa:2,bb:3,cc:4,zz:5}", e3, mobs::ConvObjFromStr().useExceptUnknown()));
   EXPECT_EQ("{xx:1,aa:2,bb:3,cc:4,zz:5}", e3.to_string(mobs::ConvObjToString()));
 
-  EXPECT_EQ("{xx:0,a_aa:0,a_bb:0,a_cc:0,aa:0,ww:{b_aa:0,b_bb:0,b_cc:0}}", e2.to_string(mobs::ConvObjToString().exportPrefix()));
-  EXPECT_EQ("{xx:0,a_aa:0,a_bb:0,a_cc:0,aa:0,ww:{aa:0,bb:0,cc:0}}", e2.to_string(mobs::ConvObjToString()));
+  EXPECT_NO_THROW(mobs::string2Obj("{xx:1,aa:2,bb:3,cc:4,zz:5}", e4, mobs::ConvObjFromStr().useExceptUnknown()));
+  EXPECT_EQ("{aa:2,bb:3,cc:4,xx:1,zz:5}", e4.to_string(mobs::ConvObjToString()));
+
+  e2.yy.bb(3);
+  EXPECT_EQ("{xx:0,a_aa:0,a_bb:3,a_cc:0,aa:0,ww:{b_aa:0,b_bb:0,b_cc:0}}", e2.to_string(mobs::ConvObjToString().exportPrefix()));
+  EXPECT_EQ("{xx:0,a_aa:0,a_bb:3,a_cc:0,aa:0,ww:{aa:0,bb:0,cc:0}}", e2.to_string(mobs::ConvObjToString()));
   EXPECT_NO_THROW(mobs::string2Obj("{xx:1,a_aa:2,a_bu:3,a_cc:4,aa:5,ww:{aa:0,bb:0,cc:0}}", e2, mobs::ConvObjFromStr().useAutoNames().useExceptUnknown()));
 
 }

@@ -112,11 +112,19 @@ static std::string getNameAll(const mobs::ObjectBase *parent, const std::string 
 {
   MemVarCfg n = parent and cth.useAltNames() ? altName : Unset;
   std::string tmp;
-  if (parent and ((cth.usePrefix() and (n or not parent->hasFeature(Embedded))) or
-                  (n and parent->hasFeature(Embedded)))) {
-    MemVarCfg p = parent->hasFeature(PrefixBase);
-    if (p and parent->getParentObject())
-      tmp = parent->getParentObject()->getConf(p);
+  if (parent and parent->hasFeature(Embedded)) {
+    auto p = parent;
+    while (p and p->hasFeature(Embedded)) {
+      MemVarCfg pf = p->hasFeature(PrefixBase);
+      p = p->getParentObject();
+      if (pf and p)
+        tmp = p->getConf(pf) + tmp;
+    }
+  }
+  else if (parent and cth.usePrefix()) {
+    MemVarCfg pf = parent->hasFeature(PrefixBase);
+    if (pf and parent->getParentObject())
+      tmp += parent->getParentObject()->getConf(pf);
   }
   tmp += ((n == Unset) ? name : parent->getConf(n));
   if (cth.toLowercase()) {
@@ -292,20 +300,7 @@ void ObjectBase::regObj(ObjectBase *obj)
 {
   if (obj == nullptr) // used by MobsUnion
     mlist.clear();
-  else if (obj->hasFeature(Embedded)) {
-    // Objekt-Prefix auf Membernamen übertragen
-    MemVarCfg pfx = obj->hasFeature(PrefixBase);
-    if (pfx and obj->getParentObject()) {
-      string prefix = obj->getParentObject()->getConf(pfx);
-
-      for (auto &m:obj->mlist) {
-        if (m.obj) m.obj->m_varNam.insert(0, prefix);
-        if (m.vec) m.vec->m_name.insert(0, prefix);
-        if (m.mem) m.mem->m_name.insert(0, prefix);
-      }
-    }
-    mlist.splice(mlist.end(), obj->mlist);
-  } else
+  else
     mlist.emplace_back(nullptr, obj, nullptr);
 }
 
@@ -343,6 +338,20 @@ ObjectBase *ObjectBase::getObjInfo(const std::string &name, const ConvObjFromStr
         (cfh.acceptAltNames() and name == i.obj->getName(ConvToStrHint(false, true, false, cfh.caseinsensitive()))))
       return i.obj;
   }
+  // Dito für Embedded
+  for (auto i:mlist) {
+    if (not i.obj or not i.obj->hasFeature(Embedded)) continue;
+    MemVarCfg pfx = i.obj->hasFeature(PrefixBase);
+    size_t pfxLen = 0;
+    if (pfx and getParentObject()) {
+      string pfix = i.obj->getParentObject()->getConf(pfx);
+      pfxLen = pfix.length();
+      if (pfxLen and (name.length() <= pfxLen or name.substr(0, pfxLen) != pfix))
+        continue;
+    }
+    if (auto res = i.obj->getObjInfo(name.substr(pfxLen), cfh))
+      return res;
+  }
   return nullptr;
 }
 
@@ -354,6 +363,20 @@ MemBaseVector *ObjectBase::getVecInfo(const std::string &name, const ConvObjFrom
         (cfh.acceptAltNames() and name == i.vec->getName(ConvToStrHint(false, true, false, cfh.caseinsensitive()))))
       return i.vec;
   }
+  // Dito für Embedded
+  for (auto i:mlist) {
+    if (not i.obj or not i.obj->hasFeature(Embedded)) continue;
+    MemVarCfg pfx = i.obj->hasFeature(PrefixBase);
+    size_t pfxLen = 0;
+    if (pfx and getParentObject()) {
+      string pfix = i.obj->getParentObject()->getConf(pfx);
+      pfxLen = pfix.length();
+      if (pfxLen and (name.length() <= pfxLen or name.substr(0, pfxLen) != pfix))
+        continue;
+    }
+    if (auto res = i.obj->getVecInfo(name.substr(pfxLen), cfh))
+      return res;
+  }
   return nullptr;
 }
 
@@ -364,6 +387,20 @@ MemberBase *ObjectBase::getMemInfo(const std::string &name, const ConvObjFromStr
     if ((cfh.acceptOriNames() and name == i.mem->getName(ConvToStrHint(false, false, false, cfh.caseinsensitive()))) or
         (cfh.acceptAltNames() and name == i.mem->getName(ConvToStrHint(false, true, false, cfh.caseinsensitive()))))
       return i.mem;
+  }
+  // Dito für Embedded
+  for (auto i:mlist) {
+    if (not i.obj or not i.obj->hasFeature(Embedded)) continue;
+    MemVarCfg pfx = i.obj->hasFeature(PrefixBase);
+    size_t pfxLen = 0;
+    if (pfx and getParentObject()) {
+      string pfix = i.obj->getParentObject()->getConf(pfx);
+      pfxLen = pfix.length();
+      if (pfxLen and (name.length() <= pfxLen or name.substr(0, pfxLen) != pfix))
+        continue;
+    }
+    if (auto res = i.obj->getMemInfo(name.substr(pfxLen), cfh))
+      return res;
   }
   return nullptr;
 }
@@ -440,8 +477,6 @@ void ObjectBase::doCopy(const ObjectBase &other)
     forceNull();
     return;
   }
-  if (mlist.empty() and hasFeature(Embedded))
-    throw runtime_error(u8"ObjectBase::doCopy: embedded element not allowed");
   auto src = other.mlist.begin();
   for (auto const &m:mlist)
   {
@@ -481,10 +516,6 @@ void ObjectBase::carelessCopy(const ObjectBase &other) {
   if (other.isNull()) {
     if (getObjectName() == other.getObjectName() and not isNull())
       forceNull();
-    return;
-  }
-  if (mlist.empty() and hasFeature(Embedded)) {
-    LOG(LM_INFO, u8"ObjectBase::doCopy: embedded element not allowed");
     return;
   }
   for (auto const &src:other.mlist)
@@ -592,7 +623,8 @@ void ObjectBase::traverse(ObjTravConst &trav) const
 
   bool inNull = trav.m_inNull;
   trav.m_keyMode = false;
-  if (trav.doObjBeg(*this))
+  bool embedded = hasFeature(Embedded);
+  if (embedded or trav.doObjBeg(*this))
   {
     size_t arrayIndex = trav.m_arrayIndex;
     for (auto const &m:mlist)
@@ -608,13 +640,15 @@ void ObjectBase::traverse(ObjTravConst &trav) const
     }
     trav.m_inNull = inNull;
     trav.m_arrayIndex = arrayIndex;
-    trav.doObjEnd(*this);
+    if (not embedded)
+      trav.doObjEnd(*this);
   }
 }
 
 void ObjectBase::traverse(ObjTrav &trav)
 {
-  if (trav.doObjBeg(*this))
+  bool embedded = hasFeature(Embedded);
+  if (embedded or trav.doObjBeg(*this))
   {
     size_t arrayIndex = trav.m_arrayIndex;
     for (auto const &m:mlist)
@@ -631,7 +665,8 @@ void ObjectBase::traverse(ObjTrav &trav)
       }
     }
     trav.m_arrayIndex = arrayIndex;
-    trav.doObjEnd(*this);
+    if (not embedded)
+      trav.doObjEnd(*this);
   }
 }
 
@@ -660,7 +695,8 @@ void ObjectBase::traverseKey(ObjTravConst &trav) const
   bool inNull = trav.m_inNull;
   trav.m_keyMode = true;
 //  if (not wasParentMode and not trav.doObjBeg(*this))
-  if (not trav.doObjBeg(*this))
+  bool embedded = hasFeature(Embedded);
+  if (not embedded and not trav.doObjBeg(*this))
     return;
   for (auto const &i:tmp)
   {
@@ -672,7 +708,8 @@ void ObjectBase::traverseKey(ObjTravConst &trav) const
       m.obj->traverseKey(trav);
   }
   trav.m_inNull = inNull;
-  trav.doObjEnd(*this);
+  if (not embedded)
+    trav.doObjEnd(*this);
 }
 
 void ObjectBase::traverseKey(ObjTrav &trav)
@@ -690,7 +727,8 @@ void ObjectBase::traverseKey(ObjTrav &trav)
   // Key-Elemente jetzt in richtiger Reihenfolge durchgehen
   trav.m_keyMode = true;
 //  if (not wasParentMode and not trav.doObjBeg(*this))
-  if (not trav.doObjBeg(*this))
+  bool embedded = hasFeature(Embedded);
+  if (not embedded and not trav.doObjBeg(*this))
     return;
   for (auto const &i:tmp)
   {
@@ -700,7 +738,8 @@ void ObjectBase::traverseKey(ObjTrav &trav)
     if (m.obj)
       m.obj->traverseKey(trav);
   }
-  trav.doObjEnd(*this);
+  if (not embedded)
+    trav.doObjEnd(*this);
 }
 
 void ObjectBase::visit(ObjVisitor &visitor) {
