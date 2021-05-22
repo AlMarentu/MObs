@@ -46,6 +46,18 @@ class UxTime {
 public:
   /// Konstruktor über unix-Zeit \c time_t
   explicit UxTime(std::time_t t = -1) : m_time(t) {}
+  /// compare operator
+  bool operator!=(const UxTime &other) const { return m_time != other.m_time; }
+  /// compare operator
+  bool operator==(const UxTime &other) const { return m_time == other.m_time; }
+  /// compare operator
+  bool operator<(const UxTime &other) const { return m_time < other.m_time; }
+  /// compare operator
+  bool operator<=(const UxTime &other) const { return m_time <= other.m_time; }
+  /// compare operator
+  bool operator>(const UxTime &other) const { return m_time > other.m_time; }
+  /// compare operator
+  bool operator>=(const UxTime &other) const { return m_time >= other.m_time; }
   /// \brief Konstruktor für lokale Zeit
   /// @param year  Jahr >= 1900
   /// @param month Monat 1..12
@@ -65,6 +77,8 @@ public:
   std::string toISO8601() const;
   /// liefert aktuelle Uhrzeit
   static UxTime now() { return UxTime(time(nullptr)); }
+  /// liefert Sekunden seit 1.1.1970
+  inline std::time_t to_time() const { return m_time; }
 private:
   static void parseChar(char c, const char *&cp);
   static int parseDigit(const char *&cp);

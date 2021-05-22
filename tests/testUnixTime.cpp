@@ -38,6 +38,13 @@ using namespace mobs;
 namespace {
 
 
+TEST(dateTimeTest, basics) {
+  EXPECT_TRUE(UxTime(5) < UxTime(7));
+  EXPECT_TRUE(UxTime(8) > UxTime(7));
+  EXPECT_TRUE(UxTime(5) != UxTime(7));
+  EXPECT_TRUE(UxTime(5) == UxTime(5));
+}
+
 TEST(dateTimeTest, einAusgabe) {
   UxTime t(1095379198);
   EXPECT_EQ("2004-09-17T01:59:58+02:00", t.toISO8601());
