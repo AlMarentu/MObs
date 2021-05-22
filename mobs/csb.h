@@ -49,6 +49,9 @@ public:
   using int_type = typename Base::int_type;
 
   CryptBufBase();
+  /// \private
+  CryptBufBase(const CryptBufBase &) = delete;
+  CryptBufBase &operator=(const CryptBufBase &) = delete;
 
   ~CryptBufBase() override;
 
@@ -162,7 +165,7 @@ public:
   using int_type = typename Base::int_type;
 
   CryptBufNull() = default;
-  ~CryptBufNull() override {};
+  ~CryptBufNull() override = default;;
   /// Bezeichnung des Algorithmus der Verschlüsselung
   std::string name() const override { return u8"null"; }
 
@@ -199,6 +202,9 @@ public:
    * @param cbbp Plugin für Verschlüsselung, bei Fehlen wird CryptBufBase verwendet
    */
   explicit CryptIstrBuf(std::istream &istr, CryptBufBase *cbbp = nullptr);
+  /// \private
+  CryptIstrBuf(const CryptIstrBuf &) = delete;
+  CryptIstrBuf &operator=(const CryptIstrBuf &) = delete;
   ~CryptIstrBuf() override;
 
   /// \private
@@ -271,6 +277,9 @@ public:
    * @param cbbp Plugin für Verschlüsselung, bei Fehlen wird CryptBufBase verwendet
    */
   explicit CryptOstrBuf(std::ostream &ostr, CryptBufBase *cbbp = nullptr);
+  /// \private
+  CryptOstrBuf(const CryptOstrBuf &) = delete;
+  CryptOstrBuf &operator=(const CryptOstrBuf &) = delete;
   ~CryptOstrBuf() override;
   /// \private
   int_type overflow(int_type ch) override;
