@@ -22,6 +22,7 @@
 #include "audittrail.h"
 #include "queryorder.h"
 #include "querygenerator.h"
+#include "converter.h"
 //#include <strstream>
 
 using namespace mobs;
@@ -488,9 +489,9 @@ public:
         if (c and tx.length() > (c - mobs::LengthBase))
           throw runtime_error("SQL: DBJSON-element to big für column");
       } else if (mode == Create)  {
-        if (dupl.find(name) != dupl.end())
-          throw runtime_error(name + u8" is a duplicate id in SQL statement");
-        dupl.insert(name);
+        if (dupl.find(mobs::toUpper(name)) != dupl.end())
+          throw runtime_error(name + u8" is a duplicate id in SQL statement, use ALTNAME");
+        dupl.insert(mobs::toUpper(name));
         mobs::MemVarCfg c = obj.hasFeature(mobs::LengthBase);
         size_t n = c ? (c - mobs::LengthBase) : 100;
         res << delimiter() << name << " " << sqldb.createStmtText(name, n);
@@ -549,9 +550,9 @@ public:
         }
         else if (mode == Create) {
           res << delimiter() << name << " " << sqldb.createStmtIndex(i.first);
-          if (dupl.find(name) != dupl.end())
-            throw runtime_error(name + u8" is a duplicate id in SQL statement");
-          dupl.insert(name);
+          if (dupl.find(mobs::toUpper(name)) != dupl.end())
+            throw runtime_error(name + u8" is a duplicate id in SQL statement, use ALTNAME");
+          dupl.insert(mobs::toUpper(name));
         }
         else if (mode == Fields) {
           res << delimiter() << name;
@@ -639,9 +640,9 @@ public:
         fields++;
         res2 << sqldb.valueStmtText(tx, vec.isNull());
       } else if (mode == Create)  {
-        if (dupl.find(name) != dupl.end())
-          throw runtime_error(name + u8" is a duplicate id in SQL statement");
-        dupl.insert(name);
+        if (dupl.find(mobs::toUpper(name)) != dupl.end())
+          throw runtime_error(name + u8" is a duplicate id in SQL statement, use ALTNAME");
+        dupl.insert(mobs::toUpper(name));
         mobs::MemVarCfg c = vec.hasFeature(mobs::LengthBase);
         size_t n = c ? (c - mobs::LengthBase) : 100;
         res << delimiter() << name << " " << sqldb.createStmtText(name, n);
@@ -689,6 +690,8 @@ public:
       if (cth.skipVersion())
         return;
     }
+    if (mode != Values and mode != FldVal and inArray() and arrayIndex() > 0)
+      return;
     bool compact = cth.compact();
     if (mem.is_chartype(cth) and mem.hasFeature(mobs::DbCompact))
       compact = true;
@@ -697,6 +700,11 @@ public:
       return;
     }
     string name = mem.getName(cth);
+    if (name.empty()) { // ist bei Arrays von MemberVars üblich
+      if (mem.getParentVector())
+        name = mem.getParentVector()->getName(cth);
+      name += "Value";
+    }
     if ((mode == Update or mode == FldVal) and mem.keyElement() and key.top()) { // Key or version element
       if (mode == FldVal and mem.isVersionField())  // version increment
         res2 << name << '=' << name << "+1,";
@@ -730,9 +738,9 @@ public:
       fields++;
       res2 << sqldb.valueStmt(mem, compact, mem.isVersionField(), false);
     } else if (mode == Create)  {
-      if (dupl.find(name) != dupl.end())
-        throw runtime_error(name + u8" is a duplicate id in SQL statement");
-      dupl.insert(name);
+      if (dupl.find(mobs::toUpper(name)) != dupl.end())
+        throw runtime_error(name + u8" is a duplicate id in SQL statement, use ALTNAME");
+      dupl.insert(mobs::toUpper(name));
       res << delimiter() << name << " " << sqldb.createStmt(mem, compact);
     }
   };
@@ -1230,13 +1238,20 @@ void SqlGenerator::readObject(const DetailInfo &di) {
     throw runtime_error("no index position in readObject");
   vec->resize(index+1);
   ObjectBase *vobj = vec->getObjInfo(index);
-  if (not vobj)
-    throw runtime_error("Object missing in readObject");
+  MemberBase *mobj = nullptr;
+  if (not vobj) {
+    mobj =vec->getMemInfo(index);
+    if (not mobj)
+      throw runtime_error("Object missing in readObject");
+  }
   ExtractSql es(sqldb, mobs::ConvObjToString());
   // aktuellen Index in di ablegen
   es.current = di;
   es.current.arrayKeys.back().second = index;
-  vobj->traverse(es);
+  if (vobj)
+    vobj->traverse(es);
+  else
+    mobj->traverse(es);
   sqldb.finishReading();
   detailVec.splice(detailVec.end(), es.detailVec);
 

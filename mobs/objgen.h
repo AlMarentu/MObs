@@ -395,6 +395,8 @@ public:
   bool isVersionField() const { return m_key == INT_MAX; }
   /// Zeiger auf Vater-Objekt
   const ObjectBase *getParentObject() const { return m_parent; }
+  /// Zeiger auf Vater-Vektor
+  const MemBaseVector *getParentVector() const { return m_parVec; }
   /// Objekt wurde beschrieben - modified setzen
   void activate();
   /// Abfrage gesetzter  Attribute
