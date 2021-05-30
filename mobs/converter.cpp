@@ -512,7 +512,11 @@ int StringFormatter::insertPattern(const wstring &regex, const wstring &format) 
   return data->rules.size();
 }
 
-int StringFormatter::format(const wstring &input, wstring &result, int ruleBegin) {
+bool StringFormatter::empty() const {
+  return data->rules.empty();
+}
+
+int StringFormatter::format(const wstring &input, wstring &result, int ruleBegin) const {
   if (ruleBegin < 1)
     ruleBegin = 1;
   for (int i = ruleBegin -1; i < data->rules.size(); i++) {

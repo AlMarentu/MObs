@@ -240,7 +240,9 @@ public:
    * @param ruleBegin Regel ab der geprüft werden soll
    * @return 0, wenn kein Treffer oder Nummer der Regel die verwendet wurde
    */
-  int format(const std::wstring &input, std::wstring &result, int ruleBegin = 0);
+  int format(const std::wstring &input, std::wstring &result, int ruleBegin = 0) const;
+  /// Abfrage, ob Suchmuster vorhanden
+  bool empty() const;
 private:
   StringFormatterData *data = nullptr;
 };
