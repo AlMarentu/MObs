@@ -209,7 +209,7 @@ public:
       return 0;
     auto res = recv(fd, &rdBuf[0], int(rdBuf.size()), MSG_NOSIGNAL); // immer < INT_MAX
     if (res < 0) {
-      LOG(LM_ERROR, "read error " << errno);
+      LOG(LM_ERROR, "read error " << errno << " " << strerror(errno));
       bad = true;
       return 0;
     }
