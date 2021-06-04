@@ -46,6 +46,20 @@ namespace mobs {
  */
 std::string timeOffsetToStr(long gmtoff);
 
+/** \brief Reduziert einen Text auf Suchtoken vo Großbuchstaben und Ziffern
+ *
+ * Dabei wird mehrfaches Vorkommen von identischen Zeichen ebenfalls reduziert
+ * Goethe -> GOTHE, Müller->MULER, 1223->123
+ * @param begin Start-Iterator
+ * @param end Ende-Iterator
+ * @param result Rückgabe Token
+ * @return iterator Iterator nach einem Delimiter oder end
+ */
+std::wstring::const_iterator to7Up(std::wstring::const_iterator begin, std::wstring::const_iterator end, std::string &result);
+
+/// Zugriff auf Umsetztabelle von to7Up
+wchar_t to_7up(wchar_t c);
+
 /// \brief wandelt einen Text in Kleinbuchstaben anhand der Locale der Rechners
 std::wstring toLower(const std::wstring &);
 /// \brief wandelt einen Text in Großbuchstaben anhand der Locale der Rechners

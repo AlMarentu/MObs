@@ -115,6 +115,45 @@ wchar_t from_iso_8859_15(wchar_t c) {
   }
 }
 
+static const char tab_7up[] =
+        "         ,          "
+        "            ,       "
+        "    ,  ,0123456789,,"
+        "     ABCDEFGHIJKLMNO"
+        "PQRSTUVWXYZ      ABC"
+        "DEFGHIJKLMNOPQRSTUVW"
+        "XYZ        F      S "
+        "O Z           S O ZY"
+        "      ,             "
+        "            AAAAAAAC"
+        "EEEEIIIIDNOOOOO OUUU"
+        "UYPSAAAAAAACEEEEIIII"
+        "DNOOOOO OUUUUYPYAAAA"
+        "AACCCCCCCCDDDDEEEEEE"
+        "EEEEGGGGGGGGHHHHIIII"
+        "IIIIIIJJJJKKKLLLLLLL"
+        "LLLNNNNNNNNNOOOOOOOO"
+        "RRRRRRSSSSSSSSTTTTTT"
+        "UUUUUUUUUUUUWWYYYYZZ"
+        "ZZZ BBBBBBCCCDDDDDEE"
+        "EFFGGHIIKKLLMNNOOORR"
+        "PPPSSSTTTTTUUOOYYZZZ"
+        "ZZ          ZZZLLLNN"
+        "NAAIIOOUUUUUUUUUU AA"
+        "AAAAGGGGKKOOOOZZZZZZ"
+        "GGHPNNAAAAOOAAAAEEEE"
+        "IIIIOOOORRRRUUUUSSTT"
+        "  HH    ZZAAEEOOOOOO"
+        "OOYY      ACC      B";
+
+
+wchar_t to_7up(wchar_t c) {
+  if (sizeof(tab_7up) != 581)
+    abort();
+  if (c < 0 or c > sizeof(tab_7up))
+    return L' ';
+  return tab_7up[size_t(c)];
+}
 
 codec_iso8859_1::result codec_iso8859_1::do_out(mbstate_t& state,
                                                 const wchar_t* from,
@@ -282,6 +321,35 @@ wchar_t from_html_tag(const std::wstring &tok)
     } catch (...) {}
   }
   return c;
+}
+
+std::wstring::const_iterator to7Up(std::wstring::const_iterator begin, std::wstring::const_iterator end, std::string &result) {
+  char last = ' ';
+  for (; begin != end; begin++) {
+    char n = ' ';
+    wchar_t x = *begin;
+    if (*begin >= 0 and size_t(*begin) < sizeof(tab_7up) -1)
+      n = tab_7up[size_t(*begin)];
+    switch (n) {
+      case '\0' ... 0x1f:
+        LOG(LM_ERROR, " EEEE " << to_string(*begin));
+      case ',':
+        begin++;
+        return begin;
+      case ' ':
+        last = ' ';
+        break;
+      case 'E':
+        if (last == 'A' or last == 'O' or last == 'U') // Umschrift AE OE UE ignorieren
+          break;
+      default:
+        if (n == last)
+          continue;
+        result += n;
+        last = n;
+    }
+  }
+  return begin;
 }
 
 std::wstring toLower(const std::wstring &tx) {
