@@ -227,7 +227,63 @@ public:
 };
 
 
+////////////////////////////////////////////////////////////////////////
 
+MOBS_ENUM_DEF(TagType, TagEnumeration, TagDate, TagString, TagIdent);
+MOBS_ENUM_VAL(TagType, "enum",         "date",  "string",  "ident");
+
+class TemplateTagInfo : virtual public mobs::ObjectBase
+{
+public:
+  ObjInit(TemplateTagInfo);
+
+  MemMobsEnumVar(TagType, type);
+  MemVar(std::string, name);
+  MemVar(std::string, maskText);
+  MemVar(std::string, regex);
+  MemVar(std::string, format);
+  MemVarVector(std::string, enums);
+  MemVar(bool, hide);
+  MemVar(int, maxSize);
+};
+
+
+MOBS_ENUM_DEF(DocumenType, DocumentUnknown, DocumentPdf, DocumentJpeg, DocumentTiff, DocumentHtml, DocumentText);
+MOBS_ENUM_VAL(DocumenType, "unk",           "pdf",       "jpg",        "tif",        "htm",        "txt");
+
+class DocumentTags : virtual public mobs::ObjectBase
+{
+public:
+  ObjInit(DocumentTags);
+
+  MemVar(std::string, name);
+  MemVar(std::string, content);
+};
+
+MOBS_ENUM_DEF(TemplateType, TemplateSearch, TemplateCreate, TemplateEdit);
+MOBS_ENUM_VAL(TemplateType, "R",            "C",            "U");
+
+class TemplateInfo : virtual public mobs::ObjectBase
+{
+public:
+  ObjInit(TemplateInfo);
+
+  MemMobsEnumVar(TemplateType, type);
+  MemVar(std::string, pool, KEYELEMENT1);
+  MemVar(std::string, tName, KEYELEMENT2);
+  MemVar(std::string, maskText);
+
+  MemVector(TemplateTagInfo, tags);
+  MemVector(DocumentTags, fixTags, USEVECNULL);
+};
+
+class DMGR_TemplatePool : virtual public TemplateInfo {
+public:
+  ObjInit(DMGR_TemplatePool);
+  MemVar(int64_t, version, VERSIONFIELD);
+
+};
+////////////////////////////////////////////////////////////////////////
 
 
 class SetModified  : virtual public mobs::ObjTrav {
@@ -512,6 +568,29 @@ TEST(helperTest, query) {
 //
 //  LOG(LM_INFO, "QQQQQ "  << gsql.queryBE());
 }
+
+
+TEST(helperTest, sqlBig) {
+
+  DMGR_TemplatePool a3;
+
+//  SetModified sm;
+//  a3.traverse(sm);
+//
+//  a3.clearModified();
+
+  SQLDBTestDesc sd;
+  mobs::SqlGenerator gsql(a3, sd);
+
+  EXPECT_EQ("create table D.DMGR_TemplatePool(type VARCHAR(30) NOT NULL,pool VARCHAR(30) NOT NULL,tName VARCHAR(30) NOT NULL,maskText VARCHAR(30) NOT NULL,version INT NOT NULL, primary key (pool,tName));",
+            gsql.createStatement(true));
+  EXPECT_FALSE(gsql.eof());
+  EXPECT_EQ("create table D.DMGR_TemplatePool_tags(pool VARCHAR(30) NOT NULL,tName VARCHAR(30) NOT NULL,tags INT NOT NULL,type VARCHAR(30) NOT NULL,name VARCHAR(30) NOT NULL,maskText VARCHAR(30) NOT NULL,regex VARCHAR(30) NOT NULL,format VARCHAR(30) NOT NULL,hide INT NOT NULL,maxSize INT NOT NULL, primary key (pool,tName,tags));",
+            gsql.createStatement(false));
+
+
+}
+
 
 
 }
