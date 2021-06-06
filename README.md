@@ -1,5 +1,5 @@
 #  MObs
-Bibliothek für serialisierbare C++-Objekte zur Übergabe oder zum Speichern in Datenbanken
+Bibliothek für serialisierbare C++-Objekte zur Übergabe oder zum Speichern in Datenbanken 
 
 [MObs GitHub](https://github.com/AlMarentu/MObs)
 Lizenz: LGPL
@@ -17,6 +17,7 @@ hierarchische Definitionen.
 
 MObs versucht hier die typische C++-Klassenstruktur in die gewünschten Zielstrukturen abzubilden, indem
 - Datei Im- und Exportschnittstellen für XML (in den Zeichensätzen UTF-8, ISO8859-1,9,15, UTF16)
+- Verschlüsselte Kommunikation über Netzwerke
 - Konvertierroutinen von und nach JSON
 - Datenbankoperationen (MongoDb[^1], MariaDb[^1], Informix[^2])
 angeboten werden.
@@ -487,20 +488,22 @@ Darüber lassen sich
 usw. realisieren
 
 ## Installation
-Zum Übersetzen wird ein c++11 Compiler inkl. STL benötigt. Zusätzlich muss die UUID-Lib vorhanden sein.
 
+Die Bibliothek wurde unter folgenden Compilern getestet:
+- OSX Apple clang version 12.0.0
+- Windows 10 mingw-w64/i686-8.1.0
+- Linux gcc version 8.3.0
 
-Für die Test-Suite wird googletest benötigt
-Die Entwicklung erfolgt mit clang version 11.0.3
 
 Build und Installation erfolgen über cmake
+
 Folgende Defines können angegeben werden:
 - BUILD_MARIA_INTERFACE
 - BUILD_SQLITE_INTERFACE
 - BUILD_MONGO_INTERFACE
 - BUILD_INFORMIX_INTERFACE
-- BUILD_DOC
 - PACKAGE_TESTS
+- BUILD_DOC
 
 Für die jeweiligen Optionen werden die entsprechenden Zusatzpakete benötigt.
 * SQLite3
@@ -508,6 +511,18 @@ Für die jeweiligen Optionen werden die entsprechenden Zusatzpakete benötigt.
 * MongoDb
 * Informix connect
 * libOpenSSL
+* googletest
+* doxygen
+
+### Umgebung vorbereiten
+
+Soll Googletest verwendet werden so ist der Source-Tree von Github
+im Verzeichnis extern zu installieren. Eventuell muss das Verzeichnis in 
+googletest umbenannt werden.
+
+SQLite kann entweder als vorinstallierte Version vorliegen oder im Verzeichnis
+"extern" kann die "sqlite-amalgamation" Version entpackt werden.
+Dann wird diese Version in die Bibliothek integriert
 
 ## Datenbanken
 
@@ -572,6 +587,11 @@ Für die jeweiligen Optionen werden die entsprechenden Zusatzpakete benötigt.
 * sqlite.h Datenbankinterface 
 * informix.h Datenbankinterface 
 * infxtools.h Hilfsfunktionen Informix
+* tcpstream.h iostream-Klasse für TCP-Vernindungen
+* csb.h Basisklassen für Verschlüsselung über iostream
+* aes.h Klassen/Funktionen für AES-Verschlüsselung
+* rsa.h Klassen/Funktionen für RSA-Verschlüsselung
+* digest.h Klassen/Funktionen für Hash-Werte
 
 
 
