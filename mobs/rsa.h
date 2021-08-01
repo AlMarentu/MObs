@@ -121,29 +121,39 @@ private:
   CryptBufRsaData *data;
 };
 
-/** \brief Erzeugung eines RSA Schlüsselpaares
+/** \brief Erzeugung eines RSA Schlüsselpaares (Datei)
  *
  * erzeugt ein RSA-Schlüsselpaar mit 2048 Bit. Der private-key ist des_ede3_cbc verschlüsselt
  * @param filePriv Dateiname für die zu erzeugende privat-key Datei im PEM-Format
- * @param filePup Dateiname für die zu erzeugende public-key Datei im PEM-Format
+ * @param filePub Dateiname für die zu erzeugende public-key Datei im PEM-Format
  * @param passphrase Passphrase für den private-key
  */
-void generateRsaKey(const std::string &filePriv, const std::string &filePup, const std::string &passphrase);
+void generateRsaKey(const std::string &filePriv, const std::string &filePub, const std::string &passphrase);
+
+/** \brief Erzeugung eines RSA Schlüsselpaares (String)
+ *
+ * erzeugt ein RSA-Schlüsselpaar mit 2048 Bit. Der private-key ist des_ede3_cbc verschlüsselt, falls eine passphrase
+ * angegeben ist
+ * @param priv String des erzeugten privat-key im PEM-Format
+ * @param pub String des erzeugten public-key im PEM-Format
+ * @param passphrase Passphrase für den private-key, wenn leer dann unverschlüsselt
+ */
+void generateRsaKeyMem(std::string &priv, std::string &pub, const std::string &passphrase = "");
 
 /** \brief Verschlüsselung eine Keys mit einem public Key
  *
  * Der zu verschlüsselnde Buffer darf maximal 214 Zeichen lang sein
  * @param sessionKey zu verschlüsselnde Zeichenkette
  * @param cipher verschlüsseltes Ergebnis
- * @param filePup Dateipfad eines public Keys
+ * @param filePup Dateipfad eines public Keys oder der Schlüssel selbst im PEM-Format
  */
-void encryptPublicRsa(const std::vector<u_char> &sessionKey, std::vector<u_char> &cipher, const std::string &filePup);
+void encryptPublicRsa(const std::vector<u_char> &sessionKey, std::vector<u_char> &cipher, const std::string &filePub);
 
 /** \brief Entschlüsselung mit einem private Key
  *
  * @param cipher verschlüsselte Eingabe
  * @param sessionKey entschlüsselte Zeichenkette
- * @param filePup Dateipfad eines private Keys
+ * @param filePup Dateipfad eines private Keys oder der Schlüssel selbst im PEM-Format
  * @param passphrase Kennwort zum private Key
 */
 void decryptPrivateRsa(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePriv, const std::string &passphrase);
@@ -153,7 +163,7 @@ void decryptPrivateRsa(const std::vector<u_char> &cipher, std::vector<u_char> &s
  * Der zu verschlüsselnde Buffer darf maximal 214 Zeichen lang sein
  * @param sessionKey zu verschlüsselnde Zeichenkette
  * @param cipher verschlüsseltes Ergebnis
- * @param filePup Dateipfad eines private Keys
+ * @param filePup Dateipfad eines private Keys oder der Schlüssel selbst im PEM-Format
  * @param passphrase Kennwort zum private Key
  */void encryptPrivateRsa(const std::vector<u_char> &sessionKey, std::vector<u_char> &cipher, const std::string &filePriv, const std::string &passphrase);
 
@@ -161,7 +171,7 @@ void decryptPrivateRsa(const std::vector<u_char> &cipher, std::vector<u_char> &s
  *
  * @param cipher verschlüsselte Eingabe
  * @param sessionKey entschlüsselte Zeichenkette
- * @param filePup Dateipfad eines public Keys
+ * @param filePup Dateipfad eines public Keys oder der Schlüssel selbst im PEM-Format
  */
  void decryptPublicRsa(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePup);
 
