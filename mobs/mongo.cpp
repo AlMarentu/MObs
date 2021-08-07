@@ -1008,14 +1008,25 @@ std::string MongoDatabaseConnection::collectionName(const ObjectBase &obj) {
   return obj.getObjectName();
 }
 
+std::map<std::string, mongocxx::pool> MongoDatabaseConnection::pools;
+
+void MongoDatabaseConnection::close() {
+  entry.release();
+}
 
 void MongoDatabaseConnection::open() {
-  if (not connected) {
-    mongocxx::uri u(m_url);
+  if (not entry) {
     // "mongodb://my_user:password@localhost:27017/my_database?ssl=true"
-    mongocxx::client c(u);
-    client = std::move(c);
-    connected = true;
+    // "mongodb://db1.example.net:27017,db2.example.net:2500/?replicaSet=test&connectTimeoutMS=300000"
+    auto it = pools.find(m_url);
+    if (it == pools.end()) {
+      mongocxx::uri u(m_url);
+      it = pools.emplace(m_url, u).first;
+      if (it == pools.end())
+        THROW("connection failed");
+    }
+
+    entry = std::unique_ptr<Entry>(new Entry(it->second));
   }
 }
 
@@ -1025,7 +1036,7 @@ bool MongoDatabaseConnection::load(DatabaseInterface &dbi, ObjectBase &obj) {
   obj.traverseKey(bo);
   LOG(LM_DEBUG, "LOAD " << dbi.database() << "." << collectionName(obj) << " " << bo.result());
 
-  mongocxx::database db = client[dbi.database()];
+  mongocxx::database db = entry->client()[dbi.database()];
   auto val = db[collectionName(obj)].find_one(bo.value());
   if (not val)
     return false;
@@ -1046,7 +1057,7 @@ void MongoDatabaseConnection::create(DatabaseInterface &dbi, const ObjectBase &o
   LOG(LM_DEBUG, "CREATE " << dbi.database() << "." << collectionName(obj) << " " << bo.result());
 
   //bsoncxx::stdx::optional<mongocxx::result::insert_one> result =
-  mongocxx::database db = client[dbi.database()];
+  mongocxx::database db = entry->client()[dbi.database()];
   auto result = db[collectionName(obj)].insert_one(bo.value());
 
   if (not result)
@@ -1070,7 +1081,7 @@ void MongoDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj
   obj.traverse(bo);
   LOG(LM_DEBUG, "UPDATE " << dbi.database() << "." << collectionName(obj) << " " << bk.result() <<  " TO "
                          << bo.result());
-  mongocxx::database db = client[dbi.database()];
+  mongocxx::database db = entry->client()[dbi.database()];
 
 //    auto result = db[colName(obj)].update_one(bk.value(), bo.setValue());
 //    mongocxx::options::update u;
@@ -1109,7 +1120,7 @@ bool MongoDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase &
   LOG(LM_DEBUG, "DESTROY " << dbi.database() << "." << collectionName(obj) << " " <<  bo.result());
 
   bool found;
-  mongocxx::database db = client[dbi.database()];
+  mongocxx::database db = entry->client()[dbi.database()];
   if (mtdb) {
     LOG(LM_DEBUG, "drop with session");
     auto result = db[collectionName(obj)].delete_one(mtdb->session, bo.value());
@@ -1132,13 +1143,13 @@ void MongoDatabaseConnection::dropAll(DatabaseInterface &dbi, const ObjectBase &
   open();
   LOG(LM_DEBUG, "DROP COLLECTOION " << dbi.database() << "." << collectionName(obj));
 
-  mongocxx::database db = client[dbi.database()];
+  mongocxx::database db = entry->client()[dbi.database()];
   db[collectionName(obj)].drop();
 }
 
 void MongoDatabaseConnection::structure(DatabaseInterface &dbi, const ObjectBase &obj) {
   open();
-  mongocxx::database db = client[dbi.database()];
+  mongocxx::database db = entry->client()[dbi.database()];
   // db.test.createIndex({ id: 1 }, { unique: true })
   BsonElements bo((mobs::ConvObjToString()));
   bo.index = true;
@@ -1153,7 +1164,7 @@ std::shared_ptr<DbCursor>
 MongoDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, bool qbe, const QueryGenerator *query,
                                const QueryOrder *sort) {
   open();
-  mongocxx::database db = client[dbi.database()];
+  mongocxx::database db = entry->client()[dbi.database()];
   mongocxx::collection col = db[collectionName(obj)];
 
   auto mtdb = static_cast<MongoTransactionDbInfo *>(dbi.transactionDbInfo());
@@ -1236,7 +1247,7 @@ MongoDatabaseConnection::retrieve(DatabaseInterface &dbi, ObjectBase &obj, std::
 
 mongocxx::database MongoDatabaseConnection::getDb(DatabaseInterface &dbi) {
   open();
-  return client[dbi.database()];
+  return entry->client()[dbi.database()];
 }
 
 bool MongoDatabaseConnection::changedReadConcern(mongocxx::read_concern &rc, const DatabaseInterface &dbi) {
@@ -1268,7 +1279,7 @@ void MongoDatabaseConnection::startTransaction(DatabaseInterface &dbi, DbTransac
   open();
 //  if (not tdb) {
 //    LOG(LM_DEBUG, "MongoDB startTransaction");
-//    auto mtdb = make_shared<MongoTransactionDbInfo>(client.start_session());
+//    auto mtdb = make_shared<MongoTransactionDbInfo>(entry->client().start_session());
 //    tdb = mtdb;
 //    mtdb->session.start_transaction();
 //  }
@@ -1306,7 +1317,7 @@ void MongoDatabaseConnection::uploadFile(DatabaseInterface &dbi, const std::stri
   open();
   LOG(LM_DEBUG, "UPLOAD FILE " << dbi.database() << "." << id);
 
-  mongocxx::database db = client[dbi.database()];
+  mongocxx::database db = entry->client()[dbi.database()];
   auto gridfs_bucket = db.gridfs_bucket();
   auto doc = make_document(kvp("v", oid(id)));
   bsoncxx::document::element el = doc.view()["v"];
@@ -1317,7 +1328,7 @@ std::string MongoDatabaseConnection::uploadFile(DatabaseInterface &dbi, std::ist
   open();
   LOG(LM_DEBUG, "UPLOAD FILE " << dbi.database());
 
-  mongocxx::database db = client[dbi.database()];
+  mongocxx::database db = entry->client()[dbi.database()];
   auto gridfs_bucket = db.gridfs_bucket();
   auto result = gridfs_bucket.upload_from_stream(	"", &source);
   return result.id().get_oid().value.to_string();
@@ -1327,7 +1338,7 @@ void MongoDatabaseConnection::downloadFile(DatabaseInterface &dbi, const std::st
   open();
   LOG(LM_DEBUG, "DOWNLOAD FILE " << dbi.database() << "." << id);
 
-  mongocxx::database db = client[dbi.database()];
+  mongocxx::database db = entry->client()[dbi.database()];
   auto gridfs_bucket = db.gridfs_bucket();
   auto doc = make_document(kvp("v", oid(id)));
   bsoncxx::document::element el = doc.view()["v"];
@@ -1338,7 +1349,7 @@ void MongoDatabaseConnection::deleteFile(DatabaseInterface &dbi, const std::stri
   open();
   LOG(LM_DEBUG, "DELETE FILE " << dbi.database() << "." << id);
 
-  mongocxx::database db = client[dbi.database()];
+  mongocxx::database db = entry->client()[dbi.database()];
   auto gridfs_bucket = db.gridfs_bucket();
   auto doc = make_document(kvp("v", oid(id)));
   bsoncxx::document::element el = doc.view()["v"];

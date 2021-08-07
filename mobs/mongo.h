@@ -32,6 +32,7 @@
 
 #include "dbifc.h"
 #include <mongocxx/client.hpp>
+#include <mongocxx/pool.hpp>
 
 namespace mobs {
 
@@ -57,6 +58,8 @@ namespace mobs {
 
     /// \private
     void open();
+    /// \private
+    void close();
     /// \private
     bool load(DatabaseInterface &dbi, ObjectBase &obj) override;
     /// \private
@@ -105,9 +108,15 @@ namespace mobs {
     mongocxx::database getDb(DatabaseInterface &dbi);
 
   private:
-    mongocxx::client client;
-    bool connected = false;
+    class Entry {
+    public:
+      Entry(mongocxx::pool &pool) : entry(pool.acquire()) { }
+      mongocxx::client &client() { return *entry; }
+      mongocxx::pool::entry entry;
+    };
+    std::unique_ptr<Entry> entry;
 
+    static std::map<std::string, mongocxx::pool> pools;
   };
 
 }
