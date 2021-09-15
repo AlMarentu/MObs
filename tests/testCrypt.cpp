@@ -164,6 +164,7 @@ TEST(cryptTest, rsa4) {
 
 }
 
+
 TEST(cryptTest, rsa5) {
   string priv, pub;
   ASSERT_NO_THROW(mobs::generateRsaKeyMem(priv, pub));
@@ -178,6 +179,27 @@ TEST(cryptTest, rsa5) {
   EXPECT_EQ(sessionKey, sessionKey2);
 
 }
+
+TEST(cryptTest, rsaCheck) {
+  string priv, pub;
+  ASSERT_NO_THROW(mobs::generateRsaKeyMem(priv, pub, "12345"));
+  EXPECT_TRUE(mobs::checkPasswordRsa(priv, "12345"));
+//  std::cerr << mobs::printRsa(priv, "12345") << std::endl;
+  EXPECT_FALSE(mobs::checkPasswordRsa(priv, "54321"));
+  auto hash = mobs::getRsaFingerprint(pub);
+  //std::cerr << hash << std::endl;
+  EXPECT_EQ(32, hash.length());
+}
+
+TEST(cryptTest, rsaChange) {
+  string priv, pub, priv2, pub2;
+  ASSERT_NO_THROW(mobs::generateRsaKeyMem(priv, pub, "12345"));
+  EXPECT_TRUE(mobs::checkPasswordRsa(priv, "12345"));
+  ASSERT_NO_THROW(mobs::exportKey(priv, "12345", priv2, pub2, "55555"));
+  EXPECT_TRUE(mobs::checkPasswordRsa(priv2, "55555"));
+  EXPECT_TRUE(pub == pub2);
+}
+
 
 
 TEST(cryptTest, digest1) {

@@ -24,6 +24,7 @@
 #include "rsa.h"
 #include "logging.h"
 #include "converter.h"
+#include "digest.h"
 
 #include <openssl/ssl.h>
 #include <openssl/rand.h>
@@ -31,6 +32,7 @@
 #include <utility>
 #include <vector>
 #include <cstring>
+
 
 
 #define KEYBUFLEN 32
@@ -116,7 +118,7 @@ public:
     return rsaPrivKey;
   }
 
-  static RSA *readPupliceKey(const std::string &file) {
+  static RSA *readPublicKey(const std::string &file) {
     BIO *bp;
     if (file.length() > 10 and file.compare(0, 10, "-----BEGIN") == 0) {
       bp = BIO_new_mem_buf(file.c_str(), file.length());
@@ -147,7 +149,7 @@ public:
       throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
 
     for (auto &k:pupkeys) {
-      RSA *rsaPupKey = readPupliceKey(k.filename);
+      RSA *rsaPupKey = readPublicKey(k.filename);
       if (not rsaPupKey)
         THROW("can't load public key " << k.filename);
       EVP_PKEY *pub_key = EVP_PKEY_new();
@@ -427,9 +429,11 @@ void mobs::generateRsaKeyMem(std::string &priv, std::string &pub, const std::str
   if (passphrase.empty()) {
     if (1 != PEM_write_bio_RSAPrivateKey(bp_private, rsa, nullptr, nullptr, 0, nullptr, nullptr)) // unverschlüsselte Ausgabe
       throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
-  } else
-  if (1 != PEM_write_bio_RSAPrivateKey(bp_private, rsa, EVP_des_ede3_cbc(), nullptr, 0, nullptr, (void *)passphrase.c_str()))
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
+  } else {
+    if (1 != PEM_write_bio_RSAPrivateKey(bp_private, rsa, EVP_des_ede3_cbc(), nullptr, 0, nullptr,
+                                         (void *) passphrase.c_str()))
+      throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
+  }
   n = BIO_get_mem_data(bp_private, &bptr);
   priv = std::string(bptr, n);
   BIO_free_all(bp_private);
@@ -442,7 +446,7 @@ void mobs::generateRsaKeyMem(std::string &priv, std::string &pub, const std::str
 
 void
 mobs::decryptPublicRsa(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePup) {
-  RSA* rsaPubKey = mobs::CryptBufRsaData::readPupliceKey(filePup);
+  RSA* rsaPubKey = mobs::CryptBufRsaData::readPublicKey(filePup);
   if (not rsaPubKey)
     THROW(u8"can't load pub key");
   if (cipher.size() != RSA_size(rsaPubKey))
@@ -487,7 +491,7 @@ mobs::decryptPrivateRsa(const std::vector<u_char> &cipher, std::vector<u_char> &
 
 void
 mobs::encryptPublicRsa(const std::vector<u_char> &sessionKey, std::vector<u_char> &cipher, const std::string &filePup) {
-  RSA* rsaPubKey = mobs::CryptBufRsaData::readPupliceKey(filePup);
+  RSA* rsaPubKey = mobs::CryptBufRsaData::readPublicKey(filePup);
   if (not rsaPubKey)
     THROW(u8"can't load pub key");
   if (sessionKey.size() >= RSA_size(rsaPubKey) - 41)
@@ -498,3 +502,81 @@ mobs::encryptPublicRsa(const std::vector<u_char> &sessionKey, std::vector<u_char
   RSA_free(rsaPubKey);
 }
 
+bool mobs::checkPasswordRsa(const std::string &filePriv, const std::string &passphrase) {
+  try {
+    RSA *rsaPrivKey = mobs::CryptBufRsaData::readPrivateKey(filePriv, passphrase);
+    if (not rsaPrivKey)
+      return false;
+    int ret = RSA_check_key(rsaPrivKey);
+    RSA_free(rsaPrivKey);
+    return ret == 1;
+  } catch (openssl_exception &e) {
+    return false;
+  }
+}
+
+
+void mobs::exportKey(const std::string &filePriv, const std::string &passphraseOld, std::string &priv, std::string &pub, const std::string &passphraseNew) {
+  RSA *rsa = mobs::CryptBufRsaData::readPrivateKey(filePriv, passphraseOld);
+  if (not rsa)
+    throw openssl_exception(LOGSTR("mobs::exportKey"));
+
+  BIO	*bp_public = BIO_new(BIO_s_mem());
+  if (not bp_public)
+    THROW("alloc memory");
+  if (1 != PEM_write_bio_RSAPublicKey(bp_public, rsa))
+    throw openssl_exception(LOGSTR("mobs::exportKey"));
+  char *bptr;
+  auto n = BIO_get_mem_data(bp_public, &bptr);
+  pub = std::string(bptr, n);
+  BIO_free_all(bp_public);
+
+  BIO	*bp_private = BIO_new(BIO_s_mem());
+  if (passphraseNew.empty()) {
+    if (1 != PEM_write_bio_RSAPrivateKey(bp_private, rsa, nullptr, nullptr, 0, nullptr, nullptr)) // unverschlüsselte Ausgabe
+      throw openssl_exception(LOGSTR("mobs::exportKey"));
+  } else {
+    if (1 != PEM_write_bio_RSAPrivateKey(bp_private, rsa, EVP_des_ede3_cbc(), nullptr, 0, nullptr,
+                                         (void *) passphraseNew.c_str()))
+      throw openssl_exception(LOGSTR("mobs::exportKey"));
+  }
+  n = BIO_get_mem_data(bp_private, &bptr);
+  priv = std::string(bptr, n);
+  BIO_free_all(bp_private);
+  RSA_free(rsa);
+}
+
+std::string mobs::getRsaInfo(const std::string &filePriv, const std::string &passphrase) {
+  try {
+    RSA *rsaPrivKey = mobs::CryptBufRsaData::readPrivateKey(filePriv, passphrase);
+    //    RSA *rsaPrivKey = mobs::CryptBufRsaData::readPublicKey(filePriv);
+    if (not rsaPrivKey)
+      throw openssl_exception(LOGSTR("mobs::exportKey"));
+    BIO	*bp_private = BIO_new(BIO_s_mem());
+    if (1 != RSA_print(bp_private, rsaPrivKey, 3))
+      throw openssl_exception(LOGSTR("mobs::exportKey"));
+    char *bptr;
+    auto n = BIO_get_mem_data(bp_private, &bptr);
+    auto res = std::string(bptr, n);
+    BIO_free_all(bp_private);
+    RSA_free(rsaPrivKey);
+    return res;
+  } catch (openssl_exception &e) {
+    return "";
+  }
+}
+
+std::string mobs::getRsaFingerprint(const std::string &filePub) {
+  RSA *rsa = mobs::CryptBufRsaData::readPublicKey(filePub);
+  if (not rsa)
+    throw openssl_exception(LOGSTR("mobs::getRsaFingerprint"));
+  const BIGNUM *modulus = RSA_get0_n(rsa);
+  unsigned int sz = BN_num_bytes(modulus);
+//    std::cerr << sz << " " << BN_bn2hex(n) << std::endl;
+  std::vector<unsigned char> buf;
+  buf.resize(sz);
+  BN_bn2bin(modulus, &buf[0]);
+  std::string res = mobs::hash_value(buf, "md5");
+  RSA_free(rsa);
+  return res;
+}

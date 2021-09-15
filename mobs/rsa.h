@@ -134,7 +134,7 @@ void generateRsaKey(const std::string &filePriv, const std::string &filePub, con
  *
  * erzeugt ein RSA-Schlüsselpaar mit 2048 Bit. Der private-key ist des_ede3_cbc verschlüsselt, falls eine passphrase
  * angegeben ist
- * @param priv String des erzeugten privat-key im PEM-Format
+ * @param priv String des erzeugten private-key im PEM-Format
  * @param pub String des erzeugten public-key im PEM-Format
  * @param passphrase Passphrase für den private-key, wenn leer dann unverschlüsselt
  */
@@ -163,7 +163,7 @@ void decryptPrivateRsa(const std::vector<u_char> &cipher, std::vector<u_char> &s
  * Der zu verschlüsselnde Buffer darf maximal 214 Zeichen lang sein
  * @param sessionKey zu verschlüsselnde Zeichenkette
  * @param cipher verschlüsseltes Ergebnis
- * @param filePup Dateipfad eines private Keys oder der Schlüssel selbst im PEM-Format
+ * @param filePriv Dateipfad eines private Keys oder der Schlüssel selbst im PEM-Format
  * @param passphrase Kennwort zum private Key
  */void encryptPrivateRsa(const std::vector<u_char> &sessionKey, std::vector<u_char> &cipher, const std::string &filePriv, const std::string &passphrase);
 
@@ -175,8 +175,45 @@ void decryptPrivateRsa(const std::vector<u_char> &cipher, std::vector<u_char> &s
  */
  void decryptPublicRsa(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePup);
 
+ /** \brief Test ob Passwort und Schlüssel OK
+  *
+  * @param filePriv Dateipfad eines private Keys oder der Schlüssel selbst im PEM-Format
+  * @param passphrase Kennwort zum private Key
+  * @return true, wenn privat key unf Passwort korrekt
+  */
+ bool checkPasswordRsa(const std::string &filePriv, const std::string &passphrase);
+
+ /** \brief Schlüsselpaar erneut ausgeben
+  *
+  * Aus dem privat key / File wird ein public/private Key-Paar erzeugt mit neuem Passwort.
+  * So kann der öffentliche Schlüssel neu generiert werden oder das Passwort der privaten geändert
+  * @param filePriv Dateipfad eines private Keys oder der Schlüssel selbst im PEM-Format
+  * @param passphraseOld Kennwort zum private Key
+  * @param priv String des erzeugten private-key im PEM-Format
+  * @param pub String des erzeugten public-key im PEM-Format
+  * @param passphraseNew neues Kennwort zum neu gespeicherten private Key
+  */
+ void exportKey(const std::string &filePriv, const std::string &passphraseOld, std::string &priv, std::string &pub,
+                const std::string &passphraseNew);
+
+ /** \brief info zum Schlüssel ausgeben
+  *
+  * @param filePriv Dateipfad eines private Keys oder der Schlüssel selbst im PEM-Format
+  * @param passphrase Kennwort zum private Key
+  * @return Info in Textform oder Leerstring im Fehlerfall
+  */
+  std::string getRsaInfo(const std::string &filePriv, const std::string &passphrase);
+
+  /** \brief Fingerprint zum Public-Key
+   *
+   * @param filePub Dateipfad eines öffentlichen Keys oder der Schlüssel selbst im PEM-Format
+   * @return MD5 Hash des Schlüssels (32 Zeichen)
+   * \throw runtime_error im Fehlerfall
+   */
+    std::string getRsaFingerprint(const std::string &filePub);
+
 }
 
 
 
-#endif //MOBS_RSA_H
+    #endif //MOBS_RSA_H
