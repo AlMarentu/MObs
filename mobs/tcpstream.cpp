@@ -37,6 +37,7 @@
 #endif
 #include <unistd.h>
 #include <string.h>
+#include <sys/poll.h>
 
 static std::string hostIp(const struct sockaddr &sa, socklen_t len)
 {
@@ -297,6 +298,26 @@ bool TcpStBuf::is_open() const {
   return data->fd != invalidSocket;
 }
 
+bool TcpStBuf::poll(std::ios_base::openmode which) const {
+  if (data->fd == invalidSocket)
+    return false;
+  struct pollfd pf = { data->fd, 0, 0 };
+  if (which & std::ios_base::in)
+    pf.events += POLLIN;
+  if (which & std::ios_base::out)
+    pf.events += POLLOUT;
+  auto res = ::poll(&pf, 1, 0);
+  if (res < 0) {
+    LOG(LM_ERROR, "poll error " << errno);
+    data->bad = true;
+  } else if (pf.revents & (POLLERR | POLLHUP | POLLNVAL)) {
+    data->bad = true;
+  }
+  else if (pf.revents & (POLLIN | POLLOUT))
+    return true;
+  return false;
+}
+
 bool TcpStBuf::bad() const {
   return data->bad;
 }
@@ -424,7 +445,19 @@ void tcpstream::close() {
 bool tcpstream::is_open() const {
   auto *tp = dynamic_cast<TcpStBuf *>(rdbuf());
   if (not tp) THROW("bad cast");
+  if (tp->bad() or not tp->is_open())
+    return false;
+
   return (not tp->bad() and tp->is_open());
+}
+
+bool tcpstream::poll(std::ios_base::openmode which) {
+  auto *tp = dynamic_cast<TcpStBuf *>(rdbuf());
+  if (not tp) THROW("bad cast");
+  bool res = tp->poll(which);
+  if (tp->bad())
+    setstate(std::ios_base::badbit);
+  return res;
 }
 
 void tcpstream::shutdown(std::ios_base::openmode which) {

@@ -121,6 +121,9 @@ public:
    */
   void shutdown(std::ios_base::openmode which);
 
+  /// prüfe status
+  bool poll(unsigned int which = std::ios_base::in | std::ios_base::out) const;
+
   /// Rückgabe ob Verbindung offen
   bool is_open() const;
 
@@ -197,6 +200,15 @@ public:
   /// liefert remote ip bei passiver Verbindung
   std::string getRemoteIp() const;
 
+  /** \brief prüft, ob Zugriff entsprechend openmode möglich ist
+   *
+   * der Aufruf ist immer nicht blockierend;
+   * im Fehlerfall wird der Status bad() gesetzt
+   * @param which Richtung auf die geprüft werden soll
+   * @return True wenn Zugriff möglich
+   * \throws mobs::tcpstream::failure wen ioexceptions aktiviert und ein Fehler vorliegt
+   */
+  bool poll(std::ios_base::openmode which = std::ios_base::in | std::ios_base::out);
 };
 
 
