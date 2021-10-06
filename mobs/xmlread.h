@@ -29,18 +29,32 @@ namespace mobs {
 
 class CryptBufBase;
 class XmlReadData;
-/// KLasse um Objekte aus XML einzulesen
-/// \throw runtime_error wenn in der Struktur des XML ein Fehler ist
+/** \brief KLasse um Objekte aus XML einzulesen
+ *
+ */
 class XmlReader {
 public:
-  /// Konstruktor mit Übergabe eines \c std::string
-  /// @param input XML
-  /// @param c conversion-hints
-  /// @param charsetUnknown default ist der übergebene String in UTF-8 codiert, wird hier false übergeben, wird der Zeichensatz ermittelt (UTF-8, ISO-8869-1, -9, -15)
+  /** \brief Konstruktor mit Übergabe eines \c std::string
+   *
+   * @param input XML
+   * @param c conversion-hints
+   * @param charsetUnknown default ist der übergebene String in UTF-8 codiert, wird hier false übergeben, wird der Zeichensatz ermittelt (UTF-8, ISO-8869-1, -9, -15)
+   * \throw runtime_error wenn in der Struktur des XML ein Fehler ist
+   */
   explicit XmlReader(const std::string &input, const ConvObjFromStr &c = ConvObjFromStr(), bool charsetUnknown = false);
-  /// Konstruktor mit XML und conversion-hints initialisieren
+  /** \brief Konstruktor mit Übergabe eines \c std::wstring
+   *
+   * @param input XML
+   * @param c conversion-hints
+   * \throw runtime_error wenn in der Struktur des XML ein Fehler ist
+   */
   explicit XmlReader(const std::wstring &input, const ConvObjFromStr &c = ConvObjFromStr());
-  /// Konstruktor mit XML und conversion-hints initialisieren
+  /** \brief Konstruktor mit Übergabe eines \c std::wistream
+   *
+   * @param str XML
+   * @param c conversion-hints
+   * \throw runtime_error wenn in der Struktur des XML ein Fehler ist
+   */
   explicit XmlReader(std::wistream &str, const ConvObjFromStr &c = ConvObjFromStr());
   ~XmlReader();
 
@@ -52,10 +66,10 @@ public:
   virtual void Value(const std::wstring &value) { }
   /// Callback für Cdata-Element
   virtual void Cdata(const std::wstring &value) { Value(value); }
-  /** \brief Callback-Function: Ein CDATA-Elemet mit base64 codiertem Inhalt
+  /** \brief Callback-Function: Ein CDATA-Element mit base64 codiertem Inhalt
    
       nur, wenn setBase64(true) gesetzt wurde
-   @param base64 Inhalt des base64 codierden Wertes
+   @param base64 Inhalt des base64 codierten Wertes
    */
   virtual void Base64(const std::vector<u_char> &base64) { }
   /// Callback für Start-Tag
@@ -71,6 +85,7 @@ public:
    * Es wird  "https://www.w3.org/2001/04/xmlenc#Element" unterstützt
    * @param algorithm Algorithmus um xmlns bereinigt zB.: aes-256-cbc, oder "https://www.w3.org/2001/04/xmlenc#aes-256-cbc"/
    * @param keyName KeyInfo-Element
+   * @param cipher Schlüssel-Element
    * @param cryptBufp ein mit new erzeugtes Encryption-Module; wird automatisch freigegeben
    */
   virtual void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, mobs::CryptBufBase *&cryptBufp) { }
@@ -126,6 +141,7 @@ public:
     if (not error.empty())
       throw std::runtime_error(error);
   }
+  /// \private
   void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, mobs::CryptBufBase *&cryptBufp) override {
     if (decrypFun)
       cryptBufp = decrypFun(algorithm, keyName);

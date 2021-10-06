@@ -66,7 +66,7 @@ namespace {
 
 class openssl_exception : public std::runtime_error {
 public:
-  openssl_exception(const std::string &log = "") : std::runtime_error(log + " " + mobs_internal::openSslGetError()) {
+  explicit openssl_exception(const std::string &log = "") : std::runtime_error(log + " " + mobs_internal::openSslGetError()) {
     LOG(LM_DEBUG, "openssl: " << what());
   }
 };
@@ -143,12 +143,12 @@ public:
     return rsaPubKey;
   }
 
-  void initPubkeys(const std::list<CryptBufRsa::PubKey> &pupkeys) {
+  void initPubkeys(const std::list<CryptBufRsa::PubKey> &pubkeys) {
 
     if (not(ctx = EVP_CIPHER_CTX_new()))
       throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
 
-    for (auto &k:pupkeys) {
+    for (auto &k:pubkeys) {
       RSA *rsaPupKey = readPublicKey(k.filename);
       if (not rsaPupKey)
         THROW("can't load public key " << k.filename);
@@ -156,24 +156,24 @@ public:
       if (1 != EVP_PKEY_set1_RSA(pub_key, rsaPupKey))
         throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
 
-      reciepients.emplace_back(pub_key, k.id);
+      recipients.emplace_back(pub_key, k.id);
     }
 
-    std::vector<EVP_PKEY *> pub_keys(reciepients.size());
-    std::vector<int> encrypted_key_len(reciepients.size());
-    std::vector<u_char *> encrypted_key(reciepients.size());
+    std::vector<EVP_PKEY *> pub_keys(recipients.size());
+    std::vector<int> encrypted_key_len(recipients.size());
+    std::vector<u_char *> encrypted_key(recipients.size());
 
-    for (size_t i = 0; i < reciepients.size(); i++) {
-      encrypted_key[i] = &reciepients[i].cipher[0];
-      pub_keys[i] = reciepients[i].key;
+    for (size_t i = 0; i < recipients.size(); i++) {
+      encrypted_key[i] = &recipients[i].cipher[0];
+      pub_keys[i] = recipients[i].key;
     }
 
     if (not EVP_SealInit(ctx, EVP_aes_256_cbc(), &encrypted_key[0], &encrypted_key_len[0], &iv[0],
-                         &pub_keys[0], reciepients.size()))
+                         &pub_keys[0], recipients.size()))
       throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
 //  RSA_free(rsaPupKey);
-    for (size_t i = 0; i < reciepients.size(); i++)
-      reciepients[i].cipher.resize(encrypted_key_len[i]);
+    for (size_t i = 0; i < recipients.size(); i++)
+      recipients[i].cipher.resize(encrypted_key_len[i]);
 //  LOG(LM_DEBUG, "KEYLEN " << encrypted_key_len[0] << " " << EVP_PKEY_size(pub_key));
   }
 
@@ -187,7 +187,7 @@ class Receipt {
     EVP_PKEY *key = nullptr;
     std::vector<u_char> cipher;
   };
-  std::vector<Receipt> reciepients;
+  std::vector<Receipt> recipients;
   std::array<mobs::CryptBufRsa::char_type, INPUT_BUFFER_LEN> buffer;
   std::array<u_char, KEYBUFLEN> iv{};
   EVP_CIPHER_CTX *ctx = nullptr;
@@ -218,7 +218,7 @@ mobs::CryptBufRsa::CryptBufRsa(const std::string &filename, const std::vector<u_
   TRACE("");
   data = new mobs::CryptBufRsaData;
   data->cipher = cipher;
-  RSA *rsaPrivKey = data->readPrivateKey(filename, passphrase);
+  RSA *rsaPrivKey = mobs::CryptBufRsaData::readPrivateKey(filename, passphrase);
   data->priv_key = EVP_PKEY_new();
   if (1 != EVP_PKEY_set1_RSA(data->priv_key, rsaPrivKey))
     throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
@@ -236,25 +236,25 @@ mobs::CryptBufRsa::~CryptBufRsa() {
 
 
 const std::vector<u_char> &mobs::CryptBufRsa::getRecipientKey(size_t pos) const {
-  if (pos >= data->reciepients.size())
+  if (pos >= data->recipients.size())
     THROW("pos exceeds size");
-  return data->reciepients[pos].cipher;
+  return data->recipients[pos].cipher;
 }
 
 size_t mobs::CryptBufRsa::recipients() const {
-  return data->reciepients.size();
+  return data->recipients.size();
 }
 
 std::string mobs::CryptBufRsa::getRecipientId(size_t pos) const {
-  if (pos >= data->reciepients.size())
+  if (pos >= data->recipients.size())
     THROW("pos exceeds size");
-  return data->reciepients[pos].id;
+  return data->recipients[pos].id;
 }
 
 std::string mobs::CryptBufRsa::getRecipientKeyBase64(size_t pos) const {
-  if (pos >= data->reciepients.size())
+  if (pos >= data->recipients.size())
     THROW("pos exceeds size");
-  return mobs::to_string_base64(data->reciepients[pos].cipher);
+  return mobs::to_string_base64(data->recipients[pos].cipher);
 }
 
 
@@ -269,7 +269,7 @@ mobs::CryptBufRsa::int_type mobs::CryptBufRsa::underflow() {
     std::array<u_char, INPUT_BUFFER_LEN + EVP_MAX_BLOCK_LENGTH> buf{}; // NOLINT(cppcoreguidelines-pro-type-member-init)
 
     size_t sz = doRead((char *) &buf[0], buf.size() - EVP_MAX_BLOCK_LENGTH);
-    // Input Buffer wenigsten halb voll kriegen
+    // Input Buffer wenigstens halb voll kriegen
     if (sz) {
       while (sz < buf.size() / 2) {
         auto szt = doRead((char *) &buf[sz], buf.size() - sz);

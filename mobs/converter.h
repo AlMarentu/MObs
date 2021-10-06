@@ -84,14 +84,15 @@ wchar_t from_iso_8859_15(wchar_t c);
 /// codec für wfstream
 class codec_iso8859_1 : virtual public std::codecvt<wchar_t, char, std::mbstate_t> {
 public:
-/// \private
+  /// \private
   result do_out(mbstate_t& state, const wchar_t* from, const wchar_t* from_end, const wchar_t*& from_next,
-                        char* to, char* to_end, char*& to_next) const override;
+                char* to, char* to_end, char*& to_next) const override;
   /// \private
   result do_in (state_type& state, const char* from, const char* from_end, const char*& from_next,
-                        wchar_t* to, wchar_t* to_limit, wchar_t*& to_next) const override;
+                wchar_t* to, wchar_t* to_limit, wchar_t*& to_next) const override;
 
 protected:
+  /// \private
   bool do_always_noconv() const noexcept override;
 };
 /// codec für wfstream
@@ -104,6 +105,7 @@ public:
   result do_in (state_type& state, const char* from, const char* from_end, const char*& from_next,
                         wchar_t* to, wchar_t* to_limit, wchar_t*& to_next) const override;
 protected:
+  /// \private
   bool do_always_noconv() const noexcept override;
 };
 /// codec für wfstream
@@ -116,6 +118,7 @@ public:
   result do_in (state_type& state, const char* from, const char* from_end, const char*& from_next,
                         wchar_t* to, wchar_t* to_limit, wchar_t*& to_next) const override;
 protected:
+  /// \private
   bool do_always_noconv() const noexcept override;
 };
 
@@ -225,6 +228,7 @@ std::string gen_uuid_v4_p();
 
 class StringFormatterData;
 
+/// Klasse die Strings nach Regular Expression parst und neu formatiert
 class StringFormatter {
 public:
   StringFormatter();

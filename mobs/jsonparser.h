@@ -19,7 +19,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /** \file jsonparser.h
-\brief EInfacher JSON-Parser */
+\brief Einfacher JSON-Parser */
 
 #ifndef MOBS_JSONPARSER_H
 #define MOBS_JSONPARSER_H
@@ -79,7 +79,7 @@ public:
    @param value Name des Schlüssels
   */
   virtual void Key(const std::string &value) = 0;
-  /** \brief Call backfunktion für gelesenes Wert-Elementt
+  /** \brief Call backfunktion für gelesenes Wert-Element
    @param value Name des Wertes
    @param charType true, wenn Wert in Quotes eingeschlossen war
   */
@@ -93,7 +93,7 @@ public:
   /** \brief Call backfunktion für Start eines Objektes
   */
   virtual void StartObject() = 0;
-  /** \brief Call backfunktion für Ende eiines Objektes
+  /** \brief Call backfunktion für Ende eines Objektes
    */
   virtual void EndObject() = 0;
   /// \brief Starte den Parser
@@ -137,7 +137,7 @@ public:
         case ']':
           eat();
           if (tags.empty() or tags.top() != '[')
-            throw std::runtime_error(u8"unexpectet ']'");
+            throw std::runtime_error(u8"unexpected ']'");
           if (not expectEnd)
             throw std::runtime_error(u8"missing element");
           tags.pop();
@@ -149,7 +149,7 @@ public:
         case '}':
           eat();
           if (tags.empty() or tags.top() != '{' or expectDelimiter == ':')
-            throw std::runtime_error(u8"unexpectet '}'");
+            throw std::runtime_error(u8"unexpected '}'");
           if (not expectEnd)
             throw std::runtime_error(u8"missing element");
           tags.pop();

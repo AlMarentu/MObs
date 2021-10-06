@@ -18,7 +18,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/** \file unixtime.h
+/** \file mchrono.h
  \brief Optional: Wrapper für die Zeitpunkte aus std::chrono \c time_point */
 
 #ifndef MOBS_MCHRONO_H

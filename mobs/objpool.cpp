@@ -196,7 +196,7 @@ bool NOPDataUnordered::lookup(const string &objName, weak_ptr<NamedObject> &ptr)
 void NOPDataUnordered::search(const string &searchName, std::list<pair<std::string, std::weak_ptr<NamedObject>>> &result)
 {
   TRACE(PARAM(searchName));
-  throw runtime_error(u8"function search not nimplemented");
+  throw runtime_error(u8"function search not implemented");
 }
 
 

@@ -394,7 +394,7 @@ public:
     size_t index = SIZE_T_MAX;
     k.emplace_back(make_pair(vec.getName(cth), index));
     detailVec.emplace_back(&vec, current.tableName + "_" + vec.getElementName(), k);
-    // übergeordete Vektoren auf Size=1 setzten, damit die Struktur für das nächste Statement vorhanden ist
+    // übergeordnete Vektoren auf Size=1 setzten, damit die Struktur für das nächste Statement vorhanden ist
     vec.resize(1);
     return false;
   };
@@ -827,8 +827,8 @@ string SqlGenerator::doDelete(SqlGenerator::DetailInfo &di) {
     gs.current.vec->traverse(gs);
   }
   else {
-    // Auf Schattenobjekt arbeiten, um all Vektoren auf Size=1 zu setzen
-    // Objekt muss wärend der Verarbeitung stabil bleiben (C-Pointer)
+    // Auf Schattenobjekt arbeiten, um alle Vektoren auf Size=1 zu setzen
+    // Objekt muss während der Verarbeitung stabil bleiben (C-Pointer)
     ObjectBase *o2 = obj.createNew();
     deleteLater(o2);
     SetArrayStructure sas;
@@ -1142,8 +1142,8 @@ string SqlGenerator::doCreate(SqlGenerator::DetailInfo &di) {
   if (di.vec)
     di.vec->traverse(gs);
   else {
-    // Auf Schattenobjekt arbeiten, um all Vektoren auf Size=1 zu setzen
-    // Objekt muss wärend der Verarbeitung stabil bleiben (C-Pointer)
+    // Auf Schattenobjekt arbeiten, um alle Vektoren auf Size=1 zu setzen
+    // Objekt muss während der Verarbeitung stabil bleiben (C-Pointer)
     ObjectBase *o2 = obj.createNew();
     deleteLater(o2);
     SetArrayStructure sas;
@@ -1606,7 +1606,7 @@ void AuditTrail::doMem(const MemberBase &mem) {
     string v;
     if (maxValSize > 0 and val.length() > maxValSize) {
       v = val.substr(0, maxValSize -1);
-      v += '\\';  // Marker am Zeilenende wenn Folgezeile kommt, um trailing spaces zu kapseln
+      v += '\\';  // Marker am Zeilenende, wenn Folgezeile kommt, um trailing spaces zu kapseln
       val.erase(0, maxValSize -1);
     } else
       v.swap(val);

@@ -116,7 +116,7 @@ mobs::CryptBufDigest::int_type mobs::CryptBufDigest::underflow() {
     if (data->finished or not isGood())
       return Traits::eof();
     size_t sz = doRead((char *) &data->buffer[0], data->buffer.size());
-    // Input Buffer wenigsten halb voll kriegen
+    // Input Buffer wenigstens halb voll kriegen
     if (sz) {
       while (sz < data->buffer.size() / 2) {
         auto szt = doRead((char *) &data->buffer[sz], data->buffer.size() - sz);
@@ -188,6 +188,10 @@ void mobs::CryptBufDigest::finalize() {
     data->md_value.resize(md_len);
   }
   CryptBufBase::finalize();
+}
+
+const std::vector<u_char> &mobs::CryptBufDigest::hash() const {
+  return data->md_value;
 }
 
 

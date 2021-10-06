@@ -405,7 +405,7 @@ void MariaDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj
   SQLMariaDBdescription sd(dbi.database());
   mobs::SqlGenerator gsql(obj, sd);
 
-  // Transaktion benutzen zwecks Atomizität
+  // Transaktion benutzen, zwecks Atomizität
   if (currentTransaction == nullptr) {
     string s = "BEGIN WORK;";
     LOG(LM_DEBUG, "SQL " << s);
@@ -438,11 +438,11 @@ void MariaDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj
       throw mysql_exception(u8"save failed", connection);
     int rows = mysql_affected_rows(connection);
     LOG(LM_DEBUG, "ROWS " << rows);
-    // update: wenn sich, obwohl gefunden, nichts geändert hat wird hier auch 0 geliefert - die Version muss sich aber immer ändern
-    // replace: 2, wenn wenn zuvor delete nötig
+    // update: wenn sich, obwohl gefunden, nichts geändert hat, wird hier auch 0 geliefert - die Version muss sich aber immer ändern
+    // replace: 2, wenn zuvor delete nötig
     if (version > 0 and rows != 1)
       throw runtime_error(u8"number of processed rows is " + to_string(mysql_affected_rows(connection)) + " should be 1");
-    if (not insertOnly and version < 0 and rows == 1) // wen bei replace 1 geliefert wird war es ein insert
+    if (not insertOnly and version < 0 and rows == 1) // wen bei replace 1 geliefert wird, war es ein insert
       insertOnly = true;
     while (not gsql.eof()) {
       if (insertOnly) // Bei insert MasterTable reicht auch ein insert auf SubElemente
@@ -490,7 +490,7 @@ bool MariaDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase &
   SQLMariaDBdescription sd(dbi.database());
   mobs::SqlGenerator gsql(obj, sd);
 
-  // Transaktion benutzen zwecks Atomizität
+  // Transaktion benutzen, zwecks Atomizität
   if (currentTransaction == nullptr) {
     string s = "BEGIN WORK;";
     LOG(LM_DEBUG, "SQL " << s);

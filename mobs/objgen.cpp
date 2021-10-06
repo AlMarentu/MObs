@@ -334,8 +334,8 @@ ObjectBase *ObjectBase::getObjInfo(const std::string &name, const ConvObjFromStr
 {
   for (auto i:mlist) {
     if (not i.obj) continue;
-    if ((cfh.acceptOriNames() and name == i.obj->getName(ConvToStrHint(false, false, false, cfh.caseinsensitive()))) or
-        (cfh.acceptAltNames() and name == i.obj->getName(ConvToStrHint(false, true, false, cfh.caseinsensitive()))))
+    if ((cfh.acceptOriNames() and name == i.obj->getName(ConvToStrHint(false, false, false, cfh.caseInsensitive()))) or
+        (cfh.acceptAltNames() and name == i.obj->getName(ConvToStrHint(false, true, false, cfh.caseInsensitive()))))
       return i.obj;
   }
   // Dito für Embedded
@@ -359,8 +359,8 @@ MemBaseVector *ObjectBase::getVecInfo(const std::string &name, const ConvObjFrom
 {
   for (auto i:mlist) {
     if (not i.vec) continue;
-    if ((cfh.acceptOriNames() and name == i.vec->getName(ConvToStrHint(false, false, false, cfh.caseinsensitive()))) or
-        (cfh.acceptAltNames() and name == i.vec->getName(ConvToStrHint(false, true, false, cfh.caseinsensitive()))))
+    if ((cfh.acceptOriNames() and name == i.vec->getName(ConvToStrHint(false, false, false, cfh.caseInsensitive()))) or
+        (cfh.acceptAltNames() and name == i.vec->getName(ConvToStrHint(false, true, false, cfh.caseInsensitive()))))
       return i.vec;
   }
   // Dito für Embedded
@@ -384,8 +384,8 @@ MemberBase *ObjectBase::getMemInfo(const std::string &name, const ConvObjFromStr
 {
   for (auto i:mlist) {
     if (not i.mem) continue;
-    if ((cfh.acceptOriNames() and name == i.mem->getName(ConvToStrHint(false, false, false, cfh.caseinsensitive()))) or
-        (cfh.acceptAltNames() and name == i.mem->getName(ConvToStrHint(false, true, false, cfh.caseinsensitive()))))
+    if ((cfh.acceptOriNames() and name == i.mem->getName(ConvToStrHint(false, false, false, cfh.caseInsensitive()))) or
+        (cfh.acceptAltNames() and name == i.mem->getName(ConvToStrHint(false, true, false, cfh.caseInsensitive()))))
       return i.mem;
   }
   // Dito für Embedded
@@ -913,7 +913,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
   memBase = nullptr;
 //  LOG(LM_DEBUG, "Im Object " << memName);
   std::string elementFind = element;
-  if (cfs.caseinsensitive())
+  if (cfs.caseInsensitive())
     elementFind = mobs::toLower(element);
   if (objekte.top().obj)
   {

@@ -411,18 +411,18 @@ std::string MobsMemberInfoDb::toString(bool *needQuotes) const {
 
 class ConvFromStrHintDefault : virtual public ConvFromStrHint {
 public:
-  ConvFromStrHintDefault() {}
-  virtual ~ConvFromStrHintDefault() {}
-  virtual bool acceptCompact() const { return true; }
-  virtual bool acceptExtended() const { return true; }
+  ConvFromStrHintDefault() = default;
+  ~ConvFromStrHintDefault() override = default;
+  bool acceptCompact() const override { return true; }
+  bool acceptExtended() const override { return true; }
 };
 
 class ConvFromStrHintExplizit : virtual public ConvFromStrHint {
 public:
-  ConvFromStrHintExplizit() {}
-  virtual ~ConvFromStrHintExplizit() {}
-  virtual bool acceptCompact() const { return false; }
-  virtual bool acceptExtended() const { return true; }
+  ConvFromStrHintExplizit() = default;
+  ~ConvFromStrHintExplizit() override = default;
+  bool acceptCompact() const override { return false; }
+  bool acceptExtended() const override { return true; }
 };
 
 const ConvFromStrHint &ConvFromStrHint::convFromStrHintDflt = ConvFromStrHintDefault();

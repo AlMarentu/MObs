@@ -18,7 +18,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/** \file maria.h
+/** \file sqlite.h
  \brief Datenbank-Interface für Zugriff auf SQLite
 
  \see www.sqlite.org

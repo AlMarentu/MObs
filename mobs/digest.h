@@ -42,10 +42,10 @@ class CryptBufDigestData;
  */
 class CryptBufDigest : public CryptBufBase {
 public:
-  using Base = std::basic_streambuf<char>;
-  using char_type = typename Base::char_type;
-  using Traits = std::char_traits<char_type>;
-  using int_type = typename Base::int_type;
+  using Base = std::basic_streambuf<char>; ///< Basis-Typ
+  using char_type = typename Base::char_type;  ///< Element-Typ
+  using Traits = std::char_traits<char_type>; ///< Traits-Typ
+  using int_type = typename Base::int_type; ///< zugehöriger int-Typ
 
 
   explicit CryptBufDigest(const std::string &algo = "");
@@ -86,8 +86,15 @@ private:
 };
 
 
+/// ostream-Klasse zum ermitteln von Hash-Werten
 class digestStream : public std::ostream {
 public:
+  /** \brief Konstruktor
+   *
+   * Methoden siehe openssl list-message-digest-commands
+   * zB.: "sha1", "sha244", "md5", ...
+   * @param algo Hash-Methode
+   */
   explicit digestStream(const std::string &algo = "sha1");
   ~digestStream() override;
 

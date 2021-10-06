@@ -36,7 +36,7 @@
 #include <netinet/ip.h>
 #endif
 #include <unistd.h>
-#include <string.h>
+#include <cstring>
 #include <sys/poll.h>
 
 static std::string hostIp(const struct sockaddr &sa, socklen_t len)
@@ -69,7 +69,7 @@ static std::string hostName(const struct sockaddr &sa, socklen_t len)
 #define MSG_NOSIGNAL 0
 #else
 #define closesocket(s) ::close(s)
-#define SOCKET_ERROR -1
+#define SOCKET_ERROR (-1)
 #endif
 
 namespace mobs {
@@ -91,7 +91,7 @@ socketHandle TcpAccept::initService(const std::string &service) {
   }
   // loop through all the results and bind to the first we can
   for(auto p = servinfo; p; p = p->ai_next)
-    LOG(LM_INFO, "TRY " << hostIp(*p->ai_addr, p->ai_addrlen));
+    LOG(LM_DEBUG, "TRY " << hostIp(*p->ai_addr, p->ai_addrlen));
   for(auto p = servinfo; p; p = p->ai_next) {
     if ((fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == invalidSocket) {
       LOG(LM_ERROR, "Fehler bei socket: " <<  strerror(errno));
@@ -144,10 +144,10 @@ socketHandle TcpAccept::acceptConnection(struct sockaddr &addr, size_t &len) con
   std::lock_guard<std::mutex> guard(mutex);
 
   socklen_t addrLen = len;
-  LOG(LM_INFO, "Accepting " << fd);
+  LOG(LM_DEBUG, "Accepting " << fd);
   int fdneu = ::accept(fd, &addr, &addrLen);
   len = addrLen;
-  LOG(LM_INFO, "Accept " << fdneu);
+  LOG(LM_DEBUG, "Accept " << fdneu);
   if (fdneu != invalidSocket) {
     LOG(LM_INFO, "accept: from Host: " << hostIp(addr, addrLen));
   }
@@ -215,7 +215,7 @@ public:
       return 0;
     }
 //    if (res < 200)
-//      LOG(LM_INFO, "READ TCP " << res << " " << std::string(&rdBuf[0], res));
+//      LOG(LM_DEBUG, "READ TCP " << res << " " << std::string(&rdBuf[0], res));
 //    else
 //      LOG(LM_INFO, "READ TCP " << res << " " << std::string(&rdBuf[0], 100) << " ... " << std::string(&rdBuf[res-100], 100));
 //    LOG(LM_DEBUG, "READ TCP " << res);
@@ -231,7 +231,7 @@ public:
     TcpStBuf::char_type *cp = &wrBuf[0];
     while (sz > 0) {
       auto res = send(fd, cp, int(sz), MSG_NOSIGNAL); // buffersize immer < INT_MAX
-      LOG(LM_INFO, "WRITE TCP " << res );
+      LOG(LM_DEBUG, "WRITE TCP " << res );
       if (res <= 0) {
         LOG(LM_ERROR, "write error " << errno);
         if (res == -1 and errno == EPIPE)

@@ -43,10 +43,10 @@ class CryptBufBase : public std::basic_streambuf<char> {
   friend class CryptIstrBufData;
   friend class CryptOstrBufData;
 public:
-  using Base = std::basic_streambuf<char>;
-  using char_type = typename Base::char_type;
-  using Traits = std::char_traits<char_type>;
-  using int_type = typename Base::int_type;
+  using Base = std::basic_streambuf<char>; ///< Basis-Typ
+  using char_type = typename Base::char_type;  ///< Element-Typ
+  using Traits = std::char_traits<char_type>; ///< Traits-Typ
+  using int_type = typename Base::int_type; ///< zugehöriger int-Typ
 
   CryptBufBase();
   /// \private
@@ -59,7 +59,7 @@ public:
   virtual std::string name() const { return ""; }
   /** \brief Anzahl der Empfänger für diese Verschlüsselung
    *
-   * @return Anzahl der vorhandenen Empfängereinträage
+   * @return Anzahl der vorhandenen Empfängereinträge
    */
   virtual size_t recipients() const { return 0; }
   /** \brief Abfrage der Id des Empfängers
@@ -98,7 +98,7 @@ public:
   /// Übergeordneten Eingabe-stream setzen
   void setIstr(std::istream &istr);
 
-  /** \brief Anzahl der zu lesenden Bytes begrnzen
+  /** \brief Anzahl der zu lesenden Bytes begrenzen
    *
    * Nachdem die Anzahl bytes die aus dem übergeordneten Buffer gelesen
    * wurde, geht der Stream in den end-of-ile-Zustand
@@ -112,7 +112,7 @@ public:
    * Trenner liest. Der Delimiter wird zurückgeliefert immer zu Beginn der Folgeblocks geliefert
    * @param delim unsigned char des Trenners oder Traits::eof() für aus
    */
-  void setReadDelimiter(char_type c);
+  void setReadDelimiter(char_type delim);
 
   ///  Delimiter-Funktion abschalten
   void setReadDelimiter();
@@ -149,7 +149,7 @@ protected:
   bool isGood() const;
   /// \private
   void setBad();
-
+  /// \private
   CryptBufBaseData *data;
 };
 
@@ -159,10 +159,10 @@ protected:
  */
 class CryptBufNull : public CryptBufBase {
 public:
-  using Base = std::basic_streambuf<char>;
-  using char_type = typename Base::char_type;
-  using Traits = std::char_traits<char_type>;
-  using int_type = typename Base::int_type;
+  using Base = std::basic_streambuf<char>; ///< Basis-Typ
+  using char_type = typename Base::char_type;  ///< Element-Typ
+  using Traits = std::char_traits<char_type>; ///< Traits-Typ
+  using int_type = typename Base::int_type; ///< zugehöriger int-Typ
 
   CryptBufNull() = default;
   ~CryptBufNull() override = default;;
@@ -191,10 +191,10 @@ class CryptIstrBufData;
  */
 class CryptIstrBuf : public std::basic_streambuf<wchar_t> {
 public:
-  using Base = std::basic_streambuf<wchar_t>;
-  using char_type = typename Base::char_type;
-  using Traits = std::char_traits<char_type>;
-  using int_type = typename Base::int_type;
+  using Base = std::basic_streambuf<wchar_t>; ///< Basis-Typ
+  using char_type = typename Base::char_type; ///< Element-Typ
+  using Traits = std::char_traits<char_type>; ///< Traits-Typ
+  using int_type = typename Base::int_type; ///< zugehöriger int-Typ
 
   /** \brief Konstruktor
    *
@@ -210,6 +210,7 @@ public:
   /// \private
   int_type underflow() override;
 
+  /// Referenz auf internen istream
   std::istream &getIstream();
 
   /// Zugriff auf den Stream-Buffer des Plugins (ist immer gültig)
@@ -221,7 +222,7 @@ public:
 protected:
 //  pos_type seekpos(pos_type pos, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override;
   /// \private
-  pos_type seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which = std::ios_base::in) override;
+  pos_type seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which) override;
   /// \private
   void imbue(const std::locale& loc) override;
 
@@ -236,10 +237,10 @@ private:
  */
 class Base64IstBuf : public std::basic_streambuf<char> {
 public:
-  using Base = std::basic_streambuf<char>;
-  using char_type = typename Base::char_type;
-  using Traits = std::char_traits<char_type>;
-  using int_type = typename Base::int_type;
+  using Base = std::basic_streambuf<char>; ///< Basis-Typ
+  using char_type = typename Base::char_type;  ///< Element-Typ
+  using Traits = std::char_traits<char_type>; ///< Traits-Typ
+  using int_type = typename Base::int_type; ///< zugehöriger int-Typ
 
   /// Konstruktor mit Übergabe des zu verarbeitenden wistream
   explicit Base64IstBuf(std::wistream &istr);
@@ -266,10 +267,10 @@ class CryptOstrBufData;
  */
 class CryptOstrBuf : public std::basic_streambuf<wchar_t> {
 public:
-  using Base = std::basic_streambuf<wchar_t>;
-  using char_type = typename Base::char_type;
-  using Traits = std::char_traits<char_type>;
-  using int_type = typename Base::int_type;
+  using Base = std::basic_streambuf<wchar_t>; ///< Basis-Typ
+  using char_type = typename Base::char_type; ///< Element-Typ
+  using Traits = std::char_traits<char_type>; ///< Traits-Typ
+  using int_type = typename Base::int_type; ///< zugehöriger int-Typ
 
   /** \brief Konstruktor
    *
@@ -284,6 +285,7 @@ public:
   /// \private
   int_type overflow(int_type ch) override;
 
+  /// Zugriff auf internen ostream
   std::ostream &getOstream();
 
   /** \brief Schließe des Stream ab.
@@ -299,7 +301,7 @@ protected:
   int sync() override;
 //  pos_type seekpos(pos_type pos, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override;
   /// \private
-  pos_type seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which = std::ios_base::out) override;
+  pos_type seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which) override;
   /// \private
   void imbue(const std::locale& loc) override;
 

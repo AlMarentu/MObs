@@ -195,10 +195,10 @@ public:
   NamedObjList() : std::list<NamedObjRef<T>>() {}
   
   /// Sucht nach Objekten, die einen gleichen Teil zu Beginn des Objektnamens haben
-  /// @param pool Zeiger auf Pool aus dem gesucht weden soll
+  /// @param pool Zeiger auf Pool, aus dem gesucht werden soll
   /// @param searchName Suchmuster
   /// \throws runtime_error falls Methode nicht implementiert (unordered pool)
-  void serchBeginsWith(std::shared_ptr<NamedObjPool> pool, const std::string &searchName) {
+  void searchBeginsWith(std::shared_ptr<NamedObjPool> pool, const std::string &searchName) {
     std::list<std::pair<std::string, std::weak_ptr<NamedObject>>> result;
     pool->search(searchName, result);
     this->clear();

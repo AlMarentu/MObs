@@ -296,7 +296,7 @@ void XmlWriter::clearString()
 string XmlWriter::getString() const
 {
   string result;
-// ist leer wenn filebuffer
+// ist leer, wenn filebuffer
   switch (data->cs) {
     case CS_iso8859_1: {
          const wstring &t = data->wstrBuff.str();

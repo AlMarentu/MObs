@@ -188,7 +188,7 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::underflow() {
     {
       u_char *start = &buf[0];
       size_t sz = doRead((char *) &buf[0], buf.size() - EVP_MAX_BLOCK_LENGTH);
-      // Input Buffer wenigsten halb voll kriegen
+      // Input Buffer wenigstens halb voll kriegen
       if (sz) {
         while (sz < buf.size() / 2) {
           auto szt = doRead((char *) &buf[sz], buf.size() - sz);
@@ -268,7 +268,7 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::underflow() {
 void mobs::CryptBufAes::ctxInit() {
   if (not data->ctx) {
     if (data->salted) {
-      LOG(LM_INFO, "AES init");
+      LOG(LM_DEBUG, "AES init");
       openSalt();
       data->initAES();
     }
@@ -339,7 +339,7 @@ void mobs::CryptBufAes::finalize() {
 //    EVP_CIPHER_CTX_reset(data->ctx);
     EVP_CIPHER_CTX_free(data->ctx);
     data->ctx = nullptr;
-    LOG(LM_INFO, "Writing. " << len);
+    LOG(LM_DEBUG, "Writing. " << len);
     doWrite(reinterpret_cast<char *>(&buf[0]), len);
     if (data->mdctx) {
       data->md_value.resize(EVP_MAX_MD_SIZE);
@@ -356,7 +356,7 @@ void mobs::CryptBufAes::openSalt() {
   data->newSalt();
   doWrite("Salted__", 8);
   doWrite(reinterpret_cast<char *>(&data->salt[0]), data->salt.size());
-  LOG(LM_INFO, "Writing salt " << 8 + data->salt.size());
+  LOG(LM_DEBUG, "Writing salt " << 8 + data->salt.size());
 }
 
 std::string mobs::CryptBufAes::getRecipientId(size_t pos) const {
