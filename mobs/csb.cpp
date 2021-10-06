@@ -199,7 +199,7 @@ void CryptIstrBuf::imbue(const std::locale &loc) {
                                                                          &data->buffer[INPUT_BUFFER_SIZE], bit2);
     if (bp != bp2)
       LOG(LM_ERROR, u8"read buffer to small");
-    LOG(LM_INFO, "locale change " << std::distance(Base::gptr(), Base::egptr()) << " -> " << std::distance(&buf[0], bp) << " -> " << std::distance(&data->buffer[0], bit2));
+    LOG(LM_DEBUG, "locale change " << std::distance(Base::gptr(), Base::egptr()) << " -> " << std::distance(&buf[0], bp) << " -> " << std::distance(&data->buffer[0], bit2));
     Base::setg(&data->buffer[0], &data->buffer[0], bit2);
     data->pos += off_type(std::distance(Base::gptr(), Base::egptr()));
   }
@@ -520,7 +520,7 @@ public:
           if (not inStb->get(*s).good())
             break;
           if (*s == d) {
-            LOG(LM_INFO, "delimiter found at " << n);
+            LOG(LM_DEBUG, "delimiter found at " << n);
             inStb->unget();
             break;
           }

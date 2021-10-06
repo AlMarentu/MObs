@@ -141,7 +141,7 @@ DatabaseInterface DatabaseManagerData::getDbIfc(const std::string &connectionNam
     throw std::runtime_error(connectionName + u8" is not a valid connection");
   Database &dbCon = i->second;
 
-  return DatabaseInterface(dbCon.connection, dbCon.database);
+  return {dbCon.connection, dbCon.database};
 }
 
 std::string DatabaseManagerData::connectionName(std::shared_ptr<mobs::DatabaseConnection> dbCon, const std::string &dbName) const {
@@ -149,7 +149,7 @@ std::string DatabaseManagerData::connectionName(std::shared_ptr<mobs::DatabaseCo
     if (i.second.connection == dbCon and i.second.database == dbName)
       return i.first;
   }
-  return std::string();
+  return {};
 }
 
 

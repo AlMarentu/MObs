@@ -186,7 +186,7 @@ TEST(objpoolTest, list) {
      ref2->a = i + 100;
    }
   mobs::NamedObjList<Berlin> l;
-  ASSERT_NO_THROW(l.serchBeginsWith(pool, "B."));
+  ASSERT_NO_THROW(l.searchBeginsWith(pool, "B."));
   EXPECT_EQ(3, l.size());
   int i = 1;
   for (auto p:l)

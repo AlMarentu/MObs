@@ -47,14 +47,19 @@ class CryptBufRsaData;
  */
 class CryptBufRsa : public CryptBufBase {
 public:
-  using Base = std::basic_streambuf<char>;
-  using char_type = typename Base::char_type;
-  using Traits = std::char_traits<char_type>;
-  using int_type = typename Base::int_type;
+  using Base = std::basic_streambuf<char>; ///< Basis-Typ
+  using char_type = typename Base::char_type;  ///< Element-Typ
+  using Traits = std::char_traits<char_type>; ///< Traits-Typ
+  using int_type = typename Base::int_type; ///< zugehöriger int-Typ
 
   /// Klasse für public-Key Informationen
   class PubKey {
   public:
+    /** \brief Konstruktor
+     *
+     * @param f Dateiname der public-key Datei im PEM-Format
+     * @param i Bezeichnung des Empfängers
+     */
     PubKey(std::string f, std::string i) : filename(std::move(f)), id(std::move(i)) {}
     std::string filename; ///< Dateiname der public-key Datei im PEM-Format
     std::string id; ///< Bezeichnung des Empfängers
@@ -145,7 +150,7 @@ void generateRsaKeyMem(std::string &priv, std::string &pub, const std::string &p
  * Der zu verschlüsselnde Buffer darf maximal 214 Zeichen lang sein
  * @param sessionKey zu verschlüsselnde Zeichenkette
  * @param cipher verschlüsseltes Ergebnis
- * @param filePup Dateipfad eines public Keys oder der Schlüssel selbst im PEM-Format
+ * @param filePub Dateipfad eines public Keys oder der Schlüssel selbst im PEM-Format
  */
 void encryptPublicRsa(const std::vector<u_char> &sessionKey, std::vector<u_char> &cipher, const std::string &filePub);
 
@@ -153,7 +158,7 @@ void encryptPublicRsa(const std::vector<u_char> &sessionKey, std::vector<u_char>
  *
  * @param cipher verschlüsselte Eingabe
  * @param sessionKey entschlüsselte Zeichenkette
- * @param filePup Dateipfad eines private Keys oder der Schlüssel selbst im PEM-Format
+ * @param filePriv Dateipfad eines private Keys oder der Schlüssel selbst im PEM-Format
  * @param passphrase Kennwort zum private Key
 */
 void decryptPrivateRsa(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePriv, const std::string &passphrase);

@@ -327,7 +327,7 @@ std::wstring::const_iterator to7Up(std::wstring::const_iterator begin, std::wstr
   char last = ' ';
   for (; begin != end; begin++) {
     char n = ' ';
-    wchar_t x = *begin;
+//    wchar_t x = *begin;
     if (*begin >= 0 and size_t(*begin) < sizeof(tab_7up) -1)
       n = tab_7up[size_t(*begin)];
     switch (n) {
@@ -427,7 +427,7 @@ void Base64Reader::put(wchar_t c) {
           base64.push_back((b64Value >> 2) & 0xff);
           // fall into
         case 100:
-          b64Cnt = 999; // Wenn noch ein = kommt -> fehler
+          b64Cnt = 999; // Wenn noch ein = kommt ⇒ fehler
           break;
         case 2:
           base64.push_back(b64Value >> 4);
@@ -465,7 +465,7 @@ bool StrConv<std::vector<u_char>>::c_string2x(const std::string &str, std::vecto
     r.done();
   }
   catch (exception &e) {
-    LOG(LM_INFO, "Erro, in base64: " << e.what());
+    LOG(LM_INFO, "Error, in base64: " << e.what());
     return false;
   }
   return true;

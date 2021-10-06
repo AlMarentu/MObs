@@ -177,9 +177,9 @@ class ElementNamesData;
  */
 class ElementNames : virtual public ObjTravConst {
 public:
-  /// Konstruktor mit Konvertierungmodalität
+  /// Konstruktor mit Konvertierungsmodalität
   explicit ElementNames(ConvObjToString c);
-  ~ElementNames();
+  ~ElementNames() override;
 
   /** \brief Callback für einen Statement-Generator
    *

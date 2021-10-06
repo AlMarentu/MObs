@@ -18,9 +18,9 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// TODO dirtyRead, TransaktionsLevel
+// TODO dirtyRead, TransactionLevel
 // TODO Transaktionen (benötigt sharded Installation)
-// TODO Erkennung ob Datanbank shardet (also über mongos)
+// TODO Erkennung ob Datenbank sharded (also über mongos)
 // TODO Passwort und User aus ConnectionObjekt übernehmen
 
 #include "mongo.h"
@@ -711,7 +711,7 @@ public:
         case QueryGenerator::AndBegin:
         case QueryGenerator::OrBegin:
           level.emplace(i.op, negate);
-          LOG(LM_INFO, "LEVEL " << level.size());
+          LOG(LM_DEBUG, "LEVEL " << level.size());
           negate = level.top().invert();
           break;
         case QueryGenerator::AndEnd:
@@ -747,7 +747,7 @@ public:
           literal = true;
           if (level.empty()) {
             level.emplace(QueryGenerator::AndBegin, negate);
-            LOG(LM_INFO, "LEVEL " << level.size());
+            LOG(LM_DEBUG, "LEVEL " << level.size());
             negate = not level.empty() and level.top().invert();
           }
           break;
@@ -1114,7 +1114,7 @@ bool MongoDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase &
   BsonOut bo(mobs::ConvObjToString().exportExtended());
   bo.withVersionField = true;
   obj.traverseKey(bo);
-  LOG(LM_INFO, "VERSION IS " << bo.version);
+  LOG(LM_DEBUG, "VERSION IS " << bo.version);
   if (bo.version == 0)
     THROW(u8"destroy Object version = 0 cannot destroy");
   LOG(LM_DEBUG, "DESTROY " << dbi.database() << "." << collectionName(obj) << " " <<  bo.result());
@@ -1141,7 +1141,7 @@ bool MongoDatabaseConnection::destroy(DatabaseInterface &dbi, const ObjectBase &
 
 void MongoDatabaseConnection::dropAll(DatabaseInterface &dbi, const ObjectBase &obj) {
   open();
-  LOG(LM_DEBUG, "DROP COLLECTOION " << dbi.database() << "." << collectionName(obj));
+  LOG(LM_DEBUG, "DROP COLLECTION " << dbi.database() << "." << collectionName(obj));
 
   mongocxx::database db = entry->client()[dbi.database()];
   db[collectionName(obj)].drop();
@@ -1294,7 +1294,7 @@ void MongoDatabaseConnection::endTransaction(DbTransaction *transaction, std::sh
       return;
     }
   }
-//  throw std::runtime_error("endTransaction missing TransactinInfo");
+//  throw std::runtime_error("endTransaction missing TransactionInfo");
 }
 
 void MongoDatabaseConnection::rollbackTransaction(DbTransaction *transaction, std::shared_ptr<TransactionDbInfo> &tdb) {
@@ -1306,7 +1306,7 @@ void MongoDatabaseConnection::rollbackTransaction(DbTransaction *transaction, st
       return;
     }
   }
-//  throw std::runtime_error("rollbackTransaction missing TransactinInfo");
+//  throw std::runtime_error("rollbackTransaction missing TransactionInfo");
 }
 
 size_t MongoDatabaseConnection::maxAuditChangesValueSize(const DatabaseInterface &dbi) const {

@@ -131,7 +131,7 @@
  \endcode
  Sortierung ist über \c mobs::QueryOrder möglich; komplexe Queries könne über \c mobs::QueryGenerator erzeugt werden.
 
- Um Objekte direkt lesen und Schreiben zu können muss ein Primärschlüsse im Objekt definiert werden:
+ Um Objekte direkt lesen und Schreiben zu können muss ein Primärschlüssel im Objekt definiert werden:
  \code
     MemVar(int,  kundennr, KEYELEMENT1);  // int Membervariable kundennr
  \endcode
@@ -442,7 +442,7 @@ public:
   friend class ObjectBase;
   template <class T>
   friend class MemberVector;
-  /// Konstatnte, die auf das nächste Element eines MenBaseVectors verweist, das dann automatisch erzeugt wird
+  /// Konstante, die auf das nächste Element eines MenBaseVectors verweist, das dann automatisch erzeugt wird
   static const size_t nextpos = INT_MAX;
   /// \private
   MemBaseVector(const std::string& n, ObjectBase *obj, const std::vector<MemVarCfg>& cv) : m_name(n), m_parent(obj)
@@ -488,7 +488,7 @@ public:
   inline const ObjectBase *getParentObject() const { return m_parent; }
   /// Abfrage gesetzter  Attribute
   MemVarCfg hasFeature(MemVarCfg c) const;
-  /// Abfrage der ursrünglichen Vectorsize (Audit Trail)
+  /// Abfrage der ursprünglichen Vectorsize (Audit Trail)
   size_t getInitialSize() const { return m_oldSize; }
   /// Ausgabe der Vector-Elemente als String
   std::string to_string(const ConvObjToString& cth) const;
@@ -523,6 +523,7 @@ class ObjectBase : public NullValue {
   friend class MemberVector;
   friend class DatabaseInterface;
 protected:
+  /// \private
   ObjectBase(std::string n, ObjectBase *obj, const std::vector<MemVarCfg>& cv ) : m_varNam(std::move(n)), m_parent(obj) { for (auto c:cv) doConfig(c); } // Konstruktor for MemObj
   /// \private
   ObjectBase(MemBaseVector *m, ObjectBase *o, const std::vector<MemVarCfg>& cv) : m_varNam(""), m_parent(o), m_parVec(m) { for (auto c:cv) doConfig(c); } // Konstruktor for Vector
@@ -596,7 +597,7 @@ public:
   /// @param parent  Zeiger auf Parent des Objektes, immer \c nullptr, wird nur intern verwendet
   /// @return Zeiger auf das erzeugte Objekt oder \c nullptr falls ein solches Objekt nicht registriert wurde \see ObjRegister(name)
   static ObjectBase *createObj(const std::string& name, ObjectBase *parent = nullptr);
-  /// Setze Inhalt auf leer, d.h. alle Vektoren sowie Unterobjekte und Varieblen werden gelöscht,
+  /// Setze Inhalt auf leer, d.h. alle Vektoren sowie Unterobjekte und Variablen werden gelöscht,
   void clear();
   /// Setze Inhalt auf null
   void forceNull() { clear(); setNull(true);}
@@ -768,7 +769,7 @@ public:
   bool is_chartype(const ConvToStrHint &cth) const override { return this->c_is_chartype(cth); }
   /// Einlesen der Variable aus einem \c std::string im Format UTF-8
   bool fromStr(const std::string &sin, const ConvFromStrHint &cfh) override { doAudit(); if (this->c_string2x(sin, wert, cfh)) { activate(); return true; } return false; }
-  /// Einlesenen der Variablen aus einem String im erweiterten Modus
+  /// Einlesen der Variablen aus einem String im erweiterten Modus
   /// \throw runtime_error bei Konvertierungsfehler
   void fromStrExplizit(const std::string &sin)  { if (not fromStr(sin, ConvFromStrHint::convFromStrHintExplizit)) throw std::runtime_error("fromStrExplizit input error"); }
   /// Einlesen der Variable aus einem \c std::wstring
@@ -803,7 +804,7 @@ public:
 
   /** \brief Erzeuge eine Query-Bedingung: MemberVariable == "Konstante"
    *
-   * Ist äquivalent zu Qi("=", valuee)
+   * Ist äquivalent zu Qi("=", value)
    * @param value Vergleichswert vom Typ der Membervariablen
    * @return QueryInfo für QueryGenerator::operator<<()
    */
@@ -811,7 +812,7 @@ public:
 
   /** \brief Erzeuge eine Query-Bedingung: MemberVariable == "Konstante"
    *
-   * Ist äquivalent zu Qi("=", valuee)
+   * Ist äquivalent zu Qi("=", value)
    * @param value Vergleichswert vom Typ der Membervariablen
    * @return QueryInfo für QueryGenerator::operator<<()
    */
@@ -1112,7 +1113,7 @@ public:
   virtual bool doArrayBeg(MemBaseVector &vec) = 0;
   /// Callbackfunktion, die bei Verlassen eines Arrays aufgerufen wird
   virtual void doArrayEnd(MemBaseVector &vec) = 0;
-  /// Callbackfunktion, die bei einer Varieblen aufgerufen wird
+  /// Callbackfunktion, die bei einer Variablen aufgerufen wird
   virtual void doMem(MemberBase &mem) = 0;
   /// Zeigt an, ob gerade ein Array durchlaufen wird
   bool inArray() const { return m_arrayIndex != SIZE_MAX; }
@@ -1146,7 +1147,7 @@ public:
   virtual bool doArrayBeg(const MemBaseVector &vec) = 0;
   /// Callbackfunktion, die bei Verlassen eines Arrays aufgerufen wird
   virtual void doArrayEnd(const MemBaseVector &vec) = 0;
-  /// Callbackfunktion, die bei einer Varieblen aufgerufen wird
+  /// Callbackfunktion, die bei einer Variablen aufgerufen wird
   virtual void doMem(const MemberBase &mem) = 0;
   /// Zeigt an, ob gerade ein Array durchlaufen wird
   bool inArray() const { return m_arrayIndex != SIZE_MAX; }
@@ -1175,6 +1176,10 @@ private:
 class ObjVisitor {
 public:
   virtual ~ObjVisitor() = default;
+  /**\brief Aufruf für Visitor
+   *
+   * @param obj zu Besuchendes Objekt
+   */
   virtual void visit(ObjectBase &obj) = 0;
 };
 
@@ -1182,6 +1187,10 @@ public:
 class ObjVisitorConst {
 public:
   virtual ~ObjVisitorConst() = default;
+  /**\brief Aufruf für Visitor
+   *
+   * @param obj zu Besuchendes Objekt
+   */
   virtual void visit(const ObjectBase &obj) = 0;
 };
 

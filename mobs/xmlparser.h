@@ -505,6 +505,7 @@ public:
    * @return Level 1 = root
    */
   size_t currentLevel() const { return tags.size(); };
+  /// liefert aktuellen Namespace
   std::string currentXmlns() const { return tags.empty() ? "" : tags.top().xmlns; };
 
   /** \brief Callback-Function: Ein Tag ohne Inhalt, impliziert EndTag(..)

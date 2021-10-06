@@ -49,18 +49,17 @@ class CryptBufAesData;
  */
 class CryptBufAes : public CryptBufBase {
 public:
-  using Base = std::basic_streambuf<char>;
-  using char_type = typename Base::char_type;
-  using Traits = std::char_traits<char_type>;
-  using int_type = typename Base::int_type;
+  using Base = std::basic_streambuf<char>; ///< Basis-Typ
+  using char_type = typename Base::char_type;  ///< Element-Typ
+  using Traits = std::char_traits<char_type>; ///< Traits-Typ
+  using int_type = typename Base::int_type; ///< zugehöriger int-Typ
 
   /** \brief Konstruktor für Verschlüsselung mit AES-256
    *
-   * Es wird die Verschlüsselungsmethode aes-256-cb mit sha1 gehashter Passphrase verwendet
+   * Es wird die Verschlüsselungsmethode aes-256-cbc mit sha1 gehashter Passphrase verwendet
    * es wird das Prefix "SALTED__" und ein 8-Zeichen Salt vorangestellt
    * @param pass Passwort
    * @param id Id des Empfängers (falls für Export benötigt)
-   * @param writeIV schreibe IV zu Beginn des Ausgabestroms
    */
   explicit CryptBufAes(const std::string &pass, const std::string &id = "");
   /** \brief Konstruktor für Verschlüsselung mit AES-256 und passphrase
@@ -118,7 +117,7 @@ public:
    */
   std::string hashStr() const;
 
-    /// \private
+  /// \private
   int_type overflow(int_type ch) override;
   /// \private
   int_type underflow() override;
@@ -126,6 +125,7 @@ public:
   /// \private
   void finalize() override;
 
+  /// Ausgabe des Salt-Prefixes
   void openSalt();
 
 protected:
@@ -141,7 +141,7 @@ private:
 
 /** \brief verschlüsselt einen String mit AES und gibt ihn Base64 aus
  *
- * Es wird die Verschlüsselungsmethode aes-256-cb mit sha1 gehashter Passphrase verwendet
+ * Es wird die Verschlüsselungsmethode aes-256-cbc mit sha1 gehashter Passphrase verwendet
  * @param s zu verschlüsselnder Text
  * @param pass Passphrase
  * @return verschlüsselter Text in base64
@@ -150,7 +150,7 @@ std::string to_aes_string(const std::string &s, const std::string &pass);
 
 /** \brief entschlüsselt einen base64-codierten Text
  *
- * Es wird die Verschlüsselungsmethode aes-256-cb mit sha1 gehashter Passphrase verwendet
+ * Es wird die Verschlüsselungsmethode aes-256-cbc mit sha1 gehashter Passphrase verwendet
  * @param s zu entschlüsselnder Text in base64
  * @param pass Passphrase
  * @return Klartext

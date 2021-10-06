@@ -47,11 +47,11 @@ private:
   static WinSock *winSock;
 };
 
-typedef SOCKET socketHandle;
+typedef SOCKET socketHandle; ///< Systemunabhängiger typ eines TCP-Sockets
 const socketHandle invalidSocket = INVALID_SOCKET;
 #else
-typedef int socketHandle;
-const socketHandle invalidSocket = -1;
+typedef int socketHandle; ///< Systemunabhängiger typ eines TCP-Sockets
+const socketHandle invalidSocket = -1; ///< Konstante für uninitialisierten TCP-Socket
 #endif
 
 /** \brief Klasse um eine passive TCP-Verbindung zu öffnen
@@ -63,7 +63,7 @@ public:
   /** \brief öffnet eine Port, um eine TCP-Verbindung anzunehmen \see mobs::tcpstream
    *
    * @param service TCP-Port
-   * @return socketHandle (betriebssystemabhängig) invalidSocket im Fehlerfall
+   * @return socketHandle (Betriebssystem abhängig) invalidSocket im Fehlerfall
    */
   socketHandle initService(const std::string &service);
 
@@ -77,10 +77,10 @@ class TcpStBufData;
 /// streambuffer für TCP-Verbindungen
 class TcpStBuf : public std::basic_streambuf<char> {
 public:
-  using Base = std::basic_streambuf<char>;
-  using char_type = typename Base::char_type;
-  using Traits = std::char_traits<char_type>;
-  using int_type = typename Base::int_type;
+  using Base = std::basic_streambuf<char>; ///< Basis-Typ
+  using char_type = typename Base::char_type; ///< Element-Typ
+  using Traits = std::char_traits<char_type>; ///< Traits-Typ
+  using int_type = typename Base::int_type; ///< zugehöriger int-Typ
 
   /// default Konstruktor
   TcpStBuf();
@@ -90,7 +90,7 @@ public:
    * Es wird eine mobs::TcpAccept Klasse benötigt, deren eingehende Verbindung angenommen wird.
    * Der Aufruf blockiert, bis eine Verbindung eingeht
    */
-  TcpStBuf(TcpAccept &accept);
+  explicit TcpStBuf(TcpAccept &accept);
 
   /** \brief Konstruktor für TCP-Verbindung
    *
@@ -164,7 +164,7 @@ public:
    * Der Aufruf blockiert, bis eine Verbindung eingeht
    * @param accept Initialisierter mobs::TcpAccept
    */
-  tcpstream(TcpAccept &accept);
+  explicit tcpstream(TcpAccept &accept);
 
   /** \brief Konstruktor für TCP-Verbindung
    *

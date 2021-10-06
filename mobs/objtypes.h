@@ -49,7 +49,7 @@ typedef unsigned long u_long;
  \brief Definitionen von Konvertierungsroutinen von und nach std::string */
 
 /**
- \brief Deklaration einses \c enum
+ \brief Deklaration eines \c enum
  
  Im Beispiel wird ein enum direction {Dleft, Dright, Dup, Ddown};
  deklariert. Zusätzlich wird eine Konvertierungsklasse \c directionStrEnumConv sowie eine weitere Hilfsklasse erzeugt.
@@ -431,7 +431,7 @@ class ConvToStrHint {
 public:
   ConvToStrHint() = delete;
   /// Konstruktor
-  /// @param print_compact führt bei einigen Typen zur vereinfachten Ausgabe als ganzahliger Wert
+  /// @param print_compact führt bei einigen Typen zur vereinfachten Ausgabe als ganzzahliger Wert
   /// @param altNames verwende alternative Namen wenn Vorhanden
   /// @param pfix verwende den Prefix vor dem Namen, falls vorhanden
   /// @param lowercase wandelt den Namen in Kleinbuchstaben
@@ -481,6 +481,7 @@ class CryptBufBase;
 /// Ausgabeformat für \c to_string() Methode von Objekten
 class ConvObjToString : virtual public ConvToStrHint {
 public:
+  /// Funktionssignatur für die Crypto-Funktion
   using EncrypFun = std::function<mobs::CryptBufBase*()>;
   ConvObjToString() : ConvToStrHint(false) {}
   /// \private
@@ -535,6 +536,7 @@ private:
 /// Konfiguration für \c string2Obj
 class ConvObjFromStr : virtual public ConvFromStrHint {
 public:
+  /// Funktionssignatur für die Crypto-Funktion
   using DecrypFun = std::function<mobs::CryptBufBase*(const std::string &algorithm, const std::string &keyName)>;
   /// Enums für Behandlung NULL-Werte
   enum Nulls { ignore, omit, clear, force, except };
@@ -553,7 +555,7 @@ public:
   /// werfe eine Exception bei unbekannter Variable
   virtual bool exceptionIfUnknown() const { return exceptUnk; };
   /// Groß-/Kleinschreibung ignorieren
-  virtual bool caseinsensitive() const { return ignCase; };
+  virtual bool caseInsensitive() const { return ignCase; };
   /// Null-Werte behandeln
   virtual enum Nulls nullHandling() const { return null; };
   /// \private
@@ -650,10 +652,11 @@ template<> bool from_number(uint64_t, unsigned long int &t);
 template<> bool from_number(uint64_t, unsigned long long int &t);
 template<> bool from_number(uint64_t, bool &t);
 
-/// Infos zum aktuellen Wert, wenn dieser als Zahl darstellbar ist.
-///
-/// Der Inhalt ist unabhängig vo Zustand \c isNull und hängt nur vom definierten Datentyp ab
-/// bei \c bool ist \c isUnsigned gesetzt und max = 1
+/** \brief Infos zum aktuellen Wert, wenn dieser als Zahl darstellbar ist.
+ *
+ * Der Inhalt ist unabhängig vo Zustand \c isNull und hängt nur vom definierten Datentyp ab
+ * bei \c bool ist \c isUnsigned gesetzt und max = 1
+ */
 class MobsMemberInfo {
 public:
   bool isUnsigned = false; ///< hat Wert von typ \c signed, i64, min und max sind gesetzt
@@ -670,8 +673,8 @@ public:
   int64_t min = 0; ///< Minimalwert des Datentyps
   uint64_t max = 0; ///< Maximalwert des Datentyps
   uint64_t granularity = 0; ///< Körnung des Datentyps nur bei \c isTime; 1 = Mikrosekunden
-  const void *blob = nullptr;
-  double d = 0.0;
+  const void *blob = nullptr; ///< Inhalt des Wertes wenn isBlob
+  double d = 0.0; ///< Inhalt des Wertes wenn isFloat
   unsigned int size = 0; ///< sizeof wenn is_specialized
   /// fülle ein Time-Struct mit local time (nur wenn isTime == true)
   void toLocalTime(struct ::tm &ts) const;
@@ -721,6 +724,11 @@ public:
 
 /// Interne Struktur zur Ablage von Query-Informationen
 struct QueryInfo {
+  /** Konstruktor
+   *
+   * @param mem Zeiger aud MobsMenberVariable
+   * @param oper Zeiger auf Oerator z.B. "<=" oder "IN"
+   */
   QueryInfo(const MemberBase *mem, const char *oper) : mem(mem), op(oper) { }
   const MemberBase *mem;  ///< Zeiger aud MobsMenberVariable
   const char *op;         ///< Zeiger auf Oerator z.B. "<=" oder "IN"
