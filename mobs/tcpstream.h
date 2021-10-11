@@ -122,7 +122,7 @@ public:
   void shutdown(std::ios_base::openmode which);
 
   /// prüfe status
-  bool poll(unsigned int which = std::ios_base::in | std::ios_base::out) const;
+  bool poll(std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) const;
 
   /// Rückgabe ob Verbindung offen
   bool is_open() const;
