@@ -26,7 +26,6 @@
 #include <mutex>
 #include <sys/types.h>
 #ifdef __MINGW32__
-#include <winsock2.h>
 #include <windows.h>
 #include <ws2tcpip.h>
 #else
@@ -34,10 +33,10 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/ip.h>
+#include <sys/poll.h>
 #endif
 #include <unistd.h>
 #include <cstring>
-#include <sys/poll.h>
 
 static std::string hostIp(const struct sockaddr &sa, socklen_t len)
 {
@@ -306,8 +305,12 @@ bool TcpStBuf::poll(std::ios_base::openmode which) const {
     pf.events += POLLIN;
   if (which & std::ios_base::out)
     pf.events += POLLOUT;
+#ifdef __MINGW32__
+  auto res = WSAPoll(&pf, 1, 0);
+#else
   auto res = ::poll(&pf, 1, 0);
-  if (res < 0) {
+#endif
+  if (res == SOCKET_ERROR) {
     LOG(LM_ERROR, "poll error " << errno);
     data->bad = true;
   } else if (pf.revents & (POLLERR | POLLHUP | POLLNVAL)) {
