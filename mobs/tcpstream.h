@@ -29,6 +29,9 @@
 
 #include <iostream>
 #ifdef __MINGW32__
+// für poll muss _WIN32_WINNT >= 0x0601 sein entspricht Win 7
+#undef _WIN32_WINNT
+#define _WIN32_WINNT  0x0601
 #include <winsock2.h>
 #endif
 
