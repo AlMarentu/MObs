@@ -454,6 +454,8 @@ public:
   virtual void traverse(ObjTravConst &trav) const = 0;
   /// Starte Traversierung eines einzelnen Elementes
   virtual void traverseSingle(ObjTravConst &trav, size_t index) const = 0;
+  /// Starte Traversierung eines leeren temporären Elementes
+  void traverseElement(ObjTravConst &trav) const { return traverseSingle( trav, SIZE_MAX - 1); };
   /// \private
   void traverseKey(ObjTravConst &trav) const;
   /// liefert die Anzahl der Elemente
@@ -1320,14 +1322,18 @@ void MemberVector<T>::traverseSingle(ObjTravConst &trav, size_t index) const
   trav.m_inNull = false;
   trav.m_keyMode = false;
   if (trav.doArrayBeg(*this)) {
-      if (index < size()) {
-        trav.m_arrayIndex = index;
-        operator[](index).traverse(trav);
-      }
-    }
-  trav.m_inNull = false;
-  trav.m_arrayIndex = SIZE_MAX;
-  trav.doArrayEnd(*this);
+    trav.m_arrayIndex = index;
+    if (index == SIZE_MAX - 1)
+    {
+      T *w = new T(const_cast<MemberVector<T> *>(this), m_parent, m_c);
+      w->traverse(trav);
+      delete w;
+    } else if (index < size())
+      operator[](index).traverse(trav);
+    trav.m_arrayIndex = SIZE_MAX;
+    trav.m_inNull = false;
+    trav.doArrayEnd(*this);
+  }
 }
 
 template<class T>

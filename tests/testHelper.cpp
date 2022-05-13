@@ -592,5 +592,21 @@ TEST(helperTest, sqlBig) {
 }
 
 
+TEST(helperTest, xsd) {
+  ObjA2 o;
+  EXPECT_EQ(R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" targetNamespace="urn:dings:bums" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:complexType name="ObjA2Type">
+    <xs:sequence>
+      <xs:element type="xs:integer" name="k2kk"/>
+      <xs:element type="xs:string" name="s2s"/>
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>
+)",
+            mobs::generateXsd(o, "urn:dings:bums"));
+}
+
+
 
 }

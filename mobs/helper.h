@@ -288,6 +288,13 @@ private:
  */
 std::string convLikeToRegexp(const std::string &like);
 
+/** \brief  Ausgabe des XML Schemas zu einem Objekt
+ *
+ * @param obj zu analysierendes Objekt
+ * @param nameSpace Default-Namespace des XML-Schemas
+ * @return XML Schema
+ */
+std::string generateXsd(const ObjectBase &obj, const std::string &nameSpace);
 
 }
 
