@@ -114,10 +114,14 @@ public: \
   static inline std::string c_to_string(const typ &t, const mobs::ConvToStrHint &cth) { return cth.compact() ? mobs::to_string(int(t)) : toStr(t); } \
   static inline std::wstring c_to_wstring(const typ &t, const mobs::ConvToStrHint &cth) { return cth.compact() ? mobs::to_wstring(int(t)) : mobs::to_wstring(toStr(t)); }; \
   static inline bool c_is_chartype(const mobs::ConvToStrHint &cth) { return not cth.compact(); } \
-  static inline bool c_is_mobsEnmum() { return true; } \
+  static inline bool c_is_mobsEnum() { return true; } \
   static inline typ c_empty() { return mobsEnum_##typ##_define::toEnum(0); } \
   static inline bool c_from_uint(uint64_t u, typ &t) { t = typ(u); return true; } \
-  static inline uint64_t c_max() { return INT_MAX; } \
+  static inline uint64_t c_max() { \
+     static const std::vector<std::string> v = { __VA_ARGS__ };\
+     if (v.empty())  throw std::runtime_error("enum " #typ ": is empty"); \
+     return v.size() -1; }       \
+  static std::string c_to_str(int i) { return toStr((enum typ)i); }  \
 }
 
 
@@ -676,6 +680,7 @@ public:
   const void *blob = nullptr; ///< Inhalt des Wertes wenn isBlob
   double d = 0.0; ///< Inhalt des Wertes wenn isFloat
   unsigned int size = 0; ///< sizeof wenn is_specialized
+  std::string (* eToStr)(int) = nullptr;
   /// fülle ein Time-Struct mit local time (nur wenn isTime == true)
   void toLocalTime(struct ::tm &ts) const;
   /// fülle ein Time-Struct mit gmt (nur wenn isTime == true)
@@ -796,6 +801,8 @@ public:
   static bool c_from_mtime(int64_t i, T &t) { return false; }
   /// Einlesen von MTime
   static bool c_to_mtime(T t, int64_t &) { return false; }
+  /// Ausgabe enum als string
+  static std::string c_to_str(int) { return {}; }
 };
 
 template <typename T>

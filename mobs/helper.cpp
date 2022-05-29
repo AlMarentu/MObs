@@ -1761,6 +1761,8 @@ public:
   };
   void doMem(const MemberBase &mem) override
   {
+    bool useSimlpeType = false;
+    size_t sLen = 0;
     bool compact = cth.compact();
     if (mem.is_chartype(cth) and mem.hasFeature(mobs::DbCompact))
       compact = true;
@@ -1768,33 +1770,86 @@ public:
     mem.memInfo(mi);
     mi.changeCompact(compact);
     wstring type;
-    if (mi.isUnsigned and mi.max == 1)
+//    if (mi.hasCompact)
+//      xw.writeComment(L"COMP", true);
+    if (mi.isEnum) {
+      type = L"xs:NMTOKEN";
+      useSimlpeType = true;
+    }
+    else if (mi.isUnsigned and mi.max == 1)
       type = L"xs:bool";
     else if (mi.isSigned or mi.isUnsigned)
       type = L"xs:integer";
-    else if (mi.isTime)
-      type = L"xs:time";
     else if (mi.isTime)
       type = mi.granularity >= 86400000000 ? L"xs:date" : L"xs:time";
     else if (mi.isFloat)
       type = L"xs:float";
     else
+    {
       type = L"xs:string";
+      MemVarCfg c = mem.hasFeature(LengthBase);
+      if (c) {
+        sLen = (c - LengthBase);
+        useSimlpeType = true;
+      }
+    }
 
     if (sequence and not mem.hasFeature(MemVarCfg::XmlAsAttr)) {
       xw.writeTagBegin(L"element");
-      xw.writeAttribute(L"type", type);
+      if (not useSimlpeType)
+        xw.writeAttribute(L"type", type);
       xw.writeAttribute(L"name", to_wstring(mem.getName(cth)));
       if (inarray) {
         xw.writeAttribute(L"maxOccurs", L"unbounded");
         xw.writeAttribute(L"minOccurs", L"0");
       }
+      if (useSimlpeType) {
+        xw.writeTagBegin(L"simpleType");
+        xw.writeTagBegin(L"restriction");
+        xw.writeAttribute(L"base", type);
+        if (mi.isEnum) {
+          for (int i = 0; i <= mi.max; i++) {
+            auto s = mi.eToStr(i);
+            xw.writeTagBegin(L"enumeration");
+            xw.writeAttribute(L"value", to_wstring(s));
+            xw.writeTagEnd();
+          }
+        }
+        else if (sLen > 0) {
+          xw.writeTagBegin(L"maxLength");
+          xw.writeAttribute(L"value", to_wstring(sLen));
+          xw.writeTagEnd();
+        }
+        xw.writeTagEnd();
+        xw.writeTagEnd();
+      }
       xw.writeTagEnd();
     }
     if (attribute and mem.hasFeature(MemVarCfg::XmlAsAttr)) {
       xw.writeTagBegin(L"attribute");
-      xw.writeAttribute(L"type", type);
+      if (not useSimlpeType)
+        xw.writeAttribute(L"type", type);
       xw.writeAttribute(L"name", to_wstring(mem.getName(cth)));
+      if (useSimlpeType) {
+        xw.writeTagBegin(L"simpleType");
+        xw.writeTagBegin(L"restriction");
+        xw.writeAttribute(L"base", type);
+        if (mi.isEnum) {
+          for (int i = 0; i <= mi.max; i++) {
+            auto s = mi.eToStr(i);
+            xw.writeTagBegin(L"enumeration");
+            xw.writeAttribute(L"value", to_wstring(s));
+            xw.writeTagEnd();
+          }
+        }
+        else if (sLen > 0) {
+          xw.writeTagBegin(L"maxLength");
+          xw.writeAttribute(L"value", to_wstring(sLen));
+          xw.writeTagEnd();
+        }
+        xw.writeTagEnd();
+        xw.writeTagEnd();
+      }
       xw.writeTagEnd();
     }
     if (mem.isNull() and cth.omitNull())

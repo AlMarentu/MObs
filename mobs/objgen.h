@@ -1072,6 +1072,8 @@ void Member<T, C>::memInfo(MobsMemberInfo &i, const T &value) const
     i.size = sizeof(T);
   i.isBlob = this->c_is_blob();
   i.isEnum = this->c_is_mobsEnum();
+  if (i.isEnum)
+    i.eToStr = C::c_to_str;
   i.granularity = this->c_time_granularity();
   if (i.isBlob)
     i.isBlob = C::c_to_blob(value, i.blob, i.u64);
