@@ -163,8 +163,8 @@ public:
 #ifdef __MINGW32__
     WinSock::get();
 #endif
-    struct addrinfo hints, *res, *res0;
-    memset(&hints, 0, sizeof(hints));
+    struct addrinfo hints{};
+    struct addrinfo *res, *res0;
     hints.ai_family = PF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     if (auto error = getaddrinfo(host.c_str(), service.c_str(), &hints, &res0)) {
@@ -204,20 +204,20 @@ public:
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, parp, sizeof(i));
   }
 
-  std::streamsize readBuf() {
+  std::streamsize readBuf(bool nowait) {
     if (fd == invalidSocket or bad)
       return 0;
-    auto res = recv(fd, &rdBuf[0], int(rdBuf.size()), MSG_NOSIGNAL); // immer < INT_MAX
+    //LOG(LM_DEBUG, "TcpBuffer::underflow " << (nowait ? "NOWAIT":"WAIT"));
+    auto res = recv(fd, &rdBuf[0], int(rdBuf.size()), MSG_NOSIGNAL | (nowait? MSG_DONTWAIT: 0)); // immer < INT_MAX
+    //LOG(LM_DEBUG, "TcpBuffer::underflow Done " << res << "/" << rdBuf.size());
     if (res < 0) {
-      LOG(LM_ERROR, "read error " << errno << " " << strerror(errno));
-      bad = true;
+      if (not nowait or errno != EAGAIN) {
+        LOG(LM_ERROR, "read error " << errno << " " << strerror(errno));
+        bad = true;
+      }
       return 0;
     }
-//    if (res < 200)
-//      LOG(LM_DEBUG, "READ TCP " << res << " " << std::string(&rdBuf[0], res));
-//    else
-//      LOG(LM_INFO, "READ TCP " << res << " " << std::string(&rdBuf[0], 100) << " ... " << std::string(&rdBuf[res-100], 100));
-//    LOG(LM_DEBUG, "READ TCP " << res);
+    //LOG(LM_DEBUG, "TcpStream read " << res << " soll " << rdBuf.size());
     rdPos += TcpStBuf::off_type(res);
     return res;
   }
@@ -250,6 +250,14 @@ public:
 
   std::string getRemoteIp() const {
     return hostIp((sockaddr &)remoteAddr, addrLen);
+  }
+
+  bool setTOS(int tos) const {
+    if (setsockopt(fd, IPPROTO_IP, IP_TOS, &tos, sizeof(tos)) < 0) {
+      LOG(LM_ERROR, "setTOS IP_TOS " << strerror(errno));
+      return false;
+    }
+    return true;
   }
 
 
@@ -336,9 +344,27 @@ TcpStBuf::int_type TcpStBuf::overflow(TcpStBuf::int_type ch) {
   return ch;
 }
 
+std::streamsize TcpStBuf::showmanyc() {
+  TRACE("");
+  if (bad() or not is_open())
+    return -1;
+  auto sz = data->readBuf(true);
+  if (bad())
+    return -1;
+  Base::setg(&data->rdBuf[0], &data->rdBuf[0], &data->rdBuf[sz]);
+//  if (not Traits::eq(delimiter, Traits::eof())) {
+//    auto pos = std::find(gptr(), egptr(),  delimiter);
+//    if (pos != egptr() and pos != gptr()) { // als erstes Zeichen erlaubt
+//      sz = std::distance(gptr(), pos);
+//      LOG(LM_DEBUG, "Found Delimiter size " << sz);
+//    }
+//  }
+  return sz;
+}
+
 TcpStBuf::int_type TcpStBuf::underflow() {
   TRACE("");
-  auto sz = data->readBuf();
+  auto sz = data->readBuf(false);
   Base::setg(&data->rdBuf[0], &data->rdBuf[0], &data->rdBuf[sz]);
   if (sz == 0)
     return Traits::eof();
@@ -408,6 +434,10 @@ std::string TcpStBuf::getRemoteHost() const {
 
 std::string TcpStBuf::getRemoteIp() const {
   return data->getRemoteIp();
+}
+
+bool TcpStBuf::setTOS(int tos) const {
+  return data->setTOS(tos);
 }
 
 
@@ -483,6 +513,11 @@ std::string tcpstream::getRemoteIp() const {
   return tp->getRemoteIp();
 }
 
+bool tcpstream::setTOS(int tos) const {
+  auto *tp = dynamic_cast<TcpStBuf *>(rdbuf());
+  if (not tp) THROW("bad cast");
+  return tp->setTOS(tos);
+}
 
 #ifdef __MINGW32__
 

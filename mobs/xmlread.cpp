@@ -210,6 +210,7 @@ bool XmlReader::eof() const { return data->eof(); }
 bool XmlReader::eot() const { return data->eot(); }
 void XmlReader::stop() { data->stop(); }
 void XmlReader::readTillEof(bool s) { data->readTillEof(s); }
+void XmlReader::readNonBlocking(bool s) { data->readNonBlocking(s); };
 size_t XmlReader::level() const { return data->currentLevel(); }
 std::wistream &XmlReader::getIstr() { return data->getIstr(); }
 

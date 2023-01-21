@@ -88,7 +88,7 @@ public:
 CryptIstrBuf::CryptIstrBuf(std::istream &istr, CryptBufBase *cbbp) : Base() {
   TRACE("");
   data = new CryptIstrBufData(istr, cbbp);
-  // Buffer zu beginn leer
+  // Buffer zu Beginn leer
   Base::setg(data->buffer.begin(), data->buffer.begin(), data->buffer.begin());
 }
 
@@ -116,15 +116,18 @@ CryptIstrBuf::int_type CryptIstrBuf::underflow() {
       std::streamsize rd = buf.size();
       auto av = data->cbb->in_avail();
       if (av == 0) {
-        if (data->cbb->underflow() != CryptBufBase::Traits::eof())
-          av = data->cbb->in_avail();
+        // evt. auf neue Zeichen warten
+        if (data->cbb->underflow() == EOF )
+          return Traits::eof();
+        av = data->cbb->in_avail();
       }
-      if (av > 0) {
+      if (av > 0 and av < rd) {
         rd = av;
-        LOG(LM_DEBUG, "READSOME CIB " << av);
+        //LOG(LM_DEBUG, "READSOME CIB " << av);
       }
       sz = data->cbb->sgetn(&buf[0], rd);
     } else {
+      LOG(LM_DEBUG, "READ ohne cbb");
       if (data->inStb.eof())
         return Traits::eof();
       std::istream::sentry sen(data->inStb, true);
@@ -214,6 +217,12 @@ CryptBufBase *CryptIstrBuf::getCbb() {
 
 std::istream &CryptIstrBuf::getIstream() {
   return data->inStb;
+}
+
+std::streamsize CryptIstrBuf::showmanyc() {
+  if (not data->cbb)
+    return -1;
+  return data->cbb->in_avail();
 }
 
 
@@ -468,17 +477,40 @@ public:
     }
   }
 
-  std::streamsize doRead(char *s, std::streamsize count)  {
+  std::streamsize canRead() const {
+    if (readLimit == 0)
+      return -1;
+    std::streamsize s = inStb->rdbuf()->in_avail();
+    if (s <= 0 and inStb->eof())
+      s = -1;
+    else if (use64 and s > 0) {
+      s = (s > 3) ? s / 4 * 3 : 0;
+    }
+    //LOG(LM_DEBUG, "CryptBuf::canRead  " << inStb->rdbuf()->in_avail() << "->" << s << " EOF " << inStb->eof());
+    if (readLimit > 0 and s > readLimit)
+      return readLimit;
+    return s;
+  }
+
+
+  // wird nie negativ
+  std::streamsize doRead(char *s, std::streamsize countIn)  {
+    LOG(LM_DEBUG, "doRead " << countIn << " B64 " <<  use64 << "." << " Limit " << readLimit);
     if (readLimit == 0)
       return 0;
     std::istream::sentry sen(*inStb, true);
     if (not sen)
       return 0;
+    auto av = inStb->rdbuf()->in_avail();
     if (use64) {
+      std::streamsize count = countIn;
       char *it = s;
       if (count > C_IN_BUF_SZ)
         count = C_IN_BUF_SZ;
       size_t c2 = count / 3 * 4;
+      if (av >= 4 and av < c2)
+        c2 = av / 4 * 4;
+      //LOG(LM_DEBUG, "READSOME64 " << c2 << " soll " << countIn / 3 * 4);
       std::array<char, C_IN_BUF_SZ / 3 * 4 + 1> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
       if (readLimit >= 0 and readLimit < c2)
         c2 = readLimit;
@@ -496,24 +528,35 @@ public:
           for (; b64Cnt < 4; b64Cnt++)
             b64get(u_char('='), it);
       }
-      LOG(LM_DEBUG, "CSB READ " << std::distance(s, it));
+      //LOG(LM_DEBUG, "CSB READ " << std::distance(s, it));
       return std::distance(s, it);
     }  else {
-      if (readLimit >= 0 and readLimit < count)
-        count = readLimit;
-      auto av = inStb->rdbuf()->in_avail();
-      if (av == 0 and readLimit < 0) {
-        LOG(LM_DEBUG, "READSOME at end");
-        inStb->peek();
-        av = inStb->rdbuf()->in_avail();
-      }
-//      LOG(LM_DEBUG, "READSOME " << av << " soll " << count);
-      if (av > 0 and av < count and readLimit == -1)
+      if (readLimit >= 0 and readLimit < countIn)
+        countIn = readLimit;
+      std::streamsize count = countIn;
+      if (av > 0 and av < count) //  and readLimit == -1
         count = av;
+      LOG(LM_DEBUG, "READSOME " << count << " soll " << countIn);
       std::streamsize n;
       if (Traits::eq(delimiter, Traits::eof())) {
         inStb->read(s, count);
         n = inStb->gcount();
+#if 1
+        if (n > 0 and n < countIn) { // wenn möglich nachfassen
+          av = inStb->rdbuf()->in_avail();
+          LOG(LM_DEBUG, "RSRS nachfasen " << av);
+          if (av > 0) {
+            if (av > countIn - n)
+              av = countIn -n;
+            inStb->read(s + n, av);
+            auto n2 = inStb->gcount();
+            if (n2 > 0)
+              n += n2;
+            else
+              LOG(LM_ERROR, "doRead gcount liefert " << n2);
+          }
+        }
+#endif
       } else {
         char d = Traits::to_char_type(delimiter);
         for (n = 0; n < count; n++,s++) {
@@ -525,16 +568,28 @@ public:
             break;
           }
         }
+#if 1
+        if (n == count and n < countIn) { // wenn möglich nachfassen
+          av = inStb->rdbuf()->in_avail();
+          LOG(LM_DEBUG, "RSRS nachfasen (delim) " << av);
+          if (av > 0) {
+            count += av;
+            if (count > countIn)
+              count = countIn;
+            for (; n < count; n++,s++) {
+              if (not inStb->get(*s).good())
+                break;
+              if (*s == d) {
+                LOG(LM_DEBUG, "delimiter found at " << n);
+                inStb->unget();
+                break;
+              }
+            }
+          }
+        }
+#endif
       }
 
-//      inStb->get(s, count, L'\0');
-//      std::streamsize n = inStb->readsome(s, count);
-//      if (n > 0) {
-//        LOG(LM_DEBUG, "READSOME " << n);
-//        if (readLimit >= 0)
-//          readLimit -= n;
-//        return n;
-//      }
       if (readLimit >= 0)
         readLimit -= n;
       return n;
@@ -636,9 +691,13 @@ void CryptBufBase::setIstr(std::istream &istr) {
   Base::setg(data->buffer.begin(), data->buffer.begin(), data->buffer.begin());
 }
 
+std::streamsize CryptBufBase::showmanyc()
+{
+  return data->canRead();
+}
+
 CryptBufBase::int_type CryptBufBase::underflow() {
   TRACE("");
-//  std::cout << "underflow\n";
   size_t sz = data->doRead(&data->buffer[0], data->buffer.size());
   Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[sz]);
 //  std::cout << "GC2 = " << sz << "  ";
@@ -704,9 +763,12 @@ std::streamsize CryptBufBase::doRead(char *s, std::streamsize count) {
   return data->doRead(s, count);
 }
 
+std::streamsize CryptBufBase::canRead() const {
+  return data->canRead();
+}
+
 int CryptBufBase::sync() {
   TRACE("");
-//  LOG(LM_INFO, "CryptBufBase::sync()");
   if (Base::pbase() != Base::pptr())
     overflow(Traits::eof());
   return data->isGood() ? 0: -1;
@@ -788,6 +850,10 @@ Base64IstBuf::int_type Base64IstBuf::underflow() {
   }
   inStb.unget();
   return Traits::eof();
+}
+
+std::streamsize Base64IstBuf::showmanyc() {
+  return inStb.rdbuf()->in_avail();
 }
 
 

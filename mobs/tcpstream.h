@@ -136,6 +136,14 @@ public:
   /// liefert remote ip bei passiver Verbindung
   std::string getRemoteIp() const;
 
+  /** \brief Setze Einstellungen für QoS des Streams
+   *
+   * benötiget include <netinet/ip.h>
+   * @param tos IPTOS_LOWDELAY, IPTOS_THROUGHPUT, IPTOS_RELIABILITY, IPTOS_MINCOST
+   * @return Erfolg
+   */
+  bool setTOS(int tos) const;
+
   /// Rückgabe ob Fehlerstatus
   bool bad() const;
 
@@ -149,8 +157,12 @@ protected:
   std::basic_streambuf<char>::pos_type seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which) override;
   /// \private
   int sync() override;
+  /// \private
+  std::streamsize showmanyc() override;
+
 private:
   TcpStBufData *data;
+
 };
 
 /** \brief iostream für TCP-Verbindungen
@@ -212,6 +224,14 @@ public:
    * \throws mobs::tcpstream::failure wen ioexceptions aktiviert und ein Fehler vorliegt
    */
   bool poll(std::ios_base::openmode which = std::ios_base::in | std::ios_base::out);
+
+  /** \brief Setze Einstellungen für QoS des Streams
+ *
+ * benötiget include <netinet/ip.h>
+ * @param tos IPTOS_LOWDELAY, IPTOS_THROUGHPUT, IPTOS_RELIABILITY, IPTOS_MINCOST
+ * @return Erfolg
+ */
+  bool setTOS(int tos) const;
 };
 
 

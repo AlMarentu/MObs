@@ -109,7 +109,7 @@ public:
   /** \brief setze Trennzeichen
    *
    * Über ein Trennzeichen, kann das Leseverhalten des Buffers gesteuert werden, so dass ein read_avail() nur bis zum
-   * Trenner liest. Der Delimiter wird zurückgeliefert immer zu Beginn der Folgeblocks geliefert
+   * Trenner liest. Der Delimiter wird immer zu Beginn der Folgeblocks zurückgeliefert
    * @param delim unsigned char des Trenners oder Traits::eof() für aus
    */
   void setReadDelimiter(char_type delim);
@@ -138,6 +138,8 @@ public:
 
 protected:
   /// \private
+  std::streamsize showmanyc() override;
+  /// \private
   int sync() override;
   /// \private
   std::streamsize xsputn( const char_type* s, std::streamsize count ) override;
@@ -145,6 +147,8 @@ protected:
   void doWrite( const char_type* s, std::streamsize count);
   /// \private
   std::streamsize doRead(char *s, std::streamsize count);
+  /// \private
+  std::streamsize canRead() const;
   /// \private
   bool isGood() const;
   /// \private
@@ -220,6 +224,9 @@ public:
   bool bad() const;
 
 protected:
+  std::streamsize showmanyc() override;
+
+protected:
 //  pos_type seekpos(pos_type pos, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override;
   /// \private
   pos_type seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which) override;
@@ -247,6 +254,9 @@ public:
 
   /// \private
   int_type underflow() override;
+
+protected:
+  std::streamsize showmanyc() override;
 
 private:
   std::wistream &inStb;

@@ -64,7 +64,10 @@ public:
   /// \see clearString
   explicit XmlWriter(charset c = CS_utf8, bool indent = true);
   ~XmlWriter();
-  /// Schreibe XML-Header, bei Files auch BOM
+  /** \brief Schreibe XML-Header, bei Files auch BOM
+   *
+   * Wiederholtes Aufrufen setzt den level wieder auf 0 und erzeugt einen neuen Header
+   */
   void writeHead();
   /// Schreibe eine Start-Tag
   void writeTagBegin(const std::wstring &tag);
@@ -102,6 +105,8 @@ public:
   void sync();
   /// ein Zeichen in den Ausgabe-Stream schreiben
   void putc(wchar_t c);
+  /// Tag-Stack aktualisieren (nach wiederholtem writeHead())
+  void pushTag(const std::wstring &tag);
 
   std::wstring valueToken; ///< Wenn nicht leer, dann als Attributname für Values verwenden
   std::wstring version = L"1.0"; ///< Version für Header
@@ -110,6 +115,7 @@ public:
 
 private:
   XmlWriterData *data;
+
 };
 
 
