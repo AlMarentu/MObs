@@ -129,6 +129,8 @@ public:
   void openSalt();
 
 protected:
+  std::streamsize showmanyc() override;
+
 //  virtual int sync() override;
 //  virtual std::streamsize xsputn( const char_type* s, std::streamsize count ) override;
 
@@ -136,6 +138,7 @@ private:
   CryptBufAesData *data;
 
   void ctxInit();
+  int underflowWorker(bool nowait);
 
 };
 
@@ -157,7 +160,6 @@ std::string to_aes_string(const std::string &s, const std::string &pass);
  * \throw runtime_error im Fehlerfall
  */
 std::string from_aes_string(const std::string &s, const std::string &pass);
-
 
 }
 

@@ -158,10 +158,17 @@ void XmlWriter::writeHead() {
   data->buffer << "<?xml";
   data->openEnd = true;
   data->inHeader = true;
+  data->level = 0;
+  data->elements = stack<wstring>();
   writeAttribute(L"version", version);
   writeAttribute(L"encoding", encoding);
   if (standalone)
     writeAttribute(L"standalone", L"yes");
+}
+
+void XmlWriter::pushTag(const std::wstring &tag) {
+  data->elements.push(tag);
+  data->level++;
 }
 
 void XmlWriter::writeTagBegin(const std::wstring &tag) {

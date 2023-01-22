@@ -62,11 +62,6 @@ namespace mobs {
  };
  \endcode
  */
-
-
-
-
-/// Einfacher XML-Parser - Basisklasse
 class XmlParser  {
 public:
   /*! Konstruktor der XML-Parser Basisklasse
@@ -435,6 +430,9 @@ private:
 
 
 
+
+class CryptBufBase;
+
 /** \class XmlParserW
 \brief  XML-Parser  der mit wstream arbeitet.
 Virtuelle Basisklasse mit Callback-Funktionen. Die Tags werden nativ geparst,
@@ -464,9 +462,6 @@ void ProcessingInstruction(const std::string &element, const std::string &attrib
 };
 \endcode
 */
-
-
-class CryptBufBase;
 
 class XmlParserW  {
   typedef std::char_traits<wchar_t> Traits;
@@ -561,7 +556,9 @@ public:
   virtual void EncryptionFinished() { }
 
   /// Einstellung: Lese bis EOF
-  void readTillEof(bool s) {  reedEof = s; }
+  void readTillEof(bool s) { reedEof = s; }
+  /// non blocking parsen
+  void readNonBlocking(bool s) { nonblocking = s; }
   /// ist beim Parsen das Ende der Datei erreicht
   bool eof() const { return endOfFile; }
   /// ist beim Parsen das letzte Tag erreicht
@@ -577,15 +574,18 @@ public:
   /// Starte den Parser
   void parse() {
     TRACE("");
+    paused = false;
     if (not running)
     {
+      if (nonblocking and not checkAvail(3)) {
+        paused = true;
+        return;
+      }
       std::locale lo1 = std::locale(istr.getloc(), new codec_iso8859_1);
       istr.imbue(lo1);
-
       eat();  // erstes Zeichen einlesen
-      /// BOM bearbeiten
-      if (curr == 0xff)
-      {
+      // BOM bearbeiten
+      if (curr == 0xff) {
         std::locale lo;
         if ((curr = istr.get()) != 0xfe)
           throw std::runtime_error(u8"Error in BOM");
@@ -593,9 +593,7 @@ public:
         istr.imbue(lo);
         encoding = u8"UTF-16"; // (LE)
         eat();
-      }
-      else if (curr == 0xfe)
-      {
+      } else if (curr == 0xfe) {
         std::locale lo;
         if ((curr = istr.get()) != 0xff)
           throw std::runtime_error(u8"Error in BOM");
@@ -603,9 +601,7 @@ public:
         istr.imbue(lo);
         encoding = u8"UTF-16"; // (BE)
         eat();
-      }
-      else if (curr == 0xef)
-      {
+      } else if (curr == 0xef) {
         std::locale lo;
         if ((curr = istr.get()) == 0xbb and (curr = istr.get()) == 0xbf)
           lo = std::locale(istr.getloc(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
@@ -615,44 +611,61 @@ public:
         istr.imbue(lo);
         eat();
       }
-
       buffer.clear();
-      parse2LT();
-      if (not Traits::eq_int_type(curr, '<'))
-        THROW(u8"Syntax Head");
-      // BOM überlesen
-      if (not buffer.empty() and buffer != L"\u00EF\u00BB\u00BF" and buffer != L"\ufeff")
-      {
-//        for (auto c:buffer) std::cerr << '#' <<  int(c) << std::endl;
-        THROW("invalid begin of File");
-      }
-      buffer.clear();
+      inParse2Lt = true;
+      inParse2LtWork = true;
       running = true;
-    } else if (paused) {
-      paused = false;
-      eat('>');
-      parse2LT();
-//      if (inParse2LT)
-//        return;
-//    }
-//    else if (inParse2LT) {
-//      while ((curr = get()) > 0) {
-//        if (curr == '<') {
-//          inParse2LT = false;
-//          break;
-//        }
-//        if (try64)
-//          base64.put(curr);
-//        else
-//          buffer += curr;
-//        if (maxRead == 0)
-//          return;
-//      }
+      bomCheck = true;
     }
     // eigentliches Parsing
-    while (Traits::eq_int_type(curr, '<'))
+    for (;;)
     {
+      if (inParse2Lt) {
+        if (nonblocking and not checkAvail(1))
+          paused = true;
+        if (paused)
+          return;
+        if (not inParse2LtWork) {
+          eat('>');
+          //parse2LT();
+          buffer.clear();
+          inParse2LtWork = true;
+          continue;
+        } else {
+          if (Traits::not_eof(curr) and Traits::to_char_type(curr) != '<') {
+            if (try64)
+              base64.put(Traits::to_char_type(curr));
+            else
+              buffer += Traits::to_char_type(curr);
+            curr = get();
+            continue;
+          }
+          inParse2Lt = false;
+        }
+      }
+      inParse2LtWork = false;
+      if (bomCheck) {
+        if (not Traits::eq_int_type(curr, '<'))
+          THROW(u8"Syntax Head");
+        // BOM überlesen
+        if (not buffer.empty() and buffer != L"\u00EF\u00BB\u00BF" and buffer != L"\ufeff")
+        {
+//        for (auto c:buffer) std::cerr << '#' <<  int(c) << std::endl;
+          THROW("invalid begin of File (BOM)");
+        }
+        buffer.clear();
+        bomCheck = false;
+      }
       saveValue();
+      if (not Traits::eq_int_type(curr, '<'))  // Hauptschleife verlassen
+        break;
+
+      if (nonblocking and not checkGT())
+      {
+        paused = true;
+        return;
+      }
+
 //      saved = buffer;
       eat('<');
 
@@ -723,10 +736,7 @@ public:
         tags.pop();
         if (not reedEof and tags.empty())
           paused = true;
-        if (paused)
-          return;
-        eat('>');
-        parse2LT();
+        inParse2Lt = true;
         continue;
       }
       else if (peek() == '!')
@@ -771,10 +781,7 @@ public:
           eat('-');
           parse2Com();
         }
-        if (paused)
-          return;
-        eat('>');
-        parse2LT();
+        inParse2Lt = true;
         continue;
       }
       else if (peek() == '?')
@@ -840,10 +847,7 @@ public:
           }
           ProcessingInstruction(element, a, v);
         }
-        if (paused)
-          return;
-        eat('>');
-        parse2LT();
+        inParse2Lt = true;
         continue;
       }
       // Parse Element-Beginn
@@ -886,10 +890,7 @@ public:
       {
         if (peek() == '>')  // Ende eines Starttags
         {
-          if (paused)
-            return;
-          eat();
-          parse2LT();
+          inParse2Lt = true;
           break;
         }
         else if (peek() == '/') // Leertag
@@ -900,10 +901,7 @@ public:
           else
             NullTag(element);
           tags.pop();
-          if (paused)
-            return;
-          eat('>');
-          parse2LT();
+          inParse2Lt = true;
           break;
         }
         eat(' ');
@@ -945,9 +943,6 @@ public:
       }
       lastKey = element;
     }
-//    if (inParse2LT)
-//      return;
-    saveValue();
     if (Traits::not_eof(curr))
       THROW(u8"Syntax error");
     // nur noch für check Whitespace bis eof
@@ -958,7 +953,6 @@ public:
   };
 
 private:
-  void parse2LT() { buffer.clear(); parse2Char('<'); }
   void parse2GT() {
     buffer.clear();
     if (Traits::not_eof(curr)) {
@@ -974,23 +968,12 @@ private:
     }
   };
   void parse2Char(Traits::char_type c) {
-    if (not Traits::not_eof(curr) or Traits::to_char_type(curr) == c)
-      return;
-    if (try64)
-      base64.put(Traits::to_char_type(curr));
-    else
-      buffer += Traits::to_char_type(curr);
-//    if (maxRead == 0 and c == L'<') {
-//      inParse2LT = true;
-//      return;
-//    }
-    while (Traits::not_eof(curr = get())) {
-      if (Traits::to_char_type(curr) == c)
-        break;
+    while (Traits::not_eof(curr) and Traits::to_char_type(curr) != c) {
       if (try64)
         base64.put(Traits::to_char_type(curr));
       else
         buffer += Traits::to_char_type(curr);
+      curr = get();
     }
   };
   void parse2Com() {
@@ -1111,15 +1094,42 @@ private:
     base64.clear();
     try64 = true;
   }
+  bool checkGT() const {
+    Traits::int_type c;
+    do {
+      if (not checkAvail(1))
+        return false;
+      checkGtBuffer.push_back(c = get());
+      checkGtBufferEnd++;
+      checkGtBufferStart = checkGtBufferEnd; // noch nicht aus Buffer lesen
+    } while (Traits::not_eof(c) and not Traits::eq_int_type(Traits::to_int_type('>'), c));
+    checkGtBufferStart = 0; // jetzt kann's losgehen
+    //LOG(LM_INFO, "XXX " << mobs::to_string(checkGtBuffer) <<  " XXX");
+    return true;
+  }
+  bool checkAvail(std::streamsize n) const {
+    if (encryptedData.istr) {
+      auto av = encryptedData.istr->rdbuf()->in_avail();
+      return av >= n or av == -1;
+    }
+    auto av = istr.rdbuf()->in_avail();
+    return av >= n or av == -1;
+  }
   Traits::int_type get() const {
     Traits::int_type c;
 //    if (maxRead)
 //      maxRead--;
-    if (encryptedData.istr) {
+    if (checkGtBufferStart < checkGtBufferEnd) {
+      c = checkGtBuffer[checkGtBufferStart++];
+      if (checkGtBufferStart >= checkGtBufferEnd) {
+        checkGtBuffer.clear();
+        checkGtBufferStart = checkGtBufferEnd = 0;
+      }
+    } else if (encryptedData.istr) {
       c = encryptedData.istr->get();
 //      std::cout << " e" << mobs::to_string(c); // << " " << istr.tellg() << ".";
       if (encryptedData.istr->eof()) {
-//      LOG(LM_INFO, "ENC FIN");
+        //LOG(LM_DEBUG, "ENC FIN");
         if (encryptedData.cBuf->bad())
           THROW("decryption failed");
         delete encryptedData.istr;
@@ -1168,6 +1178,9 @@ private:
   std::wstring buffer;
   std::wstring saved;
   std::wstring cdata;
+  mutable std::vector<Traits::int_type> checkGtBuffer;
+  mutable size_t checkGtBufferStart = 0;
+  mutable size_t checkGtBufferEnd = 0;
   Traits::int_type curr = 0;
   std::string encoding;
   mutable std::stack<Level> tags;
@@ -1178,7 +1191,9 @@ private:
   EncryptedData encryptedData;
   mutable int xmlEncState = 0;
 //  mutable size_t maxRead = SIZE_T_MAX;
-//  bool inParse2LT = false;
+  bool inParse2Lt = false;
+  bool inParse2LtWork = false;
+  bool bomCheck = false;
   bool try64 = false;
   bool in64 = false;
   bool useBase64 = false;
@@ -1186,6 +1201,7 @@ private:
   bool paused = false;
   bool reedEof = true;
   bool endOfFile = false;
+  bool nonblocking = false;
 
 };
 

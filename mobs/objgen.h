@@ -454,6 +454,8 @@ public:
   virtual void traverse(ObjTravConst &trav) const = 0;
   /// Starte Traversierung eines einzelnen Elementes
   virtual void traverseSingle(ObjTravConst &trav, size_t index) const = 0;
+  /// Starte Traversierung eines leeren temporären Elementes
+  void traverseElement(ObjTravConst &trav) const { return traverseSingle( trav, SIZE_MAX - 1); };
   /// \private
   void traverseKey(ObjTravConst &trav) const;
   /// liefert die Anzahl der Elemente
@@ -1070,6 +1072,8 @@ void Member<T, C>::memInfo(MobsMemberInfo &i, const T &value) const
     i.size = sizeof(T);
   i.isBlob = this->c_is_blob();
   i.isEnum = this->c_is_mobsEnum();
+  if (i.isEnum)
+    i.eToStr = C::c_to_str;
   i.granularity = this->c_time_granularity();
   if (i.isBlob)
     i.isBlob = C::c_to_blob(value, i.blob, i.u64);
@@ -1320,14 +1324,18 @@ void MemberVector<T>::traverseSingle(ObjTravConst &trav, size_t index) const
   trav.m_inNull = false;
   trav.m_keyMode = false;
   if (trav.doArrayBeg(*this)) {
-      if (index < size()) {
-        trav.m_arrayIndex = index;
-        operator[](index).traverse(trav);
-      }
-    }
-  trav.m_inNull = false;
-  trav.m_arrayIndex = SIZE_MAX;
-  trav.doArrayEnd(*this);
+    trav.m_arrayIndex = index;
+    if (index == SIZE_MAX - 1)
+    {
+      T *w = new T(const_cast<MemberVector<T> *>(this), m_parent, m_c);
+      w->traverse(trav);
+      delete w;
+    } else if (index < size())
+      operator[](index).traverse(trav);
+    trav.m_arrayIndex = SIZE_MAX;
+    trav.m_inNull = false;
+    trav.doArrayEnd(*this);
+  }
 }
 
 template<class T>

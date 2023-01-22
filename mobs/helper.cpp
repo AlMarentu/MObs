@@ -23,6 +23,7 @@
 #include "queryorder.h"
 #include "querygenerator.h"
 #include "converter.h"
+#include "xmlwriter.h"
 //#include <strstream>
 
 using namespace mobs;
@@ -1660,6 +1661,227 @@ std::string convLikeToRegexp(const string &like) {
     result += '$';
   return result;
 }
+
+
+class XsdDump : virtual public ObjTravConst {
+public:
+  explicit XsdDump(const ConvObjToString &c, const string &nsd) : cth(c), ns(to_wstring(nsd)) { };
+  bool doObjBeg(const ObjectBase &obj) override
+  {
+    if (attribute) {
+      if (level > attribute)
+        return false;
+      level++;
+      if (level < attribute+1)
+        return true;
+      level--;
+      return false;
+    }
+    if (sequence) {
+      if (level > sequence)
+        return false;
+      level++;
+      if (level < sequence+1)
+        return true;
+
+      xw.writeTagBegin(L"element");
+      string n = obj.getObjectName();
+      xw.writeAttribute(L"type", L"urn:" + to_wstring(n + "Type"));
+      xw.writeAttribute(L"name", to_wstring(obj.getName(cth)));
+      xw.writeAttribute(L"xmlns:urn", ns);
+      xw.writeTagEnd();
+      level--;
+      return false;
+    }
+    if (level == 0) {
+      xw.writeHead();
+      xw.setPrefix(L"xs:");
+      xw.writeTagBegin(L"schema");
+      xw.writeAttribute(L"attributeFormDefault", L"unqualified");
+      xw.writeAttribute(L"elementFormDefault", L"qualified");
+      xw.writeAttribute(L"targetNamespace", ns);
+      xw.writeAttribute(L"xmlns:xs", L"http://www.w3.org/2001/XMLSchema");
+    }
+    level++;
+    return true;
+  };
+  void doObjEnd(const ObjectBase &obj) override
+  {
+    level--;
+    if (sequence or attribute)
+      return;
+    xw.writeTagBegin(L"complexType");
+    string n = obj.getObjectName();
+    xw.writeAttribute(L"name", to_wstring(n + "Type"));
+    xw.writeTagBegin(L"sequence");
+    sequence = level+1;
+    obj.traverse(*this);
+    inarray = false;
+    sequence = 0;
+    xw.writeTagEnd();
+    attribute = level+1;
+    obj.traverse(*this);
+    attribute = 0;
+    xw.writeTagEnd();
+
+    if (level == 0) {
+      //      xw.writeTagBegin(L"complexType");
+//      xw.writeAttribute(L"type", L"rootType");
+//      xw.writeAttribute(L"xmlns:urn", ns);
+//      xw.writeTagEnd();
+      xw.writeTagEnd(true);
+    }
+  };
+  bool doArrayBeg(const MemBaseVector &vec) override
+  {
+    if (arrayIndex() > vec.size()) // traverseElement
+      return true;
+    if (attribute)
+      return false;
+    if (sequence) {
+      xw.writeTagBegin(L"element");
+      string n = vec.contentObjName();
+      xw.writeAttribute(L"type", L"urn:" + to_wstring(n + "Type"));
+      xw.writeAttribute(L"name", to_wstring(vec.getName(cth)));
+      xw.writeAttribute(L"maxOccurs", L"unbounded");
+      xw.writeAttribute(L"minOccurs", L"0");
+      xw.writeAttribute(L"xmlns:urn", ns);
+      xw.writeTagEnd();
+      return false;
+    }
+
+    fname = to_wstring(vec.getName(cth));
+    inarray = true;
+    vec.traverseElement(*this);
+    inarray = false;
+    return false;
+  };
+  void doArrayEnd(const MemBaseVector &vec) override
+  {
+  };
+  void doMem(const MemberBase &mem) override
+  {
+    bool useSimlpeType = false;
+    size_t sLen = 0;
+    bool compact = cth.compact();
+    if (mem.is_chartype(cth) and mem.hasFeature(mobs::DbCompact))
+      compact = true;
+    MobsMemberInfo mi;
+    mem.memInfo(mi);
+    mi.changeCompact(compact);
+    wstring type;
+//    if (mi.hasCompact)
+//      xw.writeComment(L"COMP", true);
+    if (mi.isEnum) {
+      type = L"xs:NMTOKEN";
+      useSimlpeType = true;
+    }
+    else if (mi.isUnsigned and mi.max == 1)
+      type = L"xs:bool";
+    else if (mi.isSigned or mi.isUnsigned)
+      type = L"xs:integer";
+    else if (mi.isTime)
+      type = mi.granularity >= 86400000000 ? L"xs:date" : L"xs:time";
+    else if (mi.isFloat)
+      type = L"xs:float";
+    else
+    {
+      type = L"xs:string";
+      MemVarCfg c = mem.hasFeature(LengthBase);
+      if (c) {
+        sLen = (c - LengthBase);
+        useSimlpeType = true;
+      }
+    }
+
+    if (sequence and not mem.hasFeature(MemVarCfg::XmlAsAttr)) {
+      xw.writeTagBegin(L"element");
+      if (not useSimlpeType)
+        xw.writeAttribute(L"type", type);
+      xw.writeAttribute(L"name", to_wstring(mem.getName(cth)));
+      if (inarray) {
+        xw.writeAttribute(L"maxOccurs", L"unbounded");
+        xw.writeAttribute(L"minOccurs", L"0");
+      }
+      if (useSimlpeType) {
+        xw.writeTagBegin(L"simpleType");
+        xw.writeTagBegin(L"restriction");
+        xw.writeAttribute(L"base", type);
+        if (mi.isEnum) {
+          for (int i = 0; i <= mi.max; i++) {
+            auto s = mi.eToStr(i);
+            xw.writeTagBegin(L"enumeration");
+            xw.writeAttribute(L"value", to_wstring(s));
+            xw.writeTagEnd();
+          }
+        }
+        else if (sLen > 0) {
+          xw.writeTagBegin(L"maxLength");
+          xw.writeAttribute(L"value", to_wstring(sLen));
+          xw.writeTagEnd();
+        }
+        xw.writeTagEnd();
+        xw.writeTagEnd();
+      }
+      xw.writeTagEnd();
+    }
+    if (attribute and mem.hasFeature(MemVarCfg::XmlAsAttr)) {
+      xw.writeTagBegin(L"attribute");
+      if (not useSimlpeType)
+        xw.writeAttribute(L"type", type);
+      xw.writeAttribute(L"name", to_wstring(mem.getName(cth)));
+      if (useSimlpeType) {
+        xw.writeTagBegin(L"simpleType");
+        xw.writeTagBegin(L"restriction");
+        xw.writeAttribute(L"base", type);
+        if (mi.isEnum) {
+          for (int i = 0; i <= mi.max; i++) {
+            auto s = mi.eToStr(i);
+            xw.writeTagBegin(L"enumeration");
+            xw.writeAttribute(L"value", to_wstring(s));
+            xw.writeTagEnd();
+          }
+        }
+        else if (sLen > 0) {
+          xw.writeTagBegin(L"maxLength");
+          xw.writeAttribute(L"value", to_wstring(sLen));
+          xw.writeTagEnd();
+        }
+        xw.writeTagEnd();
+        xw.writeTagEnd();
+      }
+      xw.writeTagEnd();
+    }
+    if (mem.isNull() and cth.omitNull())
+      return;
+
+  };
+  std::string result() { return xw.getString(); };
+private:
+  int level = 0;
+  ConvObjToString cth;
+
+  wstring ns;
+  mobs::XmlWriter xw;
+  wstring fname;
+  bool inarray = false;
+  int sequence = 0;
+  int attribute = 0;
+};
+
+std::string generateXsd(const ObjectBase &obj, const std::string &nameSpace) {
+  try {
+    ConvObjToString c;
+    XsdDump xd(c, nameSpace);
+    obj.traverse(xd);
+    return xd.result();
+  } catch (exception &e)
+  {
+    LOG(LM_ERROR, "XSD error " << e.what());
+    return {};
+  }
+}
+
 
 }
 

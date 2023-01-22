@@ -56,7 +56,7 @@ public:
    * \throw runtime_error wenn in der Struktur des XML ein Fehler ist
    */
   explicit XmlReader(std::wistream &str, const ConvObjFromStr &c = ConvObjFromStr());
-  ~XmlReader();
+  virtual ~XmlReader();
 
   /// Callback für Null-Tag
   virtual void NullTag(const std::string &element) { EndTag(element); }
@@ -103,6 +103,8 @@ public:
   void setBase64(bool b);
   /// Einstellung: Lese bis EOF, ansonsten stoppe beim letzten Ene-Tag
   void readTillEof(bool s);
+  /// non blocking parsen
+  void readNonBlocking(bool s);
   /// ist beim Parsen das Ende der Datei erreicht
   bool eof() const;
   /// ist beim Parsen das letzte Tag erreicht (level() == 0)
