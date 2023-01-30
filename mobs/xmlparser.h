@@ -656,17 +656,17 @@ public:
         buffer.clear();
         bomCheck = false;
       }
-      saveValue();
       if (not Traits::eq_int_type(curr, '<'))  // Hauptschleife verlassen
+      {
+        saveValue();
         break;
-
+      }
       if (nonblocking and not checkGT())
       {
         paused = true;
         return;
       }
-
-//      saved = buffer;
+      saveValue();
       eat('<');
 
       if (peek() == '/')
@@ -1025,7 +1025,7 @@ private:
     {
       size_t p = saved.find_first_not_of(L" \n\r\t");
       if (p != std::wstring::npos)
-        THROW(u8"unexpected char");
+        THROW(u8"unexpected char in white space");
     }
     saved = buffer;
   };
