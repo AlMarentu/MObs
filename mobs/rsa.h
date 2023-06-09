@@ -29,6 +29,7 @@
 
 #include <utility>
 #include <list>
+#include <memory>
 
 
 #include "csb.h"
@@ -123,7 +124,7 @@ protected:
 //  virtual std::streamsize xsputn( const char_type* s, std::streamsize count ) override;
 
 private:
-  CryptBufRsaData *data;
+  std::unique_ptr<CryptBufRsaData> data;
 };
 
 /** \brief Erzeugung eines RSA Schlüsselpaares (Datei)

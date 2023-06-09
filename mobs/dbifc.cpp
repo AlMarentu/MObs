@@ -162,11 +162,10 @@ DatabaseManager::DatabaseManager() {
   if (manager)
     throw std::runtime_error(u8"DatabaseManager already exists");
   manager = this;
-  data = new DatabaseManagerData;
+  data = std::unique_ptr<DatabaseManagerData>(new DatabaseManagerData);
 }
 
 DatabaseManager::~DatabaseManager() {
-  delete data;
   manager = nullptr;
 }
 
@@ -316,9 +315,7 @@ void DbTransaction::writeAuditTrail() {
 
 DbTransaction::DbTransaction() : data(new DbTransactionData) { }
 
-DbTransaction::~DbTransaction() {
-  delete data;
-}
+DbTransaction::~DbTransaction() = default;
 
 
 DatabaseInterface DbTransaction::getDbIfc(DatabaseInterface &dbiIn) {

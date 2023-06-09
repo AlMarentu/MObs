@@ -568,12 +568,10 @@ public:
 };
 
 StringFormatter::StringFormatter() {
-  data = new StringFormatterData;
+  data = std::unique_ptr<StringFormatterData>(new StringFormatterData);
 }
 
-StringFormatter::~StringFormatter() {
-  delete data;
-}
+StringFormatter::~StringFormatter() = default;
 
 int StringFormatter::insertPattern(const wstring &regex, const wstring &format) {
   data->rules.emplace_back(regex, format);

@@ -127,16 +127,14 @@ public:
 
 
 XmlWriter::XmlWriter(std::wostream &str, charset c, bool indent) {
-  data = new XmlWriterData(str, c, indent);
+  data = std::unique_ptr<XmlWriterData>(new XmlWriterData(str, c, indent));
 }
 
 XmlWriter::XmlWriter(charset c, bool indent) {
-  data = new XmlWriterData(c, indent);
+  data = std::unique_ptr<XmlWriterData>(new XmlWriterData(c, indent));
 }
 
-XmlWriter::~XmlWriter() {
-  delete data;
-}
+XmlWriter::~XmlWriter() = default;
 
 int XmlWriter::level() const { return data->level; }
 int XmlWriter::cryptingLevel() const { return data->cryptLevel; }

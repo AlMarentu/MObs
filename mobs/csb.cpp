@@ -87,7 +87,7 @@ public:
 
 CryptIstrBuf::CryptIstrBuf(std::istream &istr, CryptBufBase *cbbp) : Base() {
   TRACE("");
-  data = new CryptIstrBufData(istr, cbbp);
+  data = std::unique_ptr<CryptIstrBufData>(new CryptIstrBufData(istr, cbbp));
   // Buffer zu Beginn leer
   Base::setg(data->buffer.begin(), data->buffer.begin(), data->buffer.begin());
 }
@@ -95,7 +95,6 @@ CryptIstrBuf::CryptIstrBuf(std::istream &istr, CryptBufBase *cbbp) : Base() {
 CryptIstrBuf::~CryptIstrBuf() {
   TRACE("");
 //  data->print_buffer(Base::gptr(), Base::egptr());
-  delete data;
 }
 
 
@@ -230,16 +229,14 @@ class CryptOstrBufData {
 public:
   CryptOstrBufData(std::ostream &ostr, CryptBufBase *cbbp)  : outStb(ostr), cbb(cbbp) {
     if (not cbbp)
-      cbb = new CryptBufBase;
+      cbb = std::unique_ptr<CryptBufBase>(new CryptBufBase);
     cbb->setOstr(ostr);
   }
 
-  ~CryptOstrBufData() {
-      delete cbb;
-  }
+  ~CryptOstrBufData() = default;
 
   std::ostream &outStb;
-  CryptBufBase *cbb = nullptr;
+  std::unique_ptr<CryptBufBase> cbb;
   std::mbstate_t state{};
   std::array<CryptOstrBuf::char_type, 1024> buffer;
   CryptOstrBuf::pos_type pos = 0;
@@ -248,7 +245,7 @@ public:
 
 CryptOstrBuf::CryptOstrBuf(std::ostream &ostr, CryptBufBase *cbbp) : Base() {
   TRACE("");
-  data = new CryptOstrBufData(ostr, cbbp);
+  data = std::unique_ptr<CryptOstrBufData>(new CryptOstrBufData(ostr, cbbp));
   Base::setp(data->buffer.begin(), data->buffer.end());
 }
 
@@ -256,7 +253,6 @@ CryptOstrBuf::~CryptOstrBuf() {
   TRACE("");
 //  if (seekoff(0, std::ios_base::cur) > 0)
 //    finalize();
-  delete data;
 }
 
 CryptOstrBuf::int_type CryptOstrBuf::overflow(CryptOstrBuf::int_type ch) {
@@ -369,7 +365,7 @@ void CryptOstrBuf::imbue(const std::locale &loc) {
 }
 
 CryptBufBase *CryptOstrBuf::getCbb() {
-  return data->cbb;
+  return data->cbb.get();
 }
 
 std::ostream &CryptOstrBuf::getOstream() {
@@ -672,13 +668,12 @@ public:
 
 CryptBufBase::CryptBufBase() : Base() {
   TRACE("");
-  data = new CryptBufBaseData;
+  data = std::unique_ptr<CryptBufBaseData>(new CryptBufBaseData);
 }
 
 CryptBufBase::~CryptBufBase() {
   TRACE("");
 //  finalize();
-  delete data;
 }
 
 void CryptBufBase::setOstr(std::ostream &ostr) {

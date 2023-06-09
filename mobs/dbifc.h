@@ -491,7 +491,7 @@ public:
 
 private:
   static DatabaseManager *manager;
-  DatabaseManagerData *data = nullptr;
+  std::unique_ptr<DatabaseManagerData> data;
 };
 
 
@@ -563,7 +563,7 @@ private:
   void doAuditDestroy(const ObjectBase &obj, const DatabaseInterface &dbi);
   void writeAuditTrail();
 
-  DbTransactionData *data = nullptr;
+  std::unique_ptr<DbTransactionData> data;
 
 };
 

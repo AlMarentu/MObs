@@ -68,7 +68,7 @@ public:
   /// Entfernt  Objekte die nicht in Verwendung sind \c shared_ptr<T>
   void clearUnlocked();
 private:
-  NOPData *data;
+  std::unique_ptr<NOPData> data;
 };
 
 template <class T>

@@ -181,20 +181,19 @@ static std::wstring stow(const string &s, bool dontConvert) {
 
 
 XmlReader::XmlReader(const std::string &input, const ConvObjFromStr &c, bool charsetUnknown) {
-  data = new XmlReadData(this, input, c, charsetUnknown);
+  data = std::unique_ptr<XmlReadData>(new XmlReadData(this, input, c, charsetUnknown));
 }
 
 XmlReader::XmlReader(const std::wstring &input, const ConvObjFromStr &c) {
-  data = new XmlReadData(this, input, c);
+  data = std::unique_ptr<XmlReadData>(new XmlReadData(this, input, c));
 }
 
 XmlReader::XmlReader(std::wistream &str, const ConvObjFromStr &c) {
-  data = new XmlReadData(this, str, c);
+  data = std::unique_ptr<XmlReadData>(new XmlReadData(this, str, c));
 }
 
-XmlReader::~XmlReader() {
-  delete data;
-}
+XmlReader::~XmlReader() = default;
+
 void XmlReader::fill(ObjectBase *obj) {
   data->setObj(obj);
 }

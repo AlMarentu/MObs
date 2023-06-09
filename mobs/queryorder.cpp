@@ -60,13 +60,9 @@ void QueryOrder::add(const MemberBase &mem) {
   k.sort = data->asc ? 1 : -1;
 }
 
-QueryOrder::QueryOrder() {
-  data = new QuerySortData;
-}
+QueryOrder::QueryOrder() : data(new QuerySortData) {}
 
-QueryOrder::~QueryOrder() {
-  delete data;
-}
+QueryOrder::~QueryOrder() = default;
 
 void QueryOrder::directionAsc(bool asc) {
   data->asc = asc;

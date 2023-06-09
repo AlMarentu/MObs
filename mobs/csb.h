@@ -28,6 +28,7 @@
 
 #include <iostream>
 #include <array>
+#include <memory>
 
 namespace mobs {
 
@@ -154,7 +155,7 @@ protected:
   /// \private
   void setBad();
   /// \private
-  CryptBufBaseData *data;
+  std::unique_ptr<CryptBufBaseData> data;
 };
 
 /** \brief Stream-Buffer zur Basisklasse CryptBufBase als null-device
@@ -234,7 +235,7 @@ protected:
   void imbue(const std::locale& loc) override;
 
 private:
-  CryptIstrBufData *data;
+  std::unique_ptr<CryptIstrBufData> data;
 };
 
 
@@ -316,7 +317,7 @@ protected:
   void imbue(const std::locale& loc) override;
 
 private:
-  CryptOstrBufData *data;
+  std::unique_ptr<CryptOstrBufData> data;
 };
 
 

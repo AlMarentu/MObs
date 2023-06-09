@@ -272,11 +272,11 @@ public:
 };
 
 TcpStBuf::TcpStBuf() : Base() {
-  data = new TcpStBufData;
+  data = std::unique_ptr<TcpStBufData>(new TcpStBufData);
 }
 
 TcpStBuf::TcpStBuf(TcpAccept &accept) {
-  data = new TcpStBufData;
+  data = std::unique_ptr<TcpStBufData>(new TcpStBufData);
   data->fd = accept.acceptConnection((sockaddr &)data->remoteAddr, data->addrLen);
   if (data->fd == invalidSocket)
     data->bad = true;
@@ -284,7 +284,7 @@ TcpStBuf::TcpStBuf(TcpAccept &accept) {
 }
 
 TcpStBuf::TcpStBuf(const std::string &host, const std::string &service) : Base() {
-  data = new TcpStBufData;
+  data = std::unique_ptr<TcpStBufData>(new TcpStBufData);
   data->connect(host, service);
   Base::setp(data->wrBuf.begin(), data->wrBuf.end());
 }
@@ -292,7 +292,6 @@ TcpStBuf::TcpStBuf(const std::string &host, const std::string &service) : Base()
 TcpStBuf::~TcpStBuf() {
   if (not bad() and is_open())
     close();
-  delete data;
 }
 
 bool TcpStBuf::open(const std::string &host, const std::string &service) {

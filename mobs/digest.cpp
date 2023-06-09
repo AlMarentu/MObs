@@ -96,14 +96,13 @@ void mobs::CryptBufDigest::hashAlgorithm(const std::string &algo) {
 
 mobs::CryptBufDigest::CryptBufDigest(const std::string &algo) : CryptBufBase() {
   TRACE("");
-  data = new mobs::CryptBufDigestData;
+  data = std::unique_ptr<mobs::CryptBufDigestData>(new mobs::CryptBufDigestData);
   data->md_algo = algo;
 }
 
 
 mobs::CryptBufDigest::~CryptBufDigest() {
   TRACE("");
-  delete data;
 }
 
 

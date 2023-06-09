@@ -28,6 +28,7 @@
 #include <vector>
 #include <locale>
 #include <algorithm>
+#include <memory>
 
 #ifdef __MINGW32__
 typedef unsigned char u_char;
@@ -262,7 +263,7 @@ public:
   /// Abfrage, ob Suchmuster vorhanden
   bool empty() const;
 private:
-  StringFormatterData *data = nullptr;
+  std::unique_ptr<StringFormatterData> data;
 };
 
 }

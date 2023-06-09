@@ -28,6 +28,7 @@
 
 #include "csb.h"
 #include <vector>
+#include <memory>
 
 #ifdef __MINGW32__
 typedef unsigned char u_char;
@@ -135,7 +136,7 @@ protected:
 //  virtual std::streamsize xsputn( const char_type* s, std::streamsize count ) override;
 
 private:
-  CryptBufAesData *data;
+  std::unique_ptr<CryptBufAesData> data;
 
   void ctxInit();
   int underflowWorker(bool nowait);

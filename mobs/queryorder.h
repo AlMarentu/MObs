@@ -26,6 +26,7 @@
 #define MOBS_QUERYORDER_H
 
 #include "objgen.h"
+#include <memory>
 
 namespace mobs {
 
@@ -82,7 +83,7 @@ public:
   static SortSwitch descending;
 
 private:
-  QuerySortData *data = nullptr;
+  std::unique_ptr<QuerySortData> data;
 };
 
 

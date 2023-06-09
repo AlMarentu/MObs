@@ -27,6 +27,7 @@
 #define MOBS_DIGEST_H
 
 #include "csb.h"
+#include<memory>
 
 namespace mobs {
 
@@ -82,7 +83,7 @@ public:
   void finalize() override;
 
 private:
-  CryptBufDigestData *data;
+  std::unique_ptr<CryptBufDigestData> data;
 };
 
 

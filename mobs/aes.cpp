@@ -148,7 +148,7 @@ void mobs::CryptBufAes::getRand(std::vector<u_char> &rand) {
 
 mobs::CryptBufAes::CryptBufAes(const std::string &pass, const std::string &id) : CryptBufBase() {
   TRACE("");
-  data = new mobs::CryptBufAesData;
+  data = std::unique_ptr<CryptBufAesData>(new mobs::CryptBufAesData);
   data->passwd = pass;
   data->id = id;
   data->salted = true;
@@ -156,7 +156,7 @@ mobs::CryptBufAes::CryptBufAes(const std::string &pass, const std::string &id) :
 
 mobs::CryptBufAes::CryptBufAes(const std::vector<u_char> &key, const std::vector<u_char> &iv, const std::string &id, bool writeIV) {
   TRACE("");
-  data = new mobs::CryptBufAesData;
+  data = std::unique_ptr<CryptBufAesData>(new mobs::CryptBufAesData);
   data->id = id;
   data->initIV = writeIV;
   memcpy(&data->key[0], &key[0], std::min(key.size(), size_t(KEYBUFLEN)));
@@ -165,7 +165,7 @@ mobs::CryptBufAes::CryptBufAes(const std::vector<u_char> &key, const std::vector
 
 mobs::CryptBufAes::CryptBufAes(const std::vector<u_char> &key, const std::string &id) {
   TRACE("");
-  data = new mobs::CryptBufAesData;
+  data = std::unique_ptr<CryptBufAesData>(new mobs::CryptBufAesData);
   data->id = id;
   data->initIV = true;
   memcpy(&data->key[0], &key[0], std::min(key.size(), size_t(KEYBUFLEN)));
@@ -173,7 +173,6 @@ mobs::CryptBufAes::CryptBufAes(const std::vector<u_char> &key, const std::string
 
 mobs::CryptBufAes::~CryptBufAes() {
   TRACE("");
-  delete data;
 }
 
 

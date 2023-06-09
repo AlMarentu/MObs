@@ -161,6 +161,8 @@ public:
       res << "BOOLEAN"; //"SMALLINT";
     else if (mi.isFloat)
       res << "FLOAT";
+//    else if (mi.isBlob)
+//      res << "TEXT";
     else if (mem.is_chartype(mobs::ConvToStrHint(compact))) {
       if (mi.is_specialized and mi.size == 1)
         res << "CHAR(1)";
@@ -411,6 +413,31 @@ public:
         e = rsetnull(sql_var.sqltype, sql_var.sqldata);
       else
         *(double *) (sql_var.sqldata) = mi.d;
+//    } else if (mi.isBlob) {
+//      LOG(LM_DEBUG, "Informix SqlVar " << mem.name() << ": " << fldCnt - 1 << " BLOB");
+//      sql_var.sqltype = SQLBYTES;
+//      setBuffer(sql_var);
+//      LOG(LM_INFO, "SIZE " << sql_var.sqllen << " " << sizeof(loc_t));
+//      loc_t &blob = *(loc_t *) (sql_var.sqldata);
+//      memset(&blob, 0, sizeof(loc_t));
+//      blob.loc_loctype = LOCFNAME;      /* blob is named file */
+//      blob.loc_fname = "/tmp/otto";        /* here is its name */
+//      blob.loc_oflags = LOC_RONLY;      /* contents are to be read by engine */
+//      blob.loc_size = -1;               /* read to end of file */
+//      blob.loc_indicator = 0;   /* not a null blob */
+
+//      ifx_lo_t &blob = *(ifx_lo_t *) (sql_var.sqldata);
+//      ifx_lo_create_spec_t *lo_spec;
+//      e = ifx_lo_def_create_spec(&lo_spec);
+//      // TODO ifx_lo_spec_free
+//      if (e)
+//        throw informix_exception("Conversion error LO_Spec", e);
+//      mint lo_fd = ifx_lo_create(lo_spec, LO_WRONLY, &blob, &e);
+//      if (e)
+//        throw informix_exception("Conversion error LO_Spec", e);
+//      mint res = ifx_lo_write(lo_fd, (char *)reinterpret_cast<const u_char *>(&v[0]), v.size(), &e);
+//      LOG(LM_INFO, "RES = " << res);
+
     } else {
       std::string s = mem.toStr(mobs::ConvToStrHint(compact));
       LOG(LM_DEBUG, "Informix SqlVar " << mem.getElementName() << ": " << fldCnt - 1 << "=" << s);
@@ -529,8 +556,18 @@ public:
         else
           ok = false;
         break;
-      case SQLTEXT:
+//      case SQLUDTFIXED:
+//        if (mi.isBlob) {
+//          ifx_loc_t &lo = *(loc_t *) (col.sqldata);
+//          LOG(LM_INFO, "BBBBB " << lo.loc_size << " " << lo.loc_loctype);
+//
+//
+//        }
+//        else
+//          ok = false;
+//        break;
       case SQLBYTES:
+      case SQLTEXT:
       default:
         throw runtime_error(u8"conversion error in " + mem.getElementName() + " Type=" + to_string(col.sqltype));
     }
