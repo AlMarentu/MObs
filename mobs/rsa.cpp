@@ -200,14 +200,14 @@ class Receipt {
 
 mobs::CryptBufRsa::CryptBufRsa(const std::list<PubKey> &keys) {
   TRACE("");
-  data = new mobs::CryptBufRsaData;
+  data = std::unique_ptr<mobs::CryptBufRsaData>(new mobs::CryptBufRsaData);
   data->initPubkeys(keys);
 }
 
 
 mobs::CryptBufRsa::CryptBufRsa(const std::string &filename, const std::string &id) : CryptBufBase() {
   TRACE("");
-  data = new mobs::CryptBufRsaData;
+  data = std::unique_ptr<mobs::CryptBufRsaData>(new mobs::CryptBufRsaData);
   std::list<PubKey> pk;
   pk.emplace_back(filename, id);
   data->initPubkeys(pk);
@@ -216,7 +216,7 @@ mobs::CryptBufRsa::CryptBufRsa(const std::string &filename, const std::string &i
 
 mobs::CryptBufRsa::CryptBufRsa(const std::string &filename, const std::vector<u_char> &cipher, const std::string &passphrase) : CryptBufBase() {
   TRACE("");
-  data = new mobs::CryptBufRsaData;
+  data = std::unique_ptr<mobs::CryptBufRsaData>(new mobs::CryptBufRsaData);
   data->cipher = cipher;
   RSA *rsaPrivKey = mobs::CryptBufRsaData::readPrivateKey(filename, passphrase);
   data->priv_key = EVP_PKEY_new();
@@ -231,7 +231,6 @@ mobs::CryptBufRsa::CryptBufRsa(const std::string &filename, const std::vector<u_
 
 mobs::CryptBufRsa::~CryptBufRsa() {
   TRACE("");
-  delete data;
 }
 
 

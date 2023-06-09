@@ -1380,14 +1380,12 @@ public:
 };
 
 ElementNames::ElementNames(ConvObjToString c) {
-  data = new ElementNamesData;
+  data = std::unique_ptr<ElementNamesData>(new ElementNamesData);
   data->names.push("");
   data->cth = std::move(c);
 }
 
-ElementNames::~ElementNames() {
-  delete data;
-}
+ElementNames::~ElementNames() = default;
 
 bool ElementNames::doObjBeg(const ObjectBase &obj) {
   if (data->sort and inArray() and arrayIndex() > 0)

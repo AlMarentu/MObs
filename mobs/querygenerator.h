@@ -27,6 +27,7 @@
 #define MOBS_QUERYGENERATOR_H
 
 #include <string>
+#include <memory>
 
 #include "objgen.h"
 
@@ -134,7 +135,7 @@ private:
   void add(Operator op);
   void add(const std::string &s);
   void add(int64_t i);
-  QueryGeneratorData *data = nullptr;
+  std::unique_ptr<QueryGeneratorData> data;
 };
 
 

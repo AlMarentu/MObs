@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2023 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -19,20 +19,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-/** \file tcpstream.h
+/** \file socketstream.h
  *
- *  \brief ioBuffer tcpstream
+ *  \brief ioBuffer socketstream
  */
 
-#ifndef MOBS_TCPSTREAM_H
-#define MOBS_TCPSTREAM_H
+#ifndef MOBS_SOCKETSTREAM_H
+#define MOBS_SOCKETSTREAM_H
 
 #include <iostream>
-#include<memory>
+#include <memory>
 #ifdef __MINGW32__
-// für poll muss _WIN32_WINNT >= 0x0601 sein entspricht Win 7
-#undef _WIN32_WINNT
-#define _WIN32_WINNT  0x0601
 #include <winsock2.h>
 #endif
 
@@ -58,52 +55,25 @@ typedef int socketHandle; ///< Systemunabhängiger typ eines TCP-Sockets
 const socketHandle invalidSocket = -1; ///< Konstante für uninitialisierten TCP-Socket
 #endif
 
-/** \brief Klasse um eine passive TCP-Verbindung zu öffnen
- *
- */
-class TcpAccept {
-  friend class TcpStBuf;
-public:
-  /** \brief öffnet eine Port, um eine TCP-Verbindung anzunehmen \see mobs::tcpstream
-   *
-   * @param service TCP-Port
-   * @return socketHandle (Betriebssystem abhängig) invalidSocket im Fehlerfall
-   */
-  socketHandle initService(const std::string &service);
-
-private:
-  socketHandle acceptConnection(struct sockaddr &sa, size_t &len) const;
-  socketHandle fd = invalidSocket;
-};
-
-class TcpStBufData;
+class SocketStBufData;
 
 /// streambuffer für TCP-Verbindungen
-class TcpStBuf : public std::basic_streambuf<char> {
+class SocketStBuf : public std::basic_streambuf<char> {
 public:
   using Base = std::basic_streambuf<char>; ///< Basis-Typ
   using char_type = typename Base::char_type; ///< Element-Typ
   using Traits = std::char_traits<char_type>; ///< Traits-Typ
   using int_type = typename Base::int_type; ///< zugehöriger int-Typ
 
-  /// default Konstruktor
-  TcpStBuf();
-
-  /** \brief Konstruktor für passive TCP-Verbindung
-   *
-   * Es wird eine mobs::TcpAccept Klasse benötigt, deren eingehende Verbindung angenommen wird.
-   * Der Aufruf blockiert, bis eine Verbindung eingeht
-   */
-  explicit TcpStBuf(TcpAccept &accept);
 
   /** \brief Konstruktor für TCP-Verbindung
    *
    * @param host Hostname oder IP
    * @param service Port als Zahl oder als Service-Name (z.B.: "http")
    */
-  TcpStBuf(const std::string &host, const std::string &service);
+  SocketStBuf(socketHandle &socket);
 
-  ~TcpStBuf() override;
+  ~SocketStBuf() override;
 
   /** \brief offnet eine TCP-Verbindung
    *
@@ -137,14 +107,6 @@ public:
   /// liefert remote ip bei passiver Verbindung
   std::string getRemoteIp() const;
 
-  /** \brief Setze Einstellungen für QoS des Streams
-   *
-   * benötiget include <netinet/ip.h>
-   * @param tos IPTOS_LOWDELAY, IPTOS_THROUGHPUT, IPTOS_RELIABILITY, IPTOS_MINCOST
-   * @return Erfolg
-   */
-  bool setTOS(int tos) const;
-
   /// Rückgabe ob Fehlerstatus
   bool bad() const;
 
@@ -162,59 +124,29 @@ protected:
   std::streamsize showmanyc() override;
 
 private:
-  std::unique_ptr<TcpStBufData> data;
-
+  std::unique_ptr<SocketStBufData> data;
 };
 
 /** \brief iostream für TCP-Verbindungen
  *
  */
-class tcpstream : public std::iostream {
+class socketstream : public std::iostream {
 public:
-  /// default Konstruktor
-  tcpstream();
-
-  /** \brief Konstruktor für passive TCP-Verbindung
-   *
-   * Es wird eine mobs::TcpAccept Klasse benötigt, deren eingehende Verbindung angenommen wird.
-   * Der Aufruf blockiert, bis eine Verbindung eingeht
-   * @param accept Initialisierter mobs::TcpAccept
-   */
-  explicit tcpstream(TcpAccept &accept);
 
   /** \brief Konstruktor für TCP-Verbindung
    *
    * @param host Hostname oder IP
    * @param service Port
    */
-  tcpstream(const std::string &host, const std::string &service);
+  socketstream(socketHandle &socket);
 
-  ~tcpstream() override;
-
-  /** \brief offnet eine TCP-Verbindung
-   *
-   * @param host Hostname oder IP
-   * @param service Port
-   */
-  void open(const std::string &host, const std::string &service);
+  ~socketstream() override;
 
   /// Schließen einer Verbindung
   void close();
 
-  /** \brief Beendet die Kommunikation in einer oder beiden Richtungen
-   *
-   * @param which Richtung, die beendet werden soll
-   */
-  void shutdown(std::ios_base::openmode which = std::ios_base::in | std::ios_base::out);
-
   /// Rückgabe, ob Verbindung geöffnet wurde
   bool is_open() const;
-
-  /// liefert remote host bei passiver Verbindung
-  std::string getRemoteHost() const;
-
-  /// liefert remote ip bei passiver Verbindung
-  std::string getRemoteIp() const;
 
   /** \brief prüft, ob Zugriff entsprechend openmode möglich ist
    *
@@ -226,13 +158,12 @@ public:
    */
   bool poll(std::ios_base::openmode which = std::ios_base::in | std::ios_base::out);
 
-  /** \brief Setze Einstellungen für QoS des Streams
- *
- * benötiget include <netinet/ip.h>
- * @param tos IPTOS_LOWDELAY, IPTOS_THROUGHPUT, IPTOS_RELIABILITY, IPTOS_MINCOST
- * @return Erfolg
- */
-  bool setTOS(int tos) const;
+  /** \brief Beendet die Kommunikation in einer oder beiden Richtungen
+   *
+   * @param which Richtung, die beendet werden soll
+   */
+  void shutdown(std::ios_base::openmode which = std::ios_base::in | std::ios_base::out);
+
 };
 
 

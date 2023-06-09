@@ -227,14 +227,12 @@ NamedObjPool::NamedObjPool()
 {
   TRACE("");
 //  data = new NOPDataUnordered();
-  data = new NOPDataMap();
+  data = std::unique_ptr<NOPDataMap>(new NOPDataMap);
 }
 
 NamedObjPool::~NamedObjPool()
 {
   TRACE("");
-  delete data;
-  data = nullptr;
 }
 
 void NamedObjPool::assign(const string& objName, shared_ptr<NamedObject> obj)

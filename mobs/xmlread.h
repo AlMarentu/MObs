@@ -120,7 +120,7 @@ public:
   /// Referenz auf verwendeten input stream
   std::wistream &getIstr();
   private:
-    XmlReadData *data;
+    std::unique_ptr<XmlReadData> data;
 //  XmlReadData(const std::string &input, const ConvObjFromStr &c) : XmlParserW(str), str(to_wstring(input)) { cfs = c; };
 
 };

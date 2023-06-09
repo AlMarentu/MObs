@@ -32,8 +32,8 @@
 #include<stack>
 #include<exception>
 #include<iostream>
-#include <codecvt>
-
+#include<codecvt>
+#include<memory>
 
 namespace mobs {
 
@@ -114,7 +114,7 @@ public:
   bool escapeControl = false; ///< ersetze Zeichen wie "\n" durch "&#xa;"
 
 private:
-  XmlWriterData *data;
+  std::unique_ptr<XmlWriterData> data;
 
 };
 

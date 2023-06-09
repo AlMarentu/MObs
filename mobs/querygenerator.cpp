@@ -64,13 +64,9 @@ public:
 
 
 
-QueryGenerator::QueryGenerator() {
-  data = new QueryGeneratorData;
-}
+QueryGenerator::QueryGenerator() : data(new QueryGeneratorData) {}
 
-QueryGenerator::~QueryGenerator() {
-  delete data;
-}
+QueryGenerator::~QueryGenerator() = default;
 
 void QueryGenerator::add(const mobs::MemberBase &mem) {
   QueryGenerator::QueryItem i;

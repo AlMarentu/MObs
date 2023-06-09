@@ -28,6 +28,7 @@
 #include "mchrono.h"
 #include <sstream>
 #include <set>
+#include <memory>
 
 namespace mobs {
 
@@ -223,7 +224,7 @@ public:
   void doMem(const MemberBase &mem) final;
 
 private:
-  ElementNamesData *data;
+  std::unique_ptr<ElementNamesData> data;
 };
 
 /** \brief Traversier-Klasse: Setzt alle Vektoren eines Objektes auf Größe 1
