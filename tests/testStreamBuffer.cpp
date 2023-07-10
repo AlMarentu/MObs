@@ -23,6 +23,7 @@
 #include "csb.h"
 
 #include "objtypes.h"
+#include "nbuf.h"
 
 #include <stdio.h>
 #include <sstream>
@@ -147,6 +148,89 @@ TEST(streamBufferTest, sizelimit) {
   EXPECT_FALSE(ss.get(c8).eof());
   EXPECT_EQ('C', c8);
 
+}
+
+TEST(IstreamBufferTest, B64BufferTest) {
+  wstringstream ss(L"QUJDCg==>");
+  mobs::Base64IstBuf b64buff(ss);
+  istream istr(&b64buff);
+
+  EXPECT_EQ(9, b64buff.in_avail());
+  EXPECT_EQ('Q', istr.get());
+  EXPECT_EQ(8, b64buff.in_avail());
+  EXPECT_EQ('U', istr.get());
+  EXPECT_EQ(7, b64buff.in_avail());
+  EXPECT_EQ('J', istr.get());
+  EXPECT_EQ(6, b64buff.in_avail());
+  EXPECT_EQ('D', istr.get());
+  EXPECT_EQ(5, b64buff.in_avail());
+  EXPECT_EQ('C', istr.get());
+  EXPECT_EQ(4, b64buff.in_avail());
+  EXPECT_EQ('g', istr.get());
+  istr.unget();
+  EXPECT_EQ(1, b64buff.in_avail());
+  EXPECT_EQ('g', istr.get());
+
+  EXPECT_EQ(3, b64buff.in_avail());
+  EXPECT_EQ('=', istr.get());
+  EXPECT_EQ(2, b64buff.in_avail());
+  EXPECT_EQ('=', istr.get());
+  EXPECT_EQ(1, b64buff.in_avail());
+  EXPECT_EQ(-1, istr.get());
+  EXPECT_EQ(-1, b64buff.in_avail());
+}
+
+TEST(IstreamBufferTest, NBufferTest) {
+  wstringstream ss(L"QUJDCg==>");
+  mobs::Base64IstBuf b64buff(ss);
+  istream b64str(&b64buff);
+
+  mobs::CryptIstrBuf cbuf(b64str, new mobs::CryptBufNone);
+  wistream istr(&cbuf);
+  cbuf.getCbb()->setBase64(false);
+
+  EXPECT_EQ(8, cbuf.in_avail());
+  EXPECT_EQ(L'Q', istr.get());
+  EXPECT_EQ(7, cbuf.in_avail());
+  EXPECT_EQ('U', istr.get());
+  EXPECT_EQ(6, cbuf.in_avail());
+  EXPECT_EQ('J', istr.get());
+  EXPECT_EQ(5, cbuf.in_avail());
+  EXPECT_EQ('D', istr.get());
+  EXPECT_EQ(4, cbuf.in_avail());
+  EXPECT_EQ('C', istr.get());
+  istr.unget();
+  EXPECT_EQ(4, cbuf.in_avail());
+  EXPECT_EQ('C', istr.get());
+  EXPECT_EQ(3, cbuf.in_avail());
+  EXPECT_EQ('g', istr.get());
+  EXPECT_EQ(2, cbuf.in_avail());
+  EXPECT_EQ('=', istr.get());
+  EXPECT_EQ(1, cbuf.in_avail());
+  EXPECT_EQ('=', istr.get());
+  EXPECT_EQ(-1, cbuf.in_avail());
+}
+
+TEST(IstreamBufferTest, NBufferTest64) {
+  wstringstream ss(L"QUJDCg==>");
+  mobs::Base64IstBuf b64buff(ss);
+  istream b64str(&b64buff);
+
+  mobs::CryptIstrBuf cbuf(b64str, new mobs::CryptBufNone);
+  wistream istr(&cbuf);
+  cbuf.getCbb()->setBase64(true);
+
+  EXPECT_EQ(4, cbuf.in_avail());
+  EXPECT_EQ(L'A', istr.get());
+  EXPECT_EQ(3, cbuf.in_avail());
+  EXPECT_EQ(L'B', istr.get());
+  EXPECT_EQ(2, cbuf.in_avail());
+  EXPECT_EQ(L'C', istr.get());
+  EXPECT_EQ(1, cbuf.in_avail());
+  EXPECT_EQ(L'\n', istr.get());
+  EXPECT_EQ(-1, cbuf.in_avail());
+  EXPECT_EQ(-1, istr.get());
+  EXPECT_EQ(-1, cbuf.in_avail());
 }
 
 

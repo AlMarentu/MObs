@@ -50,7 +50,7 @@ public:
   bool hasValue = false;
   std::wstring prefix;
   stack<wstring> elements;
-  CryptOstrBuf *cryptBufp = nullptr;
+  std::unique_ptr<CryptOstrBuf> cryptBufp;
   stringstream cryptss;
   wstringstream wstrBuff; // buffer für u8-Ausgabe in std::string
 
@@ -376,11 +376,11 @@ void XmlWriter::startEncrypt(CryptBufBase *cbbp) {
   auto r = dynamic_cast<mobs::CryptOstrBuf *>(data->buffer.rdbuf());
   if (r) {
     data->buffer.flush();
-    data->cryptBufp = new CryptOstrBuf(r->getOstream(), cbbp);
+    data->cryptBufp = std::unique_ptr<CryptOstrBuf>(new CryptOstrBuf(r->getOstream(), cbbp));
   } else {
-    data->cryptBufp = new CryptOstrBuf(data->cryptss, cbbp);
+    data->cryptBufp = std::unique_ptr<CryptOstrBuf>(new CryptOstrBuf(data->cryptss, cbbp));
   }
-  data->wostr = new std::wostream(data->cryptBufp);
+  data->wostr = new std::wostream(data->cryptBufp.get());
   *data->wostr << mobs::CryptBufBase::base64(true);
 }
 
@@ -394,7 +394,6 @@ void XmlWriter::stopEncrypt() {
   for (auto c:buf)
     data->buffer.put(c);
   delete data->wostr;
-  delete data->cryptBufp;
   data->cryptBufp = nullptr;
   data->cryptss.clear();
   data->wostr = &data->buffer;

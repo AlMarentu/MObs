@@ -332,7 +332,7 @@ private:
 class ExtractSql : virtual public ObjTrav {
 public:
   explicit ExtractSql(SQLDBdescription &s, const ConvObjToString& c) : current(nullptr, "", {}),
-                                                                       cth(move(c.exportPrefix().exportAltNames())),
+                                                                       cth(std::move(c.exportPrefix().exportAltNames())),
                                                                        sqldb(s) { }
 
   bool doObjBeg(ObjectBase &obj) final
@@ -784,11 +784,11 @@ namespace mobs {
 
 SqlGenerator::DetailInfo::DetailInfo(const MemBaseVector *v, std::string t,
                                      std::vector<std::pair<std::string, size_t>> k, bool c) :
-        vec(v), vecNc(nullptr), tableName(move(t)), arrayKeys(move(k)), cleaning(c) {}
+        vec(v), vecNc(nullptr), tableName(std::move(t)), arrayKeys(std::move(k)), cleaning(c) {}
 
 SqlGenerator::DetailInfo::DetailInfo(mobs::MemBaseVector *v, std::string t,
                                      std::vector<std::pair<std::string, size_t>> k) :
-        vec(v), vecNc(v), tableName(move(t)), arrayKeys(move(k)), cleaning(false) {}
+        vec(v), vecNc(v), tableName(std::move(t)), arrayKeys(std::move(k)), cleaning(false) {}
 
 SqlGenerator::DetailInfo::DetailInfo() : vec(nullptr), vecNc(nullptr), tableName(string()), arrayKeys({}), cleaning(false) {}
 

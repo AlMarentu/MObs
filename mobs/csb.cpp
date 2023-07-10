@@ -50,13 +50,11 @@ class CryptIstrBufData {
 public:
   CryptIstrBufData(std::istream &istr, CryptBufBase *cbbp)  : inStb(istr), cbb(cbbp) {
     if (not cbbp)
-      cbb = new CryptBufBase;
+      cbb = std::unique_ptr<CryptBufBase>(new CryptBufBase);
     cbb->setIstr(istr);
   }
 
-  ~CryptIstrBufData() {
-      delete cbb;
-  }
+  ~CryptIstrBufData() = default;
 
 #if 0
   void print_buffer(const CryptIstrBuf::char_type *begin, const CryptIstrBuf::char_type *end)
@@ -78,7 +76,7 @@ public:
 #endif
 
   std::istream &inStb;
-  CryptBufBase *cbb = nullptr;
+  std::unique_ptr<CryptBufBase> cbb = nullptr;
   std::mbstate_t state{};
   std::array<CryptIstrBuf::char_type, INPUT_BUFFER_SIZE> buffer;
   CryptIstrBuf::pos_type pos = 0;
@@ -211,7 +209,7 @@ void CryptIstrBuf::imbue(const std::locale &loc) {
 CryptBufBase *CryptIstrBuf::getCbb() {
   if (not data->cbb)
     LOG(LM_ERROR, "NO CBB");
-  return data->cbb;
+  return data->cbb.get();
 }
 
 std::istream &CryptIstrBuf::getIstream() {
@@ -480,6 +478,22 @@ public:
     if (s <= 0 and inStb->eof())
       s = -1;
     else if (use64 and s > 0) {
+      while (s < 4 - lookaheadCnt and (readLimit < 0 or readLimit > 3)) {
+        // wenigstens 4 Zeichen zusammenbringen
+        inStb->read(&lookahead[lookaheadCnt], s);
+        auto sr = inStb->gcount();
+        if (sr <= 0)
+          break;
+        lookaheadCnt += sr;
+        if (readLimit > 0)
+          readLimit -= sr;
+        s = inStb->rdbuf()->in_avail();
+        if (s < 0)
+          return 1;
+        if (s == 0)
+          break;
+      }
+      s += lookaheadCnt;
       s = (s > 3) ? s / 4 * 3 : 0;
     }
     //LOG(LM_DEBUG, "CryptBuf::canRead  " << inStb->rdbuf()->in_avail() << "->" << s << " EOF " << inStb->eof());
@@ -503,7 +517,7 @@ public:
       char *it = s;
       if (count > C_IN_BUF_SZ)
         count = C_IN_BUF_SZ;
-      size_t c2 = count / 3 * 4;
+      size_t c2 = (count + 2) / 3 * 4 - lookaheadCnt;
       if (av >= 4 and av < c2)
         c2 = av / 4 * 4;
       //LOG(LM_DEBUG, "READSOME64 " << c2 << " soll " << countIn / 3 * 4);
@@ -515,7 +529,11 @@ public:
       auto sr = c2 ? inStb->gcount() : 0;
       if (readLimit >= 0)
         readLimit -= sr;
-      char *cp = &buf[0];
+      char *cp = &lookahead[0];
+      for (size_t i = 0; i < lookaheadCnt; i++)
+        b64get(u_char(*cp++), it);
+      lookaheadCnt = 0;
+      cp = &buf[0];
       if (sr)
         for (size_t i = 0; i < sr; i++)
           b64get(u_char(*cp++), it);
@@ -653,14 +671,16 @@ public:
   std::ostream *outStb = nullptr;
   std::istream *inStb = nullptr;
   std::array<CryptBufBase::char_type, C_IN_BUF_SZ> buffer;
+  mutable std::array<CryptBufBase::char_type, 4> lookahead;
   bool use64 = false;
   bool bad = false;
   int delimiter = Traits::eof();
 
   int b64Value = 0;
   int b64Cnt = 0;
+  mutable int lookaheadCnt = 0;
   Base64Info b64;
-  std::streamsize readLimit = -1;
+  mutable std::streamsize readLimit = -1;
 };
 
 
@@ -844,13 +864,43 @@ Base64IstBuf::int_type Base64IstBuf::underflow() {
     return Traits::to_int_type(ch);
   }
   inStb.unget();
+  Base::setg(&ch, &ch+1, &ch+1);
+  atEof = true;
   return Traits::eof();
 }
 
 std::streamsize Base64IstBuf::showmanyc() {
+  if (atEof)
+    return -1;
   return inStb.rdbuf()->in_avail();
 }
 
+#if 0
+std::streamsize CryptBufNone2::showmanyc() {
+  int s = canRead();
+  if (s > 0)
+    return 1;
+  return s;
+}
+
+CryptBufNone2::int_type CryptBufNone2::overflow(int_type ch) {
+  if (Traits::not_eof(ch)) {
+    char_type c = Traits::to_char_type(ch);
+    doWrite(&c, 1);
+  }
+  return ch;
+}
+
+CryptBufNone2::int_type CryptBufNone2::underflow() {
+  if (doRead(&ch, 1) == 1) {
+    Base::setg(&ch, &ch, &ch + 1);
+    return Traits::to_int_type(ch);
+  }  else {
+    Base::setg(&ch, &ch+1, &ch+1);
+    return Traits::eof();
+  }
+}
+#endif
 
 }
 

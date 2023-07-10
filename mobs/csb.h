@@ -38,7 +38,7 @@ class CryptIstrBuf;
 
 /** \brief Stream-Buffer Basisklasse als Plugin für mobs::CryptIstrBuf oder mobs::CryptOstrBuf
  *
- * Die Basisklasse unterstützt die Umwandlung des Datenstromes nach Base64
+ * Die Basisklasse unterstützt die Umwandlung des Datenstreomes nach Base64
  */
 class CryptBufBase : public std::basic_streambuf<char> {
   friend class CryptIstrBufData;
@@ -203,6 +203,7 @@ public:
 
   /** \brief Konstruktor
    *
+   * der Verschlüsselungs-Plugin muss mit new erzeugt werden, die Freigabe erfolgt automatisch
    * @param istr std::istream aus dem die Daten gelesen werden
    * @param cbbp Plugin für Verschlüsselung, bei Fehlen wird CryptBufBase verwendet
    */
@@ -262,6 +263,7 @@ protected:
 private:
   std::wistream &inStb;
   char_type ch{};
+  bool atEof = false;
 };
 
 
@@ -343,6 +345,35 @@ std::basic_ostream<T> &operator<< (std::basic_ostream<T> &&s, const CryptBufBase
   return s;
 }
 
+#if 0
+/** \brief Stream-Buffer zur Basisklasse CryptBufBase als forward-device
+ *
+ * Eingabe und Ausgebe werden 1:1 durchgereicht. Kann verwendet werden um ein unverschlüsseltes Element zu erzeugen.
+ */
+class CryptBufNone2 : public CryptBufBase {
+public:
+  using Base = std::basic_streambuf<char>; ///< Basis-Typ
+  using char_type = typename Base::char_type;  ///< Element-Typ
+  using Traits = std::char_traits<char_type>; ///< Traits-Typ
+  using int_type = typename Base::int_type; ///< zugehöriger int-Typ
+
+  CryptBufNone2() = default;
+  ~CryptBufNone2() override = default;;
+  /// Bezeichnung des Algorithmus der Verschlüsselung
+  std::string name() const override { return u8"none"; }
+
+  /// \private
+  int_type overflow(int_type ch) override;
+  /// \private
+  int_type underflow() override;
+
+protected:
+  std::streamsize showmanyc() override;
+
+private:
+  char_type ch{};
+};
+#endif
 
 }
 
