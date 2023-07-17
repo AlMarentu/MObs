@@ -465,6 +465,7 @@ TEST(streamBufferTest, codecKill) {
 
 }
 
+
 TEST(streamBufferTest, dataInUTF8) {
   std::locale lo = std::locale(std::locale(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
   std::locale lo1 = std::locale(std::locale(), new mobs::codec_iso8859_1);
@@ -526,12 +527,82 @@ TEST(streamBufferTest, dataInUTF8) {
 
   EXPECT_TRUE(x2in.get(ch).eof());
 
+}
+
+
+TEST(streamBufferTest, dataStreamInUTF8) {
+  stringstream strOut("Mümmelmännchen€\200\01\02\03€Otto\200\04\05\06€ßß");
+
+  stringstream strIn(strOut.str());
+  mobs::CryptIstrBuf streambufI(strIn, new mobs::CryptBufNone);
+  std::wistream x2in(&streambufI);
+  std::locale lo = std::locale(std::locale(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
+  x2in.imbue(lo);
+
+  std::array<wchar_t, 1024> buf;
+  auto sz = x2in.readsome(&buf[0], buf.size());
+  ASSERT_GT(sz, 0);
+  EXPECT_EQ(std::wstring(L"Mümmelmännchen€"), std::wstring(&buf[0], sz));
+  EXPECT_TRUE(x2in.eof());
+
+  x2in.clear();
+  EXPECT_TRUE(x2in.good());
+
+  mobs::BinaryIstBuf binBuf1(streambufI, 4);
+  istream bin1(&binBuf1);
+  EXPECT_EQ(4, bin1.rdbuf()->in_avail());
+
+  char ch;
+  {
+    ASSERT_FALSE(bin1.get(ch).bad());
+    EXPECT_EQ('\200', ch);
+    ASSERT_FALSE(bin1.get(ch).bad());
+    EXPECT_EQ('\01', ch);
+    ASSERT_FALSE(bin1.get(ch).bad());
+    EXPECT_EQ('\02', ch);
+    ASSERT_FALSE(bin1.get(ch).bad());
+    EXPECT_EQ('\03', ch);
+    EXPECT_TRUE(bin1.good());
+    EXPECT_TRUE(bin1.get(ch).eof());
+  }
+  EXPECT_TRUE(x2in.good());
+
+  sz = x2in.readsome(&buf[0], buf.size());
+  ASSERT_GT(sz, 0);
+  EXPECT_EQ(std::wstring(L"€Otto"), std::wstring(&buf[0], sz));
+  EXPECT_FALSE(x2in.eof());
+
+  x2in.clear();
+  EXPECT_TRUE(x2in.good());
+
+  mobs::BinaryIstBuf binBuf2(streambufI, 4);
+  istream bin2(&binBuf2);
+  EXPECT_LT(0, bin2.rdbuf()->in_avail());
+
+  ASSERT_FALSE(bin2.get(ch).bad());
+  EXPECT_EQ('\200', ch);
+  ASSERT_FALSE(bin2.get(ch).bad());
+  EXPECT_EQ(L'\04', ch);
+  ASSERT_FALSE(bin2.get(ch).bad());
+  EXPECT_EQ(L'\05', ch);
+  ASSERT_FALSE(bin2.get(ch).bad());
+  EXPECT_EQ(L'\06', ch);
+  EXPECT_TRUE(bin2.good());
+  EXPECT_TRUE(bin2.get(ch).eof());
+
+
+  EXPECT_TRUE(x2in.good());
+
+  sz = x2in.readsome(&buf[0], buf.size());
+  ASSERT_GT(sz, 0);
+  EXPECT_EQ(std::wstring(L"€ßß"), std::wstring(&buf[0], sz));
+  wchar_t wch;
+  EXPECT_TRUE(x2in.get(wch).eof());
+
 
 
 
 
 }
-
-
 
 }

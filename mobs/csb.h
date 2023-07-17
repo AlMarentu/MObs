@@ -195,6 +195,7 @@ class CryptIstrBufData;
  * ISO nach beliebig geht, UTF8 bzw UTF16 darf nicht mehr geändert werden
  */
 class CryptIstrBuf : public std::basic_streambuf<wchar_t> {
+  friend class BinaryIstBuf;
 public:
   using Base = std::basic_streambuf<wchar_t>; ///< Basis-Typ
   using char_type = typename Base::char_type; ///< Element-Typ
@@ -267,6 +268,42 @@ private:
   std::wistream &inStb;
   char_type ch{};
   bool atEof = false;
+};
+
+
+
+class BinaryIstrBufData;
+
+/** \brief istream-buffer der von CryptIstrBuf abgeleitet wird um einen Block binärer Daten zu extrahieren
+ *
+ * wird für das Auswerten binärer Elemente in (CryptIstrBuf) XML-Streams verwendet. Diese müssen in einer UTF-8 locale vorliegen.
+ * Durch einen Delimiter 0x80 wird der UTF-8-Stream beendet, danach kann von diesem Stream der BinaryIstBuf abgeleitet werden,
+ * der dann eine Fixe Anzahl Bytes (inklusive dem 0x80) liest. Im Anschluss  muss der stream mit clear() zurückgesetzt werden
+ * und kann wieder normal weiterarbeiten.
+ * Der BinaryIstBuf darf nur von CryptIstrBuf abgeleitet werden, wenn diese eim eof-state sind. Ansonsten werden die bereits im Buffer
+ * befindlichen Zeichen übersprungen.
+ * Solange der BinaryIstBuf aktiv ist darf der zugehörige CryptIstrBuf nicht vernichtet werden.
+ */
+class BinaryIstBuf : public std::basic_streambuf<char> {
+public:
+  using Base = std::basic_streambuf<char>; ///< Basis-Typ
+  using char_type = typename Base::char_type;  ///< Element-Typ
+  using Traits = std::char_traits<char_type>; ///< Traits-Typ
+  using int_type = typename Base::int_type; ///< zugehöriger int-Typ
+
+  /// Konstruktor eines istream buffers, der aus einem CryptIstrBuf len (> 0) Bytes binäre Daten extrahiert
+  explicit BinaryIstBuf(CryptIstrBuf &ci, size_t len);
+
+  ~BinaryIstBuf() override;
+
+  /// \private
+  int_type underflow() override;
+
+protected:
+  std::streamsize showmanyc() override;
+
+private:
+  std::unique_ptr<BinaryIstrBufData> data;
 };
 
 
