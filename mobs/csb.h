@@ -222,6 +222,9 @@ public:
   /// Zugriff auf den Stream-Buffer des Plugins (ist immer gültig)
   CryptBufBase *getCbb();
 
+  /// Tauscht den verwendeten Crypt-Buffer aus
+  void swapBuffer(std::unique_ptr<CryptBufBase> &newBuffer);
+
   /// Abfrage des Status
   bool bad() const;
 
@@ -308,6 +311,9 @@ public:
 
   /// Zugriff auf den Stream-Buffer des Plugins (ist immer gültig)
   CryptBufBase *getCbb();
+
+  /// Tauscht den verwendeten Crypt-Buffer aus
+  void swapBuffer(std::unique_ptr<CryptBufBase> &newBuffer);
 
 protected:
   /// \private

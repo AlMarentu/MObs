@@ -73,18 +73,19 @@ mobs::CryptBufNone::int_type mobs::CryptBufNone::underflow() {
   try {
     if (data->finished)
       return Traits::eof();
-    int len = underflowWorker(false);
- //    std::cout << "GC2 = " << len << " ";
+    std::streamsize len = underflowWorker(false);
+    //    std::cout << "GC2 = " << len << " ";
     if (len)
       return Traits::to_int_type(*Base::gptr());
   } catch (std::exception &e) {
-    LOG(LM_ERROR, "Exception " << e.what());
+    LOG(LM_ERROR, "CryptBufNone Exception " << e.what());
     setBad();
+    throw std::ios_base::failure(e.what(), std::io_errc::stream);
   }
   return Traits::eof();
 }
 
-int mobs::CryptBufNone::underflowWorker(bool nowait) {
+std::streamsize mobs::CryptBufNone::underflowWorker(bool nowait) {
   std::streamsize sz = std::distance(&data->inputBuf[0], data->inputStart);
   do {
     std::streamsize s = nowait ? canRead() : data->inputBuf.size() - sz;
@@ -129,7 +130,7 @@ mobs::CryptBufNone::int_type mobs::CryptBufNone::overflow(mobs::CryptBufNone::in
       return ch;
   } catch (std::exception &e) {
     LOG(LM_ERROR, "Exception " << e.what());
-    setBad();
+    throw std::ios_base::failure(e.what(), std::io_errc::stream);
   }
   return Traits::eof();
 }

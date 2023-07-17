@@ -51,6 +51,7 @@ public:
   std::wstring prefix;
   stack<wstring> elements;
   std::unique_ptr<CryptOstrBuf> cryptBufp;
+  std::unique_ptr<CryptBufBase> cryptSwap;
   stringstream cryptss;
   wstringstream wstrBuff; // buffer für u8-Ausgabe in std::string
 
@@ -333,7 +334,7 @@ string XmlWriter::getString() const
 
 
 void XmlWriter::startEncrypt(CryptBufBase *cbbp) {
-  if (data->cryptBufp or not cbbp or data->level == 0)
+  if (data->cryptBufp or data->cryptSwap or not cbbp or data->level == 0)
     THROW("invalid state encryption");
   data->cryptLevel = data->level;
   std::wstring pfx;
@@ -376,27 +377,36 @@ void XmlWriter::startEncrypt(CryptBufBase *cbbp) {
   auto r = dynamic_cast<mobs::CryptOstrBuf *>(data->buffer.rdbuf());
   if (r) {
     data->buffer.flush();
-    data->cryptBufp = std::unique_ptr<CryptOstrBuf>(new CryptOstrBuf(r->getOstream(), cbbp));
+    data->cryptSwap = std::unique_ptr<CryptBufBase>(cbbp);
+    r->swapBuffer(data->cryptSwap);
+    //data->cryptBufp = std::unique_ptr<CryptOstrBuf>(new CryptOstrBuf(r->getOstream(), cbbp));
+    //data->wostr = new std::wostream(data->cryptBufp.get());
   } else {
+    auto lo = data->buffer.getloc();
     data->cryptBufp = std::unique_ptr<CryptOstrBuf>(new CryptOstrBuf(data->cryptss, cbbp));
+    data->wostr = new std::wostream(data->cryptBufp.get());
+    data->wostr->imbue(lo);
   }
-  data->wostr = new std::wostream(data->cryptBufp.get());
   *data->wostr << mobs::CryptBufBase::base64(true);
 }
 
 void XmlWriter::stopEncrypt() {
-  if (not data->cryptBufp)
-    return;
-  data->cryptBufp->finalize();
-  const string &buf = data->cryptss.str();
-//  copy(buf.cbegin(), buf.cend(), std::ostreambuf_iterator<wchar_t>(*data->wostr));
-  // Wenn auf den Ziel-Buffer des mobs::CryptOstrBuf geschrieben wurde, ist buf hier leer
-  for (auto c:buf)
-    data->buffer.put(c);
-  delete data->wostr;
-  data->cryptBufp = nullptr;
-  data->cryptss.clear();
-  data->wostr = &data->buffer;
+  if (data->cryptSwap) {
+    if (auto r = dynamic_cast<mobs::CryptOstrBuf *>(data->buffer.rdbuf()))
+      r->swapBuffer(data->cryptSwap);
+      data->cryptSwap = nullptr;
+  } else if (data->cryptBufp) {
+      data->cryptBufp->finalize();
+      const string &buf = data->cryptss.str();
+      // Wenn auf den Ziel-Buffer des mobs::CryptOstrBuf geschrieben wurde, ist buf hier leer
+      for (auto c: buf)
+          data->buffer.put(c);
+      delete data->wostr;
+      data->cryptBufp = nullptr;
+      data->cryptss.clear();
+      data->wostr = &data->buffer;
+  } else
+      return;
 
   std::wstring pfx;
   data->prefix.swap(pfx);

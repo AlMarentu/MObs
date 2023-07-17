@@ -82,7 +82,7 @@ protected:
 private:
   std::unique_ptr<CryptBufNoneData> data;
 
-  int underflowWorker(bool nowait);
+  std::streamsize underflowWorker(bool nowait);
 
 };
 

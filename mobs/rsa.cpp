@@ -325,7 +325,8 @@ mobs::CryptBufRsa::int_type mobs::CryptBufRsa::underflow() {
       data->ctx = nullptr;
     }
     setBad();
-    return Traits::eof();
+    throw std::ios_base::failure(e.what(), std::io_errc::stream);
+    //return Traits::eof();
   }
 }
 
