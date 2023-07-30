@@ -43,6 +43,7 @@ class CryptIstrBuf;
 class CryptBufBase : public std::basic_streambuf<char> {
   friend class CryptIstrBufData;
   friend class CryptOstrBufData;
+  friend class BinaryIstBuf;
 public:
   using Base = std::basic_streambuf<char>; ///< Basis-Typ
   using char_type = typename Base::char_type;  ///< Element-Typ
@@ -292,7 +293,7 @@ public:
   using int_type = typename Base::int_type; ///< zugehöriger int-Typ
 
   /// Konstruktor eines istream buffers, der aus einem CryptIstrBuf len (> 0) Bytes binäre Daten extrahiert
-  explicit BinaryIstBuf(CryptIstrBuf &ci, size_t len);
+  BinaryIstBuf(CryptIstrBuf &ci, size_t len);
 
   ~BinaryIstBuf() override;
 

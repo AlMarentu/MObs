@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2023 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -22,6 +22,7 @@
 \brief  Klasse um Objekte aus einen XML-String/File auszulesen */
 
 #include "objgen.h"
+#include <memory>
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "UnusedGlobalDeclarationInspection"
@@ -119,7 +120,10 @@ public:
   void fill(ObjectBase *obj);
   /// Referenz auf verwendeten input stream
   std::wistream &getIstr();
-  private:
+  /// Lese binäre Daten aus dem input stream, bei bedarf mit Verschlüsselung
+  std::istream &byteStream(size_t len, CryptBufBase *cbbp = nullptr);
+
+private:
     std::unique_ptr<XmlReadData> data;
 //  XmlReadData(const std::string &input, const ConvObjFromStr &c) : XmlParserW(str), str(to_wstring(input)) { cfs = c; };
 

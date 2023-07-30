@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2023 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -54,6 +54,7 @@ public:
   std::unique_ptr<CryptBufBase> cryptSwap;
   stringstream cryptss;
   wstringstream wstrBuff; // buffer für u8-Ausgabe in std::string
+  std::unique_ptr<std::ostream> binaryStream;
 
   void setConFun() {
     std::locale lo;
@@ -120,7 +121,37 @@ public:
     }
   }
 
-};
+  std::ostream &byteStream(const char *delimiter = nullptr, CryptBufBase *cbbp = nullptr) {
+    auto wbufp = dynamic_cast<CryptOstrBuf*>(wostr->rdbuf());
+    if (not wbufp)
+      throw std::runtime_error("no mobs::CryptOstrBuf");
+    *wostr << flush;
+    if (cbbp)
+    {
+      binaryStream = std::unique_ptr<std::ostream>(new std::ostream(cbbp));
+      if (delimiter)
+        wbufp->getOstream() << delimiter;
+      cbbp->setOstr(wbufp->getOstream());
+      return *binaryStream;
+    } else {
+      if (delimiter)
+        wbufp->getOstream() << delimiter;
+      return wbufp->getOstream();
+    }
+  }
+
+  void closeByteStream() {
+    if (binaryStream) {
+      binaryStream->flush();
+      if (auto sp = dynamic_cast<CryptBufBase *>(binaryStream->rdbuf())) {
+        sp->finalize();
+      }
+      binaryStream = nullptr;
+    }
+  }
+
+
+  };
 
 
 
@@ -424,6 +455,16 @@ void XmlWriter::sync() {
 
 void XmlWriter::putc(wchar_t c) {
   data->buffer.put(c);
+}
+
+std::ostream &XmlWriter::byteStream(const char *delimiter, CryptBufBase *cbbp)
+{
+  return data->byteStream(delimiter, cbbp);
+}
+
+void XmlWriter::closeByteStream()
+{
+  data->closeByteStream();
 }
 
 

@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2023 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -168,7 +168,7 @@ static std::wstring stow(const string &s, bool dontConvert) {
         pushObject(*obj);
       levelStart = currentLevel();
     }
-    
+
     XmlReader *parent;
     std::wistringstream str;
     ObjectBase *obj = nullptr;
@@ -197,8 +197,13 @@ XmlReader::~XmlReader() = default;
 void XmlReader::fill(ObjectBase *obj) {
   data->setObj(obj);
 }
+
 std::string XmlReader::elementRemovePrefix(const std::string &element) const {
   return data->elementRemovePrefix(element);
+}
+
+std::istream &XmlReader::byteStream(size_t len, CryptBufBase *cbbp) {
+  return data->byteStream(len, cbbp);
 }
 
 

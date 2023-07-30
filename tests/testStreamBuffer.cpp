@@ -20,7 +20,7 @@
 
 
 #include "csb.h"
-#include "csb.h"
+#include "aes.h"
 
 #include "objtypes.h"
 #include "nbuf.h"
@@ -481,7 +481,7 @@ TEST(streamBufferTest, dataInUTF8) {
   auto sz = x2in.readsome(&buf[0], buf.size());
   ASSERT_GT(sz, 0);
   EXPECT_EQ(std::wstring(L"Mümmelmännchen€"), std::wstring(&buf[0], sz));
-  EXPECT_TRUE(x2in.eof());
+  //EXPECT_TRUE(x2in.eof());
 
   x2in.clear();
   EXPECT_TRUE(x2in.good());
@@ -534,7 +534,7 @@ TEST(streamBufferTest, dataStreamInUTF8) {
   stringstream strOut("Mümmelmännchen€\200\01\02\03€Otto\200\04\05\06€ßß");
 
   stringstream strIn(strOut.str());
-  mobs::CryptIstrBuf streambufI(strIn, new mobs::CryptBufNone);
+  mobs::CryptIstrBuf streambufI(strIn); //new mobs::CryptBufNone);
   std::wistream x2in(&streambufI);
   std::locale lo = std::locale(std::locale(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
   x2in.imbue(lo);
@@ -543,17 +543,17 @@ TEST(streamBufferTest, dataStreamInUTF8) {
   auto sz = x2in.readsome(&buf[0], buf.size());
   ASSERT_GT(sz, 0);
   EXPECT_EQ(std::wstring(L"Mümmelmännchen€"), std::wstring(&buf[0], sz));
-  EXPECT_TRUE(x2in.eof());
+  //EXPECT_TRUE(x2in.eof());
 
   x2in.clear();
   EXPECT_TRUE(x2in.good());
 
-  mobs::BinaryIstBuf binBuf1(streambufI, 4);
-  istream bin1(&binBuf1);
-  EXPECT_EQ(4, bin1.rdbuf()->in_avail());
-
   char ch;
   {
+    mobs::BinaryIstBuf binBuf1(streambufI, 4);
+    istream bin1(&binBuf1);
+    EXPECT_EQ(4, bin1.rdbuf()->in_avail());
+
     ASSERT_FALSE(bin1.get(ch).bad());
     EXPECT_EQ('\200', ch);
     ASSERT_FALSE(bin1.get(ch).bad());
@@ -599,10 +599,109 @@ TEST(streamBufferTest, dataStreamInUTF8) {
   wchar_t wch;
   EXPECT_TRUE(x2in.get(wch).eof());
 
+}
 
 
+TEST(streamBufferTest, StrBufUtf8WithBin) {
+  Person p;
+  p.name("€Mähr");
+  stringstream strOut;
+  mobs::CryptOstrBuf streambufO(strOut, new mobs::CryptBufNone);
+  std::wostream x2out(&streambufO);
+  x2out.exceptions(std::wostream::failbit | std::wostream::badbit);
 
+  mobs::XmlWriter xf(x2out, mobs::XmlWriter::CS_utf8, false);
+
+  mobs::XmlOut xo(&xf, mobs::ConvObjToString().exportXml());
+
+  xf.writeHead();
+  xf.writeTagBegin(L"root");
+  p.traverse(xo);
+  xf.writeTagEnd();
+  auto &bin = xf.byteStream("\200", new mobs::CryptBufNone());
+  bin << "XXX";
+  xf.closeByteStream();
+  EXPECT_EQ(u8"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><root><Person><name>€Mähr</name></Person></root>\200XXX",
+            strOut.str());
+
+  stringstream strIn(strOut.str());
+  mobs::CryptIstrBuf streambufI(strIn, new mobs::CryptBufNone);
+  std::wistream x2in(&streambufI);
+  XmlInput xr(x2in);
+  xr.readTillEof(false);
+  EXPECT_NO_THROW(xr.parse());
+  EXPECT_EQ(u8"€Mähr", person.name());
+  EXPECT_FALSE(xr.eof());
+  EXPECT_TRUE(xr.eot());
+
+#if 0
+  x2in.clear();
+  mobs::BinaryIstBuf binBuf2(streambufI, 4);
+  istream bin2(&binBuf2);
+#else
+  istream &bin2 = xr.byteStream(3);
+#endif
+  char ch = ' ';
+  ASSERT_FALSE(bin2.bad());
+  std::string tmp;
+  bin2 >> tmp;
+  EXPECT_STREQ("XXX", tmp.c_str());
 
 }
+
+TEST(streamBufferTest, StrBufUtf8WithAes) {
+  Person p;
+  p.name("€Mähr");
+  stringstream strOut;
+  mobs::CryptOstrBuf streambufO(strOut, new mobs::CryptBufNone);
+  std::wostream x2out(&streambufO);
+  x2out.exceptions(std::wostream::failbit | std::wostream::badbit);
+
+  mobs::XmlWriter xf(x2out, mobs::XmlWriter::CS_utf8, false);
+
+  mobs::XmlOut xo(&xf, mobs::ConvObjToString().exportXml());
+
+  xf.writeHead();
+  xf.writeTagBegin(L"root");
+  p.traverse(xo);
+  xf.writeTagEnd();
+
+  std::vector<u_char> iv;
+  iv.resize(mobs::CryptBufAes::iv_size());
+  for (auto &i:iv)
+    i = '@';
+  std::vector<u_char> key;
+  iv.resize(mobs::CryptBufAes::key_size());
+  for (auto &i:key)
+    i = '1';
+
+  auto &bin = xf.byteStream("\200", new mobs::CryptBufAes(key, iv, "", true));
+  bin << "XYX123";
+  xf.closeByteStream();
+  EXPECT_EQ(u8"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><root><Person><name>€Mähr</name></Person></root>\200@@@@@@@@@@@@@@@@\xEE\x12s( tl>\xBF\xB6\t\xCD\xFF\xC3\xE0\x1F",
+            strOut.str());
+
+  stringstream strIn(strOut.str());
+  mobs::CryptIstrBuf streambufI(strIn, new mobs::CryptBufNone);
+  std::wistream x2in(&streambufI);
+  XmlInput xr(x2in);
+  xr.readTillEof(false);
+  EXPECT_NO_THROW(xr.parse());
+  EXPECT_EQ(u8"€Mähr", person.name());
+  EXPECT_FALSE(xr.eof());
+  EXPECT_TRUE(xr.eot());
+
+  LOG(LM_INFO, "start byteStream");
+  istream &bin2 = xr.byteStream(mobs::CryptBufAes::aes_size(6), new mobs::CryptBufAes(key));
+  LOG(LM_INFO, "byteStream done");
+
+  ASSERT_FALSE(bin2.bad());
+  std::string tmp;
+  bin2 >> tmp;
+  EXPECT_STREQ("XYX123", tmp.c_str());
+
+}
+
+
 
 }

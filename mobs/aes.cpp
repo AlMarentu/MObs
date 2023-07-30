@@ -185,6 +185,16 @@ std::streamsize mobs::CryptBufAes::showmanyc() {
   return underflowWorker(true);
 }
 
+/*
+int mobs::CryptBufAes::sync() {
+  TRACE("");
+  LOG(LM_INFO, "CryptBufAes::sync");
+  CryptBufBase::sync();
+  //finalize();
+  return isGood() ? 0 : -1;
+}
+*/
+
 
 mobs::CryptBufAes::int_type mobs::CryptBufAes::underflow() {
   TRACE("");

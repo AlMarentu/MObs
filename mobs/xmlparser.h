@@ -944,6 +944,27 @@ public:
       THROW(u8" expected tag at EOF: " + tags.top().element);
     endOfFile = true;
   };
+  std::istream &byteStream(size_t len, CryptBufBase *cbbp = nullptr) {
+    auto wbufp = dynamic_cast<CryptIstrBuf*>(istr.rdbuf());
+    if (not wbufp)
+      throw std::runtime_error("no mobs::CryptIstrBuf");
+    istr.clear();
+    binaryBuffer = std::unique_ptr<mobs::BinaryIstBuf>(new BinaryIstBuf(*wbufp, len + 1)); // plus delimiter
+    if (binaryBuffer->in_avail() <= 0)
+      throw std::runtime_error("delimiter missing");
+    if (binaryBuffer->sgetc() != mobs::BinaryIstBuf::Traits::to_int_type('\200'))
+        THROW("delimiter mismatch " << std::hex << binaryBuffer->sgetc());
+    binaryBuffer->sbumpc();
+    if (cbbp) {
+      binaryFiltStream = std::unique_ptr<std::istream>(new std::istream(binaryBuffer.get()));
+      cbbp->setIstr(*binaryFiltStream);
+      binaryFilt = std::unique_ptr<CryptBufBase>(cbbp);
+      binaryStream = std::unique_ptr<std::istream>(new std::istream(binaryFilt.get()));
+    } else {
+      binaryStream = std::unique_ptr<std::istream>(new std::istream(binaryBuffer.get()));
+    }
+    return *binaryStream;
+  }
 
 private:
   void parse2GT() {
@@ -1219,7 +1240,11 @@ private:
   Base64Reader base64;
   EncryptedData encryptedData;
   mutable int xmlEncState = 0;
-//  mutable size_t maxRead = SIZE_T_MAX;
+  std::unique_ptr<mobs::BinaryIstBuf> binaryBuffer;
+  std::unique_ptr<CryptBufBase> binaryFilt;
+  std::unique_ptr<std::istream> binaryFiltStream;
+  std::unique_ptr<std::istream> binaryStream;
+  //  mutable size_t maxRead = SIZE_T_MAX;
   bool inParse2Lt = false;
   bool inParse2LtWork = false;
   bool bomCheck = false;

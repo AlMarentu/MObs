@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2023 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -107,6 +107,10 @@ public:
   void putc(wchar_t c);
   /// Tag-Stack aktualisieren (nach wiederholtem writeHead())
   void pushTag(const std::wstring &tag);
+  /// Schreibe binäre Daten in den output stream, bei bedarf mit Verschlüsselung; der delimiter wird vorangestellt
+  std::ostream &byteStream(const char *delimiter = nullptr, CryptBufBase *cbbp = nullptr);
+  /// Schließe den binären stream wieder
+  void closeByteStream();
 
   std::wstring valueToken; ///< Wenn nicht leer, dann als Attributname für Values verwenden
   std::wstring version = L"1.0"; ///< Version für Header

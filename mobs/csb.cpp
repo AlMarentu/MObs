@@ -169,7 +169,7 @@ CryptIstrBuf::int_type CryptIstrBuf::underflow() {
                                                           << sz);
       if (bp != &buf[0]) { // Rest merken
         data->rest = std::unique_ptr<std::vector<char>>(
-                new std::vector<char>(bp, &buf[sz])); //std::distance(bp, &buf[sz]))
+                new std::vector<char>(const_cast<char *>(bp), &buf[sz])); //std::distance(bp, &buf[sz]))
         LOG(LM_INFO, "CryptIstrBuf saving " << data->rest->size() << " chars: "
                                             << std::string(&(*data->rest)[0], data->rest->size()));
       } else
@@ -270,7 +270,7 @@ void CryptIstrBuf::imbue(const std::locale &loc) {
                                                       << sz);
       if (bp != &buf[0]) { // Rest merken
         data->rest = std::unique_ptr<std::vector<char>>(
-                new std::vector<char>(bp, &buf[sz])); //std::distance(bp, &buf[sz]))
+                new std::vector<char>(const_cast<char *>(bp), &buf[sz])); //std::distance(bp, &buf[sz]))
         LOG(LM_INFO, "CryptIstrBuf saving " << data->rest->size() << " chars: "
                                             << std::string(&(*data->rest)[0], data->rest->size()));
       } else
@@ -638,15 +638,17 @@ public:
       std::streamsize count = countIn;
       if (av > 0 and av < count) //  and readLimit == -1
         count = av;
-      LOG(LM_DEBUG, "READSOME " << count << " soll " << countIn);
+      LOG(LM_DEBUG, "CryptBufBaseData::doRead " << count << " soll " << countIn);
       std::streamsize n;
       if (Traits::eq(delimiter, Traits::eof())) {
-        inStb->read(s, count);
-        n = inStb->gcount();
-#if 1
+        n = inStb->readsome(s, count);
+        if (n == 0) {
+          inStb->read(s, 1);  // mindestens 1 Zeichen lesen mit warten, dann nachfassen
+          n = inStb->gcount();
+        }
         if (n > 0 and n < countIn) { // wenn möglich nachfassen
           av = inStb->rdbuf()->in_avail();
-          LOG(LM_DEBUG, "RSRS nachfasen " << av);
+          LOG(LM_DEBUG, "CryptBufBaseData::doRead nachfassen " << av);
           if (av > 0) {
             if (av > countIn - n)
               av = countIn - n;
@@ -655,10 +657,9 @@ public:
             if (n2 > 0)
               n += n2;
             else
-              LOG(LM_ERROR, "doRead gcount liefert " << n2);
+              LOG(LM_ERROR, "CryptBufBaseData::doRead gcount liefert " << n2);
           }
         }
-#endif
       } else {
         char d = Traits::to_char_type(delimiter);
         for (n = 0; n < count; n++, s++) {
@@ -964,9 +965,57 @@ std::streamsize Base64IstBuf::showmanyc() {
 
 class BinaryIstrBufData {
 public:
-  BinaryIstrBufData(CryptIstrBufData *cid, size_t len) : binaryLength(len), inStb(cid->inStb), cbb(cid->cbb.get()) { }
+  BinaryIstrBufData(CryptIstrBufData *cid, size_t len) :
+          binaryLength(len), inStb(cid->inStb), cbb(cid->cbb.get()) { }
 
   ~BinaryIstrBufData() = default;
+
+  std::streamsize underflow() { // 0 == eof
+    TRACE("");
+    if (not binaryLength)
+      return 0;
+    std::streamsize sz = 0;
+    if (cbb) {
+      std::streamsize rd = buffer.size();
+      auto av = cbb->in_avail();
+      if (av == 0) {
+        // evt. auf neue Zeichen warten
+        if (cbb->underflow() == EOF)
+          return 0;
+        av = cbb->in_avail();
+      }
+      if (av > 0 and av < rd)
+        rd = av;
+      if (rd > binaryLength)
+        rd = binaryLength;
+      sz = cbb->sgetn(&buffer[0], rd);
+    } else {
+      LOG(LM_DEBUG, "READ ohne cbb");
+      if (inStb.eof())
+        return 0;
+      std::istream::sentry sen(inStb, true);
+      if (sen) {
+        std::streamsize rd = buffer.size();
+        if (rd > binaryLength)
+          rd = binaryLength;
+        inStb.read(&buffer[0], rd);
+        sz = inStb.gcount();
+      }
+    }
+    return sz;
+  }
+  std::streamsize showmanyc() {
+    if (not binaryLength)
+      return -1;
+    std::streamsize sz;
+    if (cbb)
+      sz = cbb->in_avail();
+    else
+      sz = inStb.rdbuf()->in_avail();
+    if (sz > binaryLength)
+      return binaryLength;
+    return sz;
+  }
 
   size_t binaryLength;
   std::istream &inStb;
@@ -1005,58 +1054,25 @@ BinaryIstBuf::int_type BinaryIstBuf::underflow() {
     return Traits::eof();
   std::streamsize sz = 0;
   try {
-    if (data->cbb) { // wird der buffer nicht explizit auf null gesetzt ist immer einer vorhanden
-      std::streamsize rd = data->buffer.size();
-      auto av = data->cbb->in_avail();
-      if (av == 0) {
-        // evt. auf neue Zeichen warten
-        if (data->cbb->underflow() == EOF)
-          return Traits::eof();
-        av = data->cbb->in_avail();
-      }
-      if (av > 0 and av < rd)
-        rd = av;
-      if (rd > data->binaryLength)
-        rd = data->binaryLength;
-      sz = data->cbb->sgetn(&data->buffer[0], rd);
-    } else {
-      LOG(LM_DEBUG, "READ ohne cbb");
-      if (data->inStb.eof())
-        return Traits::eof();
-      std::istream::sentry sen(data->inStb, true);
-      if (sen) {
-        std::streamsize rd = data->buffer.size();
-        if (rd > data->binaryLength)
-          rd = data->binaryLength;
-        data->inStb.read(&data->buffer[0], rd);
-        sz = data->inStb.gcount();
-      }
-    }
+    auto sz = data->underflow(); // immer >= 0 oder exception
+    Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[sz]);
+    if (not sz)
+      return Traits::eof();
   } catch (std::exception &e) {
     LOG(LM_ERROR, "exception: " << e.what());
     Base::setg(data->buffer.begin(), data->buffer.begin(), data->buffer.begin());
     throw std::ios_base::failure(e.what());
   }
-  Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[sz]);
-  if (not sz)
-    return Traits::eof();
-  data->binaryLength -= sz;
-  data->pos += off_type(sz);
   return Traits::to_int_type(*Base::gptr());
 }
 
 std::streamsize BinaryIstBuf::showmanyc() {
   LOG(LM_DEBUG, "BinaryIstBuf::showmanyc");
-
-  if (not data->binaryLength)
-    return -1;
-  if (not data->cbb)
-    return 0;
-  auto sz = data->cbb->in_avail();
-  if (sz > data->binaryLength)
-    return data->binaryLength;
-  return sz;
+  return data->showmanyc();
 }
+
+
+
 
 
 
