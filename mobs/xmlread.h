@@ -21,6 +21,9 @@
 /** \file xmlread.h
 \brief  Klasse um Objekte aus einen XML-String/File auszulesen */
 
+#ifndef MOBS_XMLREAD_H
+#define MOBS_XMLREAD_H
+
 #include "objgen.h"
 #include <memory>
 
@@ -164,3 +167,5 @@ private:
 }
 
 #pragma clang diagnostic pop
+
+#endif // MOBS_XMLREAD_H

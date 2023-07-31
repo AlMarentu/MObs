@@ -143,7 +143,7 @@ CryptIstrBuf::int_type CryptIstrBuf::underflow() {
       }
       sz = data->cbb->sgetn(&buf[0], rd);
     } else {
-      LOG(LM_DEBUG, "READ ohne cbb");
+      LOG(LM_DEBUG, "CryptIstrBuf READ ohne cbb");
       if (data->inStb.eof())
         return Traits::eof();
       std::istream::sentry sen(data->inStb, true);
@@ -990,7 +990,7 @@ public:
         rd = binaryLength;
       sz = cbb->sgetn(&buffer[0], rd);
     } else {
-      LOG(LM_DEBUG, "READ ohne cbb");
+      LOG(LM_DEBUG, "BinaryIstrBuf READ ohne cbb");
       if (inStb.eof())
         return 0;
       std::istream::sentry sen(inStb, true);
@@ -1002,6 +1002,9 @@ public:
         sz = inStb.gcount();
       }
     }
+    if (sz > binaryLength)
+      sz = binaryLength;
+    binaryLength -= sz;
     return sz;
   }
   std::streamsize showmanyc() {
