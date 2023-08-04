@@ -1,10 +1,10 @@
 
 set(libSrcs objgen.cpp objtypes.cpp logging.cpp strtoobj.cpp objpool.cpp xmlwriter.cpp audittrail.cpp
         xmlout.cpp xmlread.cpp converter.cpp unixtime.cpp dbifc.cpp helper.cpp mchrono.cpp queryorder.cpp
-        querygenerator.cpp csb.cpp nbuf.cpp tcpstream.cpp socketstream.cpp
+        querygenerator.cpp csb.cpp nbuf.cpp tcpstream.cpp socketstream.cpp mrpc.cpp
         converter.h logging.h objpool.h objtypes.h unixtime.h xmlparser.h xmlwriter.h audittrail.h
-        jsonparser.h objgen.h objstore.h union.h xmlout.h xmlread.h dbifc.h helper.h mchrono.h  queryorder.h
-        querygenerator.h csb.h nbuf.h tcpstream.h socketstream.h)
+        jsonparser.h objgen.h objstore.h union.h xmlout.h xmlread.h dbifc.h helper.h mchrono.h queryorder.h
+        querygenerator.h csb.h nbuf.h tcpstream.h socketstream.h mrpcsession.h mrpc.h)
 
 find_package(OpenSSL)
 if (OPENSSL_FOUND)
@@ -66,8 +66,6 @@ if(WIN32)
 endif()
 
 add_library(mobs  ${libSrcs})
-set_target_properties(mobs PROPERTIES VERSION ${PROJECT_VERSION})
-set_target_properties(mobs PROPERTIES SOVERSION 0)
 target_link_libraries(mobs ${EXTRA_LIBS})
 message(STATUS "EXTRA_LIBS=${EXTRA_LIBS}")
 
@@ -88,15 +86,23 @@ if(BUILD_INFORMIX_INTERFACE)
 endif()
 
 set_property(TARGET mobs PROPERTY CXX_STANDARD 11)
-set_property(TARGET mobs PROPERTY POSITION_INDEPENDENT_CODE ON)
 
+FILE(GLOB H_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.h)
 
-set_target_properties(mobs PROPERTIES PUBLIC_HEADER "converter.h;logging.h;objpool.h;objtypes.h;unixtime.h;xmlparser.h;xmlwriter.h;jsonparser.h;objgen.h;objstore.h;union.h;xmlout.h;xmlread.h;mchrono.h;dbifc.h;mongo.h;csb.h;tcpstream.h")
+set_target_properties(mobs PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+        PUBLIC_HEADER "${H_FILES}"
+        VERSION ${PROJECT_VERSION}
+        SOVERSION ${PROJECT_VERSION_MAJOR})
+
 install(TARGETS mobs
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
-        RUNTIME DESTINATION bin
-        PUBLIC_HEADER DESTINATION include/mobs)
+        LIBRARY
+            COMPONENT Libraries
+            DESTINATION lib
+            NAMELINK_COMPONENT Development
+        PUBLIC_HEADER
+            DESTINATION include/mobs}
+            COMPONENT Development)
 
 #get_cmake_property(_variableNames VARIABLES)
 #list (SORT _variableNames)

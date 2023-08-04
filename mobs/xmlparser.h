@@ -19,7 +19,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /** \file xmlparser.h
-\brief EInfacher XML-Parser */
+\brief Einfacher XML-Parser */
 
 
 #ifndef MOBS_XMLPARSER_H

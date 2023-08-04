@@ -71,7 +71,7 @@ public:
   /// Callback für Cdata-Element
   virtual void Cdata(const std::wstring &value) { Value(value); }
   /** \brief Callback-Function: Ein CDATA-Element mit base64 codiertem Inhalt
-   
+
       nur, wenn setBase64(true) gesetzt wurde
    @param base64 Inhalt des base64 codierten Wertes
    */
@@ -97,7 +97,7 @@ public:
   /// Encryption-Element abgeschlossen
   virtual void EncryptionFinished() { }
 
-    /// setzte ein XML-Prefix
+  /// setzte ein XML-Prefix
   void setPrefix(const std::string &pf);
   /// entferne das Prefix
   /// \throw runtime_error falls das prefix nicht übereinstimmt
@@ -127,7 +127,7 @@ public:
   std::istream &byteStream(size_t len, CryptBufBase *cbbp = nullptr);
 
 private:
-    std::unique_ptr<XmlReadData> data;
+  std::unique_ptr<XmlReadData> data;
 //  XmlReadData(const std::string &input, const ConvObjFromStr &c) : XmlParserW(str), str(to_wstring(input)) { cfs = c; };
 
 };
