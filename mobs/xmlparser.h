@@ -19,7 +19,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /** \file xmlparser.h
-\brief EInfacher XML-Parser */
+\brief Einfacher XML-Parser */
 
 
 #ifndef MOBS_XMLPARSER_H
@@ -471,8 +471,10 @@ public:
      es kann z.B. ein \c std::wifstream dienen oder ein \c std::wistringstream übergeben werden
           Als Zeichensätze sind UTF-8, UTF-16, ISO8859-1, -9 und -15 erlaubt; Dateien dürfen mit einem BOM beginnen
    @param input XML-stream der geparst werden soll   */
-  explicit XmlParserW(std::wistream &input) : istr(input), base64(base64data) { };
-  virtual ~XmlParserW() = default;;
+  explicit XmlParserW(std::wistream &input) : istr(input), base64(base64data) {
+    //istr.exceptions(std::ios::badbit);
+  };
+  virtual ~XmlParserW() = default;
   /*! \brief Liefert XML-Puffer und aktuelle Position für detaillierte Fehlermeldung
    @param pos Position des Fehlers im Xml-Buffer
    @return zu parsender Text-Buffer
@@ -693,11 +695,11 @@ public:
 //            LOG(LM_DEBUG, "XV " << element << " " << xmlEncState);
               if (element == u8"CipherValue") {
                 if (xmlEncState == 5) {
-                  if (not encryptedData.cryptBufp)
+                  if (not encryptedData.valid())
                     encryptedData.cipher = to_string(saved);
                 }
               } else if (element == u8"KeyName" and xmlEncState == 3) {
-                if (not encryptedData.cryptBufp)
+                if (not encryptedData.valid())
                   encryptedData.keyName = to_string(saved);
               }
             } else if (xmlEncState <= 0)
@@ -718,12 +720,11 @@ public:
             EncryptionFinished();
 //          LOG(LM_DEBUG, "encrypting element " << xmlEncState);
           } else if (element == u8"KeyInfo") {
-            if (not encryptedData.cryptBufp) {
-              Encrypt(encryptedData.algorithm, encryptedData.keyName, encryptedData.cipher, encryptedData.cryptBufp);
-              if (not encryptedData.cryptBufp) { // keine encryption, weitersuchen
-                encryptedData.keyName = "";
-                encryptedData.cipher = "";
-              }
+            if (not encryptedData.valid()) {
+              CryptBufBase *cbbp{};
+              Encrypt(encryptedData.algorithm, encryptedData.keyName, encryptedData.cipher, cbbp);
+              encryptedData.setCryptBuf(cbbp);
+              // wenn keine encryption, weitersuchen
             }
           }
         }
@@ -736,6 +737,8 @@ public:
         tags.pop();
         if (not reedEof and tags.empty())
           paused = true;
+        else if (tags.empty())
+          LOG(LM_INFO, "READY");
         inParse2Lt = true;
         continue;
       }
@@ -865,17 +868,7 @@ public:
         xmlEncState++;
 //      LOG(LM_DEBUG, "III element " << element << " " << xmlEncState);
         if (xmlEncState == 3 and element == "CipherValue") {
-          LOG(LM_DEBUG, "START CRYPT " << encryptedData.keyName);
-          if (not encryptedData.cryptBufp)
-            THROW("no suitable decryption found");
-          // Pipe aufbauen: filter base64 | bas64-encrypt
-          encryptedData.b64buf = new Base64IstBuf(istr);
-          encryptedData.tmpstr = new std::istream(encryptedData.b64buf);
-          encryptedData.cBuf = new mobs::CryptIstrBuf(*encryptedData.tmpstr, encryptedData.cryptBufp);
-          if (encryptedData.cBuf->bad())
-            THROW("decryption failed");
-          encryptedData.cBuf->getCbb()->setBase64(true);
-          encryptedData.istr = new std::wistream(encryptedData.cBuf);
+          encryptedData.startEncryption(istr);
           xmlEncState = 0;
           tags.pop();
           tags.pop();
@@ -951,6 +944,27 @@ public:
       THROW(u8" expected tag at EOF: " + tags.top().element);
     endOfFile = true;
   };
+  std::istream &byteStream(size_t len, CryptBufBase *cbbp = nullptr) {
+    auto wbufp = dynamic_cast<CryptIstrBuf*>(istr.rdbuf());
+    if (not wbufp)
+      throw std::runtime_error("no mobs::CryptIstrBuf");
+    istr.clear();
+    binaryBuffer = std::unique_ptr<mobs::BinaryIstBuf>(new BinaryIstBuf(*wbufp, len + 1)); // plus delimiter
+    if (binaryBuffer->in_avail() <= 0)
+      throw std::runtime_error("delimiter missing");
+    if (binaryBuffer->sgetc() != mobs::BinaryIstBuf::Traits::to_int_type('\200'))
+        THROW("delimiter mismatch " << std::hex << binaryBuffer->sgetc());
+    binaryBuffer->sbumpc();
+    if (cbbp) {
+      binaryFiltStream = std::unique_ptr<std::istream>(new std::istream(binaryBuffer.get()));
+      cbbp->setIstr(*binaryFiltStream);
+      binaryFilt = std::unique_ptr<CryptBufBase>(cbbp);
+      binaryStream = std::unique_ptr<std::istream>(new std::istream(binaryFilt.get()));
+    } else {
+      binaryStream = std::unique_ptr<std::istream>(new std::istream(binaryBuffer.get()));
+    }
+    return *binaryStream;
+  }
 
 private:
   void parse2GT() {
@@ -1024,8 +1038,10 @@ private:
     if (not saved.empty())
     {
       size_t p = saved.find_first_not_of(L" \n\r\t");
-      if (p != std::wstring::npos)
+      if (p != std::wstring::npos) {
+        LOG(LM_ERROR, "unexpected char in white space WS=" << mobs::to_string(saved));
         THROW(u8"unexpected char in white space");
+      }
     }
     saved = buffer;
   };
@@ -1108,8 +1124,8 @@ private:
     return true;
   }
   bool checkAvail(std::streamsize n) const {
-    if (encryptedData.istr) {
-      auto av = encryptedData.istr->rdbuf()->in_avail();
+    if (encryptedData.streamPtr()) {
+      auto av = encryptedData.streamPtr()->rdbuf()->in_avail();
       return av >= n or av == -1;
     }
     auto av = istr.rdbuf()->in_avail();
@@ -1125,21 +1141,14 @@ private:
         checkGtBuffer.clear();
         checkGtBufferStart = checkGtBufferEnd = 0;
       }
-    } else if (encryptedData.istr) {
-      c = encryptedData.istr->get();
+    } else if (encryptedData.streamPtr()) {
+      std::wistream::sentry s(*encryptedData.streamPtr(), true);
+      if (not s)
+        THROW("bad crypt stream");
+      c = encryptedData.streamPtr()->get();
 //      std::cout << " e" << mobs::to_string(c); // << " " << istr.tellg() << ".";
-      if (encryptedData.istr->eof()) {
-        //LOG(LM_DEBUG, "ENC FIN");
-        if (encryptedData.cBuf->bad())
-          THROW("decryption failed");
-        delete encryptedData.istr;
-        delete encryptedData.cBuf;
-        delete encryptedData.tmpstr;
-        delete encryptedData.b64buf;
-        encryptedData.istr = nullptr;
-        encryptedData.cBuf = nullptr;
-        encryptedData.tmpstr = nullptr;
-        encryptedData.b64buf = nullptr;
+      if (encryptedData.streamPtr()->eof()) {
+        encryptedData.stopEncryption();
         xmlEncState = 99;
         tags.emplace(u8"EncryptedData", currentXmlns());
         tags.emplace(u8"CipherData", currentXmlns());
@@ -1152,8 +1161,8 @@ private:
       if (not s)
         THROW("bad stream");
       c = istr.get();
-//    if (istr.eof())
-//      std::cout << "EOF";
+      if (istr.eof())
+        LOG(LM_DEBUG, "EOF");
 //    std::cout << " x" << mobs::to_string(c); // << " " << istr.tellg() << ".";
     }
     return c;
@@ -1164,13 +1173,54 @@ private:
     std::string element;
     std::string xmlns;
   };
-  struct EncryptedData {
+  class EncryptedData {
+  public:
     std::string algorithm;
     std::string keyName;
     std::string cipher;
+
+    inline bool valid() { return cryptBufp; } // hat gültige encryption
+    inline std::wistream *streamPtr() const { return istr; } // stream pointer bei aktiver encryption
+    void setCryptBuf(mobs::CryptBufBase *cbbp) {
+      cryptBufp = cbbp;
+      if (not valid() ) {
+        keyName = "";
+        cipher = "";
+      }
+    }
+    void startEncryption(std::wistream &inStr) {
+      LOG(LM_DEBUG, "START CRYPT " << keyName);
+      if (not cryptBufp)
+        THROW("no suitable decryption found");
+      // Pipe aufbauen: filter base64 | bas64-encrypt
+      b64buf = new mobs::Base64IstBuf(inStr);
+      tmpstr = new std::istream(b64buf);
+      //tmpstr->exceptions(std::ios::badbit | std::ios::failbit);
+      cBuf = new mobs::CryptIstrBuf(*tmpstr, cryptBufp);
+      if (cBuf->bad())
+        THROW("decryption failed");
+      cBuf->getCbb()->setBase64(true);
+      istr = new std::wistream(cBuf);
+      //istr->exceptions(std::ios::badbit | std::ios::failbit);
+      istr->imbue(inStr.getloc());
+    }
+    void stopEncryption() const {
+      LOG(LM_DEBUG, "STOP CRYPT");
+      if (cBuf->bad())
+        THROW("decryption failed");
+      delete istr;
+      delete cBuf;
+      delete tmpstr;
+      delete b64buf;
+      istr = nullptr;
+      cBuf = nullptr;
+      tmpstr = nullptr;
+      b64buf = nullptr;
+    }
+  private:
     CryptBufBase *cryptBufp = nullptr;
-    mutable mobs::CryptIstrBuf *cBuf = nullptr;
     mutable std::wistream *istr = nullptr;
+    mutable mobs::CryptIstrBuf *cBuf = nullptr;
     mutable std::istream *tmpstr = nullptr;
     mutable mobs::Base64IstBuf *b64buf = nullptr;
   };
@@ -1190,7 +1240,11 @@ private:
   Base64Reader base64;
   EncryptedData encryptedData;
   mutable int xmlEncState = 0;
-//  mutable size_t maxRead = SIZE_T_MAX;
+  std::unique_ptr<mobs::BinaryIstBuf> binaryBuffer;
+  std::unique_ptr<CryptBufBase> binaryFilt;
+  std::unique_ptr<std::istream> binaryFiltStream;
+  std::unique_ptr<std::istream> binaryStream;
+  //  mutable size_t maxRead = SIZE_T_MAX;
   bool inParse2Lt = false;
   bool inParse2LtWork = false;
   bool bomCheck = false;

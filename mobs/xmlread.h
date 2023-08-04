@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2023 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -21,7 +21,11 @@
 /** \file xmlread.h
 \brief  Klasse um Objekte aus einen XML-String/File auszulesen */
 
+#ifndef MOBS_XMLREAD_H
+#define MOBS_XMLREAD_H
+
 #include "objgen.h"
+#include <memory>
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "UnusedGlobalDeclarationInspection"
@@ -67,7 +71,7 @@ public:
   /// Callback für Cdata-Element
   virtual void Cdata(const std::wstring &value) { Value(value); }
   /** \brief Callback-Function: Ein CDATA-Element mit base64 codiertem Inhalt
-   
+
       nur, wenn setBase64(true) gesetzt wurde
    @param base64 Inhalt des base64 codierten Wertes
    */
@@ -93,7 +97,7 @@ public:
   /// Encryption-Element abgeschlossen
   virtual void EncryptionFinished() { }
 
-    /// setzte ein XML-Prefix
+  /// setzte ein XML-Prefix
   void setPrefix(const std::string &pf);
   /// entferne das Prefix
   /// \throw runtime_error falls das prefix nicht übereinstimmt
@@ -119,8 +123,11 @@ public:
   void fill(ObjectBase *obj);
   /// Referenz auf verwendeten input stream
   std::wistream &getIstr();
-  private:
-    std::unique_ptr<XmlReadData> data;
+  /// Lese binäre Daten aus dem input stream, bei bedarf mit Verschlüsselung
+  std::istream &byteStream(size_t len, CryptBufBase *cbbp = nullptr);
+
+private:
+  std::unique_ptr<XmlReadData> data;
 //  XmlReadData(const std::string &input, const ConvObjFromStr &c) : XmlParserW(str), str(to_wstring(input)) { cfs = c; };
 
 };
@@ -160,3 +167,5 @@ private:
 }
 
 #pragma clang diagnostic pop
+
+#endif // MOBS_XMLREAD_H

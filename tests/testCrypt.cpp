@@ -251,7 +251,7 @@ TEST(cryptTest, digest2) {
   EXPECT_TRUE(xStrIn.good());
   std::string res;
   wchar_t c;
-  while (not xStrIn.get(c).eof()) {
+  while (xStrIn and not xStrIn.get(c).eof()) {
     res += u_char(c);
   }
 
@@ -266,7 +266,7 @@ TEST(cryptTest, faileof) {
   std::wstringstream ss(L"Fischers Fritz fischt frische Fische");
   std::string res;
   wchar_t c;
-  while (not ss.get(c).eof()) {
+  while (ss and not ss.get(c).eof()) {
     res += u_char(c);
   }
   EXPECT_TRUE(ss.eof());
@@ -283,14 +283,14 @@ TEST(cryptTest, digest2e) {
   EXPECT_TRUE(xStrIn.good());
   std::string res;
   wchar_t c;
-  while (not xStrIn.get(c).eof()) {
+  while (xStrIn and not xStrIn.get(c).eof()) {
     LOG(LM_INFO, "FAIL " << xStrIn.fail());
     res += u_char(c);
   }
   EXPECT_TRUE(streambuf.bad());
-  EXPECT_FALSE(xStrIn.bad());
+  EXPECT_TRUE(xStrIn.bad());
   EXPECT_TRUE(xStrIn.fail());
-  EXPECT_TRUE(xStrIn.eof());
+  //EXPECT_TRUE(xStrIn.eof());
   EXPECT_FALSE(xStrIn.good());
 }
 

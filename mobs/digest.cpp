@@ -144,7 +144,9 @@ mobs::CryptBufDigest::int_type mobs::CryptBufDigest::underflow() {
       return Traits::to_int_type(*Base::gptr());
   } catch (std::exception &e) {
     LOG(LM_ERROR, "Exception " << e.what());
+    Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[0]);
     setBad();
+    throw std::ios_base::failure(e.what(), std::io_errc::stream);
   }
   return Traits::eof();
 }
@@ -172,6 +174,7 @@ mobs::CryptBufDigest::int_type mobs::CryptBufDigest::overflow(mobs::CryptBufDige
     } catch (std::exception &e) {
       LOG(LM_ERROR, "Exception " << e.what());
       setBad();
+      throw std::ios_base::failure(e.what(), std::io_errc::stream);
     }
   return Traits::eof();
 }

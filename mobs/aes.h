@@ -81,9 +81,12 @@ public:
   explicit CryptBufAes(const std::vector<u_char> &key, const std::string &id = "");
   ~CryptBufAes() override;
   /// Länge des keys
-  static size_t key_size() { return 32; };
+  static size_t key_size() { return 32; }
   /// Länge des iv
   static size_t iv_size();
+  /// Länge einer verschlüsselten Datei
+  static size_t aes_size(size_t fileSize) { return iv_size() + (fileSize + 16) / 16 * 16; }
+
   /** \brief fülle alle Elemente des Vektors mit Zufallszahlen
    *
    * @param rand Vektor mit entsprechender Größe

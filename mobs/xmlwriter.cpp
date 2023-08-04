@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2023 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -50,9 +50,11 @@ public:
   bool hasValue = false;
   std::wstring prefix;
   stack<wstring> elements;
-  CryptOstrBuf *cryptBufp = nullptr;
+  std::unique_ptr<CryptOstrBuf> cryptBufp;
+  std::unique_ptr<CryptBufBase> cryptSwap;
   stringstream cryptss;
   wstringstream wstrBuff; // buffer für u8-Ausgabe in std::string
+  std::unique_ptr<std::ostream> binaryStream;
 
   void setConFun() {
     std::locale lo;
@@ -119,7 +121,37 @@ public:
     }
   }
 
-};
+  std::ostream &byteStream(const char *delimiter = nullptr, CryptBufBase *cbbp = nullptr) {
+    auto wbufp = dynamic_cast<CryptOstrBuf*>(wostr->rdbuf());
+    if (not wbufp)
+      throw std::runtime_error("no mobs::CryptOstrBuf");
+    *wostr << flush;
+    if (cbbp)
+    {
+      binaryStream = std::unique_ptr<std::ostream>(new std::ostream(cbbp));
+      if (delimiter)
+        wbufp->getOstream() << delimiter;
+      cbbp->setOstr(wbufp->getOstream());
+      return *binaryStream;
+    } else {
+      if (delimiter)
+        wbufp->getOstream() << delimiter;
+      return wbufp->getOstream();
+    }
+  }
+
+  void closeByteStream() {
+    if (binaryStream) {
+      binaryStream->flush();
+      if (auto sp = dynamic_cast<CryptBufBase *>(binaryStream->rdbuf())) {
+        sp->finalize();
+      }
+      binaryStream = nullptr;
+    }
+  }
+
+
+  };
 
 
 
@@ -333,7 +365,7 @@ string XmlWriter::getString() const
 
 
 void XmlWriter::startEncrypt(CryptBufBase *cbbp) {
-  if (data->cryptBufp or not cbbp or data->level == 0)
+  if (data->cryptBufp or data->cryptSwap or not cbbp or data->level == 0)
     THROW("invalid state encryption");
   data->cryptLevel = data->level;
   std::wstring pfx;
@@ -376,28 +408,36 @@ void XmlWriter::startEncrypt(CryptBufBase *cbbp) {
   auto r = dynamic_cast<mobs::CryptOstrBuf *>(data->buffer.rdbuf());
   if (r) {
     data->buffer.flush();
-    data->cryptBufp = new CryptOstrBuf(r->getOstream(), cbbp);
+    data->cryptSwap = std::unique_ptr<CryptBufBase>(cbbp);
+    r->swapBuffer(data->cryptSwap);
+    //data->cryptBufp = std::unique_ptr<CryptOstrBuf>(new CryptOstrBuf(r->getOstream(), cbbp));
+    //data->wostr = new std::wostream(data->cryptBufp.get());
   } else {
-    data->cryptBufp = new CryptOstrBuf(data->cryptss, cbbp);
+    auto lo = data->buffer.getloc();
+    data->cryptBufp = std::unique_ptr<CryptOstrBuf>(new CryptOstrBuf(data->cryptss, cbbp));
+    data->wostr = new std::wostream(data->cryptBufp.get());
+    data->wostr->imbue(lo);
   }
-  data->wostr = new std::wostream(data->cryptBufp);
   *data->wostr << mobs::CryptBufBase::base64(true);
 }
 
 void XmlWriter::stopEncrypt() {
-  if (not data->cryptBufp)
-    return;
-  data->cryptBufp->finalize();
-  const string &buf = data->cryptss.str();
-//  copy(buf.cbegin(), buf.cend(), std::ostreambuf_iterator<wchar_t>(*data->wostr));
-  // Wenn auf den Ziel-Buffer des mobs::CryptOstrBuf geschrieben wurde, ist buf hier leer
-  for (auto c:buf)
-    data->buffer.put(c);
-  delete data->wostr;
-  delete data->cryptBufp;
-  data->cryptBufp = nullptr;
-  data->cryptss.clear();
-  data->wostr = &data->buffer;
+  if (data->cryptSwap) {
+    if (auto r = dynamic_cast<mobs::CryptOstrBuf *>(data->buffer.rdbuf()))
+      r->swapBuffer(data->cryptSwap);
+      data->cryptSwap = nullptr;
+  } else if (data->cryptBufp) {
+      data->cryptBufp->finalize();
+      const string &buf = data->cryptss.str();
+      // Wenn auf den Ziel-Buffer des mobs::CryptOstrBuf geschrieben wurde, ist buf hier leer
+      for (auto c: buf)
+          data->buffer.put(c);
+      delete data->wostr;
+      data->cryptBufp = nullptr;
+      data->cryptss.clear();
+      data->wostr = &data->buffer;
+  } else
+      return;
 
   std::wstring pfx;
   data->prefix.swap(pfx);
@@ -415,6 +455,16 @@ void XmlWriter::sync() {
 
 void XmlWriter::putc(wchar_t c) {
   data->buffer.put(c);
+}
+
+std::ostream &XmlWriter::byteStream(const char *delimiter, CryptBufBase *cbbp)
+{
+  return data->byteStream(delimiter, cbbp);
+}
+
+void XmlWriter::closeByteStream()
+{
+  data->closeByteStream();
 }
 
 

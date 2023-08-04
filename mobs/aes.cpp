@@ -185,6 +185,16 @@ std::streamsize mobs::CryptBufAes::showmanyc() {
   return underflowWorker(true);
 }
 
+/*
+int mobs::CryptBufAes::sync() {
+  TRACE("");
+  LOG(LM_INFO, "CryptBufAes::sync");
+  CryptBufBase::sync();
+  //finalize();
+  return isGood() ? 0 : -1;
+}
+*/
+
 
 mobs::CryptBufAes::int_type mobs::CryptBufAes::underflow() {
   TRACE("");
@@ -205,6 +215,7 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::underflow() {
       data->ctx = nullptr;
     }
     setBad();
+    throw std::ios_base::failure(e.what(), std::io_errc::stream);
   }
   return Traits::eof();
 }
@@ -336,6 +347,7 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::overflow(mobs::CryptBufAes::int_t
   } catch (std::exception &e) {
     LOG(LM_ERROR, "Exception " << e.what());
     setBad();
+    throw std::ios_base::failure(e.what(), std::io_errc::stream);
   }
   return Traits::eof();
 }
@@ -408,15 +420,14 @@ std::string mobs::from_aes_string(const std::string &s, const std::string &pass)
   std::stringstream ss(s);
   mobs::CryptIstrBuf streambuf(ss, new mobs::CryptBufAes(pass));
   std::wistream xStrIn(&streambuf);
+  xStrIn.exceptions(std::ios::badbit);
   streambuf.getCbb()->setBase64(true);
   std::string res;
   wchar_t c;
   while (not xStrIn.get(c).eof())
     res += u_char(c);
-  if (streambuf.bad())
-    throw std::runtime_error("encryption failed");
   return res;
-}
+ }
 
 
 
