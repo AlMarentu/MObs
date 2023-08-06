@@ -587,7 +587,7 @@ public:
     if (readLimit == 0)
       return 0;
     if (not inStb->good()) {
-      std::cerr << "BAD doRead " << std::hex << inStb->rdstate() << std::endl;
+      //std::cerr << "BAD doRead " << std::hex << inStb->rdstate() << std::endl;
       return 0;
     }
     if (inStb->rdstate() == std::ios::eofbit) // sentry setzt fail bei eof

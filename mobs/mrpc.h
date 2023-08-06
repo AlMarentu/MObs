@@ -24,8 +24,6 @@
 #ifndef MOBS_MRPC_H
 #define MOBS_MRPC_H
 
-class virtuell;
-
 #include "xmlparser.h"
 #include "xmlread.h"
 #include "xmlwriter.h"
@@ -34,45 +32,115 @@ class virtuell;
 
 namespace mobs {
 
-
+/** \brief Klasse für Client-Server Modul über XML-RPC-Calls
+ *
+ * die Verschlüsselung der Nutzdaten ist anhand RFC 4051 implementiert.
+ * Zusätzlich besteht die Möglichkeit Roh-Daten zwischen den XML-Paketen zu übermitteln
+ */
 class Mrpc : public XmlReader {
 public:
-  Mrpc(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking);
+  enum State { fresh, getPubKey, connectingClient, connectingServer, connected, closing, closed, error };
+  Mrpc(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking, u_int sessionReuseTimeout = 0);
   ~Mrpc() override = default;
 
+  /** \brief senden eines einzelnen Objektes mit Verschlüsselung und sync()
+   *
+   * @param obj zu sendendes Objekt
+   */
   void sendSingle(const ObjectBase &obj);
+  /// starte Verschlüsselung
   void encrypt();
+  /// beende Verschlüsselung
   void stopEncrypt();
+
+  /// Einlesen eines Byte-streams der Größe sz
   std::istream &inByteStream(size_t sz);
+  /// Senden eines Byte-streams
   std::ostream &outByteStream();
+  /// Senden eines Byte-streams beenden
   void closeOutByteStream();
 
+  /** \brief Arbeitsroutine des Clients für den Initialisierungsvorgang
+   *
+   * die Routine muss solange aufgerufen werden bis true zurückgeliefert wird.
+   * Wird ein leerer public key des Servers angegeben, so wird dieser vom Server erfragt.
+   * @param keyId Schlüssel-Id für den Login-Vorgang
+   * @param software Information über den Client
+   * @param privkey private key der Clients
+   * @param passphrase passphrase des private keys
+   * @param serverkey public key des Servers, bei leer autudetection
+   * @return connected
+   */
+  bool waitForConnected(const std::string &keyId, const std::string &software, const std::string &privkey,
+                        const std::string &passphrase, std::string &serverkey);
 
+  /** \brief Arbeitsroutine des Server
+   *
+   * @return Connected-Status; d.H. der Server darf normale Anfragen bearbeiten
+   */
+  bool parseServer();
+
+  /** \brief callback für Server: Eingang einer Login-Anforderung return clientKey oder "" falls kei Login
+   *
+   * Die Login-Anforderung cipher muss mit receiveLogin(cipher, *session, privKey, "") entschlüsselt werden.
+   * Bei einer exception wird die Login-Anforderung abgelehnt
+   * @param cipher verschlüsselte Info des Logins
+   * @param info allgemeine Info oder Fehlermeldung
+   * @return Name des public clientKey bzw. der Key im PEM-Format;  "" falls kein Login möglich
+   */
+  virtual std::string loginReceived(const std::vector<u_char> &cipher, std::string &info) { info = "not implemented"; return {}; }
+  /** \brief callback für Server: Anfrage des Public keys
+   *
+   * @param key Rückgabe des PupKeys im PEM-Format "-----BEGIN ..." oder leer bei Fehler
+   * @param info Rückgabe allgemeine Serverinfo oder Fehlermeldung
+   */
+  virtual void getPupKeyReceived(std::string &key, std::string &info) { info = "not implemented";  }
+
+  /// \private
   void StartTag(const std::string &element) override;
+  /// \private
   void EndTag(const std::string &element) override;
+  /// \private
   void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, CryptBufBase *&cryptBufp) override;
+  /// \private
   void EncryptionFinished() override;
+  /// \private
   void filled(mobs::ObjectBase *obj, const std::string &error) override;
 
-  // nach xmlOut writer.sync()
+  /// senden eines Objektes ohne writer.sync()
   void xmlOut(const mobs::ObjectBase &obj);
+  /// Rückgabe, ob das zuletzt ausgewertete Objekt verschlüsselt war
   bool isEncrypted() const { return  encrypted; }
+  /// \private
   void receiveSessionKey(const std::vector<u_char> &cipher, const std::string &privkey, const std::string &pass);
+  /** \brief analysiert die empfangene Login-Information Server-seitig
+   *
+   * anhand der loginId kann dann der public key des Clients (Pfad oder PEM) ermittelt werden.
+   * @param cipher empfangene Imformation
+   * @param session session aus Mrpc
+   * @param privkey privater Schlüssel des Servers
+   * @param passwd
+   * @return login-Id der Anfrage
+   */
+  static std::string receiveLogin(const std::vector<u_char> &cipher, MrpcSession &session, const std::string &privkey, const std::string &passwd);
   /// erzeugt Sessionkey, übernimmt sessionId; returniert cipher für receiveSessionKey()
   static std::vector<u_char> generateSessionKey(MrpcSession &session, const std::string &clientkey);
+  /// \private erzeuge Login-Info auf Client-Seite
   static std::vector<u_char> generateLoginInfo(const std::string &keyId,
                                                const std::string &software, const std::string &serverkey);
 
-  mobs::CryptIstrBuf streambufI;
-  mobs::CryptOstrBuf streambufO;
-  std::wistream iStr;
-  std::wostream oStr;
-  XmlWriter writer;
-  MrpcSession *session = nullptr;
-  std::unique_ptr<mobs::ObjectBase> resultObj;
+  mobs::CryptIstrBuf streambufI; ///< \private
+  mobs::CryptOstrBuf streambufO; ///< \private
+  std::wistream iStr; ///< \private
+  std::wostream oStr; ///< \private
+  XmlWriter writer; ///< das Writer-Objekt wür die Ausgabe
+  MrpcSession *session; ///< Zeiger auf ein MrpcSession - Info; muss zwingend existieren
+  u_int sessionReuseTimeout; ///< Timeout für einen reuse, falls implementiert, ansonsten 0
+  std::unique_ptr<mobs::ObjectBase> resultObj; ///< Das zuletzt empfangene Objekt; muss nach Verwendung auf nullptr gesetzt werden
 
-private:;
+private:
   bool encrypted = false;
+  State state = fresh;
 
 };
 
