@@ -34,5 +34,5 @@ endmacro()
 
 package_add_test(test1 testObjtypes.cpp testObjgen.cpp testUnion.cpp testBlob.cpp testParser.cpp
         testUnixTime.cpp testObjpool.cpp testCharset.cpp testWriter.cpp testHelper.cpp testCrypt.cpp
-        testStreamBuffer.cpp testMChrono.cpp)
+        testStreamBuffer.cpp testMChrono.cpp testMrpc.cpp)
 

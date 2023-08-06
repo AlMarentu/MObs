@@ -30,6 +30,55 @@
 
 namespace mobs {
 
+namespace {
+class MrpcSessionLoginResult : virtual public mobs::ObjectBase {
+public:
+  ObjInit(MrpcSessionLoginResult);
+
+  MemVar(std::vector<u_char>, key);
+  MemVar(u_int, sessId);
+};
+
+class MrpcSessionLoginData : virtual public mobs::ObjectBase {
+public:
+  ObjInit(MrpcSessionLoginData);
+
+  MemVar(std::string, login);
+  MemVar(std::string, software);
+  MemVar(std::string, hostname);
+  MemVar(std::string, key);
+};
+
+class MrpcSessionLogin : virtual public mobs::ObjectBase {
+public:
+  ObjInit(MrpcSessionLogin);
+  MemVar(std::vector<u_char>, cipher);
+  MemVar(std::string, info);
+};
+
+class MrpcGetPublickey : virtual public mobs::ObjectBase {
+public:
+  ObjInit(MrpcGetPublickey);
+  MemVar(std::string, pubKey);
+  MemVar(std::string, info);
+};
+
+class MrpcSessionUse : virtual public mobs::ObjectBase {
+public:
+  ObjInit(MrpcSessionUse);
+  MemVar(u_int, sessId);
+  MemVar(std::string, info);
+};
+
+class MrpcReturnError : virtual public mobs::ObjectBase {
+public:
+  ObjInit(MrpcReturnError);
+  MemVar(std::string, error);
+};
+
+
+}
+
 void Mrpc::encrypt()
 {
   std::vector<u_char> iv;
@@ -81,9 +130,22 @@ void Mrpc::StartTag(const std::string &element)
 {
   LOG(LM_DEBUG, "start " << element);
   // Wenn passendes Tag gefunden, dann Objekt einlesen
-  auto o = ObjectBase::createObj(element);
-  if (o)
-    fill(o);
+  if (state == connectingServer or state == connectingClient or state == getPubKey) { // ohne Login nur fixe Auswahl
+    if (element == "MrpcSessionLogin")
+      fill(new MrpcSessionLogin);
+    else if (element == "MrpcSessionUse")
+      fill(new MrpcSessionUse);
+    else if (element == "MrpcReturnError")
+      fill(new MrpcReturnError);
+    else if (element == "MrpcGetPublickey")
+      fill(new MrpcGetPublickey);
+  } else {
+    auto o = ObjectBase::createObj(element);
+    if (o)
+      fill(o);
+    else
+      LOG(LM_INFO, "Unkown");
+  }
 }
 
 void Mrpc::EndTag(const std::string &element)
@@ -110,32 +172,12 @@ void Mrpc::closeOutByteStream()
   writer.closeByteStream();
 }
 
-namespace {
-class MrpcSessionLoginResult : virtual public mobs::ObjectBase {
-public:
-  ObjInit(MrpcSessionLoginResult);
 
-  MemVar(std::vector<u_char>, key);
-  MemVar(u_int, sessId);
-};
-
-class MrpcSessionLoginData : virtual public mobs::ObjectBase {
-public:
-  ObjInit(MrpcSessionLoginData);
-
-  MemVar(std::string, login);
-  MemVar(std::string, software);
-  MemVar(std::string, hostname);
-  MemVar(std::string, key);
-};
-}
-
-
-Mrpc::Mrpc(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking) :
+Mrpc::Mrpc(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking, u_int reuseTimeout) :
         XmlReader(iStr), streambufI(inStr), streambufO(outStr),
         iStr(&streambufI), oStr(&streambufO),
-        writer(oStr, mobs::XmlWriter::CS_utf8, true),
-        session(mrpcSession)
+        writer(oStr, mobs::XmlWriter::CS_utf8, false),
+        session(mrpcSession), sessionReuseTimeout(reuseTimeout)
 {
   readTillEof(false);
   readNonBlocking(nonBlocking);
@@ -153,6 +195,19 @@ void Mrpc::receiveSessionKey(const std::vector<u_char> &cipher, const std::strin
   mobs::string2Obj(buf, result, mobs::ConvObjFromStr());
   session->sessionKey = result.key();
   session->sessionId = result.sessId();
+}
+
+std::string Mrpc::receiveLogin(const std::vector<u_char> &cipher, MrpcSession &session, const std::string &privkey, const std::string &passwd)
+{
+  std::vector<u_char> sessInhalt;
+  mobs::decryptPrivateRsa(cipher, sessInhalt, privkey, passwd);
+  std::string buf((char *)&sessInhalt[0], sessInhalt.size());
+  MrpcSessionLoginData login;
+  mobs::string2Obj(buf, login, mobs::ConvObjFromStr());
+  session.server = login.hostname();
+  session.info = buf;
+  LOG(LM_DEBUG, "LOGIN = " << login.to_string());
+  return login.key();
 }
 
 std::vector<u_char> Mrpc::generateSessionKey(MrpcSession &session, const std::string &clientkey)
@@ -205,6 +260,7 @@ void Mrpc::xmlOut(const ObjectBase &obj)
 {
   XmlOut xo(&writer, mobs::ConvObjToString().exportXml());
   obj.traverse(xo);
+  //writer.putc('\n');
 }
 
 void Mrpc::sendSingle(const ObjectBase &obj)
@@ -212,8 +268,186 @@ void Mrpc::sendSingle(const ObjectBase &obj)
   encrypt();
   xmlOut(obj);
   stopEncrypt();
+  //writer.putc('\n');
   writer.sync();
 }
+
+bool Mrpc::parseServer()
+{
+  LOG(LM_DEBUG, "parseServer " << int(state));
+  if (level() <= 0 and state != fresh and state != closing and state != closed and state != error) {
+    writer.writeTagEnd();
+    writer.sync();
+    state = closing;
+    return true;
+  }
+  switch (state) {
+    case fresh:
+      // XML-Header
+      writer.writeHead();
+      writer.writeTagBegin(L"methodCall");
+      state = connectingServer;
+      __attribute__ ((fallthrough));
+    case connectingServer:
+      parse();
+      LOG(LM_DEBUG, "pars done " << std::boolalpha << bool(resultObj));
+      if (auto *sess = dynamic_cast<MrpcReturnError *>(resultObj.get())) {
+        LOG(LM_ERROR, "SESSIONERROR " << sess->error.toStr(mobs::ConvObjToString()));
+      } else if (auto *sess = dynamic_cast<MrpcSessionLogin *>(resultObj.get())) {
+        LOG(LM_INFO, "LOGIN ");
+        std::string info;
+        std::string key;
+        MrpcSessionLogin answer;
+        try {
+          key = loginReceived(sess->cipher(), info);
+          if (not key.empty())
+            answer.cipher(generateSessionKey(*session, key));
+        } catch (std::exception &e) {
+          LOG(LM_ERROR, "ParseServer exception " << e.what());
+          info = "login procedure failed";
+          key = "";
+        }
+        if (key.empty()) {
+          MrpcReturnError eanswer;
+          eanswer.error(info);
+          xmlOut(eanswer);
+          writer.sync();
+          resultObj = nullptr;
+          return false;
+        }
+        answer.info(info);
+        LOG(LM_DEBUG, "Connection establised ID " << session->sessionId << " " << session->info);
+        state = connected;
+        xmlOut(answer);
+        writer.sync();
+      } else if (auto *sess = dynamic_cast<MrpcSessionUse *>(resultObj.get())) {
+        MrpcSessionUse answer;
+        answer.sessId(session->sessionId);
+        answer.info("welcome back");
+        state = connected;
+        sendSingle(answer);
+      } else if (auto *sess = dynamic_cast<MrpcGetPublickey *>(resultObj.get())) {
+        std::string key;
+        std::string info;
+        try {
+            getPupKeyReceived(key, info);
+        } catch (std::exception &e) {
+          info = "action failed";
+          key.clear();
+        }
+        if (key.empty()) {
+          MrpcReturnError answer;
+          answer.error(info);
+          xmlOut(answer);
+          writer.sync();
+          resultObj = nullptr;
+          break;
+        }
+        MrpcGetPublickey answer;
+        answer.pubKey(key);
+        answer.info(info);
+        xmlOut(answer);
+        writer.sync();
+      }
+      resultObj = nullptr;
+      break;
+    case connected:
+      parse();
+      LOG(LM_DEBUG, "pars done " << std::boolalpha << bool(resultObj));
+      break;
+    case closing:
+      return false;
+    case error:
+    case connectingClient:
+    case getPubKey:
+      throw std::runtime_error("error while connecting");
+    case closed:
+      throw std::runtime_error("connecting closed");
+  }
+  return state == connected;
+}
+
+bool Mrpc::waitForConnected(const std::string &keyId, const std::string &software, const std::string &privkey,
+                            const std::string &passphrase, std::string &serverkey)
+{
+  switch (state) {
+    case fresh:
+      if (serverkey.empty()) {
+        // XML-Header
+        writer.writeHead();
+        writer.writeTagBegin(L"methodCall");
+        MrpcGetPublickey cmd;
+        xmlOut(cmd);
+        writer.sync();
+        state = getPubKey;
+        break;
+      }
+      if (session->sessionId == 0 or not sessionReuseTimeout or session->last + sessionReuseTimeout < time(nullptr)) {
+        MrpcSessionLogin msg;
+        msg.cipher(mobs::Mrpc::generateLoginInfo(keyId, software, serverkey));
+        if (state == fresh) {
+          // XML-Header
+          writer.writeHead();
+          writer.writeTagBegin(L"methodCall");
+        }
+        state = connectingClient;
+        xmlOut(msg);
+        writer.sync();
+      } else {
+        state = connectingClient;
+        MrpcSessionUse msg;
+        msg.sessId(session->sessionId);
+        // XML-Header
+        writer.writeHead();
+        xmlOut(msg);
+        writer.sync();
+      }
+      break;
+    case connectingClient:
+    case getPubKey:
+      parse();
+      if (auto *sess = dynamic_cast<MrpcReturnError *>(resultObj.get())) {
+        LOG(LM_ERROR, "SESSIONERROR " << sess->error.toStr(mobs::ConvObjToString()));
+        state = error;
+        session->info = sess->error();
+        resultObj = nullptr;
+        THROW("error received: " << session->info);
+      } else if (auto *sess = dynamic_cast<MrpcSessionLogin *>(resultObj.get())) {
+        LOG(LM_INFO, "LOGIN ");
+        receiveSessionKey(sess->cipher(), privkey, passphrase);
+        LOG(LM_DEBUG, "Connection establised ID " << session->sessionId << " " << session->info);
+        state = connected;
+        resultObj = nullptr;
+      } else if (auto *sess = dynamic_cast<MrpcSessionUse *>(resultObj.get())) {
+        writer.pushTag(L"methodCall"); // mit Server-State synchronisieren
+        state = connected;
+        resultObj = nullptr;
+      } else if (auto *sess = dynamic_cast<MrpcGetPublickey *>(resultObj.get())) {
+        if (serverkey.empty())
+          serverkey = sess->pubKey();
+        session->info = sess->info();
+        state = connectingClient;
+        resultObj = nullptr;
+        MrpcSessionLogin msg;
+        LOG(LM_INFO, "received server public key " << serverkey);
+        msg.cipher(mobs::Mrpc::generateLoginInfo(keyId, software, serverkey));
+        xmlOut(msg);
+        writer.sync();
+      }
+      break;
+    case connected:
+    case closing:
+      return true;
+    case error:
+    case connectingServer:
+      throw std::runtime_error("error while connecting");
+    case closed:
+      throw std::runtime_error("connecting closed");
+  }
+  return state == connected;
+}
+
+
 
 
 } // mobs
