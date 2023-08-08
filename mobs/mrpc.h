@@ -39,8 +39,8 @@ namespace mobs {
  */
 class Mrpc : public XmlReader {
 public:
-  enum State { fresh, getPubKey, connectingClient, connectingServer, connected, closing, closed, error };
-  Mrpc(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking, u_int sessionReuseTimeout = 0);
+  enum State { fresh, getPubKey, connectingClient, connectingServer, connected, closing };
+  Mrpc(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking);
   ~Mrpc() override = default;
 
   /** \brief senden eines einzelnen Objektes mit Verschlüsselung und sync()
@@ -68,27 +68,37 @@ public:
    * @param software Information über den Client
    * @param privkey private key der Clients
    * @param passphrase passphrase des private keys
-   * @param serverkey public key des Servers, bei leer autudetection
-   * @return connected
+   * @param serverkey public key des Servers, bei leer autudetection und Rückgabe des Keys im PEM-Format
+   * @return connected wenn connected==false dürfen keine Anfragen bearbeitet werden
    */
   bool waitForConnected(const std::string &keyId, const std::string &software, const std::string &privkey,
                         const std::string &passphrase, std::string &serverkey);
+  /// Versuche einen Reconnect vom Client (muss vor waitForConnected aufgerufen werden)
+  void tryReconnect();
 
   /** \brief Arbeitsroutine des Server
    *
    * @return Connected-Status; d.H. der Server darf normale Anfragen bearbeiten
+   * \throws runtime_error wenn ein Fehler im Stream bzw im Login/Reconnect aufgetreten ist;
    */
   bool parseServer();
 
   /** \brief callback für Server: Eingang einer Login-Anforderung return clientKey oder "" falls kei Login
    *
-   * Die Login-Anforderung cipher muss mit receiveLogin(cipher, *session, privKey, "") entschlüsselt werden.
+   * Die Login-Anforderung cipher muss mit receiveLogin(cipher, privKey, "", ...) entschlüsselt werden.
    * Bei einer exception wird die Login-Anforderung abgelehnt
    * @param cipher verschlüsselte Info des Logins
    * @param info allgemeine Info oder Fehlermeldung
    * @return Name des public clientKey bzw. der Key im PEM-Format;  "" falls kein Login möglich
    */
   virtual std::string loginReceived(const std::vector<u_char> &cipher, std::string &info) { info = "not implemented"; return {}; }
+  /** \brief callback für Server: Eingang einer reconnect-Anforderung auf eine bestehende SessionId
+   *
+   * @param newId gewünschte SessionId
+   * @param Fehlermeldung
+   * @return true wenn reconnect Ok
+   */
+  virtual bool reconnectReceived(u_int newId, std::string &error) { error = "not implemented"; return false; }
   /** \brief callback für Server: Anfrage des Public keys
    *
    * @param key Rückgabe des PupKeys im PEM-Format "-----BEGIN ..." oder leer bei Fehler
@@ -117,14 +127,17 @@ public:
    *
    * anhand der loginId kann dann der public key des Clients (Pfad oder PEM) ermittelt werden.
    * @param cipher empfangene Imformation
-   * @param session session aus Mrpc
    * @param privkey privater Schlüssel des Servers
    * @param passwd
+   * @param login Rückgabe Loginname des Caller-Systems
+   * @param software Rückgabe Software des Caller-Systems
+   * @param hostname Rückgabe Hostname des Caller-Systems
    * @return login-Id der Anfrage
    */
-  static std::string receiveLogin(const std::vector<u_char> &cipher, MrpcSession &session, const std::string &privkey, const std::string &passwd);
-  /// erzeugt Sessionkey, übernimmt sessionId; returniert cipher für receiveSessionKey()
-  static std::vector<u_char> generateSessionKey(MrpcSession &session, const std::string &clientkey);
+  static std::string receiveLogin(const std::vector<u_char> &cipher, const std::string &privkey, const std::string &passwd,
+                                  std::string &login, std::string &software, std::string &hostname);
+  /// \private erzeugt Sessionkey für Server, übernimmt sessionId; returniert cipher für receiveSessionKey()
+  std::vector<u_char> generateSessionKey(const std::string &clientkey);
   /// \private erzeuge Login-Info auf Client-Seite
   static std::vector<u_char> generateLoginInfo(const std::string &keyId,
                                                const std::string &software, const std::string &serverkey);
@@ -135,7 +148,6 @@ public:
   std::wostream oStr; ///< \private
   XmlWriter writer; ///< das Writer-Objekt wür die Ausgabe
   MrpcSession *session; ///< Zeiger auf ein MrpcSession - Info; muss zwingend existieren
-  u_int sessionReuseTimeout; ///< Timeout für einen reuse, falls implementiert, ansonsten 0
   std::unique_ptr<mobs::ObjectBase> resultObj; ///< Das zuletzt empfangene Objekt; muss nach Verwendung auf nullptr gesetzt werden
 
 private:
