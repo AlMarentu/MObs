@@ -363,7 +363,7 @@ std::wstring toLower(const std::wstring &tx) {
   } catch (...) {
     loc = std::locale();
   }
-  LOG(LM_DEBUG, "LOCALE = " << loc.name());
+  //LOG(LM_DEBUG, "LOCALE = " << loc.name());
   wstring lo;
   lo.reserve(tx.length());
   std::transform(tx.begin(), tx.end(), std::back_inserter(lo), [loc](const wchar_t c) { return std::tolower(c, loc);} );
@@ -381,7 +381,7 @@ std::wstring toUpper(const std::wstring &tx) {
   } catch (...) {
     loc = std::locale();
   }
-  LOG(LM_DEBUG, "LOCALE = " << loc.name());
+  //LOG(LM_DEBUG, "LOCALE = " << loc.name());
   wstring lo;
   lo.reserve(tx.length());
   std::transform(tx.begin(), tx.end(), std::back_inserter(lo), [loc](const wchar_t c) { return std::toupper(c, loc);} );

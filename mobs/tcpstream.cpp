@@ -218,6 +218,7 @@ public:
       return 0;
     }
     //LOG(LM_DEBUG, "TcpStream read " << res << " soll " << rdBuf.size());
+    //LOG(LM_DEBUG, "RCV: " << std::string(&rdBuf[0], res));
     rdPos += TcpStBuf::off_type(res);
     return res;
   }
