@@ -92,8 +92,7 @@ public:
   std::string privKey;
 };
 
-TEST(mrpcTest, MrpcClient) {
-  GTEST_SKIP() << " nur Beispiel";
+void exampleClient() {
 
   string serverPub;
   MrpcPerson p;
@@ -124,8 +123,7 @@ TEST(mrpcTest, MrpcClient) {
 
 }
 
-TEST(mrpcTest, MrpcServer) {
-  GTEST_SKIP() << " nur Beispiel";
+void exampleServer() {
   MrpcPerson p;
   p.name("OTTO");
 

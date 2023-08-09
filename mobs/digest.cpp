@@ -180,7 +180,7 @@ mobs::CryptBufDigest::int_type mobs::CryptBufDigest::overflow(mobs::CryptBufDige
 }
 
 void mobs::CryptBufDigest::finalize() {
-  LOG(LM_INFO, "CryptBufDigest::finalize");
+  //LOG(LM_DEBUG, "CryptBufDigest::finalize");
   TRACE("");
   pubsync();
   if (data->mdctx) {

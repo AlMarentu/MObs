@@ -108,17 +108,6 @@ public:
    */
   void setReadLimit(std::streamsize bytes = -1);
 
-  /** \brief setze Trennzeichen
-   *
-   * Über ein Trennzeichen, kann das Leseverhalten des Buffers gesteuert werden, so dass ein read_avail() nur bis zum
-   * Trenner liest. Der Delimiter wird immer zu Beginn der Folgeblocks zurückgeliefert
-   * @param delim unsigned char des Trenners oder Traits::eof() für aus
-   */
-  void setReadDelimiter(char_type delim);
-
-  ///  Delimiter-Funktion abschalten
-  void setReadDelimiter();
-
   /// Anzahl der noch zu lesenden Bytes, falls begrenzt
   std::streamsize getLimitRemain() const;
 
@@ -194,6 +183,11 @@ class CryptIstrBufData;
  * so muss der Buffer nach neuer Kodierung immer noch ausreichend sein. Auch darf zuvor kein Zeichensatz
  * verwendet worden sein, der Multibyte-Character verwendet.
  * ISO nach beliebig geht, UTF8 bzw UTF16 darf nicht mehr geändert werden
+ *
+ * Wird als Input ein UTF-8 Zeichensatz verwendet, so kann ,durch das in UTF-8 ungültige Zeichen 0x80, der Zeichenstrom
+ * unterbrochen werden. Es werden bei readsome nur die Zeichen bis zum Trenner gelesen. die Übrigen verbleiben im Buffer.
+ * An dieser Stelle kann durch BinaryIstBuf der binäre Datenstrom weitergelesen werden.
+ * Wird der originäre Datenstrom weitergelesen, so wird erst dann ein Fehlerzustand erreicht.
  */
 class CryptIstrBuf : public std::basic_streambuf<wchar_t> {
   friend class BinaryIstBuf;

@@ -737,8 +737,8 @@ public:
         tags.pop();
         if (not reedEof and tags.empty())
           paused = true;
-        else if (tags.empty())
-          LOG(LM_INFO, "READY");
+        //else if (tags.empty())
+        //  LOG(LM_DEBUG, "READY");
         inParse2Lt = true;
         continue;
       }
@@ -1161,8 +1161,8 @@ private:
       if (not s)
         THROW("bad stream");
       c = istr.get();
-      if (istr.eof())
-        LOG(LM_DEBUG, "EOF");
+      if (not reedEof and istr.eof())
+        LOG(LM_DEBUG, "EOF reached");
 //    std::cout << " x" << mobs::to_string(c); // << " " << istr.tellg() << ".";
     }
     return c;

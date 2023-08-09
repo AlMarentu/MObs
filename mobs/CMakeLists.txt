@@ -69,6 +69,9 @@ add_library(mobs  ${libSrcs})
 target_link_libraries(mobs ${EXTRA_LIBS})
 message(STATUS "EXTRA_LIBS=${EXTRA_LIBS}")
 
+#target_compile_definitions(mobs PUBLIC STREAMLOG)
+
+
 if(BUILD_MONGO_INTERFACE)
     target_compile_definitions(mobs PUBLIC USE_MONGO)
 endif()

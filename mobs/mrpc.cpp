@@ -150,7 +150,7 @@ void Mrpc::StartTag(const std::string &element)
     if (o)
       fill(o);
     else
-      LOG(LM_INFO, "Unkown");
+      LOG(LM_INFO, "unknown element " << element);
   }
 }
 
@@ -313,7 +313,7 @@ bool Mrpc::parseServer()
       if (auto *sess = dynamic_cast<MrpcReturnError *>(resultObj.get())) {  // sollte der Server eigentlich nie bekommen
         LOG(LM_ERROR, "SESSIONERROR (ignored) " << sess->error.toStr(mobs::ConvObjToString()));
       } else if (auto *sess = dynamic_cast<MrpcSessionLogin *>(resultObj.get())) {
-        LOG(LM_INFO, "LOGIN ");
+        LOG(LM_DEBUG, "LOGIN ");
         if (not session)
           throw std::runtime_error("session missing");
         std::string info;

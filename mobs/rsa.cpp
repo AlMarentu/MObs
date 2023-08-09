@@ -67,7 +67,7 @@ namespace {
 class openssl_exception : public std::runtime_error {
 public:
   explicit openssl_exception(const std::string &log = "") : std::runtime_error(log + " " + mobs_internal::openSslGetError()) {
-    LOG(LM_DEBUG, "openssl: " << what());
+    LOG(LM_ERROR, "openssl: " << what());
   }
 };
 

@@ -85,7 +85,7 @@ void NOPDataMap::assign(const string &objName, shared_ptr<NamedObject> obj)
     }
     else
     {
-      cerr << "Element " << objName << " ersetzt " << search->second.ptr.use_count() << endl;
+      LOG(LM_DEBUG, "Element " << objName << " ersetzt " << search->second.ptr.use_count());
       search->second.ptr = obj;
     }
   }
@@ -94,7 +94,7 @@ void NOPDataMap::assign(const string &objName, shared_ptr<NamedObject> obj)
     auto result = pool.emplace(make_pair(objName, NOD(objName, obj)));
     if (not result.second)
       throw runtime_error(string("Element ") + objName + " insert error");
-    cerr << "Element " << objName << " inserted" << endl;
+    LOG(LM_DEBUG, "Element " << objName << " inserted");
   }
 }
 
@@ -124,7 +124,7 @@ void NOPDataMap::clearUnlocked()
 
   for(auto p = pool.begin(); p != pool.end(); p++)
   {
-//    cerr << "Element " << p->first << " use " << p->second.ptr.use_count() << endl;
+//    LOG(LM_DEBUG, "Element " << p->first << " use " << p->second.ptr.use_count());
     if (p->second.ptr.use_count() <= 1)
     {
       p->second.ptr->setNOdestroyed();
@@ -170,7 +170,7 @@ void NOPDataUnordered::assign(const string &objName, shared_ptr<NamedObject> obj
     }
     else
     {
-      cerr << "Element " << objName << " ersetzt " << search->second.ptr.use_count() << endl;
+      LOG(LM_DEBUG, "Element " << objName << " ersetzt " << search->second.ptr.use_count());
       search->second.ptr = obj;
     }
   }
@@ -179,7 +179,7 @@ void NOPDataUnordered::assign(const string &objName, shared_ptr<NamedObject> obj
     auto result = pool.emplace(make_pair(objName, NOD(objName, obj)));
     if (not result.second)
       throw runtime_error(string("Element ") + objName + " insert error");
-    cerr << "Element " << objName << " inserted" << endl;
+    LOG(LM_DEBUG, "Element " << objName << " inserted");
   }
 }
 
@@ -206,7 +206,7 @@ void NOPDataUnordered::clearUnlocked()
 
   for(auto p = pool.begin(); p != pool.end(); p++)
   {
-    cerr << "Element " << p->first << " use " << p->second.ptr.use_count() << endl;
+    LOG(LM_DEBUG, "Element " << p->first << " use " << p->second.ptr.use_count());
     if (p->second.ptr.use_count() <= 1)
     {
       p->second.ptr->setNOdestroyed();

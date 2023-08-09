@@ -31,6 +31,11 @@
 #include <iomanip>
 #include <cstring>
 
+#ifdef STREAMLOG
+#define CSBLOG(x, y) LOG(x, y)
+#else
+#define CSBLOG(x, y)
+#endif
 
 #define KEYBUFLEN 32
 #define INPUT_BUFFER_LEN 1024
@@ -63,7 +68,7 @@ namespace {
 class openssl_exception : public std::runtime_error {
 public:
   explicit openssl_exception(const std::string &log = "") : std::runtime_error(log + " " + mobs_internal::openSslGetError()) {
-    LOG(LM_DEBUG, "openssl: " << what());
+    CSBLOG(LM_DEBUG, "openssl: " << what());
   }
 };
 
@@ -298,7 +303,7 @@ int mobs::CryptBufAes::underflowWorker(bool nowait) {
 void mobs::CryptBufAes::ctxInit() {
   if (not data->ctx) {
     if (data->salted) {
-      LOG(LM_DEBUG, "AES init");
+      CSBLOG(LM_DEBUG, "AES init");
       openSalt();
       data->initAES();
     }
@@ -333,7 +338,7 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::overflow(mobs::CryptBufAes::int_t
       if (1 != EVP_EncryptUpdate(data->ctx, &buf[ofs], &len, (u_char *) (Base::pbase()),
                                  std::distance(Base::pbase(), Base::pptr())))
         throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
-//    LOG(LM_DEBUG, "Writing " << len << "  was " << std::distance(Base::pbase(), Base::pptr()));
+//    CSBLOG(LM_DEBUG, "Writing " << len << "  was " << std::distance(Base::pbase(), Base::pptr()));
       len += ofs;
       doWrite((char *) (&buf[0]), len);
 //      std::cout << "overflow2 schreibe " << std::distance(Base::pbase(), Base::pptr()) << "\n";
@@ -354,7 +359,6 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::overflow(mobs::CryptBufAes::int_t
 
 void mobs::CryptBufAes::finalize() {
   TRACE("");
-//  std::cout << "finalize3\n";
   // bei leerer Eingabe, hier Verschlüsselung beginnen
   ctxInit();
   if (data->initIV) {
@@ -370,7 +374,7 @@ void mobs::CryptBufAes::finalize() {
 //    EVP_CIPHER_CTX_reset(data->ctx);
     EVP_CIPHER_CTX_free(data->ctx);
     data->ctx = nullptr;
-    //LOG(LM_DEBUG, "Writing. " << len);
+    //CSBLOG(LM_DEBUG, "Writing. " << len);
     doWrite(reinterpret_cast<char *>(&buf[0]), len);
     if (data->mdctx) {
       data->md_value.resize(EVP_MAX_MD_SIZE);
@@ -387,7 +391,7 @@ void mobs::CryptBufAes::openSalt() {
   data->newSalt();
   doWrite("Salted__", 8);
   doWrite(reinterpret_cast<char *>(&data->salt[0]), data->salt.size());
-  //LOG(LM_DEBUG, "Writing salt " << 8 + data->salt.size());
+  //CSBLOG(LM_DEBUG, "Writing salt " << 8 + data->salt.size());
 }
 
 std::string mobs::CryptBufAes::getRecipientId(size_t pos) const {
