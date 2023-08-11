@@ -276,7 +276,7 @@ std::vector<u_char> Mrpc::generateLoginInfo(const std::string &keyId, const std:
 
 void Mrpc::xmlOut(const ObjectBase &obj)
 {
-  XmlOut xo(&writer, mobs::ConvObjToString().exportXml());
+  XmlOut xo(&writer, mobs::ConvObjToString().exportXml().exportWoNull());
   obj.traverse(xo);
   //writer.putc('\n');
 }
