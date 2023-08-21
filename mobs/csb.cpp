@@ -114,7 +114,7 @@ bool CryptIstrBuf::bad() const {
 void CryptIstrBuf::swapBuffer(std::unique_ptr<CryptBufBase> &newBuffer) {
   //overflow(Traits::eof());
   CSBLOG(LM_DEBUG, "CryptIstrBuf::swapBuffer Buffer: " << std::distance(Base::pbase(), Base::pptr())
-                                                   << " avail=" << data->cbb->in_avail());
+                                                       << " avail=" << data->cbb->in_avail());
   if (not newBuffer)
     newBuffer = std::unique_ptr<CryptBufBase>(new CryptBufBase);
   newBuffer->setIstr(data->inStb);
@@ -125,39 +125,54 @@ void CryptIstrBuf::swapBuffer(std::unique_ptr<CryptBufBase> &newBuffer) {
 
 CryptIstrBuf::int_type CryptIstrBuf::underflow() {
   TRACE("");
-  if (data->rest) {
-    //TODO Schalter ob invalid char eof oder bad liefert
-    //  throw std::ios_base::failure("invalid charset", std::io_errc::stream);
-    return Traits::eof();
-  }
   try {
     std::array<char, INPUT_BUFFER_SIZE> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
     std::locale lo = this->getloc();
-//    std::cout << "underflow\n";
+    CSBLOG(LM_DEBUG, "CryptIstrBuf::underflow ");
     std::streamsize sz = 0;
-    if (data->cbb) { // wird der buffer nicht explizit auf null gesetzt ist immer einer vorhanden
-      std::streamsize rd = buf.size();
+    std::streamsize restSize = 0;
+    if (data->rest) {
+      restSize = data->rest->size();
+      if (restSize > 6) { // bei mehr als 6 extra-Bytes wird kein gültiges Zeichen mehr entstehen
+        CSBLOG(LM_DEBUG, "CryptIstrBuf::underflow Rest SZ=" << data->rest->size());
+        //TODO Schalter ob invalid char eof oder bad liefert
+        //  throw std::ios_base::failure("invalid charset", std::io_errc::stream);
+        return Traits::eof();
+      }
+      std::copy_n(data->rest->begin(), restSize, buf.begin());
+      data->rest = nullptr;
+      data->state = std::mbstate_t{};
+      CSBLOG(LM_DEBUG, "CryptIstrBuf::underflow restoring " << restSize << " chars: " << std::string(&buf[0], restSize));
+    }
+    if (data->cbb) {
+      std::streamsize rd = buf.size() - restSize;
       auto av = data->cbb->in_avail();
       if (av == 0) {
         // evt. auf neue Zeichen warten
         if (data->cbb->underflow() == EOF)
+        {
+          if (restSize) // bereits unkodierbare Zeichen vorhanden
+            throw std::ios_base::failure("invalid charset (trailing chars)", std::io_errc::stream);
           return Traits::eof();
+        }
         av = data->cbb->in_avail();
       }
       if (av > 0 and av < rd) {
         rd = av;
-        //CSBLOG(LM_DEBUG, "READSOME CIB " << av);
+        CSBLOG(LM_DEBUG, "READSOME CIB " << av);
       }
-      sz = data->cbb->sgetn(&buf[0], rd);
+      sz = restSize + data->cbb->sgetn(&buf[restSize], rd);
     } else {
       CSBLOG(LM_DEBUG, "CryptIstrBuf READ ohne cbb");
       if (data->inStb.eof())
         return Traits::eof();
       std::istream::sentry sen(data->inStb, true);
       if (sen) {
-        data->inStb.read(&buf[0], buf.size());
+        data->inStb.read(&buf[restSize], buf.size() - restSize);
         sz = data->inStb.gcount();
         if (not sz) {
+          if (restSize) // bereits unkodierbare Zeichen vorhanden
+            throw std::ios_base::failure("invalid charset (trailing chars)", std::io_errc::stream);
           Base::setg(data->buffer.begin(), data->buffer.begin(), data->buffer.begin());
           return Traits::eof();
         }
@@ -166,21 +181,24 @@ CryptIstrBuf::int_type CryptIstrBuf::underflow() {
 //    std::cout << "GC = " << sz << "  " << std::string(&buf[0], sz) << std::endl;
     char_type *bit;
     const char *bp;
-    std::use_facet<std::codecvt<char_type, char, std::mbstate_t>>(lo).in(data->state, &buf[0], &buf[sz], bp,
-                                                                         &data->buffer[0],
-                                                                         &data->buffer[INPUT_BUFFER_SIZE], bit);
-    if (bp != &buf[sz]) {
-      LOG(LM_ERROR,
-          "CryptIstrBuf::underflow facet failed chars = " << int(bp[0]) << ", " << int(bp[1]) << ", " << int(bp[2])
-                                                          << " Size " << std::distance(&buf[0], (char *) bp) << " != "
-                                                          << sz);
-      if (bp != &buf[0]) { // Rest merken
-        data->rest = std::unique_ptr<std::vector<char>>(
-                new std::vector<char>(const_cast<char *>(bp), &buf[sz])); //std::distance(bp, &buf[sz]))
-        CSBLOG(LM_DEBUG, "CryptIstrBuf saving " << data->rest->size() << " chars: "
-                                            << std::string(&(*data->rest)[0], data->rest->size()));
-      } else
+
+    std::use_facet<std::codecvt<char_type, char, std::mbstate_t>>(lo).in(
+        data->state, &buf[0], &buf[sz], bp,
+        &data->buffer[0],
+        &data->buffer[INPUT_BUFFER_SIZE], bit);
+    if (bp != &buf[sz]) { // Rest merken
+      data->rest = std::unique_ptr<std::vector<char>>(
+          new std::vector<char>(const_cast<char *>(bp), &buf[sz])); //std::distance(bp, &buf[sz]))
+      CSBLOG(LM_DEBUG, "CryptIstrBuf saving " << data->rest->size() << " chars: "
+                                              << std::string(&(*data->rest)[0], data->rest->size()));
+      if (bp == &buf[0])
+      {
+        LOG(LM_ERROR,
+            "CryptIstrBuf::underflow facet failed chars = " << int(bp[0]) << ", " << int(bp[1]) << ", " << int(bp[2])
+                                                            << " Size " << std::distance(&buf[0], (char *) bp) << " != "
+                                                            << sz);
         throw std::ios_base::failure("invalid charset", std::io_errc::stream);
+      }
     }
     Base::setg(&data->buffer[0], &data->buffer[0], bit);
     if (Base::gptr() == Base::egptr())
@@ -246,13 +264,13 @@ void CryptIstrBuf::imbue(const std::locale &loc) {
       if (bp2 != &buf[0]) { // Rest merken
         data->rest = std::unique_ptr<std::vector<char>>(new std::vector<char>((char *) bp2, bp));
         CSBLOG(LM_DEBUG, "CryptIstrBuf saving " << data->rest->size() << " chars: "
-                                            << std::string(&(*data->rest)[0], data->rest->size()));
+                                                << std::string(&(*data->rest)[0], data->rest->size()));
       } else
         throw std::ios_base::failure("invalid charset", std::io_errc::stream);
     }
     CSBLOG(LM_DEBUG,
-        "locale change " << std::distance(Base::gptr(), Base::egptr()) << " -> " << std::distance(&buf[0], bp) << " -> "
-                         << std::distance(&data->buffer[0], bit2));
+           "locale change " << std::distance(Base::gptr(), Base::egptr()) << " -> " << std::distance(&buf[0], bp) << " -> "
+                            << std::distance(&data->buffer[0], bit2));
     Base::setg(&data->buffer[0], &data->buffer[0], bit2);
     data->pos += off_type(std::distance(Base::gptr(), Base::egptr()));
     if (data->rest)
@@ -277,9 +295,9 @@ void CryptIstrBuf::imbue(const std::locale &loc) {
                                                       << sz);
       if (bp != &buf[0]) { // Rest merken
         data->rest = std::unique_ptr<std::vector<char>>(
-                new std::vector<char>(const_cast<char *>(bp), &buf[sz])); //std::distance(bp, &buf[sz]))
+            new std::vector<char>(const_cast<char *>(bp), &buf[sz])); //std::distance(bp, &buf[sz]))
         CSBLOG(LM_DEBUG, "CryptIstrBuf saving " << data->rest->size() << " chars: "
-                                            << std::string(&(*data->rest)[0], data->rest->size()));
+                                                << std::string(&(*data->rest)[0], data->rest->size()));
       } else
         throw std::ios_base::failure("invalid charset", std::io_errc::stream);
     }
@@ -913,7 +931,7 @@ std::streamsize Base64IstBuf::showmanyc() {
 class BinaryIstrBufData {
 public:
   BinaryIstrBufData(CryptIstrBufData *cid, size_t len) :
-          binaryLength(len), inStb(cid->inStb), cbb(cid->cbb.get()) { }
+      binaryLength(len), inStb(cid->inStb), cbb(cid->cbb.get()) { }
 
   ~BinaryIstrBufData() = default;
 
