@@ -153,7 +153,7 @@ public:
   bool lookup(const string &objName, weak_ptr<NamedObject> &ptr) override;
   void search(const string &searchName, std::list<pair<std::string, std::weak_ptr<NamedObject>>> &result) override;
   void clearUnlocked() override;
-} __unused;
+};
 #pragma clang diagnostic pop
 
 void NOPDataUnordered::assign(const string &objName, shared_ptr<NamedObject> obj)
