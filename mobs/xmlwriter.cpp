@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2023 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -105,7 +105,7 @@ public:
     if (indent)
     {
       wstring s;
-      s.resize(level * 2, ' ');
+      s.resize(level * 2, L' ');
       *wostr << s;
     }
   }
@@ -113,10 +113,10 @@ public:
     if (openEnd)
     {
       if (inHeader) {
-        *wostr << '?';
+        *wostr << L'?';
         inHeader = false;
       }
-      *wostr << '>';
+      *wostr << L'>';
       openEnd = false;
     }
   }
@@ -204,9 +204,9 @@ void XmlWriter::pushTag(const std::wstring &tag) {
 void XmlWriter::writeTagBegin(const std::wstring &tag) {
   data->closeTag();
   if (data->indent)
-    *data->wostr << '\n';
+    *data->wostr << L'\n';
   data->writeIndent();
-  *data->wostr << '<' << data->prefix << tag;
+  *data->wostr << L'<' << data->prefix << tag;
   data->openEnd = true;
   data->elements.push(tag);
   data->level++;
@@ -215,7 +215,7 @@ void XmlWriter::writeTagBegin(const std::wstring &tag) {
 void XmlWriter::writeAttribute(const std::wstring &attribute, const std::wstring &value) {
   if (not data->openEnd)
     LOG(LM_WARNING, "XmlWriter::writeAttribute error");
-  *data->wostr << ' ' << attribute << '=' << '"';
+  *data->wostr << L' ' << attribute << L'=' << L'"';
   for (const auto c:value)
     switch (c)
     {
@@ -225,7 +225,7 @@ void XmlWriter::writeAttribute(const std::wstring &attribute, const std::wstring
       case 0 ... 0x1f: *data->wostr << L"&#x" << hex << int(c) << L';'; break;
       default: data->write(c);
     }
-  *data->wostr << '"';
+  *data->wostr << L'"';
 }
 
 void XmlWriter::writeValue(const std::wstring &value) {
@@ -292,13 +292,13 @@ void XmlWriter::writeTagEnd(bool forceNoNulltag) {
     *data->wostr << L"/>";
   else {
     if (data->indent and not data->hasValue) {
-      *data->wostr << '\n';
+      *data->wostr << L'\n';
       data->writeIndent();
     }
-    *data->wostr << L"</" << data->prefix << data->elements.top() << '>';
+    *data->wostr << L"</" << data->prefix << data->elements.top() << L'>';
   }
   if (data->indent and level() == 0)
-    *data->wostr << '\n' << flush;
+    *data->wostr << L'\n' << flush;
   data->elements.pop();
   data->hasValue = false;
   data->openEnd = false;
@@ -307,7 +307,7 @@ void XmlWriter::writeTagEnd(bool forceNoNulltag) {
 void XmlWriter::writeComment(const std::wstring &value, bool inNewLine) {
   data->closeTag();
   if (data->indent and inNewLine) {
-    *data->wostr << '\n';
+    *data->wostr << L'\n';
     data->writeIndent();
   }
   *data->wostr << L"<!-- ";

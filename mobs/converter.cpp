@@ -461,6 +461,7 @@ std::wstring::const_iterator to7Up(std::wstring::const_iterator begin, std::wstr
 
 std::wstring toLower(const std::wstring &tx) {
   std::locale loc;
+#ifndef __WIN32__
   try {
     const char *cp = getenv("LANG");
     if (cp)
@@ -470,7 +471,8 @@ std::wstring toLower(const std::wstring &tx) {
   } catch (...) {
     loc = std::locale();
   }
-  //LOG(LM_DEBUG, "LOCALE = " << loc.name());
+  // LOG(LM_DEBUG, "LOCALE = " << loc.name());
+#endif
   wstring lo;
   lo.reserve(tx.length());
   std::transform(tx.begin(), tx.end(), std::back_inserter(lo), [loc](const wchar_t c) { return std::tolower(c, loc);} );
@@ -479,6 +481,7 @@ std::wstring toLower(const std::wstring &tx) {
 
 std::wstring toUpper(const std::wstring &tx) {
   std::locale loc;
+#ifndef __WIN32__
   try {
     const char *cp = getenv("LANG");
     if (cp)
@@ -489,6 +492,7 @@ std::wstring toUpper(const std::wstring &tx) {
     loc = std::locale();
   }
   //LOG(LM_DEBUG, "LOCALE = " << loc.name());
+#endif
   wstring lo;
   lo.reserve(tx.length());
   std::transform(tx.begin(), tx.end(), std::back_inserter(lo), [loc](const wchar_t c) { return std::toupper(c, loc);} );
