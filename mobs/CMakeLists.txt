@@ -8,7 +8,7 @@ set(libSrcs objgen.cpp objtypes.cpp logging.cpp strtoobj.cpp objpool.cpp xmlwrit
 
 if (WIN32)
 else()
-    set(libSrcs socketstream.cpp socketstream.h)
+    set(libSrcs ${libSrcs} socketstream.cpp socketstream.h)
 endif()
 
 find_package(OpenSSL)
