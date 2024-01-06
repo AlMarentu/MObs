@@ -30,7 +30,8 @@ include_directories(${CMAKE_SOURCE_DIR}/mobs)
 
 if(PACKAGE_TESTS)
     enable_testing()
-    include(GoogleTest)
+    find_package(GTest REQUIRED)
+    #include(GoogleTest)
     add_subdirectory(tests)
 endif()
 
