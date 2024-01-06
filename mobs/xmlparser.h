@@ -592,16 +592,26 @@ public:
         if ((curr = istr.get()) != 0xfe)
           throw std::runtime_error(u8"Error in BOM");
         lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::little_endian>);
+        istr.putback(0xfe);
+        istr.putback(0xff);
         istr.imbue(lo);
         encoding = u8"UTF-16"; // (LE)
+        eat();
+        if (curr != 0xFEFF) // BOM
+          throw std::runtime_error(u8"Error in Codec");
         eat();
       } else if (curr == 0xfe) {
         std::locale lo;
         if ((curr = istr.get()) != 0xff)
           throw std::runtime_error(u8"Error in BOM");
         lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::codecvt_mode(0)>);
+        istr.putback(0xff);
+        istr.putback(0xfe);
         istr.imbue(lo);
         encoding = u8"UTF-16"; // (BE)
+        eat();
+        if (curr != 0xFEFF) // BOM
+          throw std::runtime_error(u8"Error in Codec");
         eat();
       } else if (curr == 0xef) {
         std::locale lo;
