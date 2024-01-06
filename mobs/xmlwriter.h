@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2023 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -53,6 +53,9 @@ public:
   /// Wird ein frisch geöffneter \c std::wofstream übergeben, so wird bei CS_utf16 sowie CS_utf8_bom ein BOM erzeugt,
   /// ansonsten kann auch \c std::wstringstream übergeben werden, dann sind aber nur CS_utf8 oder CS_iso* erlaubt
   /// \see writeHead
+  ///
+  /// Unter Windows sollte sollte der Stream mit ios::binary geöffnet worden sein, ansonsten werden NL durch CR/LF ersetzt,
+  /// was bei UTF16 zu kaputten Dateien führt.
   /// @param str zu beschreibender stream
   /// @param c Charset für die Ausgabe
   /// @param indent zum Abschalten von Einrückung und whitespace
