@@ -94,8 +94,9 @@ TEST(mchronoTest, mtime) {
 
 TEST(mchronoTest, mtime_int) {
   MTime t;
-  EXPECT_TRUE(mobs::from_number(int64_t (45211910398000345), t));
-  EXPECT_EQ("3402-09-16T23:59:58.000345Z", to_string_gmt(t));
+
+  EXPECT_TRUE(mobs::from_number(int64_t (9223372036854775), t));
+  EXPECT_EQ("2262-04-11T23:47:16.854775Z", to_string_gmt(t));
   EXPECT_TRUE(mobs::from_number(int64_t (-12521191039804), t));
   EXPECT_EQ("1969-08-09T01:53:28.960196Z", to_string_gmt(t));
   EXPECT_TRUE(mobs::from_number(int64_t (-2521191039804000), t));

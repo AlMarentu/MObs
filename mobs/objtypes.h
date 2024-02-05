@@ -662,6 +662,10 @@ template<> bool from_number(uint64_t, bool &t);
  *
  * Der Inhalt ist unabhängig vo Zustand \c isNull und hängt nur vom definierten Datentyp ab
  * bei \c bool ist \c isUnsigned gesetzt und max = 1
+ *
+ * Bei isTime-Typen sind bei Jahren von 1701 bis 1969 Sonderfunktionen unter Windows implementiert wenn entweder
+ * GMT verwendet wird oder nur ein Datum. Der maximale Wert beträgt
+ * 2262-04-11T23:47:16.854775Z oder 9223372036854775 µs = INT64MAX ns
  */
 class MobsMemberInfo {
 public:

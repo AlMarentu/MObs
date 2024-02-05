@@ -57,9 +57,9 @@ TEST(dateTimeTest, einAusgabe) {
 
   EXPECT_ANY_THROW(UxTime("AAA"));
 
-  UxTime t6(3402, 9, 17, 1, 59, 58);
-  EXPECT_EQ(45211910398, t6.toUxTime());
-  EXPECT_EQ("3402-09-17T01:59:58+02:00", t6.toISO8601());
+  UxTime t6(2988, 9, 17, 1, 59, 58);
+  EXPECT_EQ(32147452798, t6.toUxTime());
+  EXPECT_EQ("2988-09-17T01:59:58+02:00", t6.toISO8601());
 
   EXPECT_NO_THROW(t = UxTime("2020-07-03T14:12:55+02:00"));
   EXPECT_EQ("2020-07-03T14:12:55+02:00", t.toISO8601());

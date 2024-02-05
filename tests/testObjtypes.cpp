@@ -334,21 +334,116 @@ TEST(objtypeTest, historic) {
   mobs::MobsMemberInfo mi;
   mi.setTime(-1577199660000000);
 
-#ifndef __MINGW32__
-  {
-    std::stringstream s;
-    struct tm ts{};
-    mi.toLocalTime(ts);
-    s << std::put_time(&ts, "%FT%T%z");
-    EXPECT_EQ(u8"1920-01-09T09:59:00+0100", s.str());
-  }
-#endif
   {
     std::stringstream s;
     struct tm ts{};
     mi.toGMTime(ts);
     s << std::put_time(&ts, "%Y-%m-%dT%H:%M:%SZ");
     EXPECT_EQ(u8"1920-01-09T08:59:00Z", s.str());
+  }
+  {
+    mi.granularity = 86400000000;
+    std::stringstream s;
+    struct tm ts{};
+    mi.toLocalTime(ts);
+    s << std::put_time(&ts, "%a %j %FT%T");
+    EXPECT_EQ(u8"Fri 009 1920-01-09T00:00:00", s.str());
+  }
+
+  {
+   std::istringstream s("1900-03-01");
+   std::tm t = {};
+   s >> std::get_time(&t, "%Y-%m-%d");
+   mi.fromLocalTime(t);
+   time_t ti = mi.t64 / 1000000;
+   EXPECT_EQ(-2203891200, ti);
+
+   struct tm ts{};
+   mi.toGMTime(ts);
+   std::stringstream s2;
+   s2 << std::put_time(&ts, "%a %j %F");
+   EXPECT_EQ(u8"Thu 060 1900-03-01", s2.str());
+
+  }
+
+  {
+    std::istringstream s("1900-02-28");
+    std::tm t = {};
+    s >> std::get_time(&t, "%Y-%m-%d");
+    mi.fromLocalTime(t);
+    time_t ti = mi.t64 / 1000000;
+    EXPECT_EQ(-2203977600, ti);
+
+    struct tm ts{};
+    mi.toGMTime(ts);
+    std::stringstream s2;
+    s2 << std::put_time(&ts, "%a %j %F");
+    EXPECT_EQ(u8"Wed 059 1900-02-28", s2.str());
+
+  }
+
+  {
+    std::istringstream s("1874-05-01");
+    std::tm t = {};
+    s >> std::get_time(&t, "%Y-%m-%d");
+    mi.fromLocalTime(t);
+    time_t ti = mi.t64 / 1000000;
+    EXPECT_EQ(-3019075200, ti);
+
+    struct tm ts{};
+    mi.toGMTime(ts);
+    std::stringstream s2;
+    s2 << std::put_time(&ts, "%a %j %F");
+    EXPECT_EQ(u8"Fri 121 1874-05-01", s2.str());
+
+  }
+
+  {
+    std::istringstream s("1800-03-01");
+    std::tm t = {};
+    s >> std::get_time(&t, "%Y-%m-%d");
+    mi.fromLocalTime(t);
+    time_t ti = mi.t64 / 1000000;
+    EXPECT_EQ(-5359564800, ti);
+
+    struct tm ts{};
+    mi.toGMTime(ts);
+    std::stringstream s2;
+    s2 << std::put_time(&ts, "%a %j %F");
+    EXPECT_EQ(u8"Sat 060 1800-03-01", s2.str());
+
+  }
+
+  {
+    std::istringstream s("1800-02-28");
+    std::tm t = {};
+    s >> std::get_time(&t, "%Y-%m-%d");
+    mi.fromLocalTime(t);
+    time_t ti = mi.t64 / 1000000;
+    EXPECT_EQ(-5359651200, ti);
+
+    struct tm ts{};
+    mi.toGMTime(ts);
+    std::stringstream s2;
+    s2 << std::put_time(&ts, "%a %j %F");
+    EXPECT_EQ(u8"Fri 059 1800-02-28", s2.str());
+
+  }
+
+  {
+    std::istringstream s("1701-01-01");
+    std::tm t = {};
+    s >> std::get_time(&t, "%Y-%m-%d");
+    mi.fromLocalTime(t);
+    time_t ti = mi.t64 / 1000000;
+    EXPECT_EQ(-8488800000, ti);
+
+    struct tm ts{};
+    mi.toGMTime(ts);
+    std::stringstream s2;
+    s2 << std::put_time(&ts, "%a %j %F");
+    EXPECT_EQ(u8"Sat 001 1701-01-01", s2.str());
+
   }
 
 }

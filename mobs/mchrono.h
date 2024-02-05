@@ -103,7 +103,14 @@ public:
 
 
 
-
+/** \brief Deklaration für Zeit-Representation für Datenbank
+ *
+ * Entspricht Mikrosekunden seit Epoch (1.1.1070)
+ *
+ * Maximaler Wert ist 2262-04-11T23:47:16.854775Z oder 9223372036854775 µs = INT64MAX ns;
+ * Minimaler Wert ist je nach Betriebssystem 1.1.1970 (Windows) oder -9223372036854775 µs
+ *
+ */
 using MTime = std::chrono::time_point<std::chrono::system_clock, std::chrono::microseconds>;
 
 /// Aktuelle Zeit für MTime
