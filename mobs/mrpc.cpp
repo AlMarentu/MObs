@@ -18,13 +18,6 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifdef __MINGW32__
-#include <windows.h>
-#include <minwindef.h>
-#else
-#include <pwd.h>
-#include <sys/utsname.h>
-#endif
 #include <unistd.h>
 #include "mrpc.h"
 #include "xmlwriter.h"
@@ -251,41 +244,12 @@ std::vector<u_char> Mrpc::generateSessionKey(const std::string &clientkey)
 std::vector<u_char> Mrpc::generateLoginInfo(const std::string &keyId, const std::string &software,
                                             const std::string &serverkey)
 {
-    static std::string nodename;
-    static std::string username;
-    if (nodename.empty())
-    {
-#ifdef __MINGW32__
-  char buf[300];
-  DWORD bufSize = sizeof(buf);
-  if (GetComputerNameA(buf, &bufSize))
-    nodename = std::string(buf);
-  if (nodename.empty())
-      nodename = "unknown";
-  bufSize = sizeof(buf);
-  if (GetUserNameA(buf, &bufSize))
-      username = std::string(buf);
-  if (username.empty())
-      username = "unknown";
-#else
-  struct utsname uts;
-  if (::uname(&uts) == -1)
-      nodename = "none";
-  else
-      nodename = uts.nodename;
-  struct passwd *pw = ::getpwuid(geteuid());
-  if (pw == nullptr)
-      throw std::runtime_error("can't et pwd entry");
-  username = pw->pw_name;
-#endif
-    }
-
   MrpcSessionLoginData loginData;
   //data.login(fingerprint);
   loginData.software(software);
-  loginData.hostname(nodename);
+  loginData.hostname(getNodeName());
   loginData.key(keyId);
-  loginData.login(username);
+  loginData.login(getLoginName());
   std::string buffer = loginData.to_string(mobs::ConvObjToString().exportJson().noIndent());
   std::vector<u_char> inhalt;
   copy(buffer.begin(), buffer.end(), back_inserter(inhalt));

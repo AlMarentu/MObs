@@ -23,6 +23,14 @@
 #include "objtypes.h"
 #include "converter.h"
 
+#ifdef __MINGW32__
+#include <windows.h>
+#include <minwindef.h>
+#else
+#include <pwd.h>
+#include <sys/utsname.h>
+#include <unistd.h>
+#endif
 
 #include <sstream>
 #include <utility>
@@ -810,6 +818,54 @@ int StringFormatter::format(const wstring &input, wstring &result, int ruleBegin
     }
   }
   return 0;
+}
+
+const string &getLoginName()
+{
+  static std::string username;
+  if (username.empty())
+  {
+#ifdef __MINGW32__
+    char buf[300];
+    DWORD bufSize = sizeof(buf);
+    if (GetUserNameA(buf, &bufSize))
+      username = std::string(buf);
+    if (username.empty())
+      throw std::runtime_error("can't GetUserName");
+#else
+    struct passwd *pw = ::getpwuid(geteuid());
+    if (pw == nullptr)
+      throw std::runtime_error("can't get pwd entry");
+    username = pw->pw_name;
+#endif
+  }
+  return username;
+}
+
+
+const string &getNodeName()
+{
+  static std::string nodename;
+  if (nodename.empty())
+  {
+#ifdef __MINGW32__
+    char buf[300];
+    DWORD bufSize = sizeof(buf);
+    if (GetComputerNameA(buf, &bufSize))
+      nodename = std::string(buf);
+    if (nodename.empty())
+      throw std::runtime_error("GetComputerName failed");
+#else
+    struct utsname uts;
+    if (::uname(&uts) == -1)
+      throw std::runtime_error("uname failed");
+    nodename = uts.nodename;
+    auto pos =  nodename.find('.');
+    if (pos != string::npos and pos > 0)
+      nodename.resize(pos);
+#endif
+  }
+  return nodename;
 }
 
 }

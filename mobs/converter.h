@@ -260,6 +260,21 @@ private:
  */
 std::string gen_uuid_v4_p();
 
+/** \brief Ermittle den Loginnamen
+ *
+ * @return login name
+ * \throws runtime_error wenn nicht ermittelbar
+ */
+const std::string &getLoginName();
+
+/** \brief Ermittle den Rechner-Namnen
+ *
+ * @return Rechnername
+ * \throws runtime_error wenn nicht ermittelbar
+ */
+const std::string &getNodeName();
+
+
 class StringFormatterData;
 
 /// Klasse die Strings nach Regular Expression parst und neu formatiert
