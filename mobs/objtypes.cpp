@@ -451,7 +451,8 @@ void MobsMemberInfo::toGMTime(struct ::tm &ts) const {
   std::chrono::system_clock::time_point tp{};
   tp += std::chrono::microseconds(t64);
   time_t time = std::chrono::system_clock::to_time_t(tp);
-#ifdef __MINGW32__
+  // Bei Windows und Apple ist gmtime nicht für Zeiten vor 1970 geeignet
+#if defined(__MINGW32__) || defined(__APPLE__)
   int yOfs = 0;
   if (time < 0 and time >= -8488800000) { // ab 1.1.1701
     const int64_t f = 883612800; // 365,25*24*3600*28   28 Jahre wegen Wochentag und Schaltjahr
@@ -465,7 +466,11 @@ void MobsMemberInfo::toGMTime(struct ::tm &ts) const {
     time += x * f;
     int y = 1970 - yOfs;
   }
+#ifdef __MINGW32__
   gmtime_s(&ts, &time);
+#else
+  gmtime_r(&time, &ts);
+#endif
   ts.tm_year -= yOfs;
   if (ts.tm_year == 0 and ts.tm_mon > 1) // 1900 ist kein Schaltjahr
     ts.tm_yday--;
@@ -514,7 +519,8 @@ void MobsMemberInfo::fromGMTime(tm &ts) {
     ts.tm_min = 0;
   if (granularity >= 60000000)
     ts.tm_sec = 0;
-#ifdef __MINGW32__
+  // Bei Windows und Apple ist mktime nicht für Zeiten vor 1970 geeignet
+#if defined(__MINGW32__) || defined(__APPLE__)
   int64_t mOfs = 0;
   if (ts.tm_year < 70 and ts.tm_year > -200) { // ab 1701
     //kein Schaltjahr bei 1700 1800 1900
@@ -523,7 +529,11 @@ void MobsMemberInfo::fromGMTime(tm &ts) {
     ts.tm_year += x * 28;
     mOfs = x * f;
   }
+#ifdef __MINGW32__
   time_t t = _mkgmtime(&ts) - mOfs;
+#else
+    time_t t = timegm(&ts) - mOfs;
+#endif
   if (t < -2203891200) // 1.3.1900
     t += 86400;
   if (t < -5359564800) // 1.3.1800
