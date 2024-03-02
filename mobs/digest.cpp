@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2021 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -26,6 +26,7 @@
 #include <openssl/ssl.h>
 #include <openssl/rand.h>
 #include <openssl/evp.h>
+#include <array>
 #include <vector>
 #include <iomanip>
 //#include <openssl/err.h>

@@ -34,6 +34,7 @@
 #include <sstream>
 #include <gtest/gtest.h>
 #include <codecvt>
+#include <array>
 
 using namespace std;
 
