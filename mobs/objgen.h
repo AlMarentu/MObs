@@ -1021,7 +1021,7 @@ public:
   const_reverse_iterator crend() const noexcept { return const_reverse_iterator(cbegin()); }
   /** \brief Suche nach einem Element
    *
-   * @param t zu suchenedes Element bei MemVarVektor oder Name des Objektes (objNameKeyStr()) bei Objektvektor
+   * @param t zu suchendes Element bei MemVarVektor oder Name des Objektes (objNameKeyStr()) bei Objektvektor
    * @param start Startposition (optional)
    * @return Position des Elements oder \c MemBaseVector::npos, wenn nicht gefunden
    * \throws runtime_error, wenn nach einem Objekt gesucht wird, das kein KEYELEMENT definiert hat
@@ -1031,7 +1031,7 @@ public:
    *
    * Ist der Vektor ein MemVarVektor, so kann nach dem Inhalt des Elements gesucht werden;
    * bei einem Objektvektor wird nach dem Namen des Objektes (objNameKeyStr()) gesucht
-   * @param t zu suchenedes Element bei MemVarVektor oder Name des Objektes bei Objektvektor
+   * @param t zu suchendes Element bei MemVarVektor oder Name des Objektes bei Objektvektor
    * @return true, wenn das Element gefunden wurde
    * \throws runtime_error, wenn nach einem Objekt gesucht wird, das kein KEYELEMENT definiert hat
    */
@@ -1220,7 +1220,7 @@ public:
   bool inNull() const { return m_inNull; }
   /// ist true, wenn ein \c traversKey durchgeführt wird
   bool inKeyMode() const { return m_keyMode; }
-  /// ist true, wenn im \c auditMode in bereits gelöschten Elementen travesiert wird
+  /// ist true, wenn im \c auditMode in bereits gelöschten Elementen traversiert wird
   bool inDelAudit() const { return m_delMode; }
   /// Ist das Element Teil eines Vektors, wird die Index-Position angezeigt, ansonsten ist der Wert \c SIZE_MAX
   size_t arrayIndex() const { return m_arrayIndex; }
