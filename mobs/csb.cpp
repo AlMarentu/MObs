@@ -25,6 +25,7 @@
 
 #include <locale>
 #include <vector>
+#include <array>
 #include <iomanip>
 #include <algorithm>
 
@@ -48,7 +49,11 @@ namespace mobs {
 //};
 
 
-#define INPUT_BUFFER_SIZE 1024
+#define INPUT_BUFFER_SIZE 4096
+// local-char to wide-char buffer size
+#define OUTPUT_BUFFER_SIZE 2048
+// Buffer für Base64-Kodierung, soll <= 75% INPUT_BUFFER_SIZE sein
+#define C_IN_BUF_SZ  3072
 
 #if (INPUT_BUFFER_SIZE % 4)
 #error INPUT_BUFFER_SIZE must be multiple of 4
@@ -343,7 +348,7 @@ public:
   std::ostream &outStb;
   std::unique_ptr<CryptBufBase> cbb;
   std::mbstate_t state{};
-  std::array<CryptOstrBuf::char_type, 1024> buffer;
+  std::array<CryptOstrBuf::char_type, OUTPUT_BUFFER_SIZE> buffer;
   CryptOstrBuf::pos_type pos = 0;
 };
 
@@ -376,7 +381,7 @@ CryptOstrBuf::int_type CryptOstrBuf::overflow(CryptOstrBuf::int_type ch) {
     if (s) {
       const std::locale lo = this->getloc();
       const char_type *bit;
-      std::vector<char> buf(2048);
+      std::vector<char> buf(OUTPUT_BUFFER_SIZE * 2);
       char *bp;
       std::use_facet<std::codecvt<char_type, char, std::mbstate_t>>(lo).out(data->state, Base::pbase(), Base::pptr(),
                                                                             bit, &buf[0], &buf[buf.size()], bp);
@@ -501,7 +506,6 @@ void CryptBufBase::base64::set(mobs::CryptIstrBuf *rdp) const {
 }
 
 
-#define C_IN_BUF_SZ  256
 
 class CryptBufBaseData { // NOLINT(cppcoreguidelines-pro-type-member-init)
 public:

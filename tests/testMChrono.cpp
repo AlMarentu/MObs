@@ -127,5 +127,24 @@ TEST(mchronoTest, mdate) {
   LOG(LM_INFO, "NOW " << mobs::to_string(d));
 }
 
+TEST(mchronoTest, delta) {
+  MTime t1, t2;
+  auto vorher = MTimeNow();
+  EXPECT_TRUE(string2x("2020-03-30T15:30:55.123456Z", t1));
+  EXPECT_TRUE(string2x("2020-03-30T15:30:55.123456Z", t2));
+  EXPECT_EQ(0, (t1 - t2).count());
+  EXPECT_TRUE(string2x("2020-03-30T15:30:55.123457Z", t2));
+  EXPECT_EQ(-1, (t1 - t2).count());
+  EXPECT_TRUE(string2x("2020-03-30T15:30:55.123455Z", t2));
+  EXPECT_EQ(1, (t1 - t2).count());
+  EXPECT_TRUE(string2x("2020-03-30T15:30:54.123456Z", t2));
+  EXPECT_EQ(1000000, (t1 - t2).count());
+  EXPECT_TRUE(string2x("2020-03-30T15:29:55.123456Z", t2));
+  EXPECT_EQ(60000000, (t1 - t2).count());
+  EXPECT_EQ(60000, std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t2).count());
+  EXPECT_EQ(60, std::chrono::duration_cast<std::chrono::seconds>(t1 - t2).count());
+  EXPECT_LT(5, (MTimeNow() - vorher).count()); // Sollte immer mindestens 5 microsekunden dauern
+}
+
 }
 

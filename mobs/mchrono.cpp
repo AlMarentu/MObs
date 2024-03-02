@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -310,14 +310,13 @@ bool to_int64(MDate t, int64_t &i) {
 }
 
 
-
-
 std::string to_string_iso8601(MTime t, MTimeFract f) {
 #ifdef __MINGW32__
   static const char *fmt[] = {"%Y", "%Y-%m", "%Y-%m-%d", "%Y-%m-%dT%H", "%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S",
                               "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S"};
 #else
-  static const char *fmt[] = {"%Y", "%Y-%m", "%F", "%FT%H", "%FT%H:%M", "%FT%T", "%FT%T", "%FT%T", "%FT%T", "%FT%T", "%FT%T", "%FT%T"};
+  static const char *fmt[] = {"%Y", "%Y-%m", "%F", "%FT%H", "%FT%H:%M", "%FT%T", "%FT%T", "%FT%T", "%FT%T", "%FT%T",
+                              "%FT%T", "%FT%T"};
 #endif
   std::stringstream s;
   struct tm ts{};
@@ -337,7 +336,7 @@ std::string to_string_iso8601(MTime t, MTimeFract f) {
 #endif
   s << std::put_time(&ts, fmt[f]);
   if (f >= MF1) {
-    for (MTimeFract i = MF6; i > f; i = MTimeFract((int)i -1))
+    for (MTimeFract i = MF6; i > f; i = MTimeFract((int) i - 1))
       us = us / 10;
     s << '.' << std::setfill('0') << std::setw(f - MSecond) << us;
   }
@@ -351,7 +350,8 @@ std::string to_string_ansi(MTime t, MTimeFract f) {
   static const char *fmt[] = {"%Y", "%Y-%m", "%Y-%m-%d", "%Y-%m-%d %H", "%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S",
                               "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S"};
 #else
-  static const char *fmt[] = {"%Y", "%Y-%m", "%F", "%F %H", "%F %H:%M", "%F %T", "%F %T", "%F %T", "%F %T", "%F %T", "%F %T", "%F %T"};
+  static const char *fmt[] = {"%Y", "%Y-%m", "%F", "%F %H", "%F %H:%M", "%F %T", "%F %T", "%F %T", "%F %T", "%F %T",
+                              "%F %T", "%F %T"};
 #endif
   std::stringstream s;
   struct tm ts{};
@@ -365,7 +365,7 @@ std::string to_string_ansi(MTime t, MTimeFract f) {
 #endif
   s << std::put_time(&ts, fmt[f]);
   if (f >= MF1) {
-    for (MTimeFract i = MF6; i > f; i = MTimeFract((int)i -1))
+    for (MTimeFract i = MF6; i > f; i = MTimeFract((int) i - 1))
       us = us / 10;
     s << '.' << std::setfill('0') << std::setw(f - MSecond) << us;
   }
@@ -377,7 +377,8 @@ std::string to_string_gmt(MTime t, MTimeFract f) {
   static const char *fmt[] = {"%Y", "%Y-%m", "%Y-%m-%d", "%Y-%m-%dT%H", "%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S",
                               "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S"};
 #else
-  static const char *fmt[] = {"%Y", "%Y-%m", "%F", "%FT%H", "%FT%H:%M", "%FT%T", "%FT%T", "%FT%T", "%FT%T", "%FT%T", "%FT%T", "%FT%T"};
+  static const char *fmt[] = {"%Y", "%Y-%m", "%F", "%FT%H", "%FT%H:%M", "%FT%T", "%FT%T", "%FT%T", "%FT%T", "%FT%T",
+                              "%FT%T", "%FT%T"};
 #endif
   std::stringstream s;
   struct tm ts{};
@@ -391,7 +392,7 @@ std::string to_string_gmt(MTime t, MTimeFract f) {
 #endif
   s << std::put_time(&ts, fmt[f]);
   if (f >= MF1) {
-    for (MTimeFract i = MF6; i > f; i = MTimeFract((int)i -1))
+    for (MTimeFract i = MF6; i > f; i = MTimeFract((int) i - 1))
       us = us / 10;
     s << '.' << std::setfill('0') << std::setw(f - MSecond) << us;
   }
@@ -401,12 +402,11 @@ std::string to_string_gmt(MTime t, MTimeFract f) {
 }
 
 
-
 std::string to_string(MTime t) {
   int i = int(t.time_since_epoch().count() % 1000000);
   MTimeFract f = MF6;
   while (f != MSecond and i % 10 == 0) {
-    f = MTimeFract((int)f -1);
+    f = MTimeFract((int) f - 1);
     i /= 10;
   }
   return to_string_iso8601(t, f);
@@ -459,7 +459,7 @@ bool StrConv<MTime>::c_string2x(const std::string &str, MTime &t, const ConvFrom
 
 bool StrConv<MTime>::c_from_mtime(int64_t i, MTime &t) {
   std::chrono::system_clock::time_point tp{}; // sollte genau auf "epoch" stehen
-  tp += std::chrono::microseconds (i);
+  tp += std::chrono::microseconds(i);
   t = std::chrono::time_point_cast<std::chrono::microseconds>(tp);
   return true;
 }

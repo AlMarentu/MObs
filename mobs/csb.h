@@ -27,7 +27,6 @@
 #define MOBS_CSB_H
 
 #include <iostream>
-#include <array>
 #include <memory>
 
 namespace mobs {
