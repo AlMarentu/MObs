@@ -939,6 +939,27 @@ public:
   MemVar(string, s);
 };
 
+class VecString : virtual public mobs::ObjectBase {
+public:
+  ObjInit(VecString);
+
+  MemVarVector(string, token);
+  MemVar(string, s, KEYELEMENT1);
+  MemVar(string, p, KEYELEMENT2);
+  MemVar(int, q, KEYELEMENT3);
+};
+
+class VecObjString : virtual public mobs::ObjectBase {
+public:
+  ObjInit(VecObjString);
+
+  MemVector(VecString, objs);
+  MemVar(string, s, KEYELEMENT1);
+  MemVar(string, p, KEYELEMENT2);
+  MemVar(int, q, KEYELEMENT3);
+};
+
+
 TEST(objgenTest, vectorEnum) {
   VecEnum v;
   v.s("A");
@@ -946,7 +967,48 @@ TEST(objgenTest, vectorEnum) {
   v.art[mobs::MemBaseVector::nextpos](K_t2);
   v.art[mobs::MemBaseVector::nextpos](K_t3);
   EXPECT_EQ("{art:[\"T1\",\"T2\",\"T3\"],s:\"A\"}", v.to_string(mobs::ConvObjToString()));
+  EXPECT_THROW(v.objNameKeyStr(), runtime_error);
 }
+
+TEST(objgenTest, findVectorSimple) {
+  VecString v;
+  v.s("KK");
+  v.p("XX");
+  v.q(42);
+  v.token[mobs::MemBaseVector::nextpos]("S1");
+  v.token[mobs::MemBaseVector::nextpos]("S2");
+  v.token[mobs::MemBaseVector::nextpos]("S3");
+  v.token.find(string("S2"));
+  EXPECT_EQ(1, v.token.find(string("S2")));
+  EXPECT_EQ(2, v.token.find(string("S3")));
+  EXPECT_TRUE(mobs::MemBaseVector::npos == v.token.find(string("S4")));
+  EXPECT_TRUE(mobs::MemBaseVector::npos == v.token.find(string("S1", 1)));
+  EXPECT_TRUE(v.token.contains(string("S3")));
+  EXPECT_FALSE(v.token.contains(string("S4")));
+
+}
+
+TEST(objgenTest, findVectorObject) {
+  VecObjString v;
+  v.s("K\\K");
+  v.p("X:X");
+  v.q(42);
+  EXPECT_STREQ("VecObjString:K\\\\K:X\\:X:42", v.objNameKeyStr().c_str());
+  mobs::string2Obj( "{s:\"S1\",p:\"P1\",q:1}", v.objs[mobs::MemBaseVector::nextpos], mobs::ConvObjFromStr());
+  mobs::string2Obj( "{s:\"S2\",p:\"P2\",q:2}", v.objs[mobs::MemBaseVector::nextpos], mobs::ConvObjFromStr());
+  mobs::string2Obj( "{s:\"S3\",p:\"P3\",q:3}", v.objs[mobs::MemBaseVector::nextpos], mobs::ConvObjFromStr());
+  EXPECT_STREQ("VecString:S1:P1:1", v.objs[0].objNameKeyStr().c_str());
+  EXPECT_EQ(0, v.objs.find(string("VecString:S1:P1:1")));
+  EXPECT_EQ(1, v.objs.find(string("VecString:S2:P2:2")));
+  EXPECT_TRUE(mobs::MemBaseVector::npos == v.objs.find(string("VecString:S1:P1:1"), 1));
+  EXPECT_TRUE(mobs::MemBaseVector::npos == v.objs.find(string("VecString:S4:P4:4")));
+  EXPECT_TRUE(v.objs.contains(string("VecString:S3:P3:3")));
+  EXPECT_FALSE(v.objs.contains(string("VecString:S4:P4:4")));
+
+
+}
+
+
 
 #if 0
 TEST(objgenTest, compare) {
