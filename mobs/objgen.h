@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -235,7 +235,7 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 
 
 // vector
-/*! \brief Deklarations-Makro für eines Vector von Objektvariablen
+/*! \brief Deklarations-Makro für einen Vector von Objektvariablen
  @param typ Objekttyp
  @param name Name
  */
@@ -270,6 +270,7 @@ ObjectBase::doCopy(that); }  ObjInit1(objname, __VA_ARGS__ )
  @param objname Name der Klasse (muss von ObjectBase abgeleitet sein)
  */
 #define ObjInit1(objname, ...) \
+using baseType = objname;      \
 objname() : ObjectBase() { std::vector<mobs::MemVarCfg> cv = { __VA_ARGS__ }; doConfClear(); for (auto c:cv) doConfigObj(c); doInit(); objname::init(); setModified(false); } \
 objname(mobs::MemBaseVector *m, mobs::ObjectBase *o, const std::vector<mobs::MemVarCfg> &cv = {}) : ObjectBase(m, o, cv) \
   { doInit(); objname::init(); setModified(false); } \
@@ -444,6 +445,7 @@ public:
   friend class MemberVector;
   /// Konstante, die auf das nächste Element eines MenBaseVectors verweist, das dann automatisch erzeugt wird
   static const size_t nextpos = INT_MAX;
+  static const size_t npos = SIZE_T_MAX; ///< Konstante für ungültige Position
   /// \private
   MemBaseVector(const std::string& n, ObjectBase *obj, const std::vector<MemVarCfg>& cv) : m_name(n), m_parent(obj)
   { TRACE(PARAM(n)); for (auto c:cv) doConfig(c); if (nullAllowed()) setNull(true); }
@@ -530,6 +532,8 @@ protected:
   /// \private
   ObjectBase(MemBaseVector *m, ObjectBase *o, const std::vector<MemVarCfg>& cv) : m_varNam(""), m_parent(o), m_parVec(m) { for (auto c:cv) doConfig(c); } // Konstruktor for Vector
 public:
+  using  baseType = ObjectBase; ///< Basistyp
+  using  findType = std::string; ///< typ für contains/find
   ObjectBase() = default;
   ObjectBase(const ObjectBase &that) = delete;
   /// \private
@@ -621,11 +625,23 @@ public:
   /// \return Inhalt der variable als string in UTF-8, oder leer, wenn nicht gefunden
   std::string getVariable(const std::string &path, bool *found = nullptr, bool compact = false) const;
   /** \brief liefert einen \c std::string aus den Key-Elementen sowie die Versionsnummer oder -1 bei fehlender Version
-    *
+   *
+   * Delimiter ist ein Doppelpunkt, escape für Doppelpunkt ist \\:
    * @param version Zeiger auf Variable, die, falls != nullptr, die Version des Objektes zurückliefert
    * \return Zeichenkette, die den kompletten Schlüssel des Objektes repräsentiert
-   */
+   * \throws runtime_error, wenn das Objekt kein KEYELEMENT definiert hat
+   * \see objNameKeyStr
+  */
   std::string keyStr(int64_t *version = nullptr) const;
+  /** \brief liefert einen \c std::string aus dem ObjectName und Key-Elementen sowie die Versionsnummer oder -1 bei fehlender Version
+   *
+   * Delimiter ist ein Doppelpunkt, escape für Doppelpunkt ist \\:
+   * @param version Zeiger auf Variable, die, falls != nullptr, die Version des Objektes zurückliefert
+   * \return Zeichenkette, die den kompletten Schlüssel des Objektes repräsentiert
+   * \throws runtime_error, wenn das Objekt kein KEYELEMENT definiert hat
+   * \see keyStr
+  */
+  std::string objNameKeyStr(int64_t *version = nullptr) const;
   /** \brief Kopiere ein Objekt aus einem bereits vorhandenen.
    *@param other zu kopierendes Objekt
    * \throw runtime_error Sind die Strukturen nicht identisch, wird eine Exception erzeugt
@@ -644,6 +660,14 @@ public:
   const std::string &getConf(MemVarCfg c) const;
   /// Ausgabe als \c std::string (Json)
   std::string to_string(const ConvObjToString& cft = ConvObjToString()) const;
+  /** \brief Vergleichsoperator mit Objektname aus objNameKeyStr()
+   *
+   * @param s Name des Objektes (objNameKeyStr())
+   * \return true, wenn der Name des Objektes mit dem angegebenen Namen übereinstimmt
+   * \throws runtime_error, wenn das Objekt kein KEYELEMENT definiert hat
+   * \see objNameKeyStr
+   */
+  bool operator==(const std::string &s) const { return objNameKeyStr() == s; }
 
   /// \private
   void regObj(ObjectBase *obj);
@@ -730,7 +754,9 @@ template<typename T, class C>
  */
 class Member : virtual public MemberBase, public C {
 public:
-//  /// Konstruktor für impliziten Cast
+  using baseType = T; ///< Basistyp
+  using  findType = T; ///< typ für contains/find
+  //  /// Konstruktor für impliziten Cast
 //  Member(const T &t) : MemberBase("", nullptr) { TRACE(""); clear(); operator()(t); }  // Konstruktor Solo mit zZuweisung -> Cast
 //  /// \private
 //  Member() : MemberBase("", nullptr, {}) { TRACE(""); doClear(); }  // Konstruktor Solo
@@ -754,6 +780,8 @@ public:
   inline T operator() () const { return wert; }
   /// Zuweisung eines Wertes
   inline void operator() (const T &t) { doAudit(); wert = t; activate(); }
+  /// Vergleichsoperator mit Wert, \c NULL wird als ungleich behandelt
+  bool operator== (const T &t) const { return not isNull() and wert == t; }
   /// \brief Zuweisung eines Wertes mit move
   /// sinnvoll für für zB. Byte-Arrays, um nicht doppelten Speicherplatz zu verbrauchen
   /// \code
@@ -991,6 +1019,23 @@ public:
   const_reverse_iterator crbegin() const noexcept { return const_reverse_iterator(cend()); }
   /// Ende-Iterator const reverse
   const_reverse_iterator crend() const noexcept { return const_reverse_iterator(cbegin()); }
+  /** \brief Suche nach einem Element
+   *
+   * @param t zu suchendes Element bei MemVarVektor oder Name des Objektes (objNameKeyStr()) bei Objektvektor
+   * @param start Startposition (optional)
+   * @return Position des Elements oder \c MemBaseVector::npos, wenn nicht gefunden
+   * \throws runtime_error, wenn nach einem Objekt gesucht wird, das kein KEYELEMENT definiert hat
+   */
+  size_t find(const typename T::findType &t, size_t start = 0) const;
+  /** \brief Suche nach einem Element
+   *
+   * Ist der Vektor ein MemVarVektor, so kann nach dem Inhalt des Elements gesucht werden;
+   * bei einem Objektvektor wird nach dem Namen des Objektes (objNameKeyStr()) gesucht
+   * @param t zu suchendes Element bei MemVarVektor oder Name des Objektes bei Objektvektor
+   * @return true, wenn das Element gefunden wurde
+   * \throws runtime_error, wenn nach einem Objekt gesucht wird, das kein KEYELEMENT definiert hat
+   */
+  bool contains(const typename T::findType &t) const;
 
 protected:
   /// \private
@@ -1006,6 +1051,22 @@ private:
   // Vector von Heap-Elementen verwenden, da sonst Probleme beim Reorg
   std::vector<T *> werte;
 };
+
+template<class T>
+bool MemberVector<T>::contains(const typename T::findType &t) const
+{
+  for (auto i = begin(); i != end(); i++)
+    if (*i == t)return true;
+  return false;
+}
+
+template<class T>
+size_t MemberVector<T>::find(const typename T::findType &t, size_t start) const
+{
+  for (auto i = start; i != size(); i++)
+    if (operator[](i) == t) return i;
+  return npos;
+}
 
 template<class T>
 void MemberVector<T>::resize(size_t s)
@@ -1159,7 +1220,7 @@ public:
   bool inNull() const { return m_inNull; }
   /// ist true, wenn ein \c traversKey durchgeführt wird
   bool inKeyMode() const { return m_keyMode; }
-  /// ist true, wenn im \c auditMode in bereits gelöschten Elementen travesiert wird
+  /// ist true, wenn im \c auditMode in bereits gelöschten Elementen traversiert wird
   bool inDelAudit() const { return m_delMode; }
   /// Ist das Element Teil eines Vektors, wird die Index-Position angezeigt, ansonsten ist der Wert \c SIZE_MAX
   size_t arrayIndex() const { return m_arrayIndex; }

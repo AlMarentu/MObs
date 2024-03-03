@@ -26,6 +26,8 @@
 #include <mutex>
 #include <sys/types.h>
 #ifdef __MINGW32__
+#define MSG_DONTWAIT 0
+#warning MSG_DONTWAIT
 #include <windows.h>
 #include <ws2tcpip.h>
 #else
@@ -254,12 +256,17 @@ public:
   }
 
   bool setTOS(int tos) const {
-    if (setsockopt(fd, IPPROTO_IP, IP_TOS, &tos, sizeof(tos)) < 0) {
+#ifdef __MINGW32__
+#define TOS_CAST (const char *)
+#else
+#define TOS_CAST
+#endif
+  if (setsockopt(fd, IPPROTO_IP, IP_TOS, TOS_CAST &tos, sizeof(tos)) < 0) {
       LOG(LM_ERROR, "setTOS IP_TOS " << strerror(errno));
       return false;
-    }
+}
     return true;
-  }
+}
 
 
   socketHandle fd = invalidSocket;

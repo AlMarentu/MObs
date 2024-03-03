@@ -391,9 +391,9 @@ std::string MobsMemberInfoDb::toString(bool *needQuotes) const {
       f = mobs::MF2;
     else if (granularity < 1000000)
       f = mobs::MF1;
-    else if (granularity < 86400000000)
+    else if (granularity < 3600000000)
       f = mobs::MHour;
-    else if (granularity < 86400000000 * 24)
+    else if (granularity < 86400000000)
       f = mobs::MDay;
     return to_string_ansi(t, f);
   }
@@ -429,6 +429,10 @@ const ConvFromStrHint &ConvFromStrHint::convFromStrHintDflt = ConvFromStrHintDef
 const ConvFromStrHint &ConvFromStrHint::convFromStrHintExplizit = ConvFromStrHintExplizit();
 
 void MobsMemberInfo::toLocalTime(struct ::tm &ts) const {
+  if (granularity >= 86400000000 ) {
+    toGMTime(ts);
+    return;
+  }
   std::chrono::system_clock::time_point tp{};
   tp += std::chrono::microseconds(t64);
   time_t time = std::chrono::system_clock::to_time_t(tp);
@@ -437,21 +441,68 @@ void MobsMemberInfo::toLocalTime(struct ::tm &ts) const {
 #else
   localtime_r(&time, &ts);
 #endif
+  if (granularity >= 3600000000)
+    ts.tm_min = 0;
+  if (granularity >= 60000000)
+    ts.tm_sec = 0;
 }
 
 void MobsMemberInfo::toGMTime(struct ::tm &ts) const {
   std::chrono::system_clock::time_point tp{};
   tp += std::chrono::microseconds(t64);
   time_t time = std::chrono::system_clock::to_time_t(tp);
+  // Bei Windows und Apple ist gmtime nicht für Zeiten vor 1970 geeignet
+#if defined(__MINGW32__) || defined(__APPLE__)
+  int yOfs = 0;
+  if (time < 0 and time >= -8488800000) { // ab 1.1.1701
+    const int64_t f = 883612800; // 365,25*24*3600*28   28 Jahre wegen Wochentag und Schaltjahr
+    //Problem bei 1700 1800 1900
+    int x = (f-1-time) / f;
+    yOfs = x * 28;
+    if (time < -5359564800) // 1.3.1800
+      time -= 86400;
+    if (time < -2203891200) // 1.3.1900
+        time -= 86400;
+    time += x * f;
+    int y = 1970 - yOfs;
+  }
 #ifdef __MINGW32__
   gmtime_s(&ts, &time);
 #else
   gmtime_r(&time, &ts);
 #endif
+  ts.tm_year -= yOfs;
+  if (ts.tm_year == 0 and ts.tm_mon > 1) // 1900 ist kein Schaltjahr
+    ts.tm_yday--;
+  else if (ts.tm_year <= 0)
+    ts.tm_wday = (ts.tm_wday +1) % 7;
+  if (ts.tm_year == -100 and ts.tm_mon > 1) // 1800 ist kein Schaltjahr
+    ts.tm_yday--;
+  else if (ts.tm_year <= -100)
+    ts.tm_wday = (ts.tm_wday +1) % 7;
+#else
+  gmtime_r(&time, &ts);
+#endif
+  if (granularity >= 86400000000) {
+    ts.tm_hour = 0;
+    ts.tm_isdst = -1;
+  }
+  if (granularity >= 3600000000)
+    ts.tm_min = 0;
+  if (granularity >= 60000000)
+    ts.tm_sec = 0;
 }
 
 void MobsMemberInfo::fromLocalTime(tm &ts) {
+  if (granularity >= 86400000000) {
+    fromGMTime(ts);
+    return;
+  }
   ts.tm_isdst = -1;
+  if (granularity >= 3600000000)
+    ts.tm_min = 0;
+  if (granularity >= 60000000)
+    ts.tm_sec = 0;
 #ifdef __MINGW32__
   std::time_t t = mktime(&ts); // TODO Timezone korrekt?
 #else
@@ -462,8 +513,31 @@ void MobsMemberInfo::fromLocalTime(tm &ts) {
 }
 
 void MobsMemberInfo::fromGMTime(tm &ts) {
+  if (granularity >= 86400000000)
+    ts.tm_hour = 0;
+  if (granularity >= 3600000000)
+    ts.tm_min = 0;
+  if (granularity >= 60000000)
+    ts.tm_sec = 0;
+  // Bei Windows und Apple ist mktime nicht für Zeiten vor 1970 geeignet
+#if defined(__MINGW32__) || defined(__APPLE__)
+  int64_t mOfs = 0;
+  if (ts.tm_year < 70 and ts.tm_year > -200) { // ab 1701
+    //kein Schaltjahr bei 1700 1800 1900
+    const int64_t f = 883612800; // 365,25*24*3600*28   28 Jahre wegen Wochentag und Schaltjahr
+    int x = (27+70-ts.tm_year) / 28;
+    ts.tm_year += x * 28;
+    mOfs = x * f;
+  }
 #ifdef __MINGW32__
-  std::time_t t = _mkgmtime(&ts);
+  time_t t = _mkgmtime(&ts) - mOfs;
+#else
+    time_t t = timegm(&ts) - mOfs;
+#endif
+  if (t < -2203891200) // 1.3.1900
+    t += 86400;
+  if (t < -5359564800) // 1.3.1800
+    t += 86400;
 #else
   std::time_t t = timegm(&ts);
 #endif

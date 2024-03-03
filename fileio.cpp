@@ -17,6 +17,7 @@
 
 using namespace std;
 
+bool objOk = false;
 //Objektdefinitionen
 class Fahrzeug : virtual public mobs::ObjectBase
 {
@@ -64,7 +65,18 @@ public:
     LOG(LM_INFO, "end " << element);
   }
   void filled(mobs::ObjectBase *obj, const string &error) override {
-    LOG(LM_INFO, "filled " << obj->to_string() << (error.empty() ? " OK":" ERROR = ") << error);
+    static int cnt = 0;
+    LOG(LM_INFO, "filled " << ++cnt << ": " << obj->to_string() << (error.empty() ? " OK":" ERROR = ") << error);
+    if (cnt == 2) {
+      if (auto gp = dynamic_cast<Gespann *>(obj)) {
+        if (gp->typ() == "Schlepper mit 2 Anhängern ẞßß")
+          objOk = true;
+        else
+          LOG(LM_ERROR, "Typ falsch: soll " << "Schlepper mit 2 Anhängern ẞßß" << " IST " << gp->typ());
+      } else {
+        LOG(LM_ERROR, "Objekt nicht erkannt");
+      }
+    }
     delete obj;
     stop(); // optionaler Zwischenstop
   }
@@ -80,6 +92,10 @@ public:
 
 int main(int argc, char* argv[])
 {
+  //setlocale(LC_CTYPE, ".utf8");
+  setlocale(LC_CTYPE, "");
+  std::cerr << "LC_CTYPE=" << setlocale(LC_CTYPE, nullptr) << '\n';
+
   try {
     Gespann f1, f2;
 
@@ -94,7 +110,7 @@ int main(int argc, char* argv[])
 
     f2.id(2);
     f2.fahrer("Karl-Heinz");
-    f2.typ("Schlepper mit 2 Anhängern");
+    f2.typ("Schlepper mit 2 Anhängern ẞßß");
     f2.zugmaschiene.typ("Traktor");
     f2.zugmaschiene.achsen(2);
     f2.zugmaschiene.antrieb(true);
@@ -108,9 +124,9 @@ int main(int argc, char* argv[])
 #if 1
 
     mobs::ConvObjToString cth = mobs::ConvObjToString().setEncryptor([](){return new mobs::CryptBufAes( "12345", "john");});
-//    mobs::ConvObjToString cth;
+    //mobs::ConvObjToString cth;
 #ifdef CLASSIC_IOSTREAM
-    wofstream x2out("gespann.xml", ios::trunc);
+    wofstream x2out("gespann.xml", ios::trunc | ios::binary);
     if (not x2out.is_open())
       throw runtime_error("File not open");
 #else
@@ -127,7 +143,7 @@ int main(int argc, char* argv[])
 #endif
 
     // Writer-Klasse mit File, und Optionen initialisieren
-    mobs::XmlWriter xf(x2out, mobs::XmlWriter::CS_utf8, true);
+    mobs::XmlWriter xf(x2out, mobs::XmlWriter::CS_utf8_bom, true);
     xf.setPrefix(L"m:"); // optionaler XML Namespace
     mobs::XmlOut xo(&xf, cth);
     // XML-Header
@@ -220,6 +236,10 @@ int main(int argc, char* argv[])
     xin.close();
 #endif
 
+    if (objOk)
+      LOG(LM_INFO, "Objekt gefunden");
+    else
+      LOG(LM_ERROR, "Fehler");
 
   }
   catch (exception &e)

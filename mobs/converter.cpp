@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -23,6 +23,14 @@
 #include "objtypes.h"
 #include "converter.h"
 
+#ifdef __MINGW32__
+#include <windows.h>
+#include <minwindef.h>
+#else
+#include <pwd.h>
+#include <sys/utsname.h>
+#include <unistd.h>
+#endif
 
 #include <sstream>
 #include <utility>
@@ -87,6 +95,41 @@ wchar_t to_iso_8859_15(wchar_t c) {
   }
 }
 
+wchar_t to_windows_1252(wchar_t c) {
+  switch (c) {
+    case 0x20AC: return wchar_t(0x80); //       EURO SIGN
+    case 0x0201: return wchar_t(0x82); // Komma
+    case 0x0192: return wchar_t(0x83); // f
+    case 0x201E: return wchar_t(0x84); // Anführungszeichen unten
+    case 0x2026: return wchar_t(0x85); // 3 Punkte
+    case 0x2020: return wchar_t(0x86); // Kreuz
+    case 0x2021: return wchar_t(0x87); // Doppelkreuz
+    case 0x02C6: return wchar_t(0x88); // Dach
+    case 0x2030: return wchar_t(0x89); // Promille
+    case 0x0160: return wchar_t(0x8A); //       LATIN CAPITAL LETTER S WITH CARON
+    case 0x2039: return wchar_t(0x8B); // <
+    case 0x0152: return wchar_t(0x8C); //       LATIN CAPITAL LIGATURE OE
+    case 0x017D: return wchar_t(0x8E); //       LATIN CAPITAL LETTER Z WITH CARON
+    case 0x2018: return wchar_t(0x91); // ' Anfang
+    case 0x2019: return wchar_t(0x92); // ' Ende
+    case 0x201C: return wchar_t(0x93); // " Anfang
+    case 0x201D: return wchar_t(0x94); // " Ende
+    case 0x2022: return wchar_t(0x95); // Punkt
+    case 0x2013: return wchar_t(0x96); // --
+    case 0x2014: return wchar_t(0x97); // ---
+    case 0x02DC: return wchar_t(0x98); // Welle
+    case 0x2122: return wchar_t(0x99); // TM
+    case 0x0161: return wchar_t(0x9A); //       LATIN SMALL LETTER S WITH CARON
+    case 0x203A: return wchar_t(0x9B); // >
+    case 0x0153: return wchar_t(0x9C); //       LATIN SMALL LIGATURE OE
+    case 0x017E: return wchar_t(0x9E); //       LATIN SMALL LETTER Z WITH CARON
+    case 0x0178: return wchar_t(0x9F); //       LATIN CAPITAL LETTER Y WITH DIAERESIS
+    case 0x80 ... 0x9F:
+     return inval;
+    default: return (c < L'\u0000' or c > L'\u00ff') ? inval : c;
+  }
+}
+
 inline wchar_t from_iso_8859_1(wchar_t c) { return c; }
 
 wchar_t from_iso_8859_9(wchar_t c) {
@@ -111,6 +154,39 @@ wchar_t from_iso_8859_15(wchar_t c) {
     case 0xBC: return wchar_t(0x0152); //       LATIN CAPITAL LIGATURE OE
     case 0xBD: return wchar_t(0x0153); //       LATIN SMALL LIGATURE OE
     case 0xBE: return wchar_t(0x0178); //       LATIN CAPITAL LETTER Y WITH DIAERESIS
+    default: return c;
+  }
+}
+
+wchar_t from_windows_1252(wchar_t c) {
+  switch (c) {
+    case 0x80: return wchar_t(0x20AC); //       EURO SIGN
+    case 0x82: return wchar_t(0x0201); // Komma
+    case 0x83: return wchar_t(0x0192); // f
+    case 0x84: return wchar_t(0x201E); // Anführungszeichen unten
+    case 0x85: return wchar_t(0x2026); // 3 Punkte
+    case 0x86: return wchar_t(0x2020); // Kreuz
+    case 0x87: return wchar_t(0x2021); // Doppelkreuz
+    case 0x88: return wchar_t(0x02C6); // Dach
+    case 0x89: return wchar_t(0x2030); // Promille
+    case 0x8A: return wchar_t(0x0160); //       LATIN CAPITAL LETTER S WITH CARON
+    case 0x8B: return wchar_t(0x2039); // <
+    case 0x8C: return wchar_t(0x0152); //       LATIN CAPITAL LIGATURE OE
+    case 0x8E: return wchar_t(0x017D); //       LATIN CAPITAL LETTER Z WITH CARON
+    case 0x91: return wchar_t(0x2018); // ' Anfang
+    case 0x92: return wchar_t(0x2019); // ' Ende
+    case 0x93: return wchar_t(0x201C); // " Anfang
+    case 0x94: return wchar_t(0x201D); // " Ende
+    case 0x95: return wchar_t(0x2022); // Punkt
+    case 0x96: return wchar_t(0x2013); // --
+    case 0x97: return wchar_t(0x2014); // ---
+    case 0x98: return wchar_t(0x02DC); // Welle
+    case 0x99: return wchar_t(0x2122); // TM
+    case 0x9A: return wchar_t(0x0161); //       LATIN SMALL LETTER S WITH CARON
+    case 0x9B: return wchar_t(0x203A); // >
+    case 0x9C: return wchar_t(0x0153); //       LATIN SMALL LIGATURE OE
+    case 0x9E: return wchar_t(0x017E); //       LATIN SMALL LETTER Z WITH CARON
+    case 0x9F: return wchar_t(0x0178); //       LATIN CAPITAL LETTER Y WITH DIAERESIS
     default: return c;
   }
 }
@@ -272,6 +348,45 @@ bool codec_iso8859_15::do_always_noconv() const noexcept {
 }
 
 
+codec_windows_1252::result codec_windows_1252::do_out(mbstate_t& state,
+                                                  const wchar_t* from,
+                                                  const wchar_t* from_end,
+                                                  const wchar_t*& from_next,
+                                                  char* to,
+                                                  char* to_end,
+                                                  char*& to_next) const
+{
+  for (; from != from_end and to != to_end; from++, to++)
+  {
+    *to = u_char(to_windows_1252(*from));
+  }
+  to_next = to;
+  from_next = from;
+  return ok;
+}
+
+codec_windows_1252::result codec_windows_1252::do_in (state_type& state,
+                                                  const char* from,
+                                                  const char* from_end,
+                                                  const char*& from_next,
+                                                  wchar_t* to,
+                                                  wchar_t* to_end,
+                                                  wchar_t*& to_next) const
+{
+  for (; from != from_end and to != to_end; from++, to++)
+  {
+    *to = from_windows_1252(*(unsigned char*)from);
+  }
+  to_next = to;
+  from_next = from;
+  return ok;
+}
+
+bool codec_windows_1252::do_always_noconv() const noexcept {
+  return false;
+}
+
+
 int from_base64(wchar_t c) {
   if (c < 0 or c > 127)
     return -1;
@@ -354,6 +469,7 @@ std::wstring::const_iterator to7Up(std::wstring::const_iterator begin, std::wstr
 
 std::wstring toLower(const std::wstring &tx) {
   std::locale loc;
+#ifndef __WIN32__
   try {
     const char *cp = getenv("LANG");
     if (cp)
@@ -363,7 +479,8 @@ std::wstring toLower(const std::wstring &tx) {
   } catch (...) {
     loc = std::locale();
   }
-  //LOG(LM_DEBUG, "LOCALE = " << loc.name());
+  // LOG(LM_DEBUG, "LOCALE = " << loc.name());
+#endif
   wstring lo;
   lo.reserve(tx.length());
   std::transform(tx.begin(), tx.end(), std::back_inserter(lo), [loc](const wchar_t c) { return std::tolower(c, loc);} );
@@ -372,6 +489,7 @@ std::wstring toLower(const std::wstring &tx) {
 
 std::wstring toUpper(const std::wstring &tx) {
   std::locale loc;
+#ifndef __WIN32__
   try {
     const char *cp = getenv("LANG");
     if (cp)
@@ -382,6 +500,7 @@ std::wstring toUpper(const std::wstring &tx) {
     loc = std::locale();
   }
   //LOG(LM_DEBUG, "LOCALE = " << loc.name());
+#endif
   wstring lo;
   lo.reserve(tx.length());
   std::transform(tx.begin(), tx.end(), std::back_inserter(lo), [loc](const wchar_t c) { return std::toupper(c, loc);} );
@@ -699,6 +818,54 @@ int StringFormatter::format(const wstring &input, wstring &result, int ruleBegin
     }
   }
   return 0;
+}
+
+const string &getLoginName()
+{
+  static std::string username;
+  if (username.empty())
+  {
+#ifdef __MINGW32__
+    char buf[300];
+    DWORD bufSize = sizeof(buf);
+    if (GetUserNameA(buf, &bufSize))
+      username = std::string(buf);
+    if (username.empty())
+      throw std::runtime_error("can't GetUserName");
+#else
+    struct passwd *pw = ::getpwuid(geteuid());
+    if (pw == nullptr)
+      throw std::runtime_error("can't get pwd entry");
+    username = pw->pw_name;
+#endif
+  }
+  return username;
+}
+
+
+const string &getNodeName()
+{
+  static std::string nodename;
+  if (nodename.empty())
+  {
+#ifdef __MINGW32__
+    char buf[300];
+    DWORD bufSize = sizeof(buf);
+    if (GetComputerNameA(buf, &bufSize))
+      nodename = std::string(buf);
+    if (nodename.empty())
+      throw std::runtime_error("GetComputerName failed");
+#else
+    struct utsname uts;
+    if (::uname(&uts) == -1)
+      throw std::runtime_error("uname failed");
+    nodename = uts.nodename;
+    auto pos =  nodename.find('.');
+    if (pos != string::npos and pos > 0)
+      nodename.resize(pos);
+#endif
+  }
+  return nodename;
 }
 
 }

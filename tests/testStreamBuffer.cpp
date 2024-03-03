@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2021 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -34,6 +34,7 @@
 #include <sstream>
 #include <gtest/gtest.h>
 #include <codecvt>
+#include <array>
 
 using namespace std;
 
@@ -234,7 +235,7 @@ TEST(streamBufferTest, NBufferTest64) {
   EXPECT_EQ(1, cbuf.in_avail());
   EXPECT_EQ(L'\n', istr.get());
   EXPECT_EQ(-1, cbuf.in_avail());
-  EXPECT_EQ(-1, istr.get());
+  EXPECT_EQ(wistream::traits_type::eof(), istr.get());
   EXPECT_EQ(-1, cbuf.in_avail());
 }
 

@@ -3,7 +3,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -405,7 +405,18 @@ MemberBase *ObjectBase::getMemInfo(const std::string &name, const ConvObjFromStr
   return nullptr;
 }
 
-
+static string escapeColon(const string &s) {
+  string res;
+  for (auto c:s) {
+    if (c == ':')
+      res += "\\:";
+    else if (c == '\\')
+      res += "\\\\";
+    else
+      res += c;
+  }
+  return res;
+}
 
 std::string ObjectBase::keyStr(int64_t *ver) const
 {
@@ -437,7 +448,7 @@ std::string ObjectBase::keyStr(int64_t *ver) const
       if (inNull() or mem.isNull())
         ;
       else
-        res << mem.auditValue();
+        res << escapeColon(mem.auditValue());
     };
     std::string result() { return res.str(); };
     int64_t version = -1;
@@ -452,7 +463,17 @@ std::string ObjectBase::keyStr(int64_t *ver) const
   traverseKey(kd);
   if (ver)
     *ver = kd.version;
+  if (kd.result().empty())
+    throw runtime_error(STRSTR(getObjectName() << u8"::keyStr: KEYELEMENT missing"));
   return kd.result();
+}
+
+std::string ObjectBase::objNameKeyStr(int64_t *ver) const
+{
+  string result = escapeColon(getObjectName());
+  result += ':';
+  result += keyStr(ver);
+  return result;
 }
 
 /////////////////////////////////////////////////

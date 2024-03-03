@@ -384,5 +384,17 @@ TEST(charsetTest, stringFormatter) {
   EXPECT_EQ(L"A__VVX", result);
 }
 
+TEST(converterTest, loginName) {
+  string result;
+  ASSERT_NO_THROW(result = getLoginName());
+  cerr << "login " << result << endl;
+}
+
+TEST(converterTest, nodeName) {
+  string result;
+  ASSERT_NO_THROW(result = getNodeName());
+  cerr << "node " << result << endl;
+}
+
 }
 

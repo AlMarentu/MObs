@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -28,6 +28,7 @@
 #include <openssl/evp.h>
 //#include <openssl/err.h>
 #include <vector>
+#include <array>
 #include <iomanip>
 #include <cstring>
 
@@ -38,7 +39,7 @@
 #endif
 
 #define KEYBUFLEN 32
-#define INPUT_BUFFER_LEN 1024
+#define INPUT_BUFFER_LEN 4096
 
 namespace mobs_internal {
 

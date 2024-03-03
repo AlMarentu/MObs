@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -592,16 +592,26 @@ public:
         if ((curr = istr.get()) != 0xfe)
           throw std::runtime_error(u8"Error in BOM");
         lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::little_endian>);
+        istr.putback(0xfe);
+        istr.putback(0xff);
         istr.imbue(lo);
         encoding = u8"UTF-16"; // (LE)
+        eat();
+        if (curr != 0xFEFF) // BOM
+          throw std::runtime_error(u8"Error in Codec");
         eat();
       } else if (curr == 0xfe) {
         std::locale lo;
         if ((curr = istr.get()) != 0xff)
           throw std::runtime_error(u8"Error in BOM");
         lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::codecvt_mode(0)>);
+        istr.putback(0xff);
+        istr.putback(0xfe);
         istr.imbue(lo);
         encoding = u8"UTF-16"; // (BE)
+        eat();
+        if (curr != 0xFEFF) // BOM
+          throw std::runtime_error(u8"Error in Codec");
         eat();
       } else if (curr == 0xef) {
         std::locale lo;
@@ -610,7 +620,13 @@ public:
         else
           throw std::runtime_error(u8"Error in BOM");
         encoding = u8"UTF-8";
+        istr.putback(0xbf);
+        istr.putback(0xbb);
+        istr.putback(0xef);
         istr.imbue(lo);
+        eat();
+        if (curr != 0xFEFF) // BOM
+          throw std::runtime_error(u8"Error in Codec");
         eat();
       }
       buffer.clear();
@@ -650,7 +666,7 @@ public:
         if (not Traits::eq_int_type(curr, '<'))
           THROW(u8"Syntax Head");
         // BOM überlesen
-        if (not buffer.empty() and buffer != L"\u00EF\u00BB\u00BF" and buffer != L"\ufeff")
+        if (not buffer.empty())
         {
 //        for (auto c:buffer) std::cerr << '#' <<  int(c) << std::endl;
           THROW("invalid begin of File (BOM)");

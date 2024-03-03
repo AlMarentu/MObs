@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -61,13 +61,29 @@ std::wstring::const_iterator to7Up(std::wstring::const_iterator begin, std::wstr
 /// Zugriff auf Umsetztabelle von to7Up
 wchar_t to_7up(wchar_t c);
 
-/// \brief wandelt einen Text in Kleinbuchstaben anhand der Locale der Rechners
+/** \brief wandelt einen Text in Kleinbuchstaben anhand der Locale der Rechners
+ *
+ * Unter Windows der LC_CTYPE gesetzt sein, damit Sonderzeichen korrekt behandelt werden
+ * @return Ergebnisstring
+ */
 std::wstring toLower(const std::wstring &);
-/// \brief wandelt einen Text in Großbuchstaben anhand der Locale der Rechners
+/** \brief wandelt einen Text in Großbuchstaben anhand der Locale der Rechners
+ *
+ * Unter Windows der LC_CTYPE gesetzt sein, damit Sonderzeichen korrekt behandelt werden
+ * @return Ergebnisstring
+ */
 std::wstring toUpper(const std::wstring &);
-/// \brief wandelt einen Text in Kleinbuchstaben anhand der Locale der Rechners
+/** \brief wandelt einen Text in Kleinbuchstaben anhand der Locale der Rechners
+ *
+ * Unter Windows der LC_CTYPE gesetzt sein, damit Sonderzeichen korrekt behandelt werden
+ * @return Ergebnisstring
+ */
 std::string toLower(const std::string &);
-/// \brief wandelt einen Text in Großbuchstaben anhand der Locale der Rechners
+/** \brief wandelt einen Text in Großbuchstaben anhand der Locale der Rechners
+ *
+ * Unter Windows der LC_CTYPE gesetzt sein, damit Sonderzeichen korrekt behandelt werden
+ * @return Ergebnisstring
+ */
 std::string toUpper(const std::string &);
 
 /// wandelt einen Unicode-zeichen in ein ISO8859-1 Zeichen um; im Fehlerfall wird U+00bf INVERTED QUESTION MARK geliefert
@@ -76,11 +92,15 @@ wchar_t to_iso_8859_1(wchar_t c);
 wchar_t to_iso_8859_9(wchar_t c);
 /// wandelt einen Unicode-zeichen in ein ISO8859-15 Zeichen um; im Fehlerfall wird U+00bf INVERTED QUESTION MARK geliefert
 wchar_t to_iso_8859_15(wchar_t c);
+/// wandelt einen Unicode-zeichen in ein Windows-1252 Zeichen um; im Fehlerfall wird U+00bf INVERTED QUESTION MARK geliefert
+wchar_t to_windows_1252(wchar_t c);
 
 /// wandelt ein ISO8859-9 Zeichen in Unicode um
 wchar_t from_iso_8859_9(wchar_t c);
 /// wandelt ein ISO8859-15 Zeichen in Unicode um
 wchar_t from_iso_8859_15(wchar_t c);
+/// wandelt ein Windows-1252 Zeichen in Unicode um
+wchar_t from_windows_1252(wchar_t c);
 
 /// codec für wfstream
 class codec_iso8859_1 : virtual public std::codecvt<wchar_t, char, std::mbstate_t> {
@@ -111,6 +131,19 @@ protected:
 };
 /// codec für wfstream
 class codec_iso8859_15 : virtual public std::codecvt<wchar_t, char, std::mbstate_t> {
+public:
+  /// \private
+  result do_out(mbstate_t& state, const wchar_t* from, const wchar_t* from_end, const wchar_t*& from_next,
+                        char* to, char* to_end, char*& to_next) const override;
+  /// \private
+  result do_in (state_type& state, const char* from, const char* from_end, const char*& from_next,
+                        wchar_t* to, wchar_t* to_limit, wchar_t*& to_next) const override;
+protected:
+  /// \private
+  bool do_always_noconv() const noexcept override;
+};
+/// codec für wfstream
+class codec_windows_1252 : virtual public std::codecvt<wchar_t, char, std::mbstate_t> {
 public:
   /// \private
   result do_out(mbstate_t& state, const wchar_t* from, const wchar_t* from_end, const wchar_t*& from_next,
@@ -226,6 +259,21 @@ private:
  * @return UUID nach RFC 4122
  */
 std::string gen_uuid_v4_p();
+
+/** \brief Ermittle den Loginnamen
+ *
+ * @return login name
+ * \throws runtime_error wenn nicht ermittelbar
+ */
+const std::string &getLoginName();
+
+/** \brief Ermittle den Rechner-Namnen
+ *
+ * @return Rechnername
+ * \throws runtime_error wenn nicht ermittelbar
+ */
+const std::string &getNodeName();
+
 
 class StringFormatterData;
 
