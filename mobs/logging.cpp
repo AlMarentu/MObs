@@ -25,6 +25,9 @@
 
 #ifdef __MINGW32__
 typedef unsigned char u_char;
+#else
+#include <fcntl.h>
+#include <unistd.h>
 #endif
 
 /*! \def PARAM(x)
