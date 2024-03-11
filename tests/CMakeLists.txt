@@ -21,3 +21,9 @@ gtest_discover_tests(test1
         PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_DIR}"
         )
 
+add_executable(logtest logmain.cpp)
+if(WIN32)
+    target_link_libraries(logtest mobs ${EXTRA_LIBS} stdc++)
+else()
+    target_link_libraries(logtest mobs ${OPENSSL_LIBRARIES})
+endif()
