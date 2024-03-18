@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2023 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -32,6 +32,14 @@
 
 namespace mobs {
 
+
+
+/// Fehler des Clients beim Verbindungsaufbau
+class MrpcConnectException : public std::runtime_error {
+public:
+  explicit MrpcConnectException(const std::string &what) : std::runtime_error(what) {}
+};
+
 /** \brief Klasse für Client-Server Modul über XML-RPC-Calls
  *
  * die Verschlüsselung der Nutzdaten ist anhand RFC 4051 implementiert.
@@ -39,7 +47,7 @@ namespace mobs {
  */
 class Mrpc : public XmlReader {
 public:
-  enum State { fresh, getPubKey, connectingClient, connectingServer, connected, closing };
+  enum State { fresh, getPubKey, connectingClient, connectingServer, reconnectingClient, connected, readyRead, closing };
   Mrpc(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking);
   ~Mrpc() override = default;
 
@@ -64,17 +72,36 @@ public:
    *
    * die Routine muss solange aufgerufen werden bis true zurückgeliefert wird.
    * Wird ein leerer public key des Servers angegeben, so wird dieser vom Server erfragt.
+   *
+   * ist eine sessionReuseTime gesetzt, so wird versucht eine bestehende Session zu verwenden.
    * @param keyId Schlüssel-Id für den Login-Vorgang
    * @param software Information über den Client
    * @param privkey private key der Clients
    * @param passphrase passphrase des private keys
    * @param serverkey public key des Servers, bei leer autudetection und Rückgabe des Keys im PEM-Format
-   * @return connected wenn connected==false dürfen keine Anfragen bearbeitet werden
+   * @return connected wenn isConnected==false dürfen keine Anfragen bearbeitet werden
    */
   bool waitForConnected(const std::string &keyId, const std::string &software, const std::string &privkey,
                         const std::string &passphrase, std::string &serverkey);
-  /// Versuche einen Reconnect vom Client (muss vor waitForConnected aufgerufen werden)
+  /** \brief Versuche einen Reconnect vom Client (muss vor waitForConnected aufgerufen werden)
+   *
+   * obsolet: sessionReuseTime verwenden \see waitForConnected
+   */
   void tryReconnect();
+  /** \brief Arbeitsroutine des Clients
+  *
+  * die Routine muss solange aufgerufen werden bis true zurückgeliefert wird.
+  * Danaach ist mindestens 1 Objekt empfangen und die XML-Ebene auf den Grundzustand zurückgesetzt.
+  * @return true, wenn ein Objekt empfangen wurde und die Kommunikation abgeschlossen ist
+  * \throws runtime_error wenn ein Fehler im Stream bzw im Login/Reconnect aufgetreten ist;
+  */
+  bool parseClient();
+
+  /** \brief Client-Kommando zum Schließen der Session, danach ist kein reconnect möglich
+   *
+   */
+  void closeServer();
+
 
   /** \brief Arbeitsroutine des Server
    *
@@ -142,6 +169,14 @@ public:
   static std::vector<u_char> generateLoginInfo(const std::string &keyId,
                                                const std::string &software, const std::string &serverkey);
 
+  /** \brief Verbindung hergestellt
+   * @return true, wenn die Verbindung hergestellt ist und parseClient statt waitForConnected aufgerufen werden muss
+   */
+  bool isConnected() const { return state == connected or state == reconnectingClient or state == readyRead; }
+
+  /// Rückgabe, ob der nächste Lesevorgang blockiert
+  bool clientAboutToRead() const;
+
   mobs::CryptIstrBuf streambufI; ///< \private
   mobs::CryptOstrBuf streambufO; ///< \private
   std::wistream iStr; ///< \private
@@ -150,9 +185,13 @@ public:
   MrpcSession *session; ///< Zeiger auf ein MrpcSession - Info; muss zwingend existieren
   std::unique_ptr<mobs::ObjectBase> resultObj; ///< Das zuletzt empfangene Objekt; muss nach Verwendung auf nullptr gesetzt werden
 
+  static int sessionReuseTime; ///< Zeit in Sekunden, die eine Session wiederverwendet werden kann
+
 private:
   bool encrypted = false;
   State state = fresh;
+  // TODO int clientSessionReuseTime vom Server beim Login empfangen
+  // TODO evtl auch Ablaufzeit der Session vom Server empfangen
 
 };
 
