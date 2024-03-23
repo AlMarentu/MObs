@@ -369,6 +369,214 @@ TEST(mrpcTest, invalidLogin) {
 
 }
 
+TEST(mrpcTest, reconectSpeedup) {
+  string priv, pub;
+  mobs::generateRsaKeyMem(priv, pub);
+
+  stringstream strOut;
+  stringstream strIn;
+
+  MrpcServer server(strIn, strOut, pub, priv);
+
+  mobs::MrpcSession clientSession{};
+  mobs::Mrpc client(strOut, strIn, &clientSession, false);
+  client.sessionReuseSpeedup = true;
+
+  bool clientConnected = false;
+  bool readyRead = false;
+  LOG(LM_INFO, "CLI");
+  EXPECT_FALSE(client.clientAboutToRead());
+  ASSERT_NO_THROW(clientConnected = client.waitForConnected("testkey", "googletest", priv, "", pub));
+  ASSERT_FALSE(clientConnected);
+  LOG(LM_INFO, "XXX C->S " << strIn.str());
+
+  LOG(LM_INFO, "SRV");
+  ASSERT_NO_THROW(server.parseServer());
+  LOG(LM_INFO, "XXX S->C " << strOut.str());
+
+  LOG(LM_INFO, "CLI");
+  EXPECT_TRUE(client.clientAboutToRead());
+  ASSERT_NO_THROW(clientConnected = client.waitForConnected("testkey", "googletest", priv, "", pub));
+  ASSERT_TRUE(clientConnected);
+  EXPECT_TRUE(client.clientAboutToRead());
+
+  LOG(LM_INFO, "CLI");
+  MrpcPerson p1;
+  client.sendSingle(p1);
+  LOG(LM_INFO, "XXX C->S " << strIn.str());
+
+  LOG(LM_INFO, "SRV");
+  ASSERT_NO_THROW(server.parseServer());
+  EXPECT_TRUE(bool(server.resultObj));
+  EXPECT_NE(dynamic_cast<MrpcPerson *>(server.resultObj.get()), nullptr);
+  MrpcPerson p2;
+  p2.name("Heinrich");
+  server.sendSingle(p2);
+  client.resultObj = nullptr;
+  //ASSERT_NO_THROW(server.parseServer());
+  LOG(LM_INFO, "XXX S->C " << strOut.str());
+
+  LOG(LM_INFO, "CLI");
+  EXPECT_TRUE(client.clientAboutToRead());
+  ASSERT_NO_THROW(readyRead = client.parseClient());
+  ASSERT_TRUE(bool(client.resultObj));
+  to_string(*client.resultObj);
+  ASSERT_NE(dynamic_cast<MrpcPerson *>(client.resultObj.get()), nullptr);
+  EXPECT_EQ(dynamic_cast<MrpcPerson *>(client.resultObj.get())->name(), "Heinrich");
+
+  EXPECT_FALSE(readyRead);
+  EXPECT_TRUE(client.isConnected());
+  ASSERT_NO_THROW(readyRead = client.parseClient());
+  EXPECT_TRUE(readyRead);
+  EXPECT_TRUE(client.isConnected());
+  EXPECT_TRUE(client.clientAboutToRead());
+
+
+  // jetzt reconnect
+  stringstream strOut2;
+  stringstream strIn2;
+  MrpcServer server2(strIn2, strOut2, pub, priv);
+  server2.session->sessionId = server.session->sessionId;
+  server2.session->sessionKey = server.session->sessionKey;
+  mobs::Mrpc client2(strOut2, strIn2, &clientSession, false);
+  client2.sessionReuseSpeedup = true;
+
+  LOG(LM_INFO, "------- reconnect -----");
+
+  clientConnected = false;
+  LOG(LM_INFO, "CLI");
+  //client2.tryReconnect();
+  EXPECT_FALSE(client2.clientAboutToRead());
+  ASSERT_NO_THROW(clientConnected = client2.waitForConnected("testkey", "googletest", priv, "", pub));
+  EXPECT_TRUE(clientConnected);
+  LOG(LM_INFO, "XXX C->S " << strIn2.str());
+
+  LOG(LM_INFO, "SRV");
+  ASSERT_NO_THROW(server2.parseServer());
+  LOG(LM_INFO, "XXX S->C " << strOut2.str());
+
+  LOG(LM_INFO, "CLI");
+  MrpcPerson p3;
+  client2.sendSingle(p3);
+  LOG(LM_INFO, "XXX C->S " << strIn2.str());
+
+  LOG(LM_INFO, "SRV");
+  ASSERT_NO_THROW(server2.parseServer());
+  EXPECT_TRUE(bool(server2.resultObj));
+  EXPECT_NE(dynamic_cast<MrpcPerson *>(server2.resultObj.get()), nullptr);
+  MrpcPerson p4;
+  p4.name("Chlodwig");
+  server2.sendSingle(p4);
+  client2.resultObj = nullptr;
+  //ASSERT_NO_THROW(server2.parseServer());
+  LOG(LM_INFO, "XXX S->C " << strOut2.str());
+
+  LOG(LM_INFO, "CLI");
+  ASSERT_NO_THROW(readyRead = client2.parseClient());
+  ASSERT_TRUE(bool(client2.resultObj));
+  to_string(*client2.resultObj);
+  ASSERT_NE(dynamic_cast<MrpcPerson *>(client2.resultObj.get()), nullptr);
+  EXPECT_EQ(dynamic_cast<MrpcPerson *>(client2.resultObj.get())->name(), "Chlodwig");
+
+  EXPECT_FALSE(readyRead);
+  EXPECT_TRUE(client.isConnected());
+  ASSERT_NO_THROW(readyRead = client2.parseClient());
+  EXPECT_TRUE(readyRead);
+  EXPECT_TRUE(client.isConnected());
+
+}
+
+TEST(mrpcTest, reconectSpeedupFail) {
+  string priv, pub;
+  mobs::generateRsaKeyMem(priv, pub);
+
+  stringstream strOut;
+  stringstream strIn;
+
+  MrpcServer server(strIn, strOut, pub, priv);
+
+  mobs::MrpcSession clientSession{};
+  mobs::Mrpc client(strOut, strIn, &clientSession, false);
+  client.sessionReuseSpeedup = true;
+
+  bool clientConnected = false;
+  bool readyRead = false;
+  LOG(LM_INFO, "CLI");
+  ASSERT_NO_THROW(clientConnected = client.waitForConnected("testkey", "googletest", priv, "", pub));
+  ASSERT_FALSE(clientConnected);
+  LOG(LM_INFO, "XXX C->S " << strIn.str());
+
+  LOG(LM_INFO, "SRV");
+  ASSERT_NO_THROW(server.parseServer());
+  LOG(LM_INFO, "XXX S->C " << strOut.str());
+
+  LOG(LM_INFO, "CLI");
+  ASSERT_NO_THROW(clientConnected = client.waitForConnected("testkey", "googletest", priv, "", pub));
+  ASSERT_TRUE(clientConnected);
+
+  LOG(LM_INFO, "CLI");
+  MrpcPerson p1;
+  client.sendSingle(p1);
+  LOG(LM_INFO, "XXX C->S " << strIn.str());
+
+  LOG(LM_INFO, "SRV");
+  ASSERT_NO_THROW(server.parseServer());
+  EXPECT_TRUE(bool(server.resultObj));
+  EXPECT_NE(dynamic_cast<MrpcPerson *>(server.resultObj.get()), nullptr);
+  MrpcPerson p2;
+  p2.name("Heinrich");
+  server.sendSingle(p2);
+  client.resultObj = nullptr;
+  //ASSERT_NO_THROW(server.parseServer());
+  LOG(LM_INFO, "XXX S->C " << strOut.str());
+
+  LOG(LM_INFO, "CLI");
+  ASSERT_NO_THROW(readyRead = client.parseClient());
+  ASSERT_TRUE(bool(client.resultObj));
+  EXPECT_FALSE(readyRead);
+  to_string(*client.resultObj);
+  ASSERT_NE(dynamic_cast<MrpcPerson *>(client.resultObj.get()), nullptr);
+  EXPECT_EQ(dynamic_cast<MrpcPerson *>(client.resultObj.get())->name(), "Heinrich");
+
+  ASSERT_NO_THROW(readyRead = client.parseClient());
+  EXPECT_TRUE(readyRead);
+
+  // jetzt reconnect
+  stringstream strOut2;
+  stringstream strIn2;
+  MrpcServer server2(strIn2, strOut2, pub, priv);
+  // Falsche Session Id
+  server2.session->sessionId = server.session->sessionId + 1;
+  server2.session->sessionKey = server.session->sessionKey;
+  mobs::Mrpc client2(strOut2, strIn2, &clientSession, false);
+  client2.sessionReuseSpeedup = true;
+
+  LOG(LM_INFO, "------- reconnect -----");
+
+  clientConnected = false;
+  LOG(LM_INFO, "CLI");
+  client2.tryReconnect();
+  ASSERT_NO_THROW(clientConnected = client2.waitForConnected("testkey", "googletest", priv, "", pub));
+  EXPECT_TRUE(clientConnected);
+  MrpcPerson p3;
+  client2.sendSingle(p3);
+  LOG(LM_INFO, "XXX C->S " << strIn2.str());
+
+  LOG(LM_INFO, "SRV");
+  EXPECT_ANY_THROW(server2.parseServer());
+  LOG(LM_INFO, "XXX S->C " << strOut2.str());
+
+  LOG(LM_INFO, "SRV");
+  EXPECT_ANY_THROW(server2.parseServer());
+
+  LOG(LM_INFO, "CLI");
+  ASSERT_ANY_THROW(client2.parseClient());
+  EXPECT_EQ(0, client2.session->sessionId);
+
+
+}
+
+
 TEST(mrpcTest, reconect) {
   string priv, pub;
   mobs::generateRsaKeyMem(priv, pub);
@@ -443,15 +651,20 @@ TEST(mrpcTest, reconect) {
 
   clientConnected = false;
   LOG(LM_INFO, "CLI");
-  //client2.tryReconnect();
   EXPECT_FALSE(client2.clientAboutToRead());
   ASSERT_NO_THROW(clientConnected = client2.waitForConnected("testkey", "googletest", priv, "", pub));
-  EXPECT_TRUE(clientConnected);
+  EXPECT_FALSE(clientConnected);
   LOG(LM_INFO, "XXX C->S " << strIn2.str());
 
   LOG(LM_INFO, "SRV");
   ASSERT_NO_THROW(server2.parseServer());
   LOG(LM_INFO, "XXX S->C " << strOut2.str());
+
+  LOG(LM_INFO, "CLI");
+  EXPECT_TRUE(client2.clientAboutToRead());
+  ASSERT_NO_THROW(clientConnected = client2.waitForConnected("testkey", "googletest", priv, "", pub));
+  EXPECT_TRUE(clientConnected);
+  LOG(LM_INFO, "XXX C->S " << strIn2.str());
 
   LOG(LM_INFO, "CLI");
   MrpcPerson p3;
@@ -471,6 +684,8 @@ TEST(mrpcTest, reconect) {
 
   LOG(LM_INFO, "CLI");
   ASSERT_NO_THROW(readyRead = client2.parseClient());
+  EXPECT_FALSE(bool(client2.resultObj));
+  ASSERT_NO_THROW(readyRead = client2.parseClient());
   ASSERT_TRUE(bool(client2.resultObj));
   to_string(*client2.resultObj);
   ASSERT_NE(dynamic_cast<MrpcPerson *>(client2.resultObj.get()), nullptr);
@@ -484,7 +699,7 @@ TEST(mrpcTest, reconect) {
 
 }
 
-TEST(mrpcTest, reconectFail) {
+TEST(mrpcTest, reconectReuse) {
   string priv, pub;
   mobs::generateRsaKeyMem(priv, pub);
 
@@ -551,25 +766,58 @@ TEST(mrpcTest, reconectFail) {
 
   clientConnected = false;
   LOG(LM_INFO, "CLI");
-  client2.tryReconnect();
+  EXPECT_FALSE(client2.clientAboutToRead());
   ASSERT_NO_THROW(clientConnected = client2.waitForConnected("testkey", "googletest", priv, "", pub));
-  EXPECT_TRUE(clientConnected);
+  EXPECT_FALSE(clientConnected);
+  LOG(LM_INFO, "XXX C->S " << strIn2.str());
+
+  LOG(LM_INFO, "SRV");
+  ASSERT_NO_THROW(server2.parseServer());
+  LOG(LM_INFO, "XXX S->C " << strOut2.str());
+
+  LOG(LM_INFO, "CLI");
+  EXPECT_TRUE(client2.clientAboutToRead());
+  ASSERT_NO_THROW(clientConnected = client2.waitForConnected("testkey", "googletest", priv, "", pub));
+  EXPECT_FALSE(clientConnected);
+  LOG(LM_INFO, "XXX C->S " << strIn2.str());
+
+  LOG(LM_INFO, "SRV");
+  ASSERT_NO_THROW(server2.parseServer());
+  LOG(LM_INFO, "XXX S->C " << strOut2.str());
+
+  LOG(LM_INFO, "CLI");
+  EXPECT_TRUE(client2.clientAboutToRead());
+  ASSERT_NO_THROW(clientConnected = client2.waitForConnected("testkey", "googletest", priv, "", pub));
+  ASSERT_TRUE(clientConnected);
+  LOG(LM_INFO, "XXX C->S " << strIn2.str());
+
+  LOG(LM_INFO, "CLI");
   MrpcPerson p3;
   client2.sendSingle(p3);
   LOG(LM_INFO, "XXX C->S " << strIn2.str());
 
   LOG(LM_INFO, "SRV");
-  EXPECT_ANY_THROW(server2.parseServer());
+  ASSERT_NO_THROW(server2.parseServer());
+  EXPECT_TRUE(bool(server2.resultObj));
+  EXPECT_NE(dynamic_cast<MrpcPerson *>(server2.resultObj.get()), nullptr);
+  MrpcPerson p4;
+  p4.name("Chlodwig");
+  server2.sendSingle(p4);
+  client2.resultObj = nullptr;
+  //ASSERT_NO_THROW(server2.parseServer());
   LOG(LM_INFO, "XXX S->C " << strOut2.str());
 
-  LOG(LM_INFO, "SRV");
-  EXPECT_ANY_THROW(server2.parseServer());
-
   LOG(LM_INFO, "CLI");
-  ASSERT_ANY_THROW(client2.parseClient());
-  EXPECT_EQ(0, client2.session->sessionId);
+  ASSERT_NO_THROW(readyRead = client2.parseClient());
+  ASSERT_TRUE(bool(client2.resultObj));
+  to_string(*client2.resultObj);
+  ASSERT_NE(dynamic_cast<MrpcPerson *>(client2.resultObj.get()), nullptr);
+  EXPECT_EQ(dynamic_cast<MrpcPerson *>(client2.resultObj.get())->name(), "Chlodwig");
 
-
-}
+  EXPECT_FALSE(readyRead);
+  EXPECT_TRUE(client.isConnected());
+  ASSERT_NO_THROW(readyRead = client2.parseClient());
+  EXPECT_TRUE(readyRead);
+  EXPECT_TRUE(client.isConnected());}
 
 }

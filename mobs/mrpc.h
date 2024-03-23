@@ -44,10 +44,17 @@ public:
  *
  * die Verschlüsselung der Nutzdaten ist anhand RFC 4051 implementiert.
  * Zusätzlich besteht die Möglichkeit Roh-Daten zwischen den XML-Paketen zu übermitteln
+ *
+ * Ist im Server eine reuseTime gesetzt, so wird vom Client versucht eine bestehende Session zu verwenden.
+ * gelingt dies nicht, so wird ein neuer Login-Vorgang gestartet. Der Server-Kontext geht dabei verloren.
+ * Dies erlaubt eine schnelle Wiederverwendung einer bestehenden Session inklusive deren Kontext.
+ * Wenn die Variable sessionReuseSpeedup gesetzt ist, so wird bei einer erfolgreichen Session-Reuse sofort ein Kommando gesendet.
+ * Ist bei sessionReuseSpeedup der Session-Reuse nicht erfolgreich, so wird eine Exception geworfen.
  */
 class Mrpc : public XmlReader {
+  enum State { fresh, getPubKey, connectingClient, connectingServer, reconnectingClient, reconnectingClientTest,
+    connected, readyRead, closing };
 public:
-  enum State { fresh, getPubKey, connectingClient, connectingServer, reconnectingClient, connected, readyRead, closing };
   Mrpc(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking);
   ~Mrpc() override = default;
 
@@ -63,7 +70,7 @@ public:
 
   /// Einlesen eines Byte-streams der Größe sz
   std::istream &inByteStream(size_t sz);
-  /// Senden eines Byte-streams
+  /// Senden eines Byte-streams; der XML-Stream darf dabei nicht verschlüsselt sein
   std::ostream &outByteStream();
   /// Senden eines Byte-streams beenden
   void closeOutByteStream();
@@ -172,7 +179,7 @@ public:
   /** \brief Verbindung hergestellt
    * @return true, wenn die Verbindung hergestellt ist und parseClient statt waitForConnected aufgerufen werden muss
    */
-  bool isConnected() const { return state == connected or state == reconnectingClient or state == readyRead; }
+  bool isConnected() const;
 
   /// Rückgabe, ob der nächste Lesevorgang blockiert
   bool clientAboutToRead() const;
@@ -184,13 +191,13 @@ public:
   XmlWriter writer; ///< das Writer-Objekt wür die Ausgabe
   MrpcSession *session; ///< Zeiger auf ein MrpcSession - Info; muss zwingend existieren
   std::unique_ptr<mobs::ObjectBase> resultObj; ///< Das zuletzt empfangene Objekt; muss nach Verwendung auf nullptr gesetzt werden
+  bool sessionReuseSpeedup = false; ///< true, wenn ein session-reuse ohne verifizierung sofort ein Kommando sendet. (clientseitig)
 
-  static int sessionReuseTime; ///< Zeit in Sekunden, die eine Session wiederverwendet werden kann
+  static int sessionServerReuseTime; ///< Zeit in Sekunden, die eine Session wiederverwendet werden kann (für den Server)
 
 private:
   bool encrypted = false;
   State state = fresh;
-  // TODO int clientSessionReuseTime vom Server beim Login empfangen
   // TODO evtl auch Ablaufzeit der Session vom Server empfangen
 
 };
