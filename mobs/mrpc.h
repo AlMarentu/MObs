@@ -55,7 +55,15 @@ class Mrpc : public XmlReader {
   enum State { fresh, getPubKey, connectingClient, connectingServer, reconnectingClient, reconnectingClientTest,
     connected, readyRead, closing };
 public:
-  Mrpc(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking);
+  /** \brief Konstruktor für Client
+   *
+   * @param inStr Eingabestream
+   * @param outStr Ausgabestream
+   * @param mrpcSession Zeiger auf die Session-Info, darf nicht null sein
+   * @param nonBlocking true, wenn statt blocking read nur die im Stream vorhandenen Daten gelesen werden sollen
+   * @param fastReconnect true, (nur Client) wenn ein schneller Reconnect versucht werden soll, ohne auf den Server zu warten
+   */
+  Mrpc(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking, bool fastReconnect = false);
   ~Mrpc() override = default;
 
   /** \brief senden eines einzelnen Objektes mit Verschlüsselung und sync()
@@ -90,11 +98,7 @@ public:
    */
   bool waitForConnected(const std::string &keyId, const std::string &software, const std::string &privkey,
                         const std::string &passphrase, std::string &serverkey);
-  /** \brief Versuche einen Reconnect vom Client (muss vor waitForConnected aufgerufen werden)
-   *
-   * obsolet: sessionReuseTime verwenden \see waitForConnected
-   */
-  void tryReconnect();
+
   /** \brief Arbeitsroutine des Clients
   *
   * die Routine muss solange aufgerufen werden bis true zurückgeliefert wird.
@@ -175,6 +179,8 @@ public:
   /// \private erzeuge Login-Info auf Client-Seite
   static std::vector<u_char> generateLoginInfo(const std::string &keyId,
                                                const std::string &software, const std::string &serverkey);
+  /// fordere einen neuen Session-Key an (Client)
+  void refreshSessionKey();
 
   /** \brief Verbindung hergestellt
    * @return true, wenn die Verbindung hergestellt ist und parseClient statt waitForConnected aufgerufen werden muss
@@ -190,15 +196,19 @@ public:
   std::wostream oStr; ///< \private
   XmlWriter writer; ///< das Writer-Objekt wür die Ausgabe
   MrpcSession *session; ///< Zeiger auf ein MrpcSession - Info; muss zwingend existieren
+  bool sessionReuseSpeedup; ///< true, wenn ein session-reuse ohne verifizierung sofort ein Kommando sendet. (clientseitig)
   std::unique_ptr<mobs::ObjectBase> resultObj; ///< Das zuletzt empfangene Objekt; muss nach Verwendung auf nullptr gesetzt werden
-  bool sessionReuseSpeedup = false; ///< true, wenn ein session-reuse ohne verifizierung sofort ein Kommando sendet. (clientseitig)
 
   static int sessionServerReuseTime; ///< Zeit in Sekunden, die eine Session wiederverwendet werden kann (für den Server)
+  static int sessionKeyValidTime; ///< Zeit in Sekunden, die ein Session-Key gültig ist (für den Server)
 
 private:
   bool encrypted = false;
   State state = fresh;
   // TODO evtl auch Ablaufzeit der Session vom Server empfangen
+
+  void sendNewSessionKey();
+  void tryReconnect();
 
 };
 

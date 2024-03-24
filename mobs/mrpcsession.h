@@ -35,17 +35,20 @@ public:
   MrpcSession() = default;
   explicit MrpcSession(const std::string &hostname) : server(hostname) {};
   ~MrpcSession() = default;
-  /// gibt den Hostnamen zurück
-  std::string hostPart() const;
-  /// gibt den Port zurück
-  int portNum() const;
+  /// gibt den Hostnamen zurück (Teil bis :)
+  std::string host() const;
+  /// gibt den Port zurück (Teil nach :)
+  std::string port() const;
   std::string server; ///< hostname[:Port]; die Verwaltung erfolgt in der Client-Anwendung.
-  std::vector<u_char> sessionKey; ///< session-Key; wird vom Mrpc verwaltet
+  std::vector<u_char> sessionKey{}; ///< session-Key; wird vom Mrpc verwaltet
+  std::string keyName; ///< Name des session-Keys; wird vom Mrpc verwaltet
   u_int sessionId = 0; ///< session-Key; wird vom Mrpc verwaltet; im Server muss sie explizit im Login-Vorgang gesetzt werden
   time_t last = 0; ///< letzte Verwendung; wird vom Mrpc verwaltet
+  time_t generated = 0; ///< Erzeugung des Keys; wird vom Mrpc verwaltet
   std::string info; ///< Info über Login-Informationen im Server
   std::string publicServerKey; ///< hier kann der öffentliche Schlüssel als PEM abgelegt werden; muss in der Client-Anwendung erfolgen
   int sessionReuseTime = 0; ///< Zeit in Sekunden, die eine Session wiederverwendet werden kann; wird vom Mrpc verwaltet
+  int keyValidTime = 0; ///< Zeit in Sekunden, die der sessionKey seit Erzeugung gültig ist wenn > 0; wird vom Mrpc verwaltet
 };
 
 }

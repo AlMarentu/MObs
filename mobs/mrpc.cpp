@@ -35,6 +35,7 @@ public:
   MemVar(std::vector<u_char>, key);
   MemVar(u_int, sessId);
   MemVar(u_int, sessionReuseTime, USENULL);
+  MemVar(u_int, sessionKeyValidTime, USENULL);
 };
 
 class MrpcSessionLoginData : virtual public mobs::ObjectBase {
@@ -69,6 +70,15 @@ public:
   MemVar(std::string, info, USENULL);
 };
 
+class MrpcSessionRefreshKey : virtual public mobs::ObjectBase {
+public:
+  ObjInit(MrpcSessionRefreshKey);
+  MemVar(std::vector<u_char>, key, USENULL);
+  MemVar(u_int, sessionReuseTime, USENULL);
+  MemVar(u_int, sessionKeyValidTime, USENULL);
+  MemVar(std::string, info, USENULL);
+};
+
 class MrpcSessionReturnError : virtual public mobs::ObjectBase {
 public:
   ObjInit(MrpcSessionReturnError);
@@ -85,8 +95,9 @@ public:
 }
 
 int Mrpc::sessionServerReuseTime = 120;
+int Mrpc::sessionKeyValidTime = 0;  // 0 = unbegrenzt
 
-std::string MrpcSession::hostPart() const
+std::string MrpcSession::host() const
 {
   auto pos = server.find(':');
   if (pos == std::string::npos)
@@ -94,12 +105,12 @@ std::string MrpcSession::hostPart() const
   return server.substr(0, pos);
 }
 
-int MrpcSession::portNum() const
+std::string MrpcSession::port() const
 {
   auto pos = server.find(':');
   if (pos == std::string::npos)
     return 0;
-  return std::stoi(server.substr(pos + 1));
+  return server.substr(pos + 1);
 }
 
 void Mrpc::encrypt()
@@ -149,7 +160,7 @@ void Mrpc::filled(mobs::ObjectBase *obj, const std::string &error)
   if (not error.empty())
     THROW("error in XML stream: " << error);
   if (resultObj)
-    throw std::runtime_error("result object bereits vorhanden");
+    THROW("result object bereits vorhanden: " << resultObj->getObjectName());
   resultObj = std::unique_ptr<mobs::ObjectBase>(obj);
   // parsen anhalten
   stop();
@@ -177,6 +188,8 @@ void Mrpc::StartTag(const std::string &element)
     auto o = ObjectBase::createObj(element);
     if (o)
       fill(o);
+    else if (state == connected and element == "MrpcSessionRefreshKey")
+      fill(new MrpcSessionRefreshKey);
     else if ((state == reconnectingClient or state == reconnectingClientTest) and element == "MrpcSessionReturnError")
       fill(new MrpcSessionReturnError);
     else if ((state == reconnectingClient or state == reconnectingClientTest) and element == "MrpcSessionTestConnection")
@@ -217,11 +230,11 @@ void Mrpc::closeOutByteStream()
 }
 
 
-Mrpc::Mrpc(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking) :
+Mrpc::Mrpc(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking, bool fastReconnect) :
     XmlReader(iStr), streambufI(inStr), streambufO(outStr),
     iStr(&streambufI), oStr(&streambufO),
     writer(oStr, mobs::XmlWriter::CS_utf8, false),
-    session(mrpcSession)
+    session(mrpcSession), sessionReuseSpeedup(fastReconnect)
 {
   readTillEof(false);
   readNonBlocking(nonBlocking);
@@ -241,6 +254,8 @@ void Mrpc::receiveSessionKey(const std::vector<u_char> &cipher, const std::strin
   session->sessionKey = result.key();
   session->sessionId = result.sessId();
   session->sessionReuseTime = result.sessionReuseTime();
+  session->generated = time(nullptr);
+  session->keyValidTime = result.sessionKeyValidTime();
 }
 
 std::string Mrpc::receiveLogin(const std::vector<u_char> &cipher, const std::string &privkey, const std::string &passwd,
@@ -269,9 +284,14 @@ std::vector<u_char> Mrpc::generateSessionKey(const std::string &clientkey)
   result.sessId(session->sessionId);
   if (sessionServerReuseTime > 0)
     result.sessionReuseTime(sessionServerReuseTime);
+  if (sessionKeyValidTime > 0)
+    result.sessionKeyValidTime(sessionKeyValidTime);
   session->sessionKey.resize(mobs::CryptBufAes::key_size());
   mobs::CryptBufAes::getRand(session->sessionKey);
   result.key(session->sessionKey);
+  session->generated = time(nullptr);
+  session->keyName = clientkey;
+  session->keyValidTime = sessionKeyValidTime;
 
   std::string buffer = result.to_string(mobs::ConvObjToString().exportJson().noIndent());
   std::vector<u_char> inhalt;
@@ -279,6 +299,33 @@ std::vector<u_char> Mrpc::generateSessionKey(const std::string &clientkey)
   encryptPublicRsa(inhalt, cipher, clientkey);
   return cipher;
 }
+
+void Mrpc::sendNewSessionKey() // Server
+{
+  MrpcSessionRefreshKey result;
+  // neuen Key erzeugen und senden
+  std::vector<u_char> newKey;
+  newKey.resize(mobs::CryptBufAes::key_size());
+  mobs::CryptBufAes::getRand(newKey);
+  if (sessionServerReuseTime > 0)
+    result.sessionReuseTime(sessionServerReuseTime);
+  if (sessionKeyValidTime > 0)
+    result.sessionKeyValidTime(sessionKeyValidTime);
+  result.key(newKey);
+  //result.info();
+  LOG(LM_INFO, "Refresh session key " << session->sessionId << " " << session->info);
+  sendSingle(result); // mit altem Schlüssel versenden, dann wird der neue Schlüssel verwendet
+  session->sessionKey = newKey;
+  session->generated = time(nullptr);
+  session->keyValidTime = sessionKeyValidTime;
+}
+
+void Mrpc::refreshSessionKey()  // Client
+{
+  MrpcSessionRefreshKey result;
+  sendSingle(result);
+}
+
 
 std::vector<u_char> Mrpc::generateLoginInfo(const std::string &keyId, const std::string &software,
                                             const std::string &serverkey)
@@ -383,6 +430,13 @@ bool Mrpc::parseServer()
             writer.sync();
             throw std::runtime_error("reconnect: session invalid");
           }
+          if (session->keyValidTime > 0 and session->generated + session->keyValidTime < time(nullptr)) {
+            MrpcSessionReturnError eanswer;
+            eanswer.error(STRSTR("KEY_EXPIRED"));
+            xmlOut(eanswer); // Achtung: unverschlüsselt
+            writer.sync();
+            throw std::runtime_error("reconnect: session key expired");
+          }
           LOG(LM_DEBUG, "Connection reestablished ID " << session->sessionId);
           state = connected;
           if (sess->verify()) {
@@ -431,6 +485,17 @@ bool Mrpc::parseServer()
     case connected:
       parse();
       LOG(LM_DEBUG, "pars done " << std::boolalpha << bool(resultObj));
+      if (dynamic_cast<MrpcSessionRefreshKey *>(resultObj.get())) {
+        resultObj = nullptr;
+        sendNewSessionKey();
+      } else if (session->keyValidTime > 0 and session->generated + session->keyValidTime < time(nullptr)) {
+        MrpcSessionReturnError eanswer;
+        eanswer.error(STRSTR("KEY_EXPIRED"));
+        stopEncrypt();
+        xmlOut(eanswer); // Achtung: unverschlüsselt
+        writer.sync();
+        throw std::runtime_error("reconnect: session key expired");
+      }
       break;
     case closing:
       return false;
@@ -479,6 +544,20 @@ bool Mrpc::parseClient()
       throw MrpcConnectException(STRSTR("error received: " << session->info));
     }
     state = connected;
+  }
+  else if (auto *refKey = dynamic_cast<MrpcSessionRefreshKey *>(resultObj.get())) {
+    LOG(LM_INFO, "New session key received " << session->sessionId << " " << refKey->info());
+    session->sessionKey = refKey->key();
+    session->sessionReuseTime = refKey->sessionReuseTime();
+    session->keyValidTime = refKey->sessionKeyValidTime();
+    session->info = refKey->info();
+    session->generated = time(nullptr);
+    resultObj = nullptr;
+    // readyRead-State verhindern
+    if (state == readyRead)
+      state = connected;
+    else if (state == connected)
+      state = reconnectingClient;
   }
   bool ret = state == readyRead;
   if (ret)
