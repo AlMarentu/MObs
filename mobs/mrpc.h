@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2023 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -32,15 +32,38 @@
 
 namespace mobs {
 
+
+
+/// Fehler des Clients beim Verbindungsaufbau
+class MrpcConnectException : public std::runtime_error {
+public:
+  explicit MrpcConnectException(const std::string &what) : std::runtime_error(what) {}
+};
+
 /** \brief Klasse für Client-Server Modul über XML-RPC-Calls
  *
  * die Verschlüsselung der Nutzdaten ist anhand RFC 4051 implementiert.
  * Zusätzlich besteht die Möglichkeit Roh-Daten zwischen den XML-Paketen zu übermitteln
+ *
+ * Ist im Server eine reuseTime gesetzt, so wird vom Client versucht eine bestehende Session zu verwenden.
+ * gelingt dies nicht, so wird ein neuer Login-Vorgang gestartet. Der Server-Kontext geht dabei verloren.
+ * Dies erlaubt eine schnelle Wiederverwendung einer bestehenden Session inklusive deren Kontext.
+ * Wenn die Variable sessionReuseSpeedup gesetzt ist, so wird bei einer erfolgreichen Session-Reuse sofort ein Kommando gesendet.
+ * Ist bei sessionReuseSpeedup der Session-Reuse nicht erfolgreich, so wird eine Exception geworfen.
  */
 class Mrpc : public XmlReader {
+  enum State { fresh, getPubKey, connectingClient, connectingServer, reconnectingClient, reconnectingClientTest,
+    connected, readyRead, closing };
 public:
-  enum State { fresh, getPubKey, connectingClient, connectingServer, connected, closing };
-  Mrpc(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking);
+  /** \brief Konstruktor für Client
+   *
+   * @param inStr Eingabestream
+   * @param outStr Ausgabestream
+   * @param mrpcSession Zeiger auf die Session-Info, darf nicht null sein
+   * @param nonBlocking true, wenn statt blocking read nur die im Stream vorhandenen Daten gelesen werden sollen
+   * @param fastReconnect true, (nur Client) wenn ein schneller Reconnect versucht werden soll, ohne auf den Server zu warten
+   */
+  Mrpc(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking, bool fastReconnect = false);
   ~Mrpc() override = default;
 
   /** \brief senden eines einzelnen Objektes mit Verschlüsselung und sync()
@@ -55,7 +78,7 @@ public:
 
   /// Einlesen eines Byte-streams der Größe sz
   std::istream &inByteStream(size_t sz);
-  /// Senden eines Byte-streams
+  /// Senden eines Byte-streams; der XML-Stream darf dabei nicht verschlüsselt sein
   std::ostream &outByteStream();
   /// Senden eines Byte-streams beenden
   void closeOutByteStream();
@@ -64,17 +87,32 @@ public:
    *
    * die Routine muss solange aufgerufen werden bis true zurückgeliefert wird.
    * Wird ein leerer public key des Servers angegeben, so wird dieser vom Server erfragt.
+   *
+   * ist eine sessionReuseTime gesetzt, so wird versucht eine bestehende Session zu verwenden.
    * @param keyId Schlüssel-Id für den Login-Vorgang
    * @param software Information über den Client
    * @param privkey private key der Clients
    * @param passphrase passphrase des private keys
    * @param serverkey public key des Servers, bei leer autudetection und Rückgabe des Keys im PEM-Format
-   * @return connected wenn connected==false dürfen keine Anfragen bearbeitet werden
+   * @return connected wenn isConnected==false dürfen keine Anfragen bearbeitet werden
    */
   bool waitForConnected(const std::string &keyId, const std::string &software, const std::string &privkey,
                         const std::string &passphrase, std::string &serverkey);
-  /// Versuche einen Reconnect vom Client (muss vor waitForConnected aufgerufen werden)
-  void tryReconnect();
+
+  /** \brief Arbeitsroutine des Clients
+  *
+  * die Routine muss solange aufgerufen werden bis true zurückgeliefert wird.
+  * Danaach ist mindestens 1 Objekt empfangen und die XML-Ebene auf den Grundzustand zurückgesetzt.
+  * @return true, wenn ein Objekt empfangen wurde und die Kommunikation abgeschlossen ist
+  * \throws runtime_error wenn ein Fehler im Stream bzw im Login/Reconnect aufgetreten ist;
+  */
+  bool parseClient();
+
+  /** \brief Client-Kommando zum Schließen der Session, danach ist kein reconnect möglich
+   *
+   */
+  void closeServer();
+
 
   /** \brief Arbeitsroutine des Server
    *
@@ -141,6 +179,16 @@ public:
   /// \private erzeuge Login-Info auf Client-Seite
   static std::vector<u_char> generateLoginInfo(const std::string &keyId,
                                                const std::string &software, const std::string &serverkey);
+  /// fordere einen neuen Session-Key an (Client)
+  void refreshSessionKey();
+
+  /** \brief Verbindung hergestellt
+   * @return true, wenn die Verbindung hergestellt ist und parseClient statt waitForConnected aufgerufen werden muss
+   */
+  bool isConnected() const;
+
+  /// Rückgabe, ob der nächste Lesevorgang blockiert
+  bool clientAboutToRead() const;
 
   mobs::CryptIstrBuf streambufI; ///< \private
   mobs::CryptOstrBuf streambufO; ///< \private
@@ -148,11 +196,19 @@ public:
   std::wostream oStr; ///< \private
   XmlWriter writer; ///< das Writer-Objekt wür die Ausgabe
   MrpcSession *session; ///< Zeiger auf ein MrpcSession - Info; muss zwingend existieren
+  bool sessionReuseSpeedup; ///< true, wenn ein session-reuse ohne verifizierung sofort ein Kommando sendet. (clientseitig)
   std::unique_ptr<mobs::ObjectBase> resultObj; ///< Das zuletzt empfangene Objekt; muss nach Verwendung auf nullptr gesetzt werden
+
+  static int sessionServerReuseTime; ///< Zeit in Sekunden, die eine Session wiederverwendet werden kann (für den Server)
+  static int sessionKeyValidTime; ///< Zeit in Sekunden, die ein Session-Key gültig ist (für den Server)
 
 private:
   bool encrypted = false;
   State state = fresh;
+  // TODO evtl auch Ablaufzeit der Session vom Server empfangen
+
+  void sendNewSessionKey();
+  void tryReconnect();
 
 };
 

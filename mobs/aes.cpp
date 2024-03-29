@@ -39,7 +39,7 @@
 #endif
 
 #define KEYBUFLEN 32
-#define INPUT_BUFFER_LEN 4096
+#define INPUT_BUFFER_LEN 8192
 
 namespace mobs_internal {
 

@@ -49,7 +49,7 @@ namespace mobs {
 //};
 
 
-#define INPUT_BUFFER_SIZE 4096
+#define INPUT_BUFFER_SIZE 8192
 // local-char to wide-char buffer size
 #define OUTPUT_BUFFER_SIZE 2048
 // Buffer für Base64-Kodierung, soll <= 75% INPUT_BUFFER_SIZE sein

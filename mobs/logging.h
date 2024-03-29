@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -24,7 +24,11 @@
 
 #include <sstream>
 #include <string>
+#include <array>
 #include <functional>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 /** \file logging.h
 \brief Hilfsfunktionen und Makros für logging und tracing
@@ -66,6 +70,66 @@ private:
   const char *fun;
 };
 
+/** \brief Klasse zur Behandlung von Logdateien über parallele Programme
+ *
+ * Die Klasse erzeugt eine Log-Datei. Diese wird immer mit .0 erweitert.
+ * Ist diese Datei bereits von einem anderen Programm geöffnet, wird eine neue Datei mit .1 erzeugt, usw...
+ *
+ * Die wird erst erzeugt, wenn die erste Log-Meldung geschrieben wird.
+ */
+
+class FileMultiLog {
+public:
+  FileMultiLog(const std::string &filenamePart) : fileName(filenamePart) {}
+  ~FileMultiLog();
+  void logString(const std::string &str);
+  int getVersion() const { return version; }
+
+private:
+  std::string fileName;
+  int version = -1;
+#ifdef __MINGW32__
+  HANDLE handle;
+#else
+  int handle;
+#endif
+
+};
+
+/// streambuf zu FileMultiLog für LogMultiStream
+class LogMultiBuf : public std::basic_streambuf<char> {
+public:
+  using Base = std::basic_streambuf<char>; ///< Basis-Typ
+  using char_type = typename Base::char_type; ///< Element-Typ
+  using Traits = std::char_traits<char_type>; ///< Traits-Typ
+  using int_type = typename Base::int_type; ///< zugehöriger int-Typ
+
+  explicit LogMultiBuf(const std::string & filenamePart);
+  /// \private
+  LogMultiBuf(const LogMultiBuf &) = delete;
+  LogMultiBuf &operator=(const LogMultiBuf &) = delete;
+  ~LogMultiBuf() override;
+  /// \private
+  int_type overflow(int_type ch) override;
+
+protected:
+  /// \private
+  int sync() override;
+
+private:
+  FileMultiLog log;
+  std::array<char_type, 1024> buffer;
+};
+
+/// stream für FileMultiLog
+class LogMultiStream : public std::ostream {
+public:
+  explicit LogMultiStream(const std::string & filenamePart);
+  ~LogMultiStream() override;
+};
+
+
+
 void logMessage(loglevel l, std::function<std::string()> message);
 
 }
@@ -94,7 +158,7 @@ void logMessage(loglevel l, std::function<std::string()> message);
 
 /// \brief Hilfs-Makro für TRACE, stellt Parameternamen vor Inhalt.
 #define PARAM(x) " " #x "=\"" << x << "\""
-#ifndef NDEBUG
+#ifndef NTRACE
 /// \brief Makro für Tracing
 #define TRACE(x) logging::Trace ___t___(__PRETTY_FUNCTION__, [&]()->std::string { std::stringstream ___s___; ___s___ << x; return ___s___.str(); })
 #else
