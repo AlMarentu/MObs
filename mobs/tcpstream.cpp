@@ -123,7 +123,7 @@ socketHandle TcpAccept::initService(const std::string &service) {
       break;
     }
     if (fd != invalidSocket) {
-      LOG(LM_INFO, "CONNECTED " << hostIp(*p->ai_addr, p->ai_addrlen));
+      LOG(LM_DEBUG, "CONNECTED " << hostIp(*p->ai_addr, p->ai_addrlen));
       break;
     }
   }
@@ -150,7 +150,7 @@ socketHandle TcpAccept::acceptConnection(struct sockaddr &addr, size_t &len) con
   len = addrLen;
   LOG(LM_DEBUG, "Accept " << fdneu);
   if (fdneu != invalidSocket) {
-    LOG(LM_INFO, "accept: from Host: " << hostIp(addr, addrLen));
+    LOG(LM_DEBUG, "accept: from Host: " << hostIp(addr, addrLen));
   }
   else
     LOG(LM_ERROR, "accept failed " << errno << " " << strerror(errno));
@@ -175,7 +175,7 @@ public:
     }
     fd = invalidSocket;
     for (res = res0; res; res = res->ai_next) {
-      LOG(LM_INFO, "TRY " << hostIp(*res->ai_addr, res->ai_addrlen));
+      LOG(LM_DEBUG, "TRY " << hostIp(*res->ai_addr, res->ai_addrlen));
       if ((fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) == invalidSocket) {
         LOG(LM_ERROR, "socket failed " << errno);
         continue;

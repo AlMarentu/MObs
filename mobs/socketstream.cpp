@@ -66,7 +66,7 @@ public:
       socket = invalidSocket;
       return;
     }
-    LOG(LM_INFO, "SV " << sv[0] << " " << sv[1]);
+    LOG(LM_DEBUG, "SV " << sv[0] << " " << sv[1]);
     socket = sv[0];
     fd = sv[1];
   }
@@ -132,7 +132,10 @@ SocketStBuf::SocketStBuf(socketHandle &socket) : Base() {
 }
 
 SocketStBuf::~SocketStBuf() {
-  //close();
+  if (is_open()) {
+    LOG(LM_DEBUG, "CLOSE " << int(data->fd));
+    closesocket(data->fd);
+  }
 }
 
 bool SocketStBuf::is_open() const {
@@ -190,9 +193,9 @@ SocketStBuf::int_type SocketStBuf::underflow() {
   auto sz = data->readBuf(true);
   if (sz == 0)
   {
-    LOG(LM_INFO, "SocketStBuf::underflow WAITING");
+    LOG(LM_DEBUG, "SocketStBuf::underflow WAITING");
     sz = data->readBuf(false);
-    LOG(LM_INFO, "SocketStBuf::underflow DONE " << sz);
+    LOG(LM_DEBUG, "SocketStBuf::underflow DONE " << sz);
   }
   Base::setg(&data->rdBuf[0], &data->rdBuf[0], &data->rdBuf[sz]);
   if (sz == 0)
@@ -204,7 +207,7 @@ bool SocketStBuf::close() {
   pubsync();
   if (not is_open())
     return false;
-  LOG(LM_INFO, "CLOSE " << int(data->fd));
+  LOG(LM_DEBUG, "CLOSE " << int(data->fd));
   int res = closesocket(data->fd);
   data->fd = invalidSocket;
   return res == 0;

@@ -109,7 +109,7 @@ std::string MrpcSession::port() const
 {
   auto pos = server.find(':');
   if (pos == std::string::npos)
-    return 0;
+    return {};
   return server.substr(pos + 1);
 }
 
