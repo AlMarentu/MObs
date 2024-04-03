@@ -52,7 +52,9 @@ class MrpcSessionLogin : virtual public mobs::ObjectBase {
 public:
   ObjInit(MrpcSessionLogin);
   MemVar(std::vector<u_char>, cipher);
-  MemVar(std::string, info);
+  MemVar(std::string, info, USENULL);
+  // soll keine Session wiederverwendet werden, dann info setzen
+  MemVar(bool, dontKeep, USENULL);
 };
 
 class MrpcGetPublickey : virtual public mobs::ObjectBase {
@@ -230,11 +232,11 @@ std::streamsize Mrpc::closeOutByteStream()
 }
 
 
-Mrpc::Mrpc(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking, bool fastReconnect) :
+Mrpc::Mrpc(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking, SessionMode mode) :
     XmlReader(iStr), streambufI(inStr), streambufO(outStr),
     iStr(&streambufI), oStr(&streambufO),
     writer(oStr, mobs::XmlWriter::CS_utf8, false),
-    session(mrpcSession), sessionReuseSpeedup(fastReconnect)
+    session(mrpcSession), sessionMode(mode)
 {
   readTillEof(false);
   readNonBlocking(nonBlocking);
@@ -282,8 +284,8 @@ std::vector<u_char> Mrpc::generateSessionKey(const std::string &clientkey)
   if (not session->sessionId)
     throw std::runtime_error("sessionId empty");
   result.sessId(session->sessionId);
-  if (sessionServerReuseTime > 0)
-    result.sessionReuseTime(sessionServerReuseTime);
+  if (session->sessionReuseTime > 0)
+    result.sessionReuseTime(session->sessionReuseTime);
   if (sessionKeyValidTime > 0)
     result.sessionKeyValidTime(sessionKeyValidTime);
   session->sessionKey.resize(mobs::CryptBufAes::key_size());
@@ -364,7 +366,6 @@ void Mrpc::closeServer()
 {
   writer.writeTagEnd();
   writer.sync();
-  session->sessionId = 0;
 }
 
 // Server
@@ -394,6 +395,10 @@ bool Mrpc::parseServer()
         LOG(LM_DEBUG, "LOGIN ");
         if (not session)
           throw std::runtime_error("session missing");
+        if (sessionServerReuseTime > 0 and not sess->dontKeep())
+          session->sessionReuseTime = sessionServerReuseTime;
+        else
+          session->sessionReuseTime = 0;
         std::string info;
         std::string key;
         MrpcSessionLogin answer;
@@ -518,11 +523,11 @@ void Mrpc::tryReconnect()
     writer.writeTagBegin(L"methodCall");
     MrpcSessionUse cmd;
     cmd.id(session->sessionId);
-    if (not sessionReuseSpeedup)
+    if (sessionMode != SessionMode::speedup)
       cmd.verify(true);
     xmlOut(cmd);
     writer.sync();
-    state = sessionReuseSpeedup ? reconnectingClient : reconnectingClientTest;
+    state = sessionMode == SessionMode::speedup ? reconnectingClient : reconnectingClientTest;
   }
 }
 
@@ -597,6 +602,8 @@ bool Mrpc::waitForConnected(const std::string &keyId, const std::string &softwar
           writer.writeHead();
           writer.writeTagBegin(L"methodCall");
         }
+        if (sessionMode == SessionMode::dontKeep)
+          msg.dontKeep(true);
         xmlOut(msg);
         writer.sync();
       }
@@ -614,7 +621,7 @@ bool Mrpc::waitForConnected(const std::string &keyId, const std::string &softwar
         resultObj = nullptr;
       } else if (auto *sess = dynamic_cast<MrpcSessionReturnError *>(resultObj.get())) {
         LOG(LM_ERROR, "SESSIONERROR " << sess->error());
-        if (sessionReuseSpeedup or sess->error().find(u8"PLS_RELOG") == std::string::npos) {
+        if (sessionMode == SessionMode::speedup or sess->error().find(u8"PLS_RELOG") == std::string::npos) {
           session->info = sess->error();
           resultObj = nullptr;
           throw MrpcConnectException(STRSTR("error received: " << session->info));
@@ -654,14 +661,14 @@ bool Mrpc::waitForConnected(const std::string &keyId, const std::string &softwar
     case connectingServer:
       throw std::runtime_error("error while connecting");
   }
-  if (state == reconnectingClient and sessionReuseSpeedup)
+  if (state == reconnectingClient and sessionMode == SessionMode::speedup)
     return true;
   return state == connected or state == readyRead;
 }
 
 bool Mrpc::isConnected() const
 {
-  if (state == reconnectingClient and sessionReuseSpeedup)
+  if (state == reconnectingClient and sessionMode == SessionMode::speedup)
     return true;
   return state == connected or state == readyRead;
 }
@@ -685,6 +692,10 @@ bool Mrpc::clientAboutToRead() const
   return false;
 }
 
+bool Mrpc::serverKeepSession() const
+{
+  return session and session->sessionReuseTime > 0;
+}
 
 
 } // mobs

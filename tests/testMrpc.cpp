@@ -403,7 +403,7 @@ TEST(mrpcTest, reconectSpeedup) {
   MrpcServer server(strIn, strOut, pub, priv);
 
   mobs::MrpcSession clientSession{};
-  mobs::Mrpc client(strOut, strIn, &clientSession, false, true);
+  mobs::Mrpc client(strOut, strIn, &clientSession, false, MrpcServer::SessionMode::speedup);
 
   bool clientConnected = false;
   bool readyRead = false;
@@ -415,6 +415,7 @@ TEST(mrpcTest, reconectSpeedup) {
 
   LOG(LM_INFO, "SRV");
   ASSERT_NO_THROW(server.parseServer());
+  EXPECT_TRUE(server.serverKeepSession());
   LOG(LM_INFO, "XXX S->C " << strOut.str());
 
   LOG(LM_INFO, "CLI");
@@ -461,7 +462,7 @@ TEST(mrpcTest, reconectSpeedup) {
   MrpcServer server2(strIn2, strOut2, pub, priv);
   server2.session->sessionId = server.session->sessionId;
   server2.session->sessionKey = server.session->sessionKey;
-  mobs::Mrpc client2(strOut2, strIn2, &clientSession, false, true);
+  mobs::Mrpc client2(strOut2, strIn2, &clientSession, false, MrpcServer::SessionMode::speedup);
 
   LOG(LM_INFO, "------- reconnect -----");
 
@@ -518,7 +519,7 @@ TEST(mrpcTest, reconectSpeedupFail) {
   MrpcServer server(strIn, strOut, pub, priv);
 
   mobs::MrpcSession clientSession{};
-  mobs::Mrpc client(strOut, strIn, &clientSession, false, true);
+  mobs::Mrpc client(strOut, strIn, &clientSession, false, MrpcServer::SessionMode::speedup);
 
   bool clientConnected = false;
   bool readyRead = false;
@@ -569,7 +570,7 @@ TEST(mrpcTest, reconectSpeedupFail) {
   // Falsche Session Id
   server2.session->sessionId = server.session->sessionId + 1;
   server2.session->sessionKey = server.session->sessionKey;
-  mobs::Mrpc client2(strOut2, strIn2, &clientSession, false, true);
+  mobs::Mrpc client2(strOut2, strIn2, &clientSession, false, MrpcServer::SessionMode::speedup);
 
   LOG(LM_INFO, "------- reconnect -----");
 
@@ -606,7 +607,7 @@ TEST(mrpcTest, reconect) {
   MrpcServer server(strIn, strOut, pub, priv);
 
   mobs::MrpcSession clientSession{};
-  mobs::Mrpc client(strOut, strIn, &clientSession, false);
+  mobs::Mrpc client(strOut, strIn, &clientSession, false, MrpcServer::SessionMode::keep);
 
   bool clientConnected = false;
   bool readyRead = false;
@@ -728,7 +729,7 @@ TEST(mrpcTest, reconectReuse) {
   MrpcServer server(strIn, strOut, pub, priv);
 
   mobs::MrpcSession clientSession{};
-  mobs::Mrpc client(strOut, strIn, &clientSession, false);
+  mobs::Mrpc client(strOut, strIn, &clientSession, false, MrpcServer::SessionMode::keep);
 
   bool clientConnected = false;
   bool readyRead = false;
@@ -851,7 +852,7 @@ TEST(mrpcTest, MrpcRefreshKey) {
   MrpcServer server(strIn, strOut, pub, priv);
 
   mobs::MrpcSession clientSession{};
-  mobs::Mrpc client(strOut, strIn, &clientSession, false);
+  mobs::Mrpc client(strOut, strIn, &clientSession, false, MrpcServer::SessionMode::keep);
 
   bool clientConnected = false;
   LOG(LM_INFO, "CLI");
