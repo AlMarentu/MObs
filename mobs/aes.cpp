@@ -125,6 +125,8 @@ public:
   std::string md_algo;
   std::string passwd;
   std::string id;
+  CryptBufAes::pos_type inPos = 0;
+  CryptBufAes::pos_type outPos = 0;
   bool initIV = false;  // iv aus stream lesen
   bool salted = false;  // iv aus salt generieren und schreiben
   bool finished = false;
@@ -298,6 +300,7 @@ int mobs::CryptBufAes::underflowWorker(bool nowait) {
     }
   }
   Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[len]);
+  data->inPos += len;
   return len;
 }
 
@@ -333,6 +336,7 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::overflow(mobs::CryptBufAes::int_t
       }
       if (data->mdctx)
         EVP_DigestUpdate(data->mdctx, (u_char *) Base::pbase(), std::distance(Base::pbase(), Base::pptr()));
+      data->outPos += std::distance(Base::pbase(), Base::pptr());
 
 //    size_t  s = std::distance(Base::pbase(), Base::pptr());
 //    char *cp =  (Base::pbase());
@@ -404,6 +408,18 @@ size_t mobs::CryptBufAes::iv_size() {
   if (i < 0)
     throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
   return size_t(i);
+}
+
+// für ausschließlich tellp/g verwenden
+mobs::CryptBufAes::pos_type mobs::CryptBufAes::seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which) {
+  //LOG(LM_INFO, "CryptBufAes::seekoff " << off << " " << dir << " " << which);
+  if (dir != std::ios_base::cur or off != 0)
+    return pos_type(off_type(-1));
+  if (which & std::ios_base::out)
+    return pos_type(data->outPos - off_type(std::distance(Base::pbase(), Base::pptr())));
+  if (which & std::ios_base::in)
+    return pos_type(data->inPos - off_type(std::distance(Base::gptr(), Base::egptr())));
+  return pos_type(off_type(-1));
 }
 
 

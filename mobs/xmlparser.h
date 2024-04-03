@@ -966,10 +966,10 @@ public:
       throw std::runtime_error("no mobs::CryptIstrBuf");
     istr.clear();
     binaryBuffer = std::unique_ptr<mobs::BinaryIstBuf>(new BinaryIstBuf(*wbufp, len + 1)); // plus delimiter
-    if (binaryBuffer->in_avail() <= 0)
+    if (nonblocking and binaryBuffer->in_avail() <= 0)
       throw std::runtime_error("delimiter missing");
     if (binaryBuffer->sgetc() != mobs::BinaryIstBuf::Traits::to_int_type('\200'))
-        THROW("delimiter mismatch " << std::hex << binaryBuffer->sgetc());
+        THROW("delimiter mismatch");
     binaryBuffer->sbumpc();
     if (cbbp) {
       binaryFiltStream = std::unique_ptr<std::istream>(new std::istream(binaryBuffer.get()));

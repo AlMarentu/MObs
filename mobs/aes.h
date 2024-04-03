@@ -65,7 +65,7 @@ public:
   explicit CryptBufAes(const std::string &pass, const std::string &id = "");
   /** \brief Konstruktor für Verschlüsselung mit AES-256 und passphrase
    *
-   * Key unf IV sind vorgegeben, Ver- und Entschlüsselung möglich
+   * Key und IV sind vorgegeben, Ver- und Entschlüsselung möglich
    * @param key 32-Byte Schlüssel (key_size())
    * @param iv Initialer Vektor der Größe iv_size()
    * @param id Id des Empfängers (falls für Export benötigt)
@@ -134,6 +134,8 @@ public:
 
 protected:
   std::streamsize showmanyc() override;
+
+  pos_type seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which) override;
 
 //  virtual int sync() override;
 //  virtual std::streamsize xsputn( const char_type* s, std::streamsize count ) override;

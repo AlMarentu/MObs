@@ -224,9 +224,9 @@ std::ostream &Mrpc::outByteStream()
   return writer.byteStream("\200", new mobs::CryptBufAes(session->sessionKey, iv, "", true));
 }
 
-void Mrpc::closeOutByteStream()
+std::streamsize Mrpc::closeOutByteStream()
 {
-  writer.closeByteStream();
+  return writer.closeByteStream();
 }
 
 

@@ -80,8 +80,11 @@ public:
   std::istream &inByteStream(size_t sz);
   /// Senden eines Byte-streams; der XML-Stream darf dabei nicht verschlüsselt sein
   std::ostream &outByteStream();
-  /// Senden eines Byte-streams beenden
-  void closeOutByteStream();
+ /** \brief Senden eines Byte-streams beenden
+  *
+  * @return Anzahl der übertragenen Bytes oder -1 wenn vom darunterliegenden Stream nicht unterstützt
+  */
+  std::streamsize closeOutByteStream();
 
   /** \brief Arbeitsroutine des Clients für den Initialisierungsvorgang
    *

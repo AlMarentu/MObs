@@ -55,6 +55,7 @@ public:
   stringstream cryptss;
   wstringstream wstrBuff; // buffer für u8-Ausgabe in std::string
   std::unique_ptr<std::ostream> binaryStream;
+  std::ostream::pos_type binaryStart = 0;
 
   void setConFun() {
     std::locale lo;
@@ -131,27 +132,36 @@ public:
       binaryStream = std::unique_ptr<std::ostream>(new std::ostream(cbbp));
       if (delimiter)
         wbufp->getOstream() << delimiter;
+      binaryStart = binaryStream->tellp();
       cbbp->setOstr(wbufp->getOstream());
       return *binaryStream;
     } else {
       if (delimiter)
         wbufp->getOstream() << delimiter;
+      binaryStart = wbufp->getOstream().tellp();
       return wbufp->getOstream();
     }
   }
 
-  void closeByteStream() {
+  std::streamsize closeByteStream() {
     if (binaryStream) {
       binaryStream->flush();
+      std::streamsize size = binaryStream->tellp();
+      if (size >= 0 and binaryStart >= 0)
+        size -= binaryStart;
+      else
+        size = -1;
       if (auto sp = dynamic_cast<CryptBufBase *>(binaryStream->rdbuf())) {
         sp->finalize();
       }
       binaryStream = nullptr;
+      return size;
     }
+    return -1;
   }
 
 
-  };
+};
 
 
 
@@ -462,9 +472,9 @@ std::ostream &XmlWriter::byteStream(const char *delimiter, CryptBufBase *cbbp)
   return data->byteStream(delimiter, cbbp);
 }
 
-void XmlWriter::closeByteStream()
+std::streamsize XmlWriter::closeByteStream()
 {
-  data->closeByteStream();
+  return data->closeByteStream();
 }
 
 

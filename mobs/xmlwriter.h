@@ -112,8 +112,8 @@ public:
   void pushTag(const std::wstring &tag);
   /// Schreibe binäre Daten in den output stream, bei bedarf mit Verschlüsselung; der delimiter wird vorangestellt
   std::ostream &byteStream(const char *delimiter = nullptr, CryptBufBase *cbbp = nullptr);
-  /// Schließe den binären stream wieder
-  void closeByteStream();
+  /// Schließe den binären stream wieder und liefere die Anzahl übertragener Bytes wenn unterstützt, ansonsten -1
+  std::streamsize closeByteStream();
 
   std::wstring valueToken; ///< Wenn nicht leer, dann als Attributname für Values verwenden
   std::wstring version = L"1.0"; ///< Version für Header
