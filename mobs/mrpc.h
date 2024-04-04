@@ -81,8 +81,9 @@ public:
   std::istream &inByteStream(size_t sz);
   /// Senden eines Byte-streams; der XML-Stream darf dabei nicht verschlüsselt sein
   std::ostream &outByteStream();
- /** \brief Senden eines Byte-streams beenden
+ /** \brief Senden eines Byte-streams beenden (ohne flush())
   *
+  * Die gesendete Anzahl der Bytes sollte überprüft werden.
   * @return Anzahl der übertragenen Bytes oder -1 wenn vom darunterliegenden Stream nicht unterstützt
   */
   std::streamsize closeOutByteStream();
@@ -98,7 +99,8 @@ public:
    * @param privkey private key der Clients
    * @param passphrase passphrase des private keys
    * @param serverkey public key des Servers, bei leer autudetection und Rückgabe des Keys im PEM-Format
-   * @return connected wenn isConnected==false dürfen keine Anfragen bearbeitet werden
+   * @return connected; wenn isConnected==false dürfen keine Anfragen bearbeitet werden
+   * \throws runtime_error wenn ein Fehler im Stream bzw im Login/Reconnect aufgetreten ist;
    */
   bool waitForConnected(const std::string &keyId, const std::string &software, const std::string &privkey,
                         const std::string &passphrase, std::string &serverkey);
@@ -112,7 +114,7 @@ public:
   */
   bool parseClient();
 
-  /** \brief Client-Kommando zum Schließen der Session, danach ist kein reconnect möglich
+  /** \brief Client-Kommando zum Schließen der Kommando-Sequence
    *
    */
   void closeServer();
@@ -132,6 +134,7 @@ public:
    * @param cipher verschlüsselte Info des Logins
    * @param info allgemeine Info oder Fehlermeldung
    * @return Name des public clientKey bzw. der Key im PEM-Format;  "" falls kein Login möglich
+   * \throws runtime_error bei Fehler
    */
   virtual std::string loginReceived(const std::vector<u_char> &cipher, std::string &info) { info = "not implemented"; return {}; }
   /** \brief callback für Server: Eingang einer reconnect-Anforderung auf eine bestehende SessionId
@@ -148,23 +151,12 @@ public:
    */
   virtual void getPupKeyReceived(std::string &key, std::string &info) { info = "not implemented";  }
 
-  /// \private
-  void StartTag(const std::string &element) override;
-  /// \private
-  void EndTag(const std::string &element) override;
-  /// \private
-  void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, CryptBufBase *&cryptBufp) override;
-  /// \private
-  void EncryptionFinished() override;
-  /// \private
-  void filled(mobs::ObjectBase *obj, const std::string &error) override;
-
-  /// senden eines Objektes ohne writer.sync()
+  /// senden eines Objektes ohne flush()
   void xmlOut(const mobs::ObjectBase &obj);
+  /// senden der write-Buffers
+  void flush();
   /// Rückgabe, ob das zuletzt ausgewertete Objekt verschlüsselt war
   bool isEncrypted() const { return  encrypted; }
-  /// \private
-  void receiveSessionKey(const std::vector<u_char> &cipher, const std::string &privkey, const std::string &pass);
   /** \brief analysiert die empfangene Login-Information Server-seitig
    *
    * anhand der loginId kann dann der public key des Clients (Pfad oder PEM) ermittelt werden.
@@ -200,12 +192,24 @@ public:
   std::wistream iStr; ///< \private
   std::wostream oStr; ///< \private
   XmlWriter writer; ///< das Writer-Objekt wür die Ausgabe
-  MrpcSession *session; ///< Zeiger auf ein MrpcSession - Info; muss zwingend existieren
+  MrpcSession *session; ///< Zeiger auf ein MrpcSession - darf nicht nullptr sein
   SessionMode sessionMode; ///< Modus für die Session-Verwaltung
   std::unique_ptr<mobs::ObjectBase> resultObj; ///< Das zuletzt empfangene Objekt; muss nach Verwendung auf nullptr gesetzt werden
 
   static int sessionServerReuseTime; ///< Zeit in Sekunden, die eine Session wiederverwendet werden kann (für den Server)
   static int sessionKeyValidTime; ///< Zeit in Sekunden, die ein Session-Key gültig ist (für den Server)
+
+protected:
+  /// \private
+  void StartTag(const std::string &element) override;
+  /// \private
+  void EndTag(const std::string &element) override;
+  /// \private
+  void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, CryptBufBase *&cryptBufp) override;
+  /// \private
+  void EncryptionFinished() override;
+  /// \private
+  void filled(mobs::ObjectBase *obj, const std::string &error) override;
 
 private:
   bool encrypted = false;
@@ -214,7 +218,7 @@ private:
 
   // erzeugt Sessionkey für Server, übernimmt sessionId; returniert cipher für receiveSessionKey()
   std::vector<u_char> generateSessionKey(const std::string &clientkey);
-
+  void receiveSessionKey(const std::vector<u_char> &cipher, const std::string &privkey, const std::string &pass);
   void sendNewSessionKey();
   void tryReconnect();
 

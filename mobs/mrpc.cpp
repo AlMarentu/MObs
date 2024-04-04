@@ -368,6 +368,11 @@ void Mrpc::closeServer()
   writer.sync();
 }
 
+void Mrpc::flush()
+{
+  writer.sync();
+}
+
 // Server
 bool Mrpc::parseServer()
 {

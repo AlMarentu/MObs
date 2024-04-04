@@ -157,7 +157,7 @@ public:
       binaryStream = nullptr;
       return size;
     }
-    return -1;
+    return 0;
   }
 
 
