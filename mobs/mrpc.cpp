@@ -258,6 +258,8 @@ void Mrpc::receiveSessionKey(const std::vector<u_char> &cipher, const std::strin
   session->sessionReuseTime = result.sessionReuseTime();
   session->generated = time(nullptr);
   session->keyValidTime = result.sessionKeyValidTime();
+  LOG(LM_DEBUG, "Received Session Key " << session->sessionId << " " << session->info << " reuse="
+                                           << session->sessionReuseTime << " valid=" << session->keyValidTime);
 }
 
 std::string Mrpc::receiveLogin(const std::vector<u_char> &cipher, const std::string &privkey, const std::string &passwd,
@@ -562,6 +564,8 @@ bool Mrpc::parseClient()
     session->keyValidTime = refKey->sessionKeyValidTime();
     session->info = refKey->info();
     session->generated = time(nullptr);
+    LOG(LM_DEBUG, "Changed Session Key " << session->sessionId << " " << session->info << " reuse="
+                                             << session->sessionReuseTime << " valid=" << session->keyValidTime);
     resultObj = nullptr;
     // readyRead-State verhindern
     if (state == readyRead)
@@ -583,6 +587,8 @@ bool Mrpc::waitForConnected(const std::string &keyId, const std::string &softwar
     throw std::runtime_error("session missing");
   switch (state) {
     case fresh:
+      LOG(LM_DEBUG, "Start Session " << session->sessionId  << " reuse="
+                                           << session->sessionReuseTime << " valid=" << session->keyValidTime);
       if (session->sessionReuseTime > 0 and session->sessionId > 0 and not session->sessionKey.empty() and session->last and
           session->last + session->sessionReuseTime > time(nullptr)) {
         LOG(LM_DEBUG, "Reconnect");
@@ -639,7 +645,6 @@ bool Mrpc::waitForConnected(const std::string &keyId, const std::string &softwar
         state = connectingClient;
       } else if (auto *sess = dynamic_cast<MrpcSessionLogin *>(resultObj.get())) {
         receiveSessionKey(sess->cipher(), privkey, passphrase);
-        LOG(LM_DEBUG, "Connection establised ID " << session->sessionId << " " << session->info);
         state = connected;
         resultObj = nullptr;
       } else if (auto *sess = dynamic_cast<MrpcGetPublickey *>(resultObj.get())) {
