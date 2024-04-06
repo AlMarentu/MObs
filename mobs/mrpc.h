@@ -58,6 +58,8 @@ public:
   enum SessionMode { dontKeep, keep, speedup }; ///< Modus für die Session-Verwaltung im Client
   /** \brief Konstruktor für Client
    *
+   * Soll der Server einen Reconnect anbieten, so muss session->sessionReuseTime gesetzt sein und der Server die
+   * reconnectReceived-Methode implementieren.
    * @param inStr Eingabestream
    * @param outStr Ausgabestream
    * @param mrpcSession Zeiger auf die Session-Info, darf nicht null sein
@@ -195,9 +197,6 @@ public:
   MrpcSession *session; ///< Zeiger auf ein MrpcSession - darf nicht nullptr sein
   SessionMode sessionMode; ///< Modus für die Session-Verwaltung
   std::unique_ptr<mobs::ObjectBase> resultObj; ///< Das zuletzt empfangene Objekt; muss nach Verwendung auf nullptr gesetzt werden
-
-  static int sessionServerReuseTime; ///< Zeit in Sekunden, die eine Session wiederverwendet werden kann (für den Server)
-  static int sessionKeyValidTime; ///< Zeit in Sekunden, die ein Session-Key gültig ist (für den Server)
 
 protected:
   /// \private

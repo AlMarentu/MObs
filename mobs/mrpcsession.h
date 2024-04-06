@@ -47,8 +47,8 @@ public:
   time_t generated = 0; ///< Erzeugung des Keys; wird vom Mrpc verwaltet
   std::string info; ///< Info über Login-Informationen im Server
   std::string publicServerKey; ///< hier kann der öffentliche Schlüssel als PEM abgelegt werden; muss in der Client-Anwendung erfolgen
-  int sessionReuseTime = 0; ///< Zeit in Sekunden, die eine Session wiederverwendet werden kann; wird vom Mrpc verwaltet
-  int keyValidTime = 0; ///< Zeit in Sekunden, die der sessionKey seit Erzeugung gültig ist wenn > 0; wird vom Mrpc verwaltet
+  int sessionReuseTime = 0; ///< Zeit in Sekunden, die eine Session wiederverwendet werden kann, wenn > 0; muss im Server gesetzt werden, im Client wird sie automatisch verwaltet
+  int keyValidTime = 0; ///< Zeit in Sekunden, die der sessionKey seit Erzeugung gültig ist wenn > 0; muss im Server gesetzt werden, im Client wird sie automatisch verwaltet
 };
 
 }

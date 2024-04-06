@@ -79,6 +79,7 @@ public:
     }
 
     session->sessionId = 1;
+    session->sessionReuseTime = 120;
     return pubKey; // identisch mit clientkey
   }
 

@@ -96,8 +96,6 @@ public:
 
 }
 
-int Mrpc::sessionServerReuseTime = 120;
-int Mrpc::sessionKeyValidTime = 0;  // 0 = unbegrenzt
 
 std::string MrpcSession::host() const
 {
@@ -241,6 +239,7 @@ Mrpc::Mrpc(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, 
   readTillEof(false);
   readNonBlocking(nonBlocking);
   oStr.exceptions(std::wostream::failbit | std::wostream::badbit);
+  iStr.exceptions(std::wostream::failbit | std::wostream::badbit);
 }
 
 
@@ -288,14 +287,13 @@ std::vector<u_char> Mrpc::generateSessionKey(const std::string &clientkey)
   result.sessId(session->sessionId);
   if (session->sessionReuseTime > 0)
     result.sessionReuseTime(session->sessionReuseTime);
-  if (sessionKeyValidTime > 0)
-    result.sessionKeyValidTime(sessionKeyValidTime);
+  if (session->keyValidTime > 0)
+    result.sessionKeyValidTime(session->keyValidTime);
   session->sessionKey.resize(mobs::CryptBufAes::key_size());
   mobs::CryptBufAes::getRand(session->sessionKey);
   result.key(session->sessionKey);
   session->generated = time(nullptr);
   session->keyName = clientkey;
-  session->keyValidTime = sessionKeyValidTime;
 
   std::string buffer = result.to_string(mobs::ConvObjToString().exportJson().noIndent());
   std::vector<u_char> inhalt;
@@ -311,17 +309,16 @@ void Mrpc::sendNewSessionKey() // Server
   std::vector<u_char> newKey;
   newKey.resize(mobs::CryptBufAes::key_size());
   mobs::CryptBufAes::getRand(newKey);
-  if (sessionServerReuseTime > 0)
-    result.sessionReuseTime(sessionServerReuseTime);
-  if (sessionKeyValidTime > 0)
-    result.sessionKeyValidTime(sessionKeyValidTime);
+  if (session->sessionReuseTime > 0)
+    result.sessionReuseTime(session->sessionReuseTime);
+  if (session->keyValidTime > 0)
+    result.sessionKeyValidTime(session->keyValidTime);
   result.key(newKey);
   //result.info();
   LOG(LM_INFO, "Refresh session key " << session->sessionId << " " << session->info);
   sendSingle(result); // mit altem Schlüssel versenden, dann wird der neue Schlüssel verwendet
   session->sessionKey = newKey;
   session->generated = time(nullptr);
-  session->keyValidTime = sessionKeyValidTime;
 }
 
 void Mrpc::refreshSessionKey()  // Client
@@ -400,19 +397,18 @@ bool Mrpc::parseServer()
         LOG(LM_ERROR, "SESSIONERROR (ignored) " << sess->error.toStr(mobs::ConvObjToString()));
       } else if (auto *sess = dynamic_cast<MrpcSessionLogin *>(resultObj.get())) {
         LOG(LM_DEBUG, "LOGIN ");
-        if (not session)
-          throw std::runtime_error("session missing");
-        if (sessionServerReuseTime > 0 and not sess->dontKeep())
-          session->sessionReuseTime = sessionServerReuseTime;
-        else
-          session->sessionReuseTime = 0;
         std::string info;
         std::string key;
         MrpcSessionLogin answer;
         try {
           key = loginReceived(sess->cipher(), info);
-          if (not key.empty())
+          if (not key.empty()) {
+            if (not session)
+              throw std::runtime_error("session missing");
+            if (sess->dontKeep())
+              session->sessionReuseTime = 0;
             answer.cipher(generateSessionKey(key));
+          }
         } catch (std::exception &e) {
           LOG(LM_ERROR, "ParseServer exception " << e.what());
           info = "login procedure failed";
