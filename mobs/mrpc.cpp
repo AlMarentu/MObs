@@ -206,6 +206,12 @@ void Mrpc::EndTag(const std::string &element)
     state = readyRead;
 }
 
+bool Mrpc::inByteStreamAvail() {
+  // es muss mindestens ein Zeichen im Puffer sein, für den Delimiter
+  auto s = streambufI.getIstream().rdbuf()->in_avail();
+  return s > 0;
+}
+
 std::istream &Mrpc::inByteStream(size_t sz)
 {
   LOG(LM_DEBUG, "Mrpc::inByteStream " << mobs::CryptBufAes::aes_size(sz));

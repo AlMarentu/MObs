@@ -79,6 +79,8 @@ public:
   /// beende Verschlüsselung
   void stopEncrypt();
 
+  /// für den non-blocking Modus: Rückgabe, ob ein Byte-Stream verfügbar ist
+  bool inByteStreamAvail();
   /// Einlesen eines Byte-streams der Größe sz
   std::istream &inByteStream(size_t sz);
   /// Senden eines Byte-streams; der XML-Stream darf dabei nicht verschlüsselt sein
