@@ -1024,7 +1024,6 @@ BinaryIstBuf::int_type BinaryIstBuf::underflow() {
   TRACE("");
   if (not data->binaryLength)
     return Traits::eof();
-  std::streamsize sz = 0;
   try {
     auto sz = data->underflow(); // immer >= 0 oder exception
     Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[sz]);

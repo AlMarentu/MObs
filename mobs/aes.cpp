@@ -190,7 +190,10 @@ std::streamsize mobs::CryptBufAes::showmanyc() {
   std::streamsize s = canRead();
   if (s == 0)
     return 0;
-  return underflowWorker(true);
+  auto sz = underflowWorker(true);
+  if (sz == 0)
+    return data->finished ? -1 : 0;
+  return sz;
 }
 
 /*
