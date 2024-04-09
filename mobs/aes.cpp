@@ -451,7 +451,7 @@ std::string mobs::from_aes_string(const std::string &s, const std::string &pass)
   while (not xStrIn.get(c).eof())
     res += u_char(c);
   return res;
- }
+}
 
 
 

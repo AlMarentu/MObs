@@ -215,7 +215,6 @@ protected:
 private:
   bool encrypted = false;
   State state = fresh;
-  // TODO evtl auch Ablaufzeit der Session vom Server empfangen
 
   // erzeugt Sessionkey für Server, übernimmt sessionId; returniert cipher für receiveSessionKey()
   std::vector<u_char> generateSessionKey(const std::string &clientkey);

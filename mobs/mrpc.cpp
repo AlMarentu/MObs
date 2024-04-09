@@ -194,7 +194,7 @@ void Mrpc::StartTag(const std::string &element)
       fill(new MrpcSessionReturnError);
     else if ((state == reconnectingClient or state == reconnectingClientTest) and element == "MrpcSessionTestConnection")
       fill(new MrpcSessionTestConnection);
-    else if (state != reconnectingClient or element != "methodResponse")
+    else if ((state != reconnectingClient and state != reconnectingClientTest) or element != "methodResponse")
       LOG(LM_WARNING, "unknown element " << element);
   }
 }

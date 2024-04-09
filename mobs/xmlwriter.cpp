@@ -435,19 +435,19 @@ void XmlWriter::stopEncrypt() {
   if (data->cryptSwap) {
     if (auto r = dynamic_cast<mobs::CryptOstrBuf *>(data->buffer.rdbuf()))
       r->swapBuffer(data->cryptSwap);
-      data->cryptSwap = nullptr;
+    data->cryptSwap = nullptr;
   } else if (data->cryptBufp) {
-      data->cryptBufp->finalize();
-      const string &buf = data->cryptss.str();
-      // Wenn auf den Ziel-Buffer des mobs::CryptOstrBuf geschrieben wurde, ist buf hier leer
-      for (auto c: buf)
-          data->buffer.put(c);
-      delete data->wostr;
-      data->cryptBufp = nullptr;
-      data->cryptss.clear();
-      data->wostr = &data->buffer;
+    data->cryptBufp->finalize();
+    const string &buf = data->cryptss.str();
+    // Wenn auf den Ziel-Buffer des mobs::CryptOstrBuf geschrieben wurde, ist buf hier leer
+    for (auto c: buf)
+      data->buffer.put(c);
+    delete data->wostr;
+    data->cryptBufp = nullptr;
+    data->cryptss.clear();
+    data->wostr = &data->buffer;
   } else
-      return;
+    return;
 
   std::wstring pfx;
   data->prefix.swap(pfx);
