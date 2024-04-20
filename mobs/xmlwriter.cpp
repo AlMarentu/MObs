@@ -230,8 +230,12 @@ void XmlWriter::writeAttribute(const std::wstring &attribute, const std::wstring
     switch (c)
     {
       case '<': *data->wostr << L"&lt;"; break;
+      case '>': *data->wostr << L"&gt;"; break;
       case '"': *data->wostr << L"&quot;"; break;
       case '&': *data->wostr << L"&amp;"; break;
+      case 0xD800 ... 0xDFFF:
+      case 0xFFFE ... 0xFFFF:
+      case 0x110000 ... 0x7FFFFFFF:
       case 0 ... 0x1f: *data->wostr << L"&#x" << hex << int(c) << L';'; break;
       default: data->write(c);
     }
@@ -246,7 +250,19 @@ void XmlWriter::writeValue(const std::wstring &value) {
       case '<': *data->wostr << L"&lt;"; break;
       case '>': *data->wostr << L"&gt;"; break;
       case '&': *data->wostr << L"&amp;"; break;
-      case 0 ... 0x1f: if (escapeControl) { *data->wostr << L"&#x" << hex << int(c) << L';'; break; }
+      case 0 ... 8:
+      case 11:
+      case 12:
+      case 14 ... 0x1f:
+      case 0xD800 ... 0xDFFF:
+      case 0xFFFE ... 0xFFFF:
+      case 0x110000 ... 0x7FFFFFFF:
+        *data->wostr << L"&#x" << hex << int(c) << L';';
+        break;
+      case '\r':
+      case '\n':
+      case '\t':
+        if (escapeControl) { *data->wostr << L"&#x" << hex << int(c) << L';'; break; }
       default: data->write(c);
     }
   data->hasValue = true;
