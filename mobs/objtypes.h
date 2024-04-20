@@ -129,18 +129,39 @@ public: \
 
 namespace mobs {
 
-/// String-Konvertierung
-/// @param val Wert in utf8
-/// @return Wert als u32string
+/** \brief String-Konvertierung
+ *
+ * @param val Wert in utf8
+ * @return Wert als u32string
+ */
 std::u32string to_u32string(std::string val);
 
-/// String in Anführungszeichen (") setzen mit escaping
-/// @param s Wert in utf8
+/** \brief String in Anführungszeichen (") setzen mit escaping
+ *
+ * Es werden nur die Zeichen \0, ' und \ escaped
+ * @param s in UTF8
+ * @return
+ */
 std::string to_quote(const std::string &s);
 
-/// String in einfache (') Anführungszeichen setzen mit escaping
-/// @param s Wert in utf8
+/** \brief String in einfache (') Anführungszeichen setzen mit escaping
+ *
+ * Es werden nur die Zeichen \0, ' und \ escaped
+ * @param s in UTF8
+ * @return
+ */
 std::string to_squote(const std::string &s);
+
+
+/** \brief String in Anführungszeichen (") setzen mit escaping für JSON (nach RFC 8259)
+ *
+ * es werden alle Zeichen escaped, die in JSON nach RFC 8259 escaped werden müssen
+ * Dies beinhalet auch die Zeichen \b, \f, \n, \r, \t, \v  und \uXXXX für X < 0x20
+ * @param s in UTF8
+ * @return
+ */
+ std::string to_quoteJson(const std::string &s);
+
 
 //template <typename T>
 //std::string to_string(T t) { std::stringstream s; s << t; return s.str(); };
@@ -163,7 +184,7 @@ std::string to_string(std::wstring t);
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(char t) { return std::string() + t; }
+inline std::string to_string(char t) { if (t) return  std::string() + t; return {}; }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
@@ -175,15 +196,15 @@ inline std::string to_string(unsigned char t) { return to_string(char(t)); }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(char16_t t) { return to_string(std::u16string() + t); }
+inline std::string to_string(char16_t t) { if (t) return to_string(std::u16string() + t); return {}; }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(char32_t t) { return to_string(std::u32string() + t); }
+inline std::string to_string(char32_t t) { if (t) return to_string(std::u32string() + t); return {}; }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(wchar_t t) { return to_string(std::wstring() + t); }
+inline std::string to_string(wchar_t t) { if (t) return to_string(std::wstring() + t); return {}; }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
@@ -272,7 +293,7 @@ inline std::wstring to_wstring(const std::wstring &t) { return t; }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(wchar_t t) { if (t < 0 or t > 0x10FFFF) return L"\uFFFD"; else return std::wstring() + t; }
+inline std::wstring to_wstring(wchar_t t) { if (t < 0 or t > 0x10FFFF) return L"\uFFFD"; else if (t) return std::wstring() + t; return {}; }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring

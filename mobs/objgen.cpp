@@ -1132,7 +1132,7 @@ public:
     if (mem.isNull())
       res << "null";
     else if (mem.is_chartype(cth))
-      res << mobs::to_quote(mem.toStr(cth));
+      res << mobs::to_quoteJson(mem.toStr(cth));
     else
       res << mem.toStr(cth);
     needBreak = true;

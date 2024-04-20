@@ -25,6 +25,7 @@
 #define MOBS_JSONPARSER_H
 
 #include "logging.h"
+#include "objtypes.h"
 #include<stack>
 #include<exception>
 #include<iostream>
@@ -170,8 +171,45 @@ public:
               break;
             if (peek() == '\\')
             {
+              std::string u;
               eat();
-              element += peek();
+              switch (peek()) // alle möglichen Escapes in JSON (nach RFC 8259)
+              {
+                case 'u':
+                  eat();
+                  u += peek();
+                  eat();
+                  u += peek();
+                  eat();
+                  u += peek();
+                  eat();
+                  u += peek();
+                  element += mobs::to_string(wchar_t(std::stoi(u, nullptr, 16)));
+                  break;
+                case '0':
+                  element += '\0';
+                  break;
+                case 'b':
+                  element += '\b';
+                  break;
+                case 'f':
+                  element += '\f';
+                  break;
+                case 'n':
+                  element += '\n';
+                  break;
+                case 'r':
+                  element += '\r';
+                  break;
+                case 't':
+                  element += '\t';
+                  break;
+                case 'v':
+                  element += '\v';
+                  break;
+                default:
+                  element += peek();
+              }
             }
           }
           eat();

@@ -28,7 +28,6 @@
 #include <ctime>
 #include <chrono>
 #include <iomanip>
-
 //#include <iostream>
 
 using namespace std;
@@ -46,15 +45,59 @@ std::u32string to_u32string(std::string val) {
   return c.from_bytes(val);
 }
 
+// alle möglichen Escapes in JSON (nach RFC 8259)
+std::string to_quoteJson(const std::string &s) {
+  string result;
+  result.reserve(s.size() + 2);
+  result = "\"";
+  for (const auto c: s) {
+    switch (c) {
+      case '"':
+        result += "\\\"";
+        break;
+      case '\\':
+        result += "\\\\";
+        break;
+      case '\b': // 010
+        result += "\\b";
+        break;
+      case '\t': // 011
+        result += "\\t";
+        break;
+      case '\n': // 012
+        result += "\\n";
+        break;
+      case '\f': // 014
+        result += "\\f";
+        break;
+      case '\r': // 015
+        result += "\\r";
+        break;
+      case '\0': case '\1': case '\2': case '\3': case '\4': case '\5': case '\6': case '\7':
+      case '\13': case '\16': case '\17':
+      case '\20': case '\21': case '\22': case '\23': case '\24': case '\25': case '\26': case '\27':
+      case '\30': case '\31': case '\32': case '\33': case '\34': case '\35': case '\36': case '\37':
+        result += "\\u00";
+        result += STRSTR(std::hex << std::setw(2) << std::setfill('0') << (int)c);
+        break;
+      default:
+        result += c;
+    }
+  }
+  result += '"';
+  return result;
+}
+
+
 std::string to_quote(const std::string &s) {
   string result = "\"";
-  if (s.length() > 1 or s[0] != 0)
+  if (not s.empty())
   {
     size_t pos = 0;
     size_t pos2 = 0;
-    while ((pos = s.find_first_of("\"\\", pos2)) != string::npos)
+    while ((pos = s.find_first_of(string("\"\\\0", 3), pos2)) != string::npos)
     {
-      result += s.substr(pos2, pos - pos2) + "\\" + s[pos];
+      result += s.substr(pos2, pos - pos2) + "\\" + (s[pos] ? s[pos] : '0');
       pos2 = pos+1;
     }
     result += s.substr(pos2);
@@ -65,13 +108,13 @@ std::string to_quote(const std::string &s) {
 
 std::string to_squote(const std::string &s) {
   string result = "'";
-  if (s.length() > 1 or s[0] != 0)
+  if (not s.empty())
   {
     size_t pos = 0;
     size_t pos2 = 0;
-    while ((pos = s.find_first_of("\'\\", pos2)) != string::npos)
+    while ((pos = s.find_first_of(string("\'\\\0", 3), pos2)) != string::npos)
     {
-      result += s.substr(pos2, pos - pos2) + "\\" + s[pos];
+      result += s.substr(pos2, pos - pos2) + "\\" + (s[pos] ? s[pos] : '0');
       pos2 = pos+1;
     }
     result += s.substr(pos2);

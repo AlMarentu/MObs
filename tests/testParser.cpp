@@ -37,11 +37,12 @@ class JParser: public mobs::JsonParser {
 public:
   explicit JParser(const string &i) : mobs::JsonParser(i) {};
   void Key(const std::string &value) override { LOG(LM_INFO, "KEY " << value); };
-  void Value(const std::string &value, bool charType) override { LOG(LM_INFO, "VALUE " << value); }
+  void Value(const std::string &value, bool charType) override { LOG(LM_INFO, "VALUE " << value); lastValue = value; };
   void StartArray() override { LOG(LM_INFO, "START ARRAY"); }
   void EndArray() override { LOG(LM_INFO, "END ARRAY"); }
   void StartObject() override { LOG(LM_INFO, "START OBJECT"); }
   void EndObject() override { LOG(LM_INFO, "END OBJECT"); }
+  string lastValue;
 };
 
 class XParser: public mobs::XmlParser {
@@ -116,6 +117,8 @@ TEST(parserTest, jsonParser) {
 
 void parse(string s) { JParser p(s); p.parse(); };
 
+std::string parseValue(string s) { JParser p(s); p.parse(); return p.lastValue; };
+
 TEST(parserTest, jsonStruct1) {
   
   EXPECT_NO_THROW(parse(u8"{}"));
@@ -132,6 +135,9 @@ TEST(parserTest, jsonStruct1) {
   EXPECT_ANY_THROW(parse(u8"{a,b}"));
   EXPECT_ANY_THROW(parse(u8"{a:[a:b]}"));
   EXPECT_ANY_THROW(parse(u8"{a:[a,b,]}"));
+  EXPECT_EQ(u8"1", parseValue(u8"{\"a\":1}"));
+  EXPECT_EQ(u8"Ot\tt€o", parseValue(u8"{\"a\":\"Ot\\tt\\u20aco\"}")); // u+20ac = €
+  EXPECT_EQ(u8"1\n2\t3", parseValue(u8"{\"a\":\"1\\n2\\t3\"}"));
 
 }
 

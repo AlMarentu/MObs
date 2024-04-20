@@ -119,7 +119,13 @@ ObjRegister(Person)
 //    luzifer.nullAllowed(true); luzifer.setNull(true); keylist << peter << otto; };
 //};
 
+class Buchstabe : virtual public mobs::ObjectBase {
+public:
+  ObjInit(Buchstabe);
 
+  MemVar(char32_t, buchstabe, USENULL);
+  MemVar(std::string, htmlTag);
+};
 
 
 TEST(objgenTest, leer) {
@@ -184,6 +190,29 @@ TEST(objgenTest, chartype) {
   EXPECT_TRUE(dt.Wstring.is_chartype(cth));
   EXPECT_TRUE(dt.U16string.is_chartype(cth));
   EXPECT_TRUE(dt.U32string.is_chartype(cth));
+}
+
+TEST(objgenTest, escaping) {
+  Buchstabe sz;
+  sz.buchstabe(L'ß');
+  sz.htmlTag(u8"&szlig;");
+  EXPECT_EQ( R"({buchstabe:"ß",htmlTag:"&szlig;"})", sz.to_string());
+  Buchstabe null;
+  null.buchstabe(L'\0');
+  null.htmlTag(u8"");
+  EXPECT_EQ( R"({buchstabe:"",htmlTag:""})", null.to_string());
+  EXPECT_EQ(null.to_string(mobs::ConvObjToString().exportXml()),
+            R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?><root><buchstabe></buchstabe><htmlTag></htmlTag></root>)");
+  null.buchstabe.forceNull();
+  EXPECT_EQ( R"({buchstabe:null,htmlTag:""})", null.to_string());
+  EXPECT_EQ(null.to_string(mobs::ConvObjToString().exportXml()),
+            R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?><root><buchstabe/><htmlTag></htmlTag></root>)");
+
+  null.htmlTag(u8"Newline\nim String");
+  EXPECT_EQ( R"({buchstabe:null,htmlTag:"Newline\nim String"})", null.to_string());
+  EXPECT_EQ(null.to_string(mobs::ConvObjToString().exportXml()),
+            R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?><root><buchstabe/><htmlTag>Newline
+im String</htmlTag></root>)");
 }
 
 TEST(objgenTest, emptyVars) {

@@ -57,7 +57,7 @@ TEST(objtypeTest, to_string) {
 TEST(objtypeTest, to_quote) {
   EXPECT_EQ(u8"\"\"", mobs::to_quote(""));
   EXPECT_EQ(u8"\"a\"", mobs::to_quote("a"));
-  EXPECT_EQ(u8"\"\"", mobs::to_quote("\0"));
+  EXPECT_EQ(u8"\"\\0\"", mobs::to_quote(std::string("\0", 1)));
   EXPECT_EQ(u8"\"abc\"", mobs::to_quote("abc"));
   EXPECT_EQ(u8"\"ab\\\"cd\\\"ef\"", mobs::to_quote("ab\"cd\"ef"));
 }
@@ -65,9 +65,18 @@ TEST(objtypeTest, to_quote) {
 TEST(objtypeTest, to_squote) {
   EXPECT_EQ(u8"''", mobs::to_squote(""));
   EXPECT_EQ(u8"'a'", mobs::to_squote("a"));
-  EXPECT_EQ(u8"''", mobs::to_squote("\0"));
+  EXPECT_EQ(u8"'\\0'", mobs::to_squote(std::string("\0", 1)));
   EXPECT_EQ(u8"'abc'", mobs::to_squote("abc"));
   EXPECT_EQ(u8"'ab\\'cd\\'ef'", mobs::to_squote("ab'cd'ef"));
+}
+
+TEST(objtypeTest, to_quoteJson) {
+  EXPECT_EQ(u8"\"\"", mobs::to_quoteJson(""));
+  EXPECT_EQ(u8"\"a\"", mobs::to_quoteJson("a"));
+  EXPECT_EQ(R"("\"\u0000\"")", mobs::to_quoteJson(std::string("\"\0\"", 3)));
+  EXPECT_EQ(u8"\"abc\"", mobs::to_quoteJson("abc"));
+  EXPECT_EQ(R"("ab\"cd\"ef")", mobs::to_quoteJson("ab\"cd\"ef"));
+  EXPECT_EQ(R"("123\tABC\nXYZ\u0003\u001f?")", mobs::to_quoteJson(u8"123\tABC\nXYZ\003\037?"));
 }
 
 TEST(objtypeTest, string2x) {
