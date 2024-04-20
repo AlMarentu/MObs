@@ -85,12 +85,6 @@ static std::wstring stow(const string &s, bool dontConvert) {
       else
         parent->Value(val);
     };
-    void Cdata(const std::wstring &value) override {
-      if (obj)
-        Value(value);
-      else
-        parent->Cdata(value);
-    }
     void Base64(const std::vector<u_char> &base64) override {
       if (obj) {
         if (not member())

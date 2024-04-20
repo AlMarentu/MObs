@@ -30,9 +30,10 @@
 #include "converter.h"
 #include "csb.h"
 
-#include<stack>
-#include<exception>
-#include<iostream>
+#include <stack>
+#include <map>
+#include <exception>
+#include <iostream>
 #include <codecvt>
 #include <utility>
 
@@ -455,7 +456,6 @@ void parse();
 void NullTag(const std::string &element);
 void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value);
 void Value(const std::wstring &value);
-void Cdata(const std::wstring &value);
 void StartTag(const std::string &element);
 void EndTag(const std::string &element);
 void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value);
@@ -470,6 +470,8 @@ public:
    
      es kann z.B. ein \c std::wifstream dienen oder ein \c std::wistringstream übergeben werden
           Als Zeichensätze sind UTF-8, UTF-16, ISO8859-1, -9 und -15 erlaubt; Dateien dürfen mit einem BOM beginnen
+     Das ENTITY-Konstrukt ist für externe ENTITYs erlaubt: \<!ENTITY greet \"Hallo !!\" \>
+     Vordefinierte ENTITYs sind: \&lt; \&gt; \&amp; \&quot; \&apos;
    @param input XML-stream der geparst werden soll   */
   explicit XmlParserW(std::wistream &input) : istr(input), base64(base64data) {
     //istr.exceptions(std::ios::badbit);
@@ -515,14 +517,10 @@ public:
    @param value Wert des Attributes
    */
   virtual void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) = 0;
-  /** \brief Callback-Function: Ein Inhalt eines Tags
+  /** \brief Callback-Function: Ein Inhalt eines Tags inkl. CDATA
    @param value Inhalt des Tags
    */
   virtual void Value(const std::wstring &value) = 0;
-  /** \brief Callback-Function: Ein CDATA-Element (optional) ansonsten wird auf \c Value abgebildet
-   @param value Inhalt des Tags
-   */
-  virtual void Cdata(const std::wstring &value) { Value(value); }
   /** \brief Callback-Function: Ein CDATA-Element mit base64 codiertem Inhalt
    
       nur, wenn setBase64(true) gesetzt wurde
@@ -629,11 +627,11 @@ public:
           throw std::runtime_error(u8"Error in Codec");
         eat();
       }
+      bomCheck = peek() == '<'; // <?xml muß an Dateianfang stehen, Ausnahme BOM
       buffer.clear();
       inParse2Lt = true;
       inParse2LtWork = true;
       running = true;
-      bomCheck = true;
     }
     // eigentliches Parsing
     for (;;)
@@ -662,21 +660,10 @@ public:
         }
       }
       inParse2LtWork = false;
-      if (bomCheck) {
-        if (not Traits::eq_int_type(curr, '<'))
-          THROW(u8"Syntax Head");
-        // BOM überlesen
-        if (not buffer.empty())
-        {
-//        for (auto c:buffer) std::cerr << '#' <<  int(c) << std::endl;
-          THROW("invalid begin of File (BOM)");
-        }
-        buffer.clear();
-        bomCheck = false;
-      }
       if (not Traits::eq_int_type(curr, '<'))  // Hauptschleife verlassen
       {
-        saveValue();
+        LOG(LM_DEBUG, "READY "  << mobs::to_string(buffer));
+        saved += buffer;
         break;
       }
       if (nonblocking and not checkGT())
@@ -684,7 +671,8 @@ public:
         paused = true;
         return;
       }
-      saveValue();
+      decode(buffer);
+      saved += buffer;
       eat('<');
 
       if (peek() == '/')
@@ -698,33 +686,25 @@ public:
           THROW("missing end tag");
         if (lastKey == element)
         {
-          if (in64) {
-            saveValue();
-            in64 = false;
-          } if (not cdata.empty()) {
-            if (xmlEncState <= 0)
-              Cdata(cdata);
-            saveValue();
-          } else {
-            decode(saved);
-            if (xmlEncState > 0) {
+          if (in64)
+            saveValue(); // nur whitespace prüfen
+          if (xmlEncState > 0) {
 //            LOG(LM_DEBUG, "XV " << element << " " << xmlEncState);
-              if (element == u8"CipherValue") {
-                if (xmlEncState == 5) {
-                  if (not encryptedData.valid())
-                    encryptedData.cipher = to_string(saved);
-                }
-              } else if (element == u8"KeyName" and xmlEncState == 3) {
+            if (element == u8"CipherValue") {
+              if (xmlEncState == 5) {
                 if (not encryptedData.valid())
-                  encryptedData.keyName = to_string(saved);
+                  encryptedData.cipher = to_string(saved);
               }
-            } else if (xmlEncState <= 0)
-              Value(saved);
-          }
+            } else if (element == u8"KeyName" and xmlEncState == 3) {
+              if (not encryptedData.valid())
+                encryptedData.keyName = to_string(saved);
+            }
+          } else if (not in64 and xmlEncState <= 0)
+            Value(saved);
           clearValue();
           lastKey = "";
+          in64 = false;
         }
-        cdata.clear();
         if (xmlEncState <= 0)
           EndTag(element);
         else {
@@ -755,15 +735,16 @@ public:
           paused = true;
         //else if (tags.empty())
         //  LOG(LM_DEBUG, "READY");
+        skipWs();
         inParse2Lt = true;
         continue;
       }
       else if (peek() == '!')
       {
+        bomCheck = false;
         eat();
         // Parse CDATA Element
-        if (peek() == '[')
-        {
+        if (peek() == '[') {
           eat('[');
           eat('C');
           eat('D');
@@ -771,30 +752,53 @@ public:
           eat('T');
           eat('A');
           eat('[');
-          saveValue();  // nur whitespace prüfen
-          cdata.swap(buffer);
+          buffer.clear();
           parse2CD();
           if (try64) {
+            saveValue();  // nur whitespace prüfen
             base64.done();
             Base64(base64data);
-            cdata.clear();
+            clearValue();
             in64 = true;
           }
           else {
             buffer.resize(buffer.length() -2);
-            if (buffer.empty()) {
-              if (xmlEncState <= 0)
-                Cdata(buffer);
-              lastKey = "";
-            } else
-              cdata.swap(buffer);
+            saved += buffer;
           }
           base64.clear();
+          buffer.clear();
           try64 = false;
-          clearValue();
+          //clearValue();
         }
-        else
-        {
+        else if (peek() == 'E') {
+          eat('E');
+          eat('N');
+          eat('T');
+          eat('I');
+          eat('T');
+          eat('Y');
+          eatWS();
+          buffer.clear();
+          parse2Char(' ');
+          std::wstring ent = buffer;
+          skipWs();
+          wchar_t c = peek();
+          if (c == '"')
+            eat('"');
+          else
+            eat('\'');
+          buffer.clear();
+          parse2Char(c);
+          decode(buffer, true); // nur CharRef dekodieren, keine EntityRef
+          std::wstring val = buffer;
+          LOG(LM_DEBUG, "ENTITY " << mobs::to_string(ent) << " " << mobs::to_string(val));
+          if (not ent.empty())
+            entities[ent] = val;
+          eat(c);
+          skipWs();
+          buffer.clear();
+        }
+        else {
           // Parse Kommentar
           eat('-');
           eat('-');
@@ -810,6 +814,9 @@ public:
         parse2GT();
         decode(buffer);
         std::string element = to_string(buffer);
+        if (element == u8"xml" and not bomCheck)
+          THROW(u8"Syntax Head");
+        bomCheck = false;
         for (;;)
         {
           if (peek() == '?')
@@ -818,7 +825,7 @@ public:
             ProcessingInstruction(element, "", L"");
             break;
           }
-          eat(' ');
+          eatWS();
           parse2GT();
           decode(buffer);
           std::string a = to_string(buffer);
@@ -826,6 +833,7 @@ public:
           if (peek() == '=')
           {
             eat('=');
+            skipWs();
             auto c = peek();
             if (c == '"')
               eat('"');
@@ -869,12 +877,23 @@ public:
         inParse2Lt = true;
         continue;
       }
+      bomCheck = false;
       // Parse Element-Beginn
       parse2GT();
       decode(buffer);
       std::string element = to_string(buffer);
       if (element.empty())
         THROW("missing begin tag");
+      switch (element[0]) {
+        case L'-':
+        case '.':
+        case '0'...'9':
+        case 0xB7:
+        case 0x0300 ... 0x036F:
+        case 0x203F ... 0x2040:
+          LOG(LM_ERROR, "invalid start char in tag");
+          break;
+      }
       tags.emplace(element, currentXmlns());
       if (xmlEncState == 0 and element == u8"EncryptedData") {
         xmlEncState = 1;
@@ -895,8 +914,10 @@ public:
       }
       else
         StartTag(element);
+      clearValue();
       for (;;)
       {
+        bool hatWs = skipWs();
         if (peek() == '>')  // Ende eines Starttags
         {
           inParse2Lt = true;
@@ -913,11 +934,14 @@ public:
           inParse2Lt = true;
           break;
         }
-        eat(' ');
+        if (not hatWs)
+          THROW("missing whitespace");
         parse2GT();
         decode(buffer);
         std::string a = to_string(buffer);
+        skipWs();
         eat('=');
+        skipWs();
         wchar_t c = peek();
         if (c == '"')
           eat('"');
@@ -989,9 +1013,28 @@ private:
       buffer += Traits::to_char_type(curr);
       while (Traits::not_eof((curr = get()))) {
 //      std::cout << "x " << mobs::to_string(Traits::to_char_type(curr));
-        if (std::wstring(L"/ <>=\"'?!").find(Traits::to_char_type(curr)) != std::wstring::npos)
-          break;
-        buffer += Traits::to_char_type(curr);
+        switch(Traits::to_char_type(curr)) {
+          case '\n':
+          case '\r':
+          case '\t':
+            curr = L' ';
+            // fallthrough;
+          case ' ':
+          case '<':
+          case '>':
+          case '=':
+          case '/':
+          case '?':
+          case '!':
+          case '"':
+          case '\'':
+            return;
+          default:
+            buffer += Traits::to_char_type(curr);
+        }
+        //if (std::wstring(L"/ <>=\"'?!").find(Traits::to_char_type(curr)) != std::wstring::npos)
+        //  break;
+        //buffer += Traits::to_char_type(curr);
       }
       if (not Traits::not_eof(curr))
         THROW("Syntax");
@@ -1066,20 +1109,69 @@ private:
     if (not Traits::eq_int_type(Traits::to_int_type(c), curr))
       THROW(u8"Expected " << mobs::to_string(c) << " got " << mobs::to_string(Traits::to_char_type(curr)));
     curr = get();
-//    pos1++;
   };
   void eat() {
-//    pos1++;
     buffer += Traits::to_char_type(curr);
     curr = get();
+  };
+  void eatWS() { // mindestens 1 WS entfernen
+    for (bool start = true;; start = false) {
+      switch (Traits::to_char_type(curr)) {
+        case ' ':
+        case '\n':
+        case '\r':
+        case '\t':
+        case L'\uFEFF': // ZERO WIDTH NO-BREAK SPACE
+          //buffer += Traits::to_char_type(curr);
+          curr = get();
+          break;
+        default:
+            if (start)
+              THROW(u8"expected WS got " + mobs::to_string(Traits::to_char_type(curr)));
+          return;
+      }
+    }
+  };
+  bool skipWs() { // WS entfernen wenn vorhanden
+    bool hatWs = false;
+    switch (Traits::to_char_type(curr)) {
+      case ' ':
+      case '\n':
+      case '\r':
+      case '\t':
+      case L'\uFEFF': // ZERO WIDTH NO-BREAK SPACE
+        eatWS();
+        hatWs = true;
+    }
+    return hatWs;
   };
   Traits::char_type peek() const {
     if (Traits::not_eof(curr))
       return Traits::to_char_type(curr);
     THROW(u8"unexpected EOF");
   };
-/// Wandelt einen Teilstring aus Xml von der HTML-Notation in ASCII zurück
-  void decode(std::wstring &buf) {
+  std::wstring fromEntity(const std::wstring &tok) {
+    try {
+      auto it = entities.find(tok);
+      if (it != entities.end())
+        return it->second;
+      if (tok[0] == L'#' and tok.length() > 2) {
+        int c;
+        size_t p;
+        if (tok[1] == L'x')
+          c = std::stoi(tok.substr(2), &p, 16);
+        else
+          c = std::stoi(tok.substr(1), &p, 10);
+        if (p == tok.length() - (tok[1] == L'x' ? 2:1) and
+            ((c >= 0 and c <= 0xD7FF) or
+             (c >= 0xE000 and c <= 0xFFFD) or (c >= 0x10000 and c <= 0x10FFFF)))
+          return std::wstring(1, c);
+      }
+    } catch (...) {}
+    return {};
+  };
+/// Löst alle Entities auf; wenn entity=true werden nur CharRef dekodiert, keine EntityRef
+  void decode(std::wstring &buf, bool entity = false) {
     std::wstring result;
     size_t posS = 0;
     size_t posE = buf.length();
@@ -1093,11 +1185,10 @@ private:
         if (pos < posE and pos < posS + 16) // Token &xxxx; gefunden
         {
           std::wstring tok = std::wstring(&buf[posS], pos-posS);
-          //          std::cerr << "TOK " << tok << std::endl;
-          wchar_t c = from_html_tag(tok);
-          if (c)
+          std::wstring s = (entity and tok[0] != L'#') ? L"" : fromEntity(tok);
+          if (not s.empty())
           {
-            result += c;
+            result += s;
             posS = pos +1;
             continue;
           }
@@ -1243,7 +1334,6 @@ private:
   std::wistream &istr;
   std::wstring buffer;
   std::wstring saved;
-  std::wstring cdata;
   mutable std::vector<Traits::int_type> checkGtBuffer;
   mutable size_t checkGtBufferStart = 0;
   mutable size_t checkGtBufferEnd = 0;
@@ -1272,7 +1362,13 @@ private:
   bool reedEof = true;
   bool endOfFile = false;
   bool nonblocking = false;
-
+  std::map<std::wstring, std::wstring> entities = {
+      {L"lt", L"<"},
+      {L"gt", L">"},
+      {L"amp", L"&"},
+      {L"quot", L"\""},
+      {L"apos", L"\'"}
+  };
 };
 
 

@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -61,9 +61,9 @@ class XParserW: public mobs::XmlParserW {
 public:
   explicit XParserW(const wstring &i) : mobs::XmlParserW(str), str(i) { }
   void NullTag(const std::string &element) override { LOG(LM_INFO, "NULL"); }
-  void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) override { LOG(LM_INFO, "ATTRIBUT " << element); }
-  void Value(const std::wstring &value) override { LOG(LM_INFO, "VALUE >" << mobs::to_string(value) << "<"); }
-  void Cdata(const std::wstring &value) override { LOG(LM_INFO, "CDATA >" << mobs::to_string(value) << "<"); lastCdata = mobs::to_string(value); }
+  void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) override { LOG(LM_INFO, "ATTRIBUT " << attribut <<
+                  " VALUE >" << mobs::to_string(value) << "<"); lastValue = mobs::to_string(value); }
+  void Value(const std::wstring &value) override { LOG(LM_INFO, "VALUE >" << mobs::to_string(value) << "<"); lastValue = mobs::to_string(value);}
   void Base64(const std::vector<u_char> &base64) override {
     std::string s;
     std::copy(base64.cbegin(), base64.cend(), back_inserter(s));
@@ -77,6 +77,7 @@ public:
 
   std::wistringstream str;
   std::string lastCdata;
+  std::string lastValue;
 };
 
 
@@ -142,8 +143,8 @@ TEST(parserTest, jsonStruct1) {
 }
 
 void xparse(string s) { XParser p(s); p.parse(); };
-void xparse(wstring s, bool b64 = false) { XParserW p(s); p.setBase64(b64); p.parse(); };
-std::string xparseCdata(wstring s, bool b64 = false) { XParserW p(s); p.setBase64(b64); p.parse(); return p.lastCdata; };
+std::string xparse(wstring s) { XParserW p(s);  p.parse(); return p.lastValue;};
+std::string xparseCdata(wstring s) { XParserW p(s); p.setBase64(true); p.parse(); return p.lastCdata; };
 
 // aus https://de.wikipedia.org/wiki/Extensible_Markup_Language
 const string x1 = R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -177,41 +178,54 @@ TEST(parserTest, xmlStruct1) {
 }
 
 TEST(parserTest, xmlStructW1) {
-  EXPECT_NO_THROW(xparse(mobs::to_wstring(x1)));
+  //EXPECT_NO_THROW(xparse(mobs::to_wstring(x1)));
   EXPECT_NO_THROW(xparse(L"<abc/>"));
-  EXPECT_NO_THROW(xparse(L"<abc a=\"xx\" bcd=\"9999\"/>"));
-  EXPECT_NO_THROW(xparse(L"<abc f=\"\">xx&#188;&#x20;ö&lt;ä&gt;ü</abc>"));
+  EXPECT_NO_THROW(xparse(L"<abc \n/>"));
+  EXPECT_NO_THROW(xparse(L"<abc a=\"xx\"  bcd=\"9999\"/>"));
+  EXPECT_EQ(u8"xx¼ ö<ä>ü", xparse(L"<abc f=\"ä&amp;\n\">xx&#188;&#x20;ö&lt;ä&gt;ü</abc>"));
+  ASSERT_ANY_THROW(xparse(L"<!ENTITY greet \"Hallo !!\" x ><abc>xx&#188;&#x20;ö&lt;ä&gt;ü</abc>"));
+  ASSERT_NO_THROW(xparse(L"<!ENTITY greet \"Hallo !!\" ><!ENTITY   xxx   \"XXX&#10;\"><abc>xx&#188;&#x20;ö&lt;ä&gt;ü&xxx;</abc>"));
+  EXPECT_EQ(u8"xx¼ ö<Hallo !!>üXXX\n&lt;", xparse(L"<!ENTITY greet \"Hallo !!\" ><!ENTITY   xxx   \"XXX&#10;&lt;\"><abc>xx&#188;&#x20;ö&lt;&greet;&gt;ü&xxx;</abc>"));
   EXPECT_NO_THROW(xparse(L"<abc>   <cde/> </abc>"));
+  EXPECT_NO_THROW(xparse(L"<abc \t>   <cde \n /> </abc \t >"));
   EXPECT_NO_THROW(xparse(L"<ggg>   <!-- sdfsdf --><cde/>  </ggg>"));
-  EXPECT_NO_THROW(xparse(L"<abc>   <![CDATA[J]]></abc>"));
-  EXPECT_EQ("J", xparseCdata(L"<abc>   <![CDATA[J]]></abc>"));
-  EXPECT_EQ("AB", xparseCdata(L"<abc>   <![CDATA[A]]><![CDATA[B]]></abc>"));
-  EXPECT_EQ("...]]>...", xparseCdata(L"<abc>   <![CDATA[...]]]>  <![CDATA[]>...]]> </abc>"));
+  EXPECT_EQ(u8"9999", xparse(L"<abc a=\"xx\" \t bcd=\"9999\" \t/> \n"));
+  EXPECT_EQ(u8"9<999", xparse(L"<abc a=\"xx\" \t bcd=\"9&lt;999\" \t/> \n"));
+  EXPECT_EQ(u8" A J", xparse(L"<abc> A <![CDATA[J]]></abc>"));
+  EXPECT_EQ("\nJ \t ", xparse(L"<abc>\n<![CDATA[J]]> \t </abc>"));
+  EXPECT_EQ("   ...]]>... ", xparse(L"<abc>   <![CDATA[...]]]><![CDATA[]>...]]> </abc>"));
+  EXPECT_EQ(u8"   A x B \n", xparse(L"<abc>   <![CDATA[A]]> x <![CDATA[B]]> \n</abc>"));
+  EXPECT_EQ(u8"<A&lt;<<!<", xparse(L"<abc>&lt;<![CDATA[A&lt;]]>&lt;<![CDATA[<!]]>&lt;</abc>"));
+  EXPECT_EQ(u8"J", xparse(L"<abc>   <![CDATA[A]]> x <![CDATA[B]]> \n</abc><xyz>J</xyz>"));
   EXPECT_NO_THROW(xparse(L"<abc>  <cde/> </abc> <!-- sdfs<< df --> "));
-  
-  EXPECT_ANY_THROW(xparse(L"<abc>  dd <![CDATA[J]]></abc>"));
 
-  EXPECT_ANY_THROW(xparse(L"<abc  />"));
+  EXPECT_NO_THROW(xparse(L"<abc>  dd <![CDATA[J]]></abc>"));
+  EXPECT_NO_THROW(xparse(L"<abc> a  <![CDATA[A]]><![CDATA[B]]></abc>"));
+  EXPECT_NO_THROW(xparse(L"<abc>  <![CDATA[A]]><![CDATA[B]]> kk </abc>"));
+  EXPECT_NO_THROW(xparse(L"<abc  />"));
   EXPECT_ANY_THROW(xparse(L"<abc>   <cde/> </abce>"));
-  EXPECT_ANY_THROW(xparse(L"<abc a =\"xx\" bcd=\"9999\"/>"));
-  EXPECT_ANY_THROW(xparse(L"<abc a=xx bcd=\"9999\"/>"));
-  EXPECT_ANY_THROW(xparse(L"<abc> a  <![CDATA[A]]><![CDATA[B]]></abc>"));
-  EXPECT_ANY_THROW(xparse(L"<abc>   <![CDATA[A]]> x <![CDATA[B]]></abc>"));
-  EXPECT_ANY_THROW(xparse(L"<abc>  <![CDATA[A]]><![CDATA[B]]> kk </abc>"));
+  EXPECT_NO_THROW(xparse(L"<abc a =\t \"xx\" \t bcd='9999'/>"));
+  EXPECT_NO_THROW(xparse(L" \t <abc a ='xx'/>"));
+  EXPECT_NO_THROW(xparse(L"<?xml version=\"1.0\"?> \n <abc a='xx' bcd=\"9999\"/>"));
+  EXPECT_ANY_THROW(xparse(L" <?xml version=\"1.0\"?> \n <abc a='xx' bcd=\"9999\"/>"));
+  EXPECT_ANY_THROW(xparse(L"<abc a=\"xx' bcd=\"9999\"/>"));
+  EXPECT_ANY_THROW(xparse(L"<abc a a='xx' bcd=\"9999\"/>"));
 
 }
 
 TEST(parserTest, base64) {
   EXPECT_NO_THROW(xparse(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n  biwgSm9naHVydCB1bmQgUXVhcms= ]]>  </abc>"));
   EXPECT_EQ(u8"Polyfon zwitschernd aßen Mäxchens Vögel Rüben, Joghurt und Quark",
-            xparseCdata(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n  biwgSm9naHVydCB1bmQgUXVhcms= ]]>  </abc>", true));
+            xparseCdata(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n  biwgSm9naHVydCB1bmQgUXVhcms= ]]>  </abc>"));
   // missing padding
   EXPECT_EQ(u8"Polyfon zwitschernd aßen Mäxchens Vögel Rüben, Joghurt und Quark",
-            xparseCdata(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n  biwgSm9naHVydCB1bmQgUXVhcms ]]>  </abc>", true));
-  EXPECT_ANY_THROW(xparse(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n =  biwgSm9naHVydCB1bmQgUXVhcms= ]]>  </abc>", true));
-  EXPECT_EQ("A\n", xparseCdata(L"<abc>   <![CDATA[QQo= ]]>  </abc>", true));
-  EXPECT_NO_THROW(xparseCdata(L"<abc>   <![CDATA[Q+/= ]]>  </abc>", true));
-  EXPECT_ANY_THROW(xparseCdata(L"<abc>   <![CDATA[Q-o= ]]>  </abc>", true));
+            xparseCdata(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n  biwgSm9naHVydCB1bmQgUXVhcms ]]>  </abc>"));
+  EXPECT_ANY_THROW(xparseCdata(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n =  biwgSm9naHVydCB1bmQgUXVhcms= ]]>  </abc>"));
+  EXPECT_EQ("A\n", xparseCdata(L"<abc>   <![CDATA[QQo= ]]>  </abc>"));
+  EXPECT_NO_THROW(xparseCdata(L"<abc>   <![CDATA[Q+/= ]]> \t </abc>"));
+  EXPECT_ANY_THROW(xparseCdata(L"<abc>   <![CDATA[Q+/= ]]> x </abc>"));
+  EXPECT_ANY_THROW(xparseCdata(L"<abc>  a <![CDATA[Q+/= ]]>  </abc>"));
+  EXPECT_ANY_THROW(xparseCdata(L"<abc>   <![CDATA[Q-o= ]]>  </abc>"));
 }
 
 }

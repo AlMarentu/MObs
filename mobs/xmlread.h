@@ -68,8 +68,6 @@ public:
   virtual void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) { }
   /// Callback für Werte
   virtual void Value(const std::wstring &value) { }
-  /// Callback für Cdata-Element
-  virtual void Cdata(const std::wstring &value) { Value(value); }
   /** \brief Callback-Function: Ein CDATA-Element mit base64 codiertem Inhalt
 
       nur, wenn setBase64(true) gesetzt wurde
