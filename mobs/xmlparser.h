@@ -664,6 +664,8 @@ public:
       {
         LOG(LM_DEBUG, "READY "  << mobs::to_string(buffer));
         saved += buffer;
+        if (saved.size() > maxElementSize)
+          throw std::runtime_error(u8"Element too large");
         break;
       }
       if (nonblocking and not checkGT())
@@ -673,6 +675,8 @@ public:
       }
       decode(buffer);
       saved += buffer;
+      if (saved.size() > maxElementSize)
+        throw std::runtime_error(u8"Element too large");
       eat('<');
 
       if (peek() == '/')
@@ -764,6 +768,8 @@ public:
           else {
             buffer.resize(buffer.length() -2);
             saved += buffer;
+            if (saved.size() > maxElementSize)
+              throw std::runtime_error(u8"Element too large");
           }
           base64.clear();
           buffer.clear();
@@ -1005,6 +1011,7 @@ public:
     }
     return *binaryStream;
   }
+  size_t maxElementSize = 256 * 1024 * 1024; ///< Maximale Größe eines Elementes, default: 256MB
 
 private:
   void parse2GT() {
@@ -1032,6 +1039,8 @@ private:
           default:
             buffer += Traits::to_char_type(curr);
         }
+        if (buffer.length() > maxElementSize)
+          THROW("Element too large");
         //if (std::wstring(L"/ <>=\"'?!").find(Traits::to_char_type(curr)) != std::wstring::npos)
         //  break;
         //buffer += Traits::to_char_type(curr);
@@ -1042,10 +1051,15 @@ private:
   };
   void parse2Char(Traits::char_type c) {
     while (Traits::not_eof(curr) and Traits::to_char_type(curr) != c) {
-      if (try64)
+      if (try64) {
         base64.put(Traits::to_char_type(curr));
-      else
+        if (base64data.size() > maxElementSize)
+          THROW("Element too large");
+      }  else {
         buffer += Traits::to_char_type(curr);
+        if (buffer.length() > maxElementSize)
+          THROW("Element too large");
+      }
       curr = get();
     }
   };
@@ -1132,7 +1146,7 @@ private:
       }
     }
   };
-  bool skipWs() { // WS entfernen wenn vorhanden
+  bool skipWs() { // WS entfernen, wenn vorhanden
     bool hatWs = false;
     switch (Traits::to_char_type(curr)) {
       case ' ':
@@ -1240,8 +1254,6 @@ private:
   }
   Traits::int_type get() const {
     Traits::int_type c;
-//    if (maxRead)
-//      maxRead--;
     if (checkGtBufferStart < checkGtBufferEnd) {
       c = checkGtBuffer[checkGtBufferStart++];
       if (checkGtBufferStart >= checkGtBufferEnd) {
@@ -1350,7 +1362,6 @@ private:
   std::unique_ptr<CryptBufBase> binaryFilt;
   std::unique_ptr<std::istream> binaryFiltStream;
   std::unique_ptr<std::istream> binaryStream;
-  //  mutable size_t maxRead = SIZE_T_MAX;
   bool inParse2Lt = false;
   bool inParse2LtWork = false;
   bool bomCheck = false;

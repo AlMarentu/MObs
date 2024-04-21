@@ -123,6 +123,8 @@ public:
   std::wistream &getIstr();
   /// Lese binäre Daten aus dem input stream, bei bedarf mit Verschlüsselung
   std::istream &byteStream(size_t len, CryptBufBase *cbbp = nullptr);
+  /// setze maximale Elementgröße
+  void setMaxElementSize(size_t s);
 
 private:
   std::unique_ptr<XmlReadData> data;

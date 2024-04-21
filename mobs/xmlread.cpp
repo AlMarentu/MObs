@@ -162,6 +162,9 @@ static std::wstring stow(const string &s, bool dontConvert) {
         pushObject(*obj);
       levelStart = currentLevel();
     }
+    void setMaxElementSize(size_t s) {
+      XmlParserW::maxElementSize = s;
+    }
 
     XmlReader *parent;
     std::wistringstream str;
@@ -210,6 +213,7 @@ void XmlReader::stop() { data->stop(); }
 void XmlReader::readTillEof(bool s) { data->readTillEof(s); }
 void XmlReader::readNonBlocking(bool s) { data->readNonBlocking(s); };
 size_t XmlReader::level() const { return data->currentLevel(); }
+void XmlReader::setMaxElementSize(size_t s) { data->setMaxElementSize(s); }
 std::wistream &XmlReader::getIstr() { return data->getIstr(); }
 
 //  XmlReadData(const std::string &input, const ConvObjFromStr &c) : XmlParserW(str), str(to_wstring(input)) { cfs = c; };

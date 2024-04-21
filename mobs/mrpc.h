@@ -143,8 +143,9 @@ public:
   virtual std::string loginReceived(const std::vector<u_char> &cipher, std::string &info) { info = "not implemented"; return {}; }
   /** \brief callback für Server: Eingang einer reconnect-Anforderung auf eine bestehende SessionId
    *
+   * Achtung die Info wird immer unverschlüsselt übertragen
    * @param newId gewünschte SessionId
-   * @param Fehlermeldung
+   * @param info Fehlermeldung wenn Leerstring zurückgegeben wird; sonst allgemeine Info
    * @return true wenn reconnect Ok
    */
   virtual bool reconnectReceived(u_int newId, std::string &error) { error = "not implemented"; return false; }
