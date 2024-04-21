@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -111,10 +111,7 @@ void XmlOut::doMem(const MemberBase &mem)
   if (mem.hasFeature(XmlAsAttr) and data->attributeAllowed() and not ef)
   {
     if (not mem.isNull())
-    {
-      const wstring &value = to_wstring(std::move(mem.toStr(cth)));
-      data->writeAttribute(to_wstring(name), value);
-    }
+      data->writeAttribute(name,  mem.toWstr(cth));
   }
   else
   {
@@ -130,9 +127,9 @@ void XmlOut::doMem(const MemberBase &mem)
       if (mi.isBlob)
         data->writeBase64((const u_char *)mi.blob, mi.u64);
       else if (data->valueToken.empty())
-        data->writeValue(to_wstring(mem.toStr(cth)));
+        data->writeValue(mem.toWstr(cth));
       else
-        data->writeAttribute(data->valueToken, to_wstring(std::move(mem.toStr(cth))));
+        data->writeAttribute(data->valueToken, mem.toWstr(cth));
     }
     data->writeTagEnd();
     if (ef)
