@@ -51,8 +51,8 @@ public:
 class MrpcSessionLogin : virtual public mobs::ObjectBase {
 public:
   ObjInit(MrpcSessionLogin);
-  MemVar(std::vector<u_char>, cipher);
-  MemVar(std::string, info, USENULL);
+  MemVar(std::vector<u_char>, cipher); // RSA verschlüsselter MrpcSessionLoginData
+  MemVar(std::string, info, USENULL); // Rückgabe für Fehlermeldungen oder sonstiges unwichtiges. Wird nicht verschlüsselt!
   // soll keine Session wiederverwendet werden, dann info setzen
   MemVar(bool, dontKeep, USENULL);
 };
@@ -68,7 +68,9 @@ class MrpcSessionUse : virtual public mobs::ObjectBase {
 public:
   ObjInit(MrpcSessionUse);
   MemVar(u_int, id);
-  MemVar(bool, verify, USENULL);
+  MemVar(bool, verify, USENULL); // TODO: zukünftig verpflichtend
+  // Mit SessionKey verschlüsseltes Mantra zwecks Authentifikation
+  // Rückgabe für Fehlermeldungen oder sonstiges unwichtiges. Wird nicht verschlüsselt!
   MemVar(std::string, info, USENULL);
 };
 
@@ -84,7 +86,7 @@ public:
 class MrpcSessionReturnError : virtual public mobs::ObjectBase {
 public:
   ObjInit(MrpcSessionReturnError);
-  MemVar(std::string, error);
+  MemVar(std::string, error); // Rückgabe für Fehlermeldungen. Wird nicht verschlüsselt!
 };
 
 class MrpcSessionTestConnection : virtual public mobs::ObjectBase {
@@ -156,7 +158,7 @@ void Mrpc::Encrypt(const std::string &algorithm, const std::string &keyName, con
 
 void Mrpc::filled(mobs::ObjectBase *obj, const std::string &error)
 {
-  LOG(LM_DEBUG, "filled " << obj->to_string() << (isEncrypted()? " OK":" UNENCRYPTED"));
+  LOG(LM_DEBUG, "filled " << obj->getObjectName() << ": " << obj->to_string(ConvObjToString().exportWoNull()) << (isEncrypted()? " OK":" UNENCRYPTED"));
   if (not error.empty())
     THROW("error in XML stream: " << error);
   if (resultObj)
@@ -397,6 +399,7 @@ bool Mrpc::parseServer()
       state = connectingServer;
           __attribute__ ((fallthrough));
     case connectingServer:
+      setMaxElementSize(4096);
       parse();
       LOG(LM_DEBUG, "pars done " << std::boolalpha << bool(resultObj));
       if (auto *sess = dynamic_cast<MrpcSessionReturnError *>(resultObj.get())) {  // sollte der Server eigentlich nie bekommen
@@ -431,11 +434,34 @@ bool Mrpc::parseServer()
         answer.info(info);
         LOG(LM_DEBUG, "Connection establised ID " << session->sessionId << " " << session->info);
         state = connected;
+        setMaxElementSize(256*1024*1024);
         xmlOut(answer);
         writer.sync();
       } else if (auto *sess = dynamic_cast<MrpcSessionUse *>(resultObj.get())) {
         std::string info;
         LOG(LM_INFO, "REUSE " << sess->id());
+        try {
+          if (sess->info.isNull())
+            THROW("info is mandatory for reuse");
+          std::stringstream ss(sess->info());
+          mobs::CryptIstrBuf streambuf(ss, new mobs::CryptBufAes(session->sessionKey));
+          std::wistream xStrIn(&streambuf);
+          xStrIn.exceptions(std::ios::badbit);
+          streambuf.getCbb()->setBase64(true);
+          std::string res;
+          wchar_t c;
+          while (not xStrIn.get(c).eof())
+            res += u_char(c);
+          if (res != "hello!")
+            THROW("wrong info " << res);
+        } catch (std::exception &e) {
+          LOG(LM_ERROR, "REUSE " << e.what());
+          MrpcSessionReturnError eanswer;
+          eanswer.error(STRSTR("PLS_RELOG"));
+          xmlOut(eanswer); // Achtung: unverschlüsselt
+          writer.sync();
+          throw std::runtime_error("reconnect: session invalid");
+        }
         if (reconnectReceived(sess->id(), info)) {
           if (not session or not session->sessionId or session->sessionKey.empty()) {
             MrpcSessionReturnError eanswer;
@@ -453,6 +479,7 @@ bool Mrpc::parseServer()
           }
           LOG(LM_DEBUG, "Connection reestablished ID " << session->sessionId);
           state = connected;
+          setMaxElementSize(256*1024*1024);
           if (sess->verify()) {
             MrpcSessionTestConnection answer;
             answer.info("hello again");
@@ -532,6 +559,17 @@ void Mrpc::tryReconnect()
     writer.writeTagBegin(L"methodCall");
     MrpcSessionUse cmd;
     cmd.id(session->sessionId);
+    // Mantra für Authentifikation
+    std::vector<u_char> iv;
+    iv.resize(mobs::CryptBufAes::iv_size());
+    mobs::CryptBufAes::getRand(iv);
+    std::stringstream ss;
+    mobs::CryptOstrBuf streambuf(ss, new mobs::CryptBufAes(session->sessionKey, iv, "", true));
+    std::wostream xStrOut(&streambuf);
+    xStrOut << mobs::CryptBufAes::base64(true) << "hello!";
+    streambuf.finalize();
+    cmd.info(ss.str());
+
     if (sessionMode != SessionMode::speedup)
       cmd.verify(true);
     xmlOut(cmd);

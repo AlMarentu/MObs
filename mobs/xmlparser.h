@@ -890,16 +890,6 @@ public:
       std::string element = to_string(buffer);
       if (element.empty())
         THROW("missing begin tag");
-      switch (element[0]) {
-        case L'-':
-        case '.':
-        case '0'...'9':
-        case 0xB7:
-        case 0x0300 ... 0x036F:
-        case 0x203F ... 0x2040:
-          LOG(LM_ERROR, "invalid start char in tag");
-          break;
-      }
       tags.emplace(element, currentXmlns());
       if (xmlEncState == 0 and element == u8"EncryptedData") {
         xmlEncState = 1;
