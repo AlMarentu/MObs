@@ -453,6 +453,24 @@ template <> inline bool mobschar(unsigned char) { return true; }
 /// \private
 template <> inline bool mobschar(signed char) { return true; }
 
+template <class T>
+/// \private
+inline T mobsempty(const T&t) { return t; };
+/// \private
+template <> inline char mobsempty(const char &) { return ' '; };
+/// \private
+template <> inline char16_t mobsempty(const char16_t &) { return u' '; };
+/// \private
+template <> inline char32_t mobsempty(const char32_t &) { return U' '; };
+/// \private
+template <> inline wchar_t mobsempty(const wchar_t &) { return L' '; };
+/// \private
+template <> inline unsigned char mobsempty(const unsigned char &) { return ' '; };
+/// \private
+template <> inline signed char mobsempty(const signed char &) { return ' '; };
+
+
+
 /// Hilfsklasse für Konvertierungsklasse
 class ConvToStrHint {
 public:
@@ -807,7 +825,7 @@ public:
   static inline int64_t c_min() { return 0; }
   /// liefert eine \e leere Variable die zum löschen oder Initialisieren einer Membervariablen verwendet wird
   /// \see clear()
-  static inline T c_empty() { return T(); }
+  static inline T c_empty() { return mobsempty(T()); }
   /// Einlesen von int_64_t
   static bool c_from_int(int64_t i, T &t) { return false; }
   /// Einlesen von int_64_t

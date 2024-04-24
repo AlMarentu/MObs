@@ -604,7 +604,7 @@ void MemberBase::getInitialValue(std::string &old, bool &null) const {
 /// ObjectBase::clear
 /////////////////////////////////////////////////
 
-void ObjectBase::clear()
+void ObjectBase::clear(bool null)
 {
   for (auto const &m:mlist)
   {
@@ -615,7 +615,7 @@ void ObjectBase::clear()
     if (m.obj)
       m.obj->clear();
   }
-  if (nullAllowed())
+  if (null)
     setNull(true);
   else
     activate();

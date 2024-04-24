@@ -2,7 +2,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -218,16 +218,16 @@ im String</htmlTag></root>)");
 TEST(objgenTest, emptyVars) {
   DataTypes dt;
   EXPECT_EQ(false, dt.Bool());
-  EXPECT_EQ('\0', dt.Char());
-  EXPECT_EQ(u'\0', dt.Char16_t());
-  EXPECT_EQ(U'\0', dt.Char32_t());
-  EXPECT_EQ(L'\0', dt.Wchar_t());
-  EXPECT_EQ('\0', dt.SignedChar());
+  EXPECT_EQ(' ', dt.Char());
+  EXPECT_EQ(u' ', dt.Char16_t());
+  EXPECT_EQ(U' ', dt.Char32_t());
+  EXPECT_EQ(L' ', dt.Wchar_t());
+  EXPECT_EQ(' ', dt.SignedChar());
   EXPECT_EQ(0, dt.ShortInt());
   EXPECT_EQ(0, dt.Int());
   EXPECT_EQ(0, dt.LongInt());
   EXPECT_EQ(0, dt.LongLongInt());
-  EXPECT_EQ('\0', dt.UnsignedChar());
+  EXPECT_EQ(' ', dt.UnsignedChar());
   EXPECT_EQ(0, dt.UnsignedShortInt());
   EXPECT_EQ(0, dt.UnsignedInt());
   EXPECT_EQ(0, dt.UnsignedLongLong());
@@ -239,11 +239,17 @@ TEST(objgenTest, emptyVars) {
   EXPECT_EQ(L"", dt.Wstring());
   EXPECT_EQ(u"", dt.U16string());
   EXPECT_EQ(U"", dt.U32string());
+
+  dt.Char.forceNull();
+  EXPECT_EQ('\0', dt.Char());
+  dt.Char.setEmpty();
+  EXPECT_EQ(' ', dt.Char());
+
 }
 
 TEST(objgenTest, objDump) {
   DataTypes dt;
-  string leer = R"({Bool:false,Char:"",Char16_t:"",Char32_t:"",Wchar_t:"",SignedChar:"",ShortInt:0,Int:0,LongInt:0,LongLongInt:0,UnsignedChar:"",UnsignedShortInt:0,UnsignedInt:0,UnsignedLongLong:0,UnsignedLongLongInt:0,Float:0,Double:0,LongDouble:0,String:"",Wstring:"",U16string:"",U32string:""})";
+  string leer = R"({Bool:false,Char:" ",Char16_t:" ",Char32_t:" ",Wchar_t:" ",SignedChar:" ",ShortInt:0,Int:0,LongInt:0,LongLongInt:0,UnsignedChar:" ",UnsignedShortInt:0,UnsignedInt:0,UnsignedLongLong:0,UnsignedLongLongInt:0,Float:0,Double:0,LongDouble:0,String:"",Wstring:"",U16string:"",U32string:""})";
   EXPECT_EQ(leer, mobs::to_string(dt));
 //  cerr << to_string(dt) << endl << leer << endl;
 }

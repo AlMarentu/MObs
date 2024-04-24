@@ -335,7 +335,10 @@ private:
 
 // ------------------ MemberBase ------------------
 
-/// Basisklasse für Membervariablen
+/** \brief  Basisklasse für Membervariablen
+ *
+ * Bitte als Makro MemVar verwenden
+ */
 class MemberBase : public NullValue {
   friend class ObjectBase;
   template <class T>
@@ -355,8 +358,7 @@ public:
   MemVarCfg cAltName() const { return m_altName; };
   /// Abfrage des originalen oder des alternativen Namens der Membervariablen
   std::string getName(const ConvToStrHint &) const;
-  //  virtual void strOut(std::ostream &str) const  = 0;
-  /// Setze Inhalt auf leer
+  /// Setze Inhalt auf leer, mit initialen null-Einstellungen
   virtual void clear() = 0;
   /// Ausgabe des Inhalts als \c std::string in UTF-8
   virtual std::string toStr(const ConvToStrHint &) const  = 0;
@@ -384,7 +386,7 @@ public:
   /// Setze Inhalt auf null
   void forceNull() { doAudit(); clear(); setNull(true);}
   /// Setze Inhalt auf leer,
-  void setEmpty() { doAudit(); clear(); setNull(false);}
+  void setEmpty() { doAudit(); clear(); if (isNull()) activate();}
   /// Starte Traversierung nicht const
   void traverse(ObjTrav &trav);
   /// Starte Traversierung  const
@@ -398,7 +400,7 @@ public:
   const ObjectBase *getParentObject() const { return m_parent; }
   /// Zeiger auf Vater-Vektor
   const MemBaseVector *getParentVector() const { return m_parVec; }
-  /// Objekt wurde beschrieben - modified setzen
+  /// Objekt wurde beschrieben - modified setzen, null zurücksetzen
   void activate();
   /// Abfrage gesetzter  Attribute
   MemVarCfg hasFeature(MemVarCfg c) const;
@@ -433,11 +435,15 @@ private:
 // ------------------ VectorBase ------------------
 
 
-/// \brief Basisklasse für Vektoren auf Membervariablen oder Objekten innerhalb von von \c ObjectBase angeleiteten Klasse
-///
-/// Bitte als Makro MemVarVector oder MemVector verwenden
-/// \see MemVarVector
-/// \see MemVector
+/** \brief Basisklasse für Vektoren auf Membervariablen oder Objekten innerhalb von von \c ObjectBase angeleiteten Klasse
+ *
+ * Bitte als Makro MemVarVector oder MemVector verwenden
+ *
+ * alle char-typenerden mit \c Leerzeichen initialisiert;
+ * Ist der Wert auf Null gesetzt, so wird als Wert der Defaultwert T() zurückgegeben
+ *  \see MemVarVector
+ *  \see MemVector
+ */
 class MemBaseVector : public NullValue {
 public:
   friend class ObjectBase;
@@ -448,8 +454,8 @@ public:
   static const size_t npos = SIZE_T_MAX; ///< Konstante für ungültige Position
   /// \private
   MemBaseVector(const std::string& n, ObjectBase *obj, const std::vector<MemVarCfg>& cv) : m_name(n), m_parent(obj)
-  { TRACE(PARAM(n)); for (auto c:cv) doConfig(c); if (nullAllowed()) setNull(true); }
-  virtual ~MemBaseVector() { TRACE(""); }
+  { for (auto c:cv) doConfig(c); if (nullAllowed()) setNull(true); }
+  virtual ~MemBaseVector() = default;
   /// Starte Traversierung nicht const
   virtual void traverse(ObjTrav &trav) = 0;
   /// Starte Traversierung  const
@@ -457,7 +463,7 @@ public:
   /// Starte Traversierung eines einzelnen Elementes
   virtual void traverseSingle(ObjTravConst &trav, size_t index) const = 0;
   /// Starte Traversierung eines leeren temporären Elementes
-  void traverseElement(ObjTravConst &trav) const { return traverseSingle( trav, SIZE_MAX - 1); };
+  void traverseElement(ObjTravConst &trav) const { traverseSingle( trav, SIZE_MAX - 1); };
   /// \private
   void traverseKey(ObjTravConst &trav) const;
   /// liefert die Anzahl der Elemente
@@ -485,7 +491,7 @@ public:
   /// Setze Inhalt auf null
   void forceNull() { clear(); setNull(true);}
   /// Setze Inhalt auf leer,
-  void setEmpty() { clear(); setNull(false);}
+  void setEmpty() { clear(); activate();}
   /// Objekt wurde beschrieben
   void activate();
   /// Zeiger auf Vater-Objekt
@@ -530,7 +536,7 @@ protected:
   /// \private
   ObjectBase(std::string n, ObjectBase *obj, const std::vector<MemVarCfg>& cv ) : m_varNam(std::move(n)), m_parent(obj) { for (auto c:cv) doConfig(c); } // Konstruktor for MemObj
   /// \private
-  ObjectBase(MemBaseVector *m, ObjectBase *o, const std::vector<MemVarCfg>& cv) : m_varNam(""), m_parent(o), m_parVec(m) { for (auto c:cv) doConfig(c); } // Konstruktor for Vector
+  ObjectBase(MemBaseVector *m, ObjectBase *o, const std::vector<MemVarCfg>& cv) : m_varNam(), m_parent(o), m_parVec(m) { for (auto c:cv) doConfig(c); } // Konstruktor for Vector
 public:
   using  baseType = ObjectBase; ///< Basistyp
   using  findType = std::string; ///< typ für contains/find
@@ -603,12 +609,16 @@ public:
   /// @param parent  Zeiger auf Parent des Objektes, immer \c nullptr, wird nur intern verwendet
   /// @return Zeiger auf das erzeugte Objekt oder \c nullptr falls ein solches Objekt nicht registriert wurde \see ObjRegister(name)
   static ObjectBase *createObj(const std::string& name, ObjectBase *parent = nullptr);
-  /// Setze Inhalt auf leer, d.h. alle Vektoren sowie Unterobjekte und Variablen werden gelöscht,
-  void clear();
-  /// Setze Inhalt auf null
-  void forceNull() { clear(); setNull(true);}
+  /** \brief Setze Inhalt auf leer.
+   *
+   * alle Vektoren sowie Unterobjekte und Variablen werden gelöscht, Vektoren geleert;
+   * Null-Flags entsprechend gesetzt
+   */
+  void clear() { clear(nullAllowed()); }
+  /// Setze Element auf null; der inhalt wird gelöscht
+  void forceNull() { clear(true); }
   /// Setze Inhalt auf leer,
-  void setEmpty() { clear(); setNull(false);}
+  void setEmpty() { clear(false); }
   /// lösche alle Modified-Flags
   void clearModified();
   /// lösche alle Modified-Flags und aktiviert den Audit Trail Modus
@@ -684,6 +694,8 @@ protected:
   void doConfigObj(MemVarCfg c);
   /// \private
   void doConfClear() { m_altName = Unset; } // Bei Vererbung keinen Namen erben
+  /// \private
+  void clear(bool null);
 
 private:
   std::string m_varNam;
@@ -776,8 +788,8 @@ public:
   Member &operator=(const Member<T, C> &other) = delete;
   Member &operator=(Member<T, C> &&other) = delete;
   ~Member() override { TRACE(PARAM(getElementName())); }
-  /// Zugriff auf Inhalt
-  inline T operator() () const { return wert; }
+  /// Zugriff auf Inhalt; bei null wird immer ein leerer Wert zurückgegeben (Default-Konstruktor)
+  inline T operator() () const { if (isNull()) return T(); return wert; }
   /// Zuweisung eines Wertes
   inline void operator() (const T &t) { doAudit(); wert = t; activate(); }
   /// Vergleichsoperator mit Wert, \c NULL wird als ungleich behandelt
@@ -790,7 +802,7 @@ public:
   void emplace(const T &&t) { TRACE(PARAM(this)); doAudit(); wert = std::move(t); activate(); }
 
   /// Setze Inhalt auf leer
-  void clear() override  { doAudit(); wert = this->c_empty(); if (nullAllowed()) setNull(true); else activate(); }
+  void clear() override  { doAudit(); if (nullAllowed()) setNull(true); else activate(); doClear(); }
   /// Abfragemethode mit Ausgabe als \c std::string
   std::string toStr(const ConvToStrHint &cth) const override { return this->c_to_string(wert, cth); }
   /// Abfragemethode mit Ausgabe als \c std::wstring
@@ -1063,7 +1075,7 @@ bool MemberVector<T>::contains(const typename T::findType &t) const
 template<class T>
 size_t MemberVector<T>::find(const typename T::findType &t, size_t start) const
 {
-  for (auto i = start; i != size(); i++)
+  for (size_t i = start; i < size(); i++)
     if (operator[](i) == t) return i;
   return npos;
 }
