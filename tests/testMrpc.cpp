@@ -217,7 +217,13 @@ TEST(mrpcTest, MrpcClientServer) {
   to_string(*client.resultObj);
   ASSERT_NE(dynamic_cast<MrpcPerson *>(client.resultObj.get()), nullptr);
   EXPECT_EQ(dynamic_cast<MrpcPerson *>(client.resultObj.get())->name(), "Heinrich");
-
+  auto res1 = client.getResult<MrpcPing>();
+  EXPECT_FALSE(res1);
+  auto res2 = client.getResult<MrpcPerson>();
+  ASSERT_TRUE(res2);
+  auto res3 = client.getResult<MrpcPerson>();
+  EXPECT_FALSE(res3);
+  EXPECT_EQ(res2->name(), "Heinrich");
 
 }
 

@@ -201,6 +201,15 @@ public:
   SessionMode sessionMode; ///< Modus für die Session-Verwaltung
   std::unique_ptr<mobs::ObjectBase> resultObj; ///< Das zuletzt empfangene Objekt; muss nach Verwendung auf nullptr gesetzt werden
 
+  template<class T>
+  /** \brief Rückgabe des zuletzt empfangenen Objektes als unique_ptr
+   *
+   * Beispiel:
+   * auto res = client.getResult<MrpcPerson>();
+   * @return unique_ptr\<T\> oder nullptr, wenn das Objekt nicht vom Typ T ist
+   */
+  std::unique_ptr<T> getResult();
+
 protected:
   /// \private
   void StartTag(const std::string &element) override;
@@ -225,6 +234,16 @@ private:
 
 };
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wpotentially-evaluated-expression"
+template<class T>
+std::unique_ptr<T> Mrpc::getResult()
+{
+  if (resultObj and typeid(T) == typeid(*resultObj))
+    return std::unique_ptr<T>(dynamic_cast<T *>(resultObj.release()));
+  return nullptr;
+}
+#pragma clang diagnostic pop
 } // mobs
 
 #endif //MOBS_MRPC_H
