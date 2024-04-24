@@ -404,7 +404,8 @@ bool Mrpc::parseServer()
       LOG(LM_DEBUG, "pars done " << std::boolalpha << bool(resultObj));
       if (auto *sess = dynamic_cast<MrpcSessionReturnError *>(resultObj.get())) {  // sollte der Server eigentlich nie bekommen
         LOG(LM_ERROR, "SESSIONERROR (ignored) " << sess->error.toStr(mobs::ConvObjToString()));
-      } else if (auto *sess = dynamic_cast<MrpcSessionLogin *>(resultObj.get())) {
+      }
+      else if (auto *sess = dynamic_cast<MrpcSessionLogin *>(resultObj.get())) {
         LOG(LM_DEBUG, "LOGIN ");
         std::string info;
         std::string key;
@@ -437,12 +438,23 @@ bool Mrpc::parseServer()
         setMaxElementSize(256*1024*1024);
         xmlOut(answer);
         writer.sync();
-      } else if (auto *sess = dynamic_cast<MrpcSessionUse *>(resultObj.get())) {
+      }
+      else if (auto *sess = dynamic_cast<MrpcSessionUse *>(resultObj.get())) {
         std::string info;
-        LOG(LM_INFO, "REUSE " << sess->id());
         try {
-          if (sess->info.isNull())
+          LOG(LM_INFO, "REUSE " << sess->id());
+          if (sess->info.isNull()) {
+            info = "need mantra";
             THROW("info is mandatory for reuse");
+          }
+          if (not reconnectReceived(sess->id(), info))
+            THROW("reconnect failed");
+          if (not session or not session->sessionId or session->sessionKey.empty())
+            THROW("session invalid");
+          if (session->keyValidTime > 0 and session->generated + session->keyValidTime < time(nullptr)) {
+            info = "session key expired";
+            THROW("session key expired");
+          }
           std::stringstream ss(sess->info());
           mobs::CryptIstrBuf streambuf(ss, new mobs::CryptBufAes(session->sessionKey));
           std::wistream xStrIn(&streambuf);
@@ -454,39 +466,18 @@ bool Mrpc::parseServer()
             res += u_char(c);
           if (res != "hello!")
             THROW("wrong info " << res);
-        } catch (std::exception &e) {
-          LOG(LM_ERROR, "REUSE " << e.what());
-          MrpcSessionReturnError eanswer;
-          eanswer.error(STRSTR("PLS_RELOG"));
-          xmlOut(eanswer); // Achtung: unverschlüsselt
-          writer.sync();
-          throw std::runtime_error("reconnect: session invalid");
-        }
-        if (reconnectReceived(sess->id(), info)) {
-          if (not session or not session->sessionId or session->sessionKey.empty()) {
-            MrpcSessionReturnError eanswer;
-            eanswer.error(STRSTR("PLS_RELOG " << info));
-            xmlOut(eanswer); // Achtung: unverschlüsselt
-            writer.sync();
-            throw std::runtime_error("reconnect: session invalid");
-          }
-          if (session->keyValidTime > 0 and session->generated + session->keyValidTime < time(nullptr)) {
-            MrpcSessionReturnError eanswer;
-            eanswer.error(STRSTR("KEY_EXPIRED"));
-            xmlOut(eanswer); // Achtung: unverschlüsselt
-            writer.sync();
-            throw std::runtime_error("reconnect: session key expired");
-          }
+
           LOG(LM_DEBUG, "Connection reestablished ID " << session->sessionId);
           state = connected;
-          setMaxElementSize(256*1024*1024);
+          setMaxElementSize(256 * 1024 * 1024);
           if (sess->verify()) {
             MrpcSessionTestConnection answer;
             answer.info("hello again");
             sendSingle(answer);
             LOG(LM_DEBUG, "verification sent");
           }
-        } else {
+        } catch (std::exception & e) {
+          LOG(LM_ERROR, "REUSE " << e.what());
           MrpcSessionReturnError eanswer;
           eanswer.error(STRSTR("PLS_RELOG " << info));
           xmlOut(eanswer); // Achtung: unverschlüsselt
@@ -495,7 +486,8 @@ bool Mrpc::parseServer()
             throw std::runtime_error("reconnect failed");
         }
         resultObj = nullptr;
-      } else if (auto *sess = dynamic_cast<MrpcGetPublickey *>(resultObj.get())) {
+      }
+      else if (auto *sess = dynamic_cast<MrpcGetPublickey *>(resultObj.get())) {
         std::string key;
         std::string info;
         try {
