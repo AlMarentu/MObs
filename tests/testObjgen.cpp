@@ -73,7 +73,7 @@ public:
 class Adresse : virtual public mobs::ObjectBase {
 public:
   ObjInit(Adresse);
-  
+
   MemVar(std::string, strasse);
   MemVar(std::string, plz);
   MemVar(std::string, ort);
@@ -83,9 +83,9 @@ public:
 
 
 class Person : virtual public mobs::ObjectBase {
-  public:
+public:
   ObjInit(Person);
-  
+
   MemVar(int, kundennr);
   MemVar(bool, firma);
   MemVar(std::string, name);
@@ -140,7 +140,7 @@ TEST(objgenTest, leer) {
 class DataTypes : virtual public mobs::ObjectBase {
 public:
   ObjInit(DataTypes);
-  
+
   MemVar(bool, Bool);
   MemVar(char, Char);
   MemVar(char16_t, Char16_t);
@@ -211,8 +211,7 @@ TEST(objgenTest, escaping) {
   null.htmlTag(u8"Newline\nim String");
   EXPECT_EQ( R"({buchstabe:null,htmlTag:"Newline\nim String"})", null.to_string());
   EXPECT_EQ(null.to_string(mobs::ConvObjToString().exportXml()),
-            R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?><root><buchstabe/><htmlTag>Newline
-im String</htmlTag></root>)");
+            R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?><root><buchstabe/><htmlTag>Newline&#xa;im String</htmlTag></root>)");
 }
 
 TEST(objgenTest, emptyVars) {
@@ -314,7 +313,7 @@ TEST(objgenTest, setVars) {
   EXPECT_EQ(u"Conni", dt.U16string());
   dt.U32string(U"Det");
   EXPECT_EQ(U"Det", dt.U32string());
-  
+
   // nochmals Dump
   string inhalt = R"({Bool:true,Char:"a",Char16_t:"b",Char32_t:"c",Wchar_t:"d",SignedChar:"e",ShortInt:42,Int:-9876543,LongInt:-45454545,LongLongInt:-34343434343434,UnsignedChar:"f",UnsignedShortInt:999,UnsignedInt:88888,UnsignedLongLong:109876543,UnsignedLongLongInt:1234567890,Float:-21.3,Double:1e-05,LongDouble:123.456,String:"Anton",Wstring:"Berti",U16string:"Conni",U32string:"Det"})";
   EXPECT_EQ(inhalt, mobs::to_string(dt));
@@ -377,7 +376,7 @@ TEST(objgenTest, Vectors) {
   ASSERT_ANY_THROW((s=copers.hobbies[mobs::MemBaseVector::nextpos]()));
 
 }
-  
+
 TEST(objgenTest, iterator) {
   Person info;
   info.kontakte[0].number("+00");
@@ -478,13 +477,13 @@ TEST(objgenTest, getSetVar) {
   EXPECT_EQ("", op->getVariable("kontakte[1].bee", &r));
   EXPECT_FALSE(r);
 //  std::cerr << to_string(p) << std::endl;
-  
+
 }
 
 TEST(objgenTest, copy) {
-  
+
   string inhalt = R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})";
-  
+
   Person info;
 
   ASSERT_NO_THROW(string2Obj(inhalt, info));
@@ -498,14 +497,14 @@ TEST(objgenTest, copy) {
   Person info3(info);
   EXPECT_EQ(inhalt, info3.to_string(mobs::ConvObjToString().exportCompact()));
 
-  
+
 }
 
 
 
 
 class RechPos : virtual public mobs::ObjectBase {
-  public:
+public:
   ObjInit(RechPos);
 
   MemVar(std::string, artikel);
@@ -514,7 +513,7 @@ class RechPos : virtual public mobs::ObjectBase {
 };
 
 class Rechnung : virtual public mobs::ObjectBase {
-  public:
+public:
   ObjInit(Rechnung);
   MemVar(int, id, USENULL);
 
@@ -542,9 +541,9 @@ TEST(objgenTest, usenullAndIndent) {
   rech.position[2].einzelpreis(3);
   rech.position[2].artikel("nnn");
   EXPECT_EQ("{id:null,kunde:null,position:[null,null,{artikel:\"nnn\",anzahl:2,einzelpreis:3},{artikel:\"\",anzahl:1,einzelpreis:0}]}", to_string(rech));
-  
+
   string xml =
-  R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+      R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <root>
   <id/>
   <kunde/>
@@ -562,7 +561,7 @@ TEST(objgenTest, usenullAndIndent) {
   </position>
 </root>
 )";
-    string json = R"({
+  string json = R"({
   "id":null,
   "kunde":null,
   "position":[
@@ -585,7 +584,7 @@ TEST(objgenTest, usenullAndIndent) {
   EXPECT_EQ(json, rech.to_string(mobs::ConvObjToString().exportJson().doIndent()));
 //  std::cerr << rech.to_string(mobs::ConvObjToString().exportJson().doIndent()) << std::endl;
 
-  
+
 
 }
 
@@ -604,7 +603,7 @@ public:
 class Obj2;
 
 class Obj1 : virtual public mobs::ObjectBase {
-  public:
+public:
   ObjInit(Obj1);
   MemVar(int, id, KEYELEMENT1);
   MemVar(int, xx);
@@ -617,7 +616,7 @@ class Obj1 : virtual public mobs::ObjectBase {
 };
 
 class Obj2 : virtual public mobs::ObjectBase {
-  public:
+public:
   ObjInit(Obj2);
   MemVar(int, id, KEYELEMENT1);
   MemVar(int, xx);
@@ -649,7 +648,7 @@ public:
     if (not fst)
       res << ",";
     fst = false;
-    
+
     res << quoteKeys << name << quoteKeys << ":";
     if (inNull() or mem.isNull())
       res << "null";
@@ -701,7 +700,7 @@ TEST(objgenTest, keys) {
 
 class ObjX : virtual public mobs::ObjectBase {
 public:
-ObjInit(ObjX, COLNAME(sonst));
+  ObjInit(ObjX, COLNAME(sonst));
   MemVar(int, id, KEYELEMENT1, ALTNAME(grimoald));
   MemVar(int, a, ALTNAME(pippin));
   MemVar(int, b, ALTNAME(karl));
@@ -778,7 +777,7 @@ TEST(objgenTest, conftoken) {
   EXPECT_NO_THROW(mobs::string2Obj("{id:12,a:17,b:22,c:33,XXX:7,d:[\"a\"]}", o2, mobs::ConvObjFromStr()));
   EXPECT_EQ("{id:12,a:17,b:22,c:33,o:null,d:[\"a\"]}", o2.to_string(mobs::ConvObjToString()));
   EXPECT_ANY_THROW(mobs::string2Obj("{id:12,a:17,b:22,c:33,XXX:7,d:[\"a\"]}", o2, mobs::ConvObjFromStr().useExceptUnknown()));
-  
+
   EXPECT_ANY_THROW(mobs::string2Obj("{id", o2, mobs::ConvObjFromStr()));
   EXPECT_ANY_THROW(mobs::string2Obj("{id:12,a:17,b:22,c:33,o:7,d:[\"a\"]}", o2, mobs::ConvObjFromStr()));
 }
@@ -1052,8 +1051,8 @@ TEST(objgenTest, compare) {
   p.vorname("ABC");
   EXPECT_TRUE(p.name() == p.vorname());
   EXPECT_TRUE(p.name == p.vorname);
-  
-  
+
+
 
 }
 #endif

@@ -101,7 +101,7 @@ TEST(objtypeTest, string2x) {
 
   ASSERT_TRUE(mobs::string2x(u8"\u2018", w));
   EXPECT_EQ(L'\u2018', w);
-  
+
   int i;
   ASSERT_TRUE(mobs::string2x(u8"12345", i));
   EXPECT_EQ(12345, i);
@@ -120,12 +120,12 @@ TEST(objtypeTest, string2x) {
   EXPECT_FALSE(mobs::string2x(u8"3.14", i));
   EXPECT_FALSE(mobs::string2x(u8"30000000000", i));
   EXPECT_FALSE(mobs::string2x(u8"", i));
-  
+
   unsigned short int usi;
   ASSERT_TRUE(mobs::string2x(u8"12345", usi));
   EXPECT_EQ(12345, usi);
   EXPECT_FALSE(mobs::string2x(u8"-998 ", usi));
-  
+
   float f;
   ASSERT_TRUE(mobs::string2x(u8"12.345", f));
   EXPECT_FLOAT_EQ(12.345, f);
@@ -135,7 +135,7 @@ TEST(objtypeTest, string2x) {
   ASSERT_TRUE(mobs::string2x(u8"-12.345", d));
   EXPECT_DOUBLE_EQ(-12.345, d);
   EXPECT_FALSE(mobs::string2x(u8"9,98", d));
-  
+
   bool b;
   ASSERT_TRUE(mobs::string2x(u8"true", b));
   EXPECT_TRUE(b);
@@ -243,28 +243,29 @@ TEST(objtypeTest, mobsenum3) {
   enum direction3 d;
   EXPECT_ANY_THROW(direction3StrEnumConv::fromStr("void"));
   EXPECT_FALSE(direction3StrEnumConv::c_string2x("middle", d, mobs::ConvObjFromStr{}));
+  EXPECT_EQ(std::string("down"), enum_to_string(D3down));
 }
 
 
 #include <vector>
 
 TEST(objtypeTest, tobase64) {
-  
+
   std::string s = "Polyfon zwitschernd aßen Mäxchens Vögel Rüben, Joghurt und Quark";
   std::string r;
   ::mobs::copy_base64(s.cbegin(), s.cend(), std::back_inserter(r));
-  
+
 //  std::cerr << "XX " << r << std::endl;
   EXPECT_EQ("UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJlbiwgSm9naHVydCB1bmQgUXVhcms=", r);
 
   std::wstring s2;
   std::vector<unsigned char> v = { 'W', 'i', 't', 'z' };
   ::mobs::copy_base64(v.cbegin(), v.cend(), std::back_inserter(s2));
-  
+
 //  std::cerr << "XX " << ::mobs::to_string(s2) << std::endl;
   EXPECT_EQ(L"V2l0eg==", s2);
 
-  
+
 }
 
 
@@ -360,18 +361,18 @@ TEST(objtypeTest, historic) {
   }
 
   {
-   std::istringstream s("1900-03-01");
-   std::tm t = {};
-   s >> std::get_time(&t, "%Y-%m-%d");
-   mi.fromLocalTime(t);
-   time_t ti = mi.t64 / 1000000;
-   EXPECT_EQ(-2203891200, ti);
+    std::istringstream s("1900-03-01");
+    std::tm t = {};
+    s >> std::get_time(&t, "%Y-%m-%d");
+    mi.fromLocalTime(t);
+    time_t ti = mi.t64 / 1000000;
+    EXPECT_EQ(-2203891200, ti);
 
-   struct tm ts{};
-   mi.toGMTime(ts);
-   std::stringstream s2;
-   s2 << std::put_time(&ts, "%a %j %F");
-   EXPECT_EQ(u8"Thu 060 1900-03-01", s2.str());
+    struct tm ts{};
+    mi.toGMTime(ts);
+    std::stringstream s2;
+    s2 << std::put_time(&ts, "%a %j %F");
+    EXPECT_EQ(u8"Thu 060 1900-03-01", s2.str());
 
   }
 

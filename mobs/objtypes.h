@@ -52,9 +52,10 @@ typedef unsigned long u_long;
 
 /**
  \brief Deklaration eines \c enum
- 
+
  Im Beispiel wird ein enum direction {Dleft, Dright, Dup, Ddown};
- deklariert. Zusätzlich wird eine Konvertierungsklasse \c directionStrEnumConv sowie eine weitere Hilfsklasse erzeugt.
+ deklariert. Zusätzlich wird eine Konvertierungsklasse \c directionStrEnumConv sowie eine weitere Hilfsklasse erzeugt;
+ ebenso wird eine Funktion enum_to_string definiert, um den Enum in seine Text-Representation zu wandeln
  \code
  MOBS_ENUM_DEF(direction, Dleft, Dright, Dup, Ddown);
  MOBS_ENUM_VAL(direction, "left", "right", "up", "down");
@@ -124,8 +125,8 @@ public: \
      if (v.empty())  throw std::runtime_error("enum " #typ ": is empty"); \
      return v.size() -1; }       \
   static std::string c_to_str(int i) { return toStr((enum typ)i); }  \
-}
-
+}; \
+inline std::string enum_to_string(enum typ e) { return typ##StrEnumConv::toStr(e); };
 
 namespace mobs {
 
@@ -160,7 +161,7 @@ std::string to_squote(const std::string &s);
  * @param s in UTF8
  * @return
  */
- std::string to_quoteJson(const std::string &s);
+std::string to_quoteJson(const std::string &s);
 
 
 //template <typename T>
@@ -481,7 +482,7 @@ public:
   /// @param pfix verwende den Prefix vor dem Namen, falls vorhanden
   /// @param lowercase wandelt den Namen in Kleinbuchstaben
   explicit ConvToStrHint(bool print_compact, bool altNames = false, bool pfix = false, bool lowercase = false) : comp(print_compact),
-                         altnam(altNames), prefix(pfix), toLower(lowercase) {}
+                                                                                                                 altnam(altNames), prefix(pfix), toLower(lowercase) {}
   virtual ~ConvToStrHint() = default;
   /// \private
   virtual bool compact() const { return comp; }
@@ -549,7 +550,7 @@ public:
   ConvObjToString exportJson() const { ConvObjToString c(*this); c.xml = false; c.quotes = true; return c; }
   /// Verwende alternative Namen
   ConvObjToString exportAltNames() const { ConvObjToString c(*this); c.altnam = true; return c; }
-  /// Export mit Einrückungen 
+  /// Export mit Einrückungen
   ConvObjToString doIndent() const { ConvObjToString c(*this); c.indent = true; return c; }
   /// Export ohne Einrückungen
   ConvObjToString noIndent() const { ConvObjToString c(*this); c.indent = false; return c; }
@@ -867,10 +868,10 @@ public:
   static inline bool c_is_chartype(const ConvToStrHint &) { return mobschar(T()); }
   /// Größter möglicher Wert
   static inline uint64_t c_max() { uint64_t u; int64_t i; if (c_to_int64(std::numeric_limits<T>::max(), i)) return uint64_t(i);
-                                   return c_to_uint64(std::numeric_limits<T>::max(), u) ? u : 0; }
+    return c_to_uint64(std::numeric_limits<T>::max(), u) ? u : 0; }
   /// Kleinster möglicher Wert
   static inline int64_t c_min() { uint64_t u; int64_t i; if (c_to_int64(std::numeric_limits<T>::min(), i)) return i;
-                                  return c_to_uint64(std::numeric_limits<T>::min(), u) ? int64_t(u) : 0; }
+    return c_to_uint64(std::numeric_limits<T>::min(), u) ? int64_t(u) : 0; }
   /// Wandeln in uint64
   static inline bool c_to_uint64(T t, uint64_t &u) { return to_uint64(t, u); }
   /// Wandeln in int64
