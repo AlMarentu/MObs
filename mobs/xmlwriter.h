@@ -118,8 +118,8 @@ public:
   std::wstring valueToken; ///< Wenn nicht leer, dann als Attributname für Values verwenden
   std::wstring version = L"1.0"; ///< Version für Header
   bool standalone = true; ///< Angabe für Header
-  bool escapeControl = false; ///< ersetze Zeichen wie "\n" durch "&#xa;"
-
+  /// ersetze Zeichen "\n" und "\r" durch ihre HTML-Sequenz, ebenso das erste sowie letzte führende/folgende Leerzeichen
+  bool escapeControl = true;
 private:
   std::unique_ptr<XmlWriterData> data;
 

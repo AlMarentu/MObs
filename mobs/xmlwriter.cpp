@@ -95,12 +95,12 @@ public:
           break;
       }
   }
-  
+
   void write(wchar_t c) {
 //    if (conFun and (c & ~0x7f))
 //      buffer << wchar_t(conFun(c));
 //    else
-      *wostr << c;
+    *wostr << c;
   }
   void writeIndent() {
     if (indent)
@@ -244,27 +244,47 @@ void XmlWriter::writeAttribute(const std::wstring &attribute, const std::wstring
 
 void XmlWriter::writeValue(const std::wstring &value) {
   data->closeTag();
-  for (const auto c:value)
-    switch (c)
-    {
-      case '<': *data->wostr << L"&lt;"; break;
-      case '>': *data->wostr << L"&gt;"; break;
-      case '&': *data->wostr << L"&amp;"; break;
+  int cnt = 0;
+  for (const auto c:value) {
+    ++cnt;
+    switch (c) {
+      case '<':
+        *data->wostr << L"&lt;";
+        break;
+      case '>':
+        *data->wostr << L"&gt;";
+        break;
+      case '&':
+        *data->wostr << L"&amp;";
+        break;
       case 0 ... 8:
+      case '\t':
       case 11:
       case 12:
       case 14 ... 0x1f:
+      case 0xa0: // "&NonBreakingSpace;"
       case 0xD800 ... 0xDFFF:
       case 0xFFFE ... 0xFFFF:
       case 0x110000 ... 0x7FFFFFFF:
         *data->wostr << L"&#x" << hex << int(c) << L';';
         break;
+      case ' ':
+        if (cnt != 1 and cnt != value.length()) {
+          data->write(c);
+          break;
+        }
+        // fall into
       case '\r':
       case '\n':
-      case '\t':
-        if (escapeControl) { *data->wostr << L"&#x" << hex << int(c) << L';'; break; }
-      default: data->write(c);
+        if (escapeControl) {
+          *data->wostr << L"&#x" << hex << int(c) << L';';
+          break;
+        }
+        // fall into
+      default:
+        data->write(c);
     }
+  }
   data->hasValue = true;
 }
 
@@ -353,7 +373,7 @@ void XmlWriter::setPrefix(const std::wstring &pf) {
 
 void XmlWriter::clearString()
 {
-   data->wstrBuff.clear();
+  data->wstrBuff.clear();
 }
 
 string XmlWriter::getString() const
@@ -362,17 +382,17 @@ string XmlWriter::getString() const
 // ist leer, wenn filebuffer
   switch (data->cs) {
     case CS_iso8859_1: {
-         const wstring &t = data->wstrBuff.str();
-         std::transform(t.begin(), t.cend(), std::back_inserter(result),
-                        [](wchar_t c) -> char{ return u_char(to_iso_8859_1(c)); });
-         return result;
-       }
+      const wstring &t = data->wstrBuff.str();
+      std::transform(t.begin(), t.cend(), std::back_inserter(result),
+                     [](wchar_t c) -> char{ return u_char(to_iso_8859_1(c)); });
+      return result;
+    }
     case CS_iso8859_9: {
-         const wstring &t = data->wstrBuff.str();
-         std::transform(t.begin(), t.cend(), std::back_inserter(result),
-                        [](wchar_t c) -> char{ return u_char(to_iso_8859_9(c)); });
-         return result;
-       }
+      const wstring &t = data->wstrBuff.str();
+      std::transform(t.begin(), t.cend(), std::back_inserter(result),
+                     [](wchar_t c) -> char{ return u_char(to_iso_8859_9(c)); });
+      return result;
+    }
     case CS_iso8859_15: {
       const wstring &t = data->wstrBuff.str();
       std::transform(t.begin(), t.cend(), std::back_inserter(result),

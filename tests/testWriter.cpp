@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -72,6 +72,29 @@ TEST(writerTest, cdata3) {
   EXPECT_EQ(R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <aaa><![CDATA[<![CDATA[]]]><![CDATA[]>]]></aaa>
 )", w.getString());
+}
+
+TEST(writerTest, escaping) {
+  mobs::XmlWriter w;
+  w.escapeControl = false;
+  w.writeTagBegin(L"aaa");
+  w.writeValue(L"  Der Bäcker backt\nBrötchen  ");
+  w.writeTagEnd();
+
+  EXPECT_EQ(R"(
+<aaa>  Der Bäcker backt
+Brötchen  </aaa>
+)", w.getString());
+
+  mobs::XmlWriter w2;
+  w2.writeTagBegin(L"aaa");
+  w2.writeValue(L"  Der Bäcker backt\nBrötchen  ");
+  w2.writeTagEnd();
+
+  EXPECT_EQ(R"(
+<aaa>&#x20; Der Bäcker backt&#xa;Brötchen &#x20;</aaa>
+)", w2.getString());
+
 }
 
 TEST(writerTest, base64) {
