@@ -34,10 +34,8 @@ endif()
 
 
 if(BUILD_MONGO_INTERFACE)
-    find_package(libmongocxx REQUIRED)
-    find_package(libbsoncxx REQUIRED)
-    set(EXTRA_LIBS ${EXTRA_LIBS} ${LIBMONGOCXX_LIBRARIES})
-    include_directories(${LIBMONGOCXX_INCLUDE_DIRS})
+    find_package(mongocxx REQUIRED)
+    set(EXTRA_LIBS ${EXTRA_LIBS} mongo::mongocxx_shared)
     set(libSrcs ${libSrcs} mongo.cpp mongo.h)
 endif()
 

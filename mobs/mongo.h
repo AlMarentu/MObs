@@ -33,6 +33,7 @@
 #include "dbifc.h"
 #include <mongocxx/client.hpp>
 #include <mongocxx/pool.hpp>
+#include <mongocxx/instance.hpp>
 
 namespace mobs {
 
@@ -47,8 +48,7 @@ namespace mobs {
     /// \private
     friend DatabaseManagerData;
     /// \private
-    explicit MongoDatabaseConnection(const ConnectionInformation &connectionInformation) :
-            DatabaseConnection(), ConnectionInformation(connectionInformation) { };
+    explicit MongoDatabaseConnection(const ConnectionInformation &connectionInformation);
     /// \private
     MongoDatabaseConnection(const MongoDatabaseConnection &) = delete;
     ~MongoDatabaseConnection() override = default;
@@ -110,9 +110,11 @@ namespace mobs {
   private:
     class Entry {
     public:
-      Entry(mongocxx::pool &pool) : entry(pool.acquire()) { }
+      explicit Entry(mongocxx::pool &pool);
+      ~Entry() = default;
       mongocxx::client &client() { return *entry; }
       mongocxx::pool::entry entry;
+      static std::unique_ptr<mongocxx::instance> inst;
     };
     std::unique_ptr<Entry> entry;
 

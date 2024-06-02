@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -31,13 +31,11 @@
 #include "unixtime.h"
 #include "helper.h"
 #include "querygenerator.h"
-#include "mchrono.h"
 
 #include <cstdint>
 #include <iostream>
 #include <utility>
 #include <vector>
-#include <chrono>
 #include <bsoncxx/json.hpp>
 #include <bsoncxx/builder/stream/document.hpp>
 #include <mongocxx/client.hpp>
@@ -131,7 +129,7 @@ public:
     else if (mi.isTime)
       doc.append(kvp(name, types::b_date(tp)));
     else if (useChar)
-      doc.append(kvp(name, types::b_utf8(mem.toStr(mobs::ConvToStrHint(compact)))));
+      doc.append(kvp(name, types::b_string(mem.toStr(mobs::ConvToStrHint(compact)))));
     else if (use32)
       doc.append(kvp(name, i32));
     else if (use64)
@@ -181,7 +179,7 @@ public:
       return false;
     if (inArray() and noArrays)
       return arrayIndex() == 0;
-    level.push(Level(level.empty() or (obj.keyElement() and level.top().isKey)));
+    level.emplace(level.empty() or (obj.keyElement() and level.top().isKey));
     return true;
   };
   void doObjEnd(const ObjectBase &obj) override
@@ -223,7 +221,7 @@ public:
       level.top().doc.append(kvp(name, 1));
       return false;
     }
-    level.push(Level(false));
+    level.emplace(false);
     return true;
   };
   void doArrayEnd(const MemBaseVector &vec) override
@@ -378,7 +376,7 @@ public:
       else if (mi.isTime)
         level.top().arr.append(types::b_date(tp));
       else if (useChar)
-        level.top().arr.append(types::b_utf8(mem.toStr(cth)));
+        level.top().arr.append(types::b_string(mem.toStr(cth)));
       else if (use32)
         level.top().arr.append(i32);
       else if (use64)
@@ -401,7 +399,7 @@ public:
       else if (mi.isTime)
         level.top().doc.append(kvp(name, types::b_date(tp)));
       else if (useChar)
-        level.top().doc.append(kvp(name, types::b_utf8(mem.toStr(cth))));
+        level.top().doc.append(kvp(name, types::b_string(mem.toStr(cth))));
       else if (use32)
         level.top().doc.append(kvp(name, i32));
       else if (use64)
@@ -458,7 +456,7 @@ public:
     bool invert() { return neg and op == QueryGenerator::AndBegin; }
   };
 
-  MongoQuery(const QueryGenerator *query) : query(query) {
+  explicit MongoQuery(const QueryGenerator *query) : query(query) {
     if (query)
       query->createLookup(lookUp);
   }
@@ -502,7 +500,7 @@ public:
       level.top().arr.append(make_document(kvp(op, val)));
   }
 
-  void genValue(bsoncxx::builder::basic::document &doc, const std::string name, const QueryGenerator::QueryItem &i) {
+  void genValue(bsoncxx::builder::basic::document &doc, const std::string &name, const QueryGenerator::QueryItem &i) {
     if (i.op != QueryGenerator::Const)
       THROW("no constant");
 //    LOG(LM_INFO, " OPER " << name << " " << i.toString());
@@ -522,7 +520,7 @@ public:
       bsoncxx::decimal128 i128 = bsoncxx::decimal128(0, i.u64);
       doc.append(kvp(name, types::b_decimal128(i128)));
     } else
-      doc.append(kvp(name, types::b_utf8(i.text)));
+      doc.append(kvp(name, types::b_string(i.text)));
   }
 
   void genValue(bsoncxx::builder::basic::array &arr, const QueryGenerator::QueryItem &i) {
@@ -544,11 +542,10 @@ public:
       bsoncxx::decimal128 i128 = bsoncxx::decimal128(0, i.u64);
       arr.append(types::b_decimal128(i128));
     } else
-      arr.append(types::b_utf8(i.text));
+      arr.append(types::b_string(i.text));
   }
 
   void generate() {
-    std::stringstream res;
     int params = 0;
     int vars = 0;
 
@@ -826,7 +823,7 @@ public:
 
 class MongoRead : public mobs::ObjectNavigator  {
 public:
-  MongoRead(ConvObjFromStr c) : mobs::ObjectNavigator(c) { }
+  explicit MongoRead(ConvObjFromStr c) : mobs::ObjectNavigator(std::move(c)) { }
 
   void parsival(const bsoncxx::document::view &v, const std::string& array = "") {
     try {
@@ -888,7 +885,7 @@ public:
               case bsoncxx::type::k_oid:
                 break; // skipped
               case bsoncxx::type::k_utf8:
-                if (not member()->fromStr(e.get_utf8().value.to_string(), cfs))
+                if (not member()->fromStr(e.get_string().value.to_string(), cfs))
                   throw runtime_error(u8"invalid type, can't assign");
                 break;
               case bsoncxx::type::k_bool:
@@ -1011,11 +1008,14 @@ std::string MongoDatabaseConnection::collectionName(const ObjectBase &obj) {
 std::map<std::string, mongocxx::pool> MongoDatabaseConnection::pools;
 
 void MongoDatabaseConnection::close() {
-  entry.release();
+  entry = nullptr;
 }
 
 void MongoDatabaseConnection::open() {
   if (not entry) {
+    if (not Entry::inst)
+      Entry::inst = std::unique_ptr<mongocxx::instance>(new mongocxx::instance);
+
     // "mongodb://my_user:password@localhost:27017/my_database?ssl=true"
     // "mongodb://db1.example.net:27017,db2.example.net:2500/?replicaSet=test&connectTimeoutMS=300000"
     auto it = pools.find(m_url);
@@ -1214,21 +1214,20 @@ MongoDatabaseConnection::query(DatabaseInterface &dbi, ObjectBase &obj, bool qbe
     if (dbi.getCountCursor())
       return std::make_shared<CountCursor>(col.count_documents(bq.value(), c_opt));
     return std::make_shared<Cursor>(col.find(bq.value(), f_opt), dbi.getConnection(), dbi.database(), dbi.getKeysOnly());
-  } else {
-    MongoQuery qgen(query);
-    if (not qgen.lookUp.empty()) {
-      BsonElements bo((mobs::ConvObjToString()));
-      bo.startLookup(qgen.lookUp);
-      obj.traverse(bo);
-    }
-    qgen.generate();
-
-    LOG(LM_DEBUG, "QUERY " << dbi.database() << "." << collectionName(obj) << " " << qgen.result() << "  " << sortLog);
-//    auto doc = bsoncxx::from_json(q); doc.view()
-    if (dbi.getCountCursor())
-      return std::make_shared<CountCursor>(col.count_documents(qgen.value(), c_opt));
-    return std::make_shared<Cursor>(col.find(qgen.value(), f_opt), dbi.getConnection(), dbi.database(), dbi.getKeysOnly());
   }
+  MongoQuery qgen(query);
+  if (not qgen.lookUp.empty()) {
+    BsonElements bo((mobs::ConvObjToString()));
+    bo.startLookup(qgen.lookUp);
+    obj.traverse(bo);
+  }
+  qgen.generate();
+
+  LOG(LM_DEBUG, "QUERY " << dbi.database() << "." << collectionName(obj) << " " << qgen.result() << "  " << sortLog);
+//    auto doc = bsoncxx::from_json(q); doc.view()
+  if (dbi.getCountCursor())
+    return std::make_shared<CountCursor>(col.count_documents(qgen.value(), c_opt));
+  return std::make_shared<Cursor>(col.find(qgen.value(), f_opt), dbi.getConnection(), dbi.database(), dbi.getKeysOnly());
 }
 
 void
@@ -1355,5 +1354,15 @@ void MongoDatabaseConnection::deleteFile(DatabaseInterface &dbi, const std::stri
   bsoncxx::document::element el = doc.view()["v"];
   gridfs_bucket.delete_file(el.get_value());
 }
+
+MongoDatabaseConnection::MongoDatabaseConnection(const ConnectionInformation &connectionInformation) :
+    DatabaseConnection(), ConnectionInformation(connectionInformation) { }
+
+MongoDatabaseConnection::Entry::Entry(mongocxx::pool &pool) : entry(pool.acquire()) {
+  if (not entry)
+    THROW("can´t get entry");
+}
+
+std::unique_ptr<mongocxx::instance> MongoDatabaseConnection::Entry::inst;
 
 }
