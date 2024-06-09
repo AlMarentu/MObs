@@ -5,7 +5,7 @@ include_directories(BEFORE ${PROJECT_SOURCE_DIR}/mobs GTest::include)
 add_executable(test1 gtest_main.cc
         testObjtypes.cpp testObjgen.cpp testUnion.cpp testBlob.cpp testParser.cpp
         testUnixTime.cpp testObjpool.cpp testCharset.cpp testWriter.cpp testHelper.cpp testCrypt.cpp
-        testStreamBuffer.cpp testMChrono.cpp testMrpc.cpp)
+        testStreamBuffer.cpp testMChrono.cpp testCache.cpp testMrpc.cpp)
 
 target_link_libraries(test1 GTest::gtest mobs pthread)
 if(WIN32)

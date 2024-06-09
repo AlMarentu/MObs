@@ -1,10 +1,10 @@
 
 set(libSrcs objgen.cpp objtypes.cpp logging.cpp strtoobj.cpp objpool.cpp xmlwriter.cpp audittrail.cpp
         xmlout.cpp xmlread.cpp converter.cpp unixtime.cpp dbifc.cpp helper.cpp mchrono.cpp queryorder.cpp
-        querygenerator.cpp csb.cpp nbuf.cpp tcpstream.cpp mrpc.cpp
+        objcache.cpp querygenerator.cpp csb.cpp nbuf.cpp tcpstream.cpp mrpc.cpp
         converter.h logging.h objpool.h objtypes.h unixtime.h xmlparser.h xmlwriter.h audittrail.h
         jsonparser.h objgen.h objstore.h union.h xmlout.h xmlread.h dbifc.h helper.h mchrono.h queryorder.h
-        querygenerator.h csb.h nbuf.h tcpstream.h mrpcsession.h mrpc.h)
+        objcache.h querygenerator.h csb.h nbuf.h tcpstream.h mrpcsession.h mrpc.h)
 
 if (WIN32)
 else()

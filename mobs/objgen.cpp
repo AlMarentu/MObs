@@ -25,6 +25,7 @@
 #include "xmlwriter.h"
 #include "converter.h"
 #include "csb.h"
+#include "objcache.h"
 #include <map>
 
 
@@ -463,7 +464,7 @@ std::string ObjectBase::keyStr(int64_t *ver) const
   traverseKey(kd);
   if (ver)
     *ver = kd.version;
-  if (kd.result().empty())
+  if (kd.fst)
     throw runtime_error(STRSTR(getObjectName() << u8"::keyStr: KEYELEMENT missing"));
   return kd.result();
 }
@@ -1200,7 +1201,10 @@ std::string MemBaseVector::to_string(const ConvObjToString& cth) const
 
 
 /////////////////////////////////////////////////
-
+// aus objCache weil escapeColon hier static
+std::string ObjCache::escapeKey(const std::string &key) {
+  return escapeColon(key);
+}
 
 }
 
