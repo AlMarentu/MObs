@@ -21,100 +21,48 @@
 
 
 #include "objcache.h"
+#include "lrucache.h"
 
 
 namespace mobs {
 
 class ObjCacheData {
 public:
-  class Info {
-  public:
-    explicit Info(std::shared_ptr<const ObjectBase> p) : ptr(std::move(p)), pos(++cnt) { }
-    std::shared_ptr<const ObjectBase> ptr;
-    u_int64_t pos;
-  };
-  void used(Info &info) {
-    auto it = lru.find(info.pos);
-    if (it == lru.end())
-      THROW("cache is inconsistent");
-    info.pos = ++cnt;
-    lru.emplace(info.pos, it->second);
-    lru.erase(it);
-  }
-  // um ein Element verkleinern
-  void reduce() {
-    auto it = lru.begin();
-    if (it == lru.end())
-      return;
-    cache.erase(it->second);
-    lru.erase(it);
-  }
-  std::map<std::string, Info> cache;
-  std::map<u_int64_t, std::string> lru;
-  static u_int64_t cnt;
+  LRUCache<const ObjectBase> cache;
 };
 
-u_int64_t ObjCacheData::cnt = 0;
 
 void ObjCache::save(const ObjectBase &obj) {
   std::string key = obj.objNameKeyStr();
   auto p = std::shared_ptr<ObjectBase>(obj.createNew());
   p->doCopy(obj);
-  auto it = data->cache.find(key);
-  if (it == data->cache.end()) {
-    it = data->cache.emplace(key, ObjCacheData::Info(std::move(p))).first;
-    if (it == data->cache.end())
-      THROW("can't save " << key);
-    data->lru[it->second.pos] = key;
-  } else {
-    it->second.ptr = std::move(p);
-    data->used(it->second);
-  }
+  data->cache.insert(key, p);
 }
 
 void ObjCache::save(std::shared_ptr<const ObjectBase> &op) {
   std::string key = op->objNameKeyStr();
   //auto p = std::shared_ptr<const ObjectBase>(op.release());
-  auto it = data->cache.find(key);
-  if (it == data->cache.end()) {
-    it = data->cache.emplace(key, ObjCacheData::Info(op)).first;
-    if (it == data->cache.end())
-      THROW("can't save " << key);
-    data->lru[it->second.pos] = key;
-  } else {
-    it->second.ptr = op;
-    data->used(it->second);
-  }
+  data->cache.insert(std::move(key), op);
 }
 
 bool ObjCache::load(ObjectBase &obj) const{
-  auto it = data->cache.find(obj.objNameKeyStr());
-  if (it == data->cache.end())
+  auto o = data->cache.lookup(obj.objNameKeyStr());
+  if (not o)
     return false;
-  data->used(it->second);
-  obj.doCopy(*it->second.ptr);
+  obj.doCopy(*o);
   return true;
 }
 
 bool ObjCache::exists(const ObjectBase &obj) const {
-  auto it = data->cache.find(obj.objNameKeyStr());
-  if (it == data->cache.end())
-    return false;
-  return true;
+  return data->cache.exists(obj.objNameKeyStr());
 }
 
 std::shared_ptr<const ObjectBase> ObjCache::searchObj(const std::string &objIdent) const {
-  auto it = data->cache.find(objIdent);
-  if (it == data->cache.end())
-    return {};
-  data->used(it->second);
-  return it->second.ptr;
+  return data->cache.lookup(objIdent);
 }
 
 size_t ObjCache::reduce(size_t n) {
-  while (data->lru.size() > n)
-    data->reduce();
-  return data->lru.size();
+  return data->cache.reduceCount(n);
 }
 
 ObjCache::ObjCache() {

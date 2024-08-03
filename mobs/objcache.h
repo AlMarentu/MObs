@@ -32,7 +32,7 @@ namespace mobs {
 class ObjCacheData;
 /** \brief Klasse zum cachen von Objekten die von mobs::ObjectBase abgeleitet sind
  *
- * In den Objekten muss mindestens ein KEYELEMENT defeiniert sein.
+ * In den Objekten muss mindestens ein KEYELEMENT definiert sein.
  * Wird über einem Object-Ident gesucht müssen die einzelnen Key-Elemente mittels escapeKey() verwendet werden, falls
  * diese Doppelpunkt oder Backslash enthalten können.
  */
@@ -51,7 +51,7 @@ public:
   bool load(ObjectBase &obj) const;
   /** \brief sucht ein Objekt vom BasisTyp mobs::objectBase anhand vorausgefüllter Schlüsselfelder aus dem Cache
    *
-   * Es wird lediglich die Key-Information geprüft, nicht der gesamte Objhektinhalt
+   * Es wird lediglich die Key-Information geprüft, nicht der gesamte Objektinhalt
    * @param obj  Object mit gefüllten Key-Elementen zur Suche
    * @return true, wenn im Cache vorhanden
    */
@@ -93,7 +93,7 @@ public:
   }
   /** \brief speichert ein Objekte im Cache
     *
-    * Dabei wird ein neuer shared_ptr erzeugt. shared_ptr, die auf das vormalige Objekt verweisen bleiben unberührt.
+    * Dabei wird ein shared_ptr aus dem unique_ptr erzeugt.
     *
     * @param obj uniq Zeiger auf das Objekt; obj wird im Anschluß mit nullptr gefüllt (move)
     * @return shared Zeiger auf das gespeicherte Objekt
