@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2024 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -48,7 +48,7 @@ namespace {
 class NOPData {
 public:
 //  NOPData() { TRACE(""); };
-  virtual ~NOPData() = default;;
+  virtual ~NOPData() = default;
   virtual void assign(const string &objName, shared_ptr<NamedObject> obj) = 0;
   virtual bool lookup(const string &objName, weak_ptr<NamedObject> &ptr) = 0;
   virtual void search(const string &searchName, std::list<pair<std::string, std::weak_ptr<NamedObject>>> &result) = 0;
@@ -91,7 +91,7 @@ void NOPDataMap::assign(const string &objName, shared_ptr<NamedObject> obj)
   }
   else if ( obj )
   {
-    auto result = pool.emplace(make_pair(objName, NOD(objName, obj)));
+    auto result = pool.emplace(objName, NOD(objName, obj));
     if (not result.second)
       throw runtime_error(string("Element ") + objName + " insert error");
     LOG(LM_DEBUG, "Element " << objName << " inserted");
@@ -114,7 +114,7 @@ void NOPDataMap::search(const string &searchName, std::list<pair<std::string, st
   auto e = pool.upper_bound(searchName + "\177");
   for (auto i = pool.lower_bound(searchName); i != e; i++)
   {
-    result.emplace(result.end(), make_pair(i->first, i->second.ptr));
+    result.emplace(result.end(), i->first, i->second.ptr);
   }
 }
 
@@ -176,7 +176,7 @@ void NOPDataUnordered::assign(const string &objName, shared_ptr<NamedObject> obj
   }
   else if ( obj )
   {
-    auto result = pool.emplace(make_pair(objName, NOD(objName, obj)));
+    auto result = pool.emplace(objName, NOD(objName, obj));
     if (not result.second)
       throw runtime_error(string("Element ") + objName + " insert error");
     LOG(LM_DEBUG, "Element " << objName << " inserted");
@@ -238,7 +238,7 @@ NamedObjPool::~NamedObjPool()
 void NamedObjPool::assign(const string& objName, shared_ptr<NamedObject> obj)
 {
   TRACE(PARAM(objName));
-  return data->assign(objName, std::move(obj));
+  data->assign(objName, std::move(obj));
 }
 
 bool NamedObjPool::lookup(const string &objName, weak_ptr<NamedObject> &ptr)
