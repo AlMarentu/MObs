@@ -152,6 +152,8 @@ void logMessage(loglevel l, std::function<std::string()> message);
 
 /// \brief Hilfs-Makro das einen Stream als std::string ausgibt
 #define STRSTR(x) ([&]()->std::string { std::stringstream ___s___; ___s___ << x; return ___s___.str(); })()
+/// \brief Hilfs-Makro das einen Stream als std::wstring ausgibt
+#define WSTRSTR(x) ([&]()->std::wstring { std::wstringstream ___s___; ___s___ << x; return ___s___.str(); })()
 /// \brief Makro zum Erzeugen eines Log std::string für exceptions o.ä.
 #define LOGSTR(x) STRSTR(__FILE_NAME__ << ':' << __LINE__ << ' ' << std::boolalpha << x)
 
