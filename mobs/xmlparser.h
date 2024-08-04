@@ -662,7 +662,7 @@ public:
       inParse2LtWork = false;
       if (not Traits::eq_int_type(curr, '<'))  // Hauptschleife verlassen
       {
-        LOG(LM_DEBUG, "READY "  << mobs::to_string(buffer));
+        //LOG(LM_DEBUG, "READY "  << mobs::to_string(buffer));
         saved += buffer;
         if (saved.size() > maxElementSize)
           throw std::runtime_error(u8"Element too large");

@@ -622,13 +622,15 @@ public:
   ConvObjFromStr useAutoNames() const {  ConvObjFromStr c(*this); c.oriNam = true; c.altNam = true; return c; }
   /// Vektoren beim Schreiben entsprechend verkleinern
   ConvObjFromStr useDontShrink() const {  ConvObjFromStr c(*this); c.shrink = false; return c; }
-  /// null-Elemente werden beim Einlesen abhängig von \c nullAllowed  auf null gesetzt im anderen Fall wird statt den Fehler zu ignorieren, eine exception geworfen
+  /// null-Elemente werden beim Einlesen abhängig von \c nullAllowed  auf null gesetzt im anderen Fall wird eine exception geworfen
   ConvObjFromStr useExceptNull() const {  ConvObjFromStr c(*this); c.null = except; return c; }
-  /// null-Elemente werden beim Einlesen überlesen
+  /// null-Elemente werden beim Einlesen generell überlesen
   ConvObjFromStr useOmitNull() const {  ConvObjFromStr c(*this); c.null = omit; return c; }
-  /// null-Elemente werden beim Einlesen anhand \c nullAllowed behandelt
+  /// null-Elemente werden beim Einlesen anhand \c nullAllowed behandelt also ignoriert, wenn nullAllowed = false
+  ConvObjFromStr useIgnoreNull() const {  ConvObjFromStr c(*this); c.null = ignore; return c; }
+  /// null-Elemente werden beim Einlesen anhand \c nullAllowed behandelt und Leer gesetzt, wenn nullAllowed = false
   ConvObjFromStr useClearNull() const {  ConvObjFromStr c(*this); c.null = clear; return c; }
-  /// null-Elemente werden beim Einlesen unabhängig von \c nullAllowed  auf null gesetzt
+  /// null-Elemente werden beim Einlesen unabhängig von \c nullAllowed  auf null gesetzt (default)
   ConvObjFromStr useForceNull() const {  ConvObjFromStr c(*this); c.null = force; return c; }
   /// wird versucht eine unbekannte Variable einzulesen, wird eine exception geworfen
   ConvObjFromStr useExceptUnknown() const {  ConvObjFromStr c(*this); c.exceptUnk = true; return c; }
@@ -654,7 +656,7 @@ protected:
   /// \private
   bool ignCase = false;
   /// \private
-  enum Nulls null = ignore;
+  enum Nulls null = force;
   /// \private
   DecrypFun decryptor = nullptr;
 };

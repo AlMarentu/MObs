@@ -868,7 +868,12 @@ bool ObjectNavigator::setNull() {
     switch (cfs.nullHandling()) {
       case ConvObjFromStr::omit: break;
       case ConvObjFromStr::force: memVec->forceNull(); break;
-      case ConvObjFromStr::clear: memVec->clear(); break;
+      case ConvObjFromStr::clear:
+        if (not memVec->nullAllowed())
+          memVec->clear();
+        else
+          memVec->forceNull();
+        break;
       case ConvObjFromStr::except:
         if (not memVec->nullAllowed())
           throw runtime_error(u8"ObjectNavigator: writing null to member " + showName() + " w/o nullAllowed");
@@ -885,7 +890,12 @@ bool ObjectNavigator::setNull() {
     switch (cfs.nullHandling()) {
       case ConvObjFromStr::omit: break;
       case ConvObjFromStr::force: member()->forceNull(); break;
-      case ConvObjFromStr::clear: member()->clear(); break;
+      case ConvObjFromStr::clear:
+        if (not member()->nullAllowed())
+          member()->clear();
+        else
+          member()->forceNull();
+        break;
       case ConvObjFromStr::except:
         if (not member()->nullAllowed())
           throw runtime_error(u8"ObjectNavigator: writing null to member " + showName() + " w/o nullAllowed");
@@ -904,7 +914,12 @@ bool ObjectNavigator::setNull() {
     switch (cfs.nullHandling()) {
       case ConvObjFromStr::omit: break;
       case ConvObjFromStr::force: objekte.top().obj->forceNull(); break;
-      case ConvObjFromStr::clear: objekte.top().obj->clear(); break;
+      case ConvObjFromStr::clear:
+        if (not objekte.top().obj->nullAllowed())
+          objekte.top().obj->clear();
+        else
+          objekte.top().obj->forceNull();
+        break;
       case ConvObjFromStr::except:
         if (not objekte.top().obj->nullAllowed())
           throw runtime_error(u8"ObjectNavigator: writing null to member " + showName() + " w/o nullAllowed");

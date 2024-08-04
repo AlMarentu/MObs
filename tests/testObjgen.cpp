@@ -165,6 +165,35 @@ public:
   MemVar(u32string, U32string);
 };
 
+class DataTypesNull : virtual public mobs::ObjectBase {
+public:
+  ObjInit(DataTypesNull);
+
+  MemVar(bool, Bool, USENULL);
+  MemVar(char, Char, USENULL);
+  MemVar(char16_t, Char16_t, USENULL);
+  MemVar(char32_t, Char32_t, USENULL);
+  MemVar(wchar_t, Wchar_t, USENULL);
+  MemVar(signed char, SignedChar, USENULL);
+  MemVar(short int, ShortInt, USENULL);
+  MemVar(int, Int, USENULL);
+  MemVar(long int, LongInt, USENULL);
+  MemVar(long long int, LongLongInt, USENULL);
+  MemVar(unsigned char, UnsignedChar, USENULL);
+  MemVar(unsigned short int, UnsignedShortInt, USENULL);
+  MemVar(unsigned int, UnsignedInt, USENULL);
+  MemVar(unsigned long int, UnsignedLongLong, USENULL);
+  MemVar(unsigned long long int, UnsignedLongLongInt, USENULL);
+  MemVar(float, Float, USENULL);
+  MemVar(double, Double, USENULL, USENULL);
+  MemVar(long double, LongDouble, USENULL);
+  MemVar(string, String, USENULL);
+  MemVar(wstring, Wstring, USENULL);
+  MemVar(u16string, U16string, USENULL);
+  MemVar(u32string, U32string, USENULL);
+};
+
+
 TEST(objgenTest, chartype) {
   DataTypes dt;
   auto cth = mobs::ConvToStrHint(false);
@@ -239,10 +268,115 @@ TEST(objgenTest, emptyVars) {
   EXPECT_EQ(u"", dt.U16string());
   EXPECT_EQ(U"", dt.U32string());
 
+}
+
+TEST(objgenTest, forceNull) {
+  DataTypes dt;
+
+  dt.Bool.forceNull();
+  EXPECT_EQ(false, dt.Bool());
   dt.Char.forceNull();
   EXPECT_EQ('\0', dt.Char());
+  dt.Int.forceNull();
+  EXPECT_EQ(0, dt.Int());
+
+  string leerNull = R"({Bool:null,Char:null,Char16_t:" ",Char32_t:" ",Wchar_t:" ",SignedChar:" ",ShortInt:0,Int:null,LongInt:0,LongLongInt:0,UnsignedChar:" ",UnsignedShortInt:0,UnsignedInt:0,UnsignedLongLong:0,UnsignedLongLongInt:0,Float:0,Double:0,LongDouble:0,String:"",Wstring:"",U16string:"",U32string:""})";
+  EXPECT_EQ(leerNull, mobs::to_string(dt));
+  string xmlNull = R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<root>
+  <Bool/>
+  <Char/>
+  <Char16_t>&#x20;</Char16_t>
+  <Char32_t>&#x20;</Char32_t>
+  <Wchar_t>&#x20;</Wchar_t>
+  <SignedChar>&#x20;</SignedChar>
+  <ShortInt>0</ShortInt>
+  <Int/>
+  <LongInt>0</LongInt>
+  <LongLongInt>0</LongLongInt>
+  <UnsignedChar>&#x20;</UnsignedChar>
+  <UnsignedShortInt>0</UnsignedShortInt>
+  <UnsignedInt>0</UnsignedInt>
+  <UnsignedLongLong>0</UnsignedLongLong>
+  <UnsignedLongLongInt>0</UnsignedLongLongInt>
+  <Float>0</Float>
+  <Double>0</Double>
+  <LongDouble>0</LongDouble>
+  <String></String>
+  <Wstring></Wstring>
+  <U16string></U16string>
+  <U32string></U32string>
+</root>
+)";
+  EXPECT_EQ(xmlNull, dt.to_string(mobs::ConvObjToString().exportXml().doIndent()));
+
+
+  dt.Bool.setEmpty();
+  EXPECT_EQ(false, dt.Bool());
   dt.Char.setEmpty();
   EXPECT_EQ(' ', dt.Char());
+  dt.Int.setEmpty();
+  EXPECT_EQ(0, dt.Int());
+
+  string leerEmpty = R"({Bool:false,Char:" ",Char16_t:" ",Char32_t:" ",Wchar_t:" ",SignedChar:" ",ShortInt:0,Int:0,LongInt:0,LongLongInt:0,UnsignedChar:" ",UnsignedShortInt:0,UnsignedInt:0,UnsignedLongLong:0,UnsignedLongLongInt:0,Float:0,Double:0,LongDouble:0,String:"",Wstring:"",U16string:"",U32string:""})";
+  EXPECT_EQ(leerEmpty, mobs::to_string(dt));
+
+}
+
+TEST(objgenTest, emptyVarsNull) {
+  DataTypesNull dt;
+  EXPECT_EQ(false, dt.Bool());
+  EXPECT_EQ('\0', dt.Char());
+  EXPECT_EQ(u'\0', dt.Char16_t());
+  EXPECT_EQ(U'\0', dt.Char32_t());
+  EXPECT_EQ(L'\0', dt.Wchar_t());
+  EXPECT_EQ('\0', dt.SignedChar());
+  EXPECT_EQ(0, dt.ShortInt());
+  EXPECT_EQ(0, dt.Int());
+  EXPECT_EQ(0, dt.LongInt());
+  EXPECT_EQ(0, dt.LongLongInt());
+  EXPECT_EQ('\0', dt.UnsignedChar());
+  EXPECT_EQ(0, dt.UnsignedShortInt());
+  EXPECT_EQ(0, dt.UnsignedInt());
+  EXPECT_EQ(0, dt.UnsignedLongLong());
+  EXPECT_EQ(0, dt.UnsignedLongLongInt());
+  EXPECT_EQ(0.0, dt.Float());
+  EXPECT_EQ(0.0, dt.Double());
+  EXPECT_EQ(0.0, dt.LongDouble());
+  EXPECT_EQ(u8"", dt.String());
+  EXPECT_EQ(L"", dt.Wstring());
+  EXPECT_EQ(u"", dt.U16string());
+  EXPECT_EQ(U"", dt.U32string());
+
+  string leerNull = R"({Bool:null,Char:null,Char16_t:null,Char32_t:null,Wchar_t:null,SignedChar:null,ShortInt:null,Int:null,LongInt:null,LongLongInt:null,UnsignedChar:null,UnsignedShortInt:null,UnsignedInt:null,UnsignedLongLong:null,UnsignedLongLongInt:null,Float:null,Double:null,LongDouble:null,String:null,Wstring:null,U16string:null,U32string:null})";
+  EXPECT_EQ(leerNull, mobs::to_string(dt));
+  string xmlNull = R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<root>
+  <Bool/>
+  <Char/>
+  <Char16_t/>
+  <Char32_t/>
+  <Wchar_t/>
+  <SignedChar/>
+  <ShortInt/>
+  <Int/>
+  <LongInt/>
+  <LongLongInt/>
+  <UnsignedChar/>
+  <UnsignedShortInt/>
+  <UnsignedInt/>
+  <UnsignedLongLong/>
+  <UnsignedLongLongInt/>
+  <Float/>
+  <Double/>
+  <LongDouble/>
+  <String/>
+  <Wstring/>
+  <U16string/>
+  <U32string/>
+</root>
+)";
+  EXPECT_EQ(xmlNull, dt.to_string(mobs::ConvObjToString().exportXml().doIndent()));
 
 }
 
@@ -1043,6 +1177,54 @@ TEST(objgenTest, findVectorObject) {
 }
 
 
+
+class DtTypes : virtual public mobs::ObjectBase {
+public:
+  ObjInit(DtTypes);
+
+  MemVar(bool, Bool);
+  MemVar(char, Char);
+  MemVar(int, Int);
+  MemVar(float, Float);
+  MemVar(double, Double);
+  MemVar(string, String);
+  MemVar(wstring, Wstring);
+};
+
+TEST(objgenTest, readnull) {
+  string leerNull = R"({Bool:null,Char:null,Int:null,Float:null,Double:null,String:null,Wstring:null})";
+  DtTypes n1, n2;
+  mobs::string2Obj(leerNull, n1, mobs::ConvObjFromStr());
+  EXPECT_TRUE(n1.Bool.isNull());
+  EXPECT_TRUE(n1.Char.isNull());
+  EXPECT_TRUE(n1.Int.isNull());
+  EXPECT_TRUE(n1.Float.isNull());
+  EXPECT_TRUE(n1.Double.isNull());
+  EXPECT_TRUE(n1.String.isNull());
+  EXPECT_TRUE(n1.Wstring.isNull());
+
+  string xmlNull = R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<root>
+  <Bool/>
+  <Char/>
+  <Int/>
+  <Float/>
+  <Double/>
+  <LongDouble/>
+  <String/>
+  <Wstring/>
+</root>
+)";
+  mobs::string2Obj(xmlNull, n2, mobs::ConvObjFromStr().useXml());
+  EXPECT_TRUE(n2.Bool.isNull());
+  EXPECT_TRUE(n2.Char.isNull());
+  EXPECT_TRUE(n2.Int.isNull());
+  EXPECT_TRUE(n2.Float.isNull());
+  EXPECT_TRUE(n2.Double.isNull());
+  EXPECT_TRUE(n2.String.isNull());
+  EXPECT_TRUE(n2.Wstring.isNull());
+
+}
 
 #if 0
 TEST(objgenTest, compare) {

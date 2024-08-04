@@ -102,7 +102,7 @@ TEST(writerTest, base64) {
 
   const char *s = "Polyfon zwitschernd aßen Mäxchens Vögel Rüben, Joghurt und Quark";
   std::vector<u_char> v;
-  for (const char * cp = s; *cp; cp++)
+  for (const char *cp = s; *cp; cp++)
     v.push_back(*cp);
   w.writeHead();
   w.writeTagBegin(L"aaa");
