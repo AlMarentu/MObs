@@ -140,7 +140,7 @@ public:
           XmlReader(str, c), object(obj), decrypFun(c.getDecFun()) { }
   /// \private
   void StartTag(const std::string &element) override {
-    if (element == "root") {
+    if (element == "root" or (object.hasFeature(OTypeAsXRoot) != Unset and element == object.getObjectName())) {
       fill(&object);
       done = true;
     }

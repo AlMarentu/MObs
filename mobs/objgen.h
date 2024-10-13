@@ -203,7 +203,7 @@ namespace mobs {
 
 /// \private
 enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Embedded, DbCompact, DbDetail, DbVersionField, DbAuditTrail,
-                 Key1, Key2, Key3, Key4, Key5, DbJson, XmlEncrypt,
+                 Key1, Key2, Key3, Key4, Key5, DbJson, XmlEncrypt, OTypeAsXRoot,
                  AltNameBase = 1000, AltNameEnd = 1999,
                  ColNameBase = 2000, ColNameEnd = 3999,
                  PrefixBase = 4000, PrefixEnd = 4999,
@@ -221,6 +221,7 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 #define DBJSON mobs::DbJson ///< In nicht dokumentbasierten Datenbanken wird das Unterobjekt als Text im JSON-Format abgelegt
 #define VERSIONFIELD mobs::DbVersionField ///< In diesem Feld wird die Objektversion gespeichert, 0 entspricht noch nicht gespeichert
 #define AUDITTRAIL mobs::DbAuditTrail ///< für dieses Objekt wird automatisch ein Audit Trail mitgeführt
+#define USEOBJTYPE mobs::OTypeAsXRoot ///< bei Ausgabe als XML-als Wurzelelement, den Objekttyp statt 'root' verwenden
 #define KEYELEMENT1 mobs::Key1 ///<  Schlüsselelement der Priorität 1 (erstes Element)
 #define KEYELEMENT2 mobs::Key2 ///< Schlüsselelement der Priorität 2
 #define KEYELEMENT3 mobs::Key3 ///< Schlüsselelement der Priorität 3

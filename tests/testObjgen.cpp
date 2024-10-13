@@ -834,7 +834,7 @@ TEST(objgenTest, keys) {
 
 class ObjX : virtual public mobs::ObjectBase {
 public:
-  ObjInit(ObjX, COLNAME(sonst));
+  ObjInit(ObjX, COLNAME(sonst), USEOBJTYPE);
   MemVar(int, id, KEYELEMENT1, ALTNAME(grimoald));
   MemVar(int, a, ALTNAME(pippin));
   MemVar(int, b, ALTNAME(karl));
@@ -874,7 +874,7 @@ TEST(objgenTest, conftoken) {
   EXPECT_EQ("{grimoald:0,pippin:0,karl:0,c:0,karlmann:null,ludwig:[]}", o.to_string(mobs::ConvObjToString().exportAltNames()));
 
   string xml = R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<root>
+<ObjX>
   <grimoald>0</grimoald>
   <pippin>0</pippin>
   <karl>0</karl>
@@ -887,7 +887,7 @@ TEST(objgenTest, conftoken) {
     <ee>0</ee>
   </karlmann>
   <ludwig></ludwig>
-</root>
+</ObjX>
 )";
   o.d[0]("");
   o.o.setEmpty();
@@ -969,7 +969,7 @@ TEST(objgenTest, readxml2) {
   EXPECT_EQ("{id:12,a:17,b:null,c:33,o:null,d:[null,\"c\"]}", o.to_string(mobs::ConvObjToString()));
   string xml = o.to_string(mobs::ConvObjToString().exportXml().doIndent());
   EXPECT_EQ(R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<root>
+<ObjX>
   <id>12</id>
   <a>17</a>
   <b/>
@@ -977,7 +977,7 @@ TEST(objgenTest, readxml2) {
   <o/>
   <d/>
   <d>c</d>
-</root>
+</ObjX>
 )", xml);
 
   EXPECT_NO_THROW(mobs::string2Obj(xml, o2, mobs::ConvObjFromStr().useXml().useForceNull()));

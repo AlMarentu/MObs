@@ -79,6 +79,7 @@ void MemberBase::doConfig(MemVarCfg c)
     case PrefixBase ... PrefixEnd:
     case VectorNull:
     case DbJson:
+    case OTypeAsXRoot:
       break;
   }
 }
@@ -167,6 +168,7 @@ void MemBaseVector::doConfig(MemVarCfg c)
     case Embedded:
     case XmlAsAttr:
     case DbVersionField:
+    case OTypeAsXRoot:
       break;
   }
 
@@ -234,6 +236,7 @@ void ObjectBase::doConfig(MemVarCfg c)
     case LengthBase ... LengthEnd:
     case DbJson:
     case XmlEncrypt:
+    case OTypeAsXRoot:
     case Embedded: m_config.push_back(c); break;
     case InitialNull: nullAllowed(true); break;
     case Key1 ... Key5: m_key = c - Key1 + 1; break;
@@ -260,6 +263,7 @@ void ObjectBase::doConfigObj(MemVarCfg c)
     case AltNameBase ... AltNameEnd: break;
     case PrefixBase ... PrefixEnd: break;
     case DbAuditTrail:
+    case OTypeAsXRoot:
     case ColNameBase ... ColNameEnd: m_config.push_back(c); break;
     case LengthBase ... LengthEnd:
     case DbCompact:

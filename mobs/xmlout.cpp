@@ -46,7 +46,7 @@ bool XmlOut::doObjBeg(const ObjectBase &obj)
   if (name.empty())
     name = to_wstring(obj.getName(cth));
   if (name.empty())
-    name = data->level() == 0 ? L"root": to_wstring(obj.getObjectName());
+    name = data->level() == 0 and obj.hasFeature(OTypeAsXRoot) == Unset ? L"root": to_wstring(obj.getObjectName());
 
   ConvObjToString::EncrypFun ef = nullptr;
   if (data->cryptingLevel() == 0 and obj.hasFeature(XmlEncrypt))
