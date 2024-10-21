@@ -121,7 +121,7 @@ std::string formatDate(const struct tm &ts) {
 
 class SQLInformixdescription : public mobs::SQLDBdescription {
 public:
-  explicit SQLInformixdescription(const string &dbName) : dbPrefix(dbName + ".") {
+  explicit SQLInformixdescription(const string &dbName) : dbPrefix(dbName + ":") {
     changeTo_is_IfNull = false;
     createWith_IfNotExists = true;
     orderInSelect = true; // Es müssen alle Elemente des "order by" auch im "select" vorkommen
