@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2024 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -260,19 +260,17 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
  @param name Name
  */
 #define MemObj(typ, name, ...) typ name = typ(#name, this, { __VA_ARGS__ })
-
-/*! \brief Makro für Definitionen im Objekt das von ObjectBase angeleitet ist
+#define COMMA ,
+#define ObjInitDerived2(objname, initializer, ...) \
+objname(const objname &that) : ObjectBase() initializer { doConfigObj({ __VA_ARGS__ }); ObjectBase::doCopy(that); } \
+ObjInit1(objname, __VA_ARGS__ )
+/*! \brief Makro für Definitionen im Objekt das von ObjectBase abgeleitet ist
  @param objname Name der Klasse (muss von ObjectBase abgeleitet sein)
  */
-#define ObjInit(objname, ...) \
-objname(const objname &that) : ObjectBase() { std::vector<mobs::MemVarCfg> cv = { __VA_ARGS__ }; for (auto c:cv) doConfigObj(c); \
-ObjectBase::doCopy(that); }  ObjInit1(objname, __VA_ARGS__ )
-/*! \brief Makro für Definitionen im Objekt das von ObjectBase abgeleitet ist ohne copy constructor
- @param objname Name der Klasse (muss von ObjectBase abgeleitet sein)
- */
-#define ObjInit1(objname, ...) \
+#define ObjInit(objname, ...) ObjInitDerived2(objname, , __VA_ARGS__)
+#define ObjInit2(objname, initializer, ...) \
 using baseType = objname;      \
-objname() : ObjectBase() { std::vector<mobs::MemVarCfg> cv = { __VA_ARGS__ }; doConfClear(); for (auto c:cv) doConfigObj(c); doInit(); objname::init(); setModified(false); } \
+objname() : ObjectBase() initializer { doConfClear(); doConfigObj({ __VA_ARGS__ }); doInit(); objname::init(); setModified(false); } \
 objname(mobs::MemBaseVector *m, mobs::ObjectBase *o, const std::vector<mobs::MemVarCfg> &cv = {}) : ObjectBase(m, o, cv) \
   { doInit(); objname::init(); setModified(false); } \
 objname(const std::string &name, ObjectBase *t, const std::vector<mobs::MemVarCfg> &cv) : ObjectBase(name, t, cv) \
@@ -284,6 +282,22 @@ static ObjectBase *createMe(ObjectBase *parent = nullptr) { if (parent) return n
 ObjectBase *createNew() const override { return new objname(); } \
 std::string getObjectName() const override { return #objname; } \
 static std::string objName() { return #objname; }
+/*! \brief Makro für Definitionen im Objekt das von ObjectBase abgeleitet ist ohne copy constructor
+ @param objname Name der Klasse (muss von ObjectBase abgeleitet sein)
+ */
+#define ObjInit1(objname, ...) ObjInit2(objname, , __VA_ARGS__)
+/*! \brief Makro für Definitionen im Objekt das von ObjectBase sowie einer weiteren Klasse abgeleitet ist.
+ @param objname Name der Klasse (muss von ObjectBase abgeleitet sein)
+ @param initializer Name einer weiteren Klasse, deren default-Konstruktor aufgerufen wird.
+ Ist die weitere Klasse ebenfalls von ObjectBase abgeleitet, so muss sie public von der primären Klasse abgeleitet sein
+ \verbatim
+    class ObjE3 : public ObjE1 {
+    public:
+      ObjInitDerived(ObjE3, ObjE1);
+      ...
+ \endverbatim
+ */
+#define ObjInitDerived(objname, initializer, ...) ObjInitDerived2(objname, COMMA initializer())
 
 /*! \brief Makro um eine Objektklasse am Objekt-Generator anzumelden
  @param name Name des Objektes
@@ -542,7 +556,7 @@ public:
   using  baseType = ObjectBase; ///< Basistyp
   using  findType = std::string; ///< typ für contains/find
   ObjectBase() = default;
-  ObjectBase(const ObjectBase &that) = delete;
+  explicit ObjectBase(const ObjectBase &that) = delete;
   /// \private
   virtual ~ObjectBase() = default;
   /// erzeuge leeres Duplikat;
@@ -694,6 +708,8 @@ protected:
   /// \private
   void doConfigObj(MemVarCfg c);
   /// \private
+  void doConfigObj(const std::vector<mobs::MemVarCfg> &cv);
+  /// \private
   void doConfClear() { m_altName = Unset; } // Bei Vererbung keinen Namen erben
   /// \private
   void clear(bool null);
@@ -776,7 +792,7 @@ public:
   Member() = delete;
   /// \private
   Member(const std::string& n, ObjectBase *o, const std::vector<MemVarCfg>& cv) : MemberBase(n, o, cv), wert(T())
-        { TRACE(PARAM(n) << PARAM(this)); if (o) o->regMem(this); doClear(); } // Konstruktor innerhalb  Objekt nur intern
+        { if (o) o->regMem(this); doClear(); } // Konstruktor innerhalb  Objekt nur intern
   /// \private
   Member(MemBaseVector *m, ObjectBase *o, const std::vector<MemVarCfg>& cv) : MemberBase(m, o, cv) { doClear(); } // Konstruktor f. Array nur intern
   /// \private
@@ -1008,7 +1024,7 @@ public:
   /// Start-Iterator
   iterator begin() noexcept { return iterator(werte.begin()); }
   /// Ende-Iterator
-  iterator end() noexcept { if (werte.size() <= size()) return iterator(werte.end()); return iterator(werte.begin()+size()); }
+  iterator end() noexcept { if (werte.size() <= size()) return iterator(werte.end()); return iterator(werte.begin()+static_cast<long int>(size())); }
   /// Start-Iterator reverse
   reverse_iterator rbegin() noexcept { return reverse_iterator(end()); }
   /// Ende-Iterator revers

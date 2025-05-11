@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2024 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -89,19 +89,20 @@ mobs::CryptBufNone::int_type mobs::CryptBufNone::underflow() {
 std::streamsize mobs::CryptBufNone::underflowWorker(bool nowait) {
   std::streamsize sz = std::distance(&data->inputBuf[0], data->inputStart);
   do {
-    std::streamsize s = nowait ? canRead() : data->inputBuf.size() - sz;
-    if (s > data->inputBuf.size() - sz)
-      s = data->inputBuf.size() - sz;
+    auto maxFree = std::streamsize(data->inputBuf.size()) - sz;
+    std::streamsize s = nowait ? canRead() : maxFree;
+    if (s < 0 or s > maxFree)
+      s = maxFree;
     if (nowait and s <= 0)
       break;
     std::streamsize n = doRead((char *)data->inputStart, s);
-    if (not n) {
+    if (n == 0) {
       data->finished = true;
       break;
     }
     data->inputStart += n;
     sz += n;
-  } while (sz < data->inputBuf.size() / 2); // Buffer wenigstens halb voll kriegen
+  } while (sz < static_cast<std::streamsize>(data->inputBuf.size() / 2)); // Buffer wenigstens halb voll kriegen
   data->inputStart = &data->inputBuf[0];
   Base::setg(&data->inputBuf[0], &data->inputBuf[0], &data->inputBuf[sz]);
   return sz;
@@ -113,9 +114,7 @@ mobs::CryptBufNone::int_type mobs::CryptBufNone::overflow(mobs::CryptBufNone::in
 //  std::cout << "overflow3 " << int(ch) << "\n";
   try {
     if (Base::pbase() != Base::pptr()) {
-      int len;
-      std::array<u_char, INPUT_BUFFER_LEN> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
-      size_t ofs = 0;
+      //std::array<u_char, INPUT_BUFFER_LEN> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
 
 //    size_t  s = std::distance(Base::pbase(), Base::pptr());
 //    char *cp =  (Base::pbase());
@@ -126,7 +125,7 @@ mobs::CryptBufNone::int_type mobs::CryptBufNone::overflow(mobs::CryptBufNone::in
       CryptBufBase::setp(data->buffer.begin(), data->buffer.end()); // buffer zurücksetzen
     }
     if (not Traits::eq_int_type(ch, Traits::eof()))
-      Base::sputc(ch);
+      Base::sputc(Traits::to_char_type(ch));
     if (isGood())
       return ch;
   } catch (std::exception &e) {

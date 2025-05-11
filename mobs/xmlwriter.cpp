@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2024 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -244,7 +244,7 @@ void XmlWriter::writeAttribute(const std::wstring &attribute, const std::wstring
 
 void XmlWriter::writeValue(const std::wstring &value) {
   data->closeTag();
-  int cnt = 0;
+  size_t cnt = 0;
   for (const auto c:value) {
     ++cnt;
     switch (c) {
@@ -273,14 +273,14 @@ void XmlWriter::writeValue(const std::wstring &value) {
           data->write(c);
           break;
         }
-        // fall into
+        __attribute__ ((fallthrough));
       case '\r':
       case '\n':
         if (escapeControl) {
           *data->wostr << L"&#x" << hex << int(c) << L';';
           break;
         }
-        // fall into
+        __attribute__ ((fallthrough));
       default:
         data->write(c);
     }
@@ -423,7 +423,7 @@ void XmlWriter::startEncrypt(CryptBufBase *cbbp) {
   writeAttribute(L"Algorithm", L"https://www.w3.org/2001/04/xmlenc#" + to_wstring(cbbp->name()));
   writeTagEnd();
   size_t rcpt = cbbp->recipients();
-  for (auto i = 0; i < rcpt; i++) {
+  for (size_t i = 0; i < rcpt; i++) {
     writeTagBegin(L"KeyInfo");
     writeAttribute(L"xmlns", L"https://www.w3.org/2000/09/xmldsig#");
     writeTagBegin(L"KeyName");

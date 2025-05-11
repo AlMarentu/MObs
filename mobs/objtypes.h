@@ -923,7 +923,7 @@ public:
   /// \private
   static inline bool c_to_double(float t, double &d) { d = t; return true; }
   /// \private
-  static inline bool c_from_double(double d, float &t) { t = d; return true; }
+  static inline bool c_from_double(double d, float &t) { t = static_cast<float>(d); return true; }
 };
 
 

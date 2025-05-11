@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -88,11 +88,14 @@ public:
   }
 #endif
 
-  std::istream &inStb;
-  std::unique_ptr<CryptBufBase> cbb = nullptr;
+  std::istream &inStb; // Stream der Quelle ist Byte-orientiert und konvertiert beim Einlesen in wchar
+  std::unique_ptr<CryptBufBase> cbb = nullptr; // Crypto-Buffer für
   std::mbstate_t state{};
   std::array<CryptIstrBuf::char_type, INPUT_BUFFER_SIZE> buffer;
-  CryptIstrBuf::pos_type pos = 0;
+  CryptIstrBuf::pos_type pos = 0; // Anzahl Zeichen für seekoff
+  // kann beim Lesen eines Blockes die Zeichensatzkonvertierung nicht bis zum Ende laufen,
+  // dann denn Rest hier parken, bis ein weiterer Block vom input-Stream kommt.
+  // Mit den Folge-Daten sollte dann die Zeichensatzkonvertierung klappen.
   std::unique_ptr<std::vector<char>> rest;
 };
 
@@ -329,8 +332,7 @@ std::streamsize CryptIstrBuf::showmanyc() {
 
   if (not data->cbb)
     return 0;
-  if (data->rest)
-    return -1;
+  // unabhängig von data->rest geht es nur weiter wenn der Input-Stream neue Daten hat oder EOF ist
   return data->cbb->in_avail();
 }
 
@@ -548,7 +550,7 @@ public:
           case 3:
             *it++ = u_char(b64Value >> 10);
             *it++ = u_char((b64Value >> 2) & 0xff);
-            // fall into
+            __attribute__ ((fallthrough));
           case 100:
             b64Cnt = 999; // Wenn noch ein = kommt -> fehler
             break;
@@ -647,12 +649,12 @@ public:
       if (readLimit >= 0)
         readLimit -= sr;
       char *cp = &lookahead[0];
-      for (size_t i = 0; i < lookaheadCnt; i++)
+      for (std::streamsize i = 0; i < lookaheadCnt; i++)
         b64get(u_char(*cp++), it);
       lookaheadCnt = 0;
       cp = &buf[0];
       if (sr)
-        for (size_t i = 0; i < sr; i++)
+        for (std::streamsize i = 0; i < sr; i++)
           b64get(u_char(*cp++), it);
       else {
         if (b64Cnt > 0)
@@ -755,14 +757,14 @@ public:
 
   std::ostream *outStb = nullptr;
   std::istream *inStb = nullptr;
-  std::array<CryptBufBase::char_type, C_IN_BUF_SZ> buffer;
+  std::array<CryptBufBase::char_type, C_IN_BUF_SZ> buffer; // NOLINT(cppcoreguidelines-pro-type-member-init)
   mutable std::array<CryptBufBase::char_type, 4> lookahead;
   bool use64 = false;
   bool bad = false;
 
   int b64Value = 0;
   int b64Cnt = 0;
-  mutable int lookaheadCnt = 0;
+  mutable std::streamsize lookaheadCnt = 0;
   Base64Info b64;
   mutable std::streamsize readLimit = -1;
 };
@@ -828,7 +830,7 @@ CryptBufBase::int_type CryptBufBase::overflow(CryptBufBase::int_type ch) {
 //    std::cout << "empty2\n";
 
   if (not Traits::eq_int_type(ch, Traits::eof()))
-    Base::sputc(ch);
+    Base::sputc(Traits::to_char_type(ch));
   if (data->isGood())
     return ch;
   return Traits::eof();
@@ -935,7 +937,7 @@ std::streamsize Base64IstBuf::showmanyc() {
 class BinaryIstrBufData {
 public:
   BinaryIstrBufData(CryptIstrBufData *cid, size_t len) :
-      binaryLength(len), inStb(cid->inStb), cbb(cid->cbb.get()) { }
+      binaryLength(static_cast<std::streamsize>(len)), inStb(cid->inStb), cbb(cid->cbb.get()) { }
 
   ~BinaryIstrBufData() = default;
 
@@ -945,7 +947,7 @@ public:
       return 0;
     std::streamsize sz = 0;
     if (cbb) {
-      std::streamsize rd = buffer.size();
+      auto rd = static_cast<std::streamsize>(buffer.size());
       auto av = cbb->in_avail();
       if (av == 0) {
         // evt. auf neue Zeichen warten
@@ -964,7 +966,7 @@ public:
         return 0;
       std::istream::sentry sen(inStb, true);
       if (sen) {
-        std::streamsize rd = buffer.size();
+        auto rd = static_cast<std::streamsize>(buffer.size());
         if (rd > binaryLength)
           rd = binaryLength;
         inStb.read(&buffer[0], rd);
@@ -989,7 +991,7 @@ public:
     return sz;
   }
 
-  size_t binaryLength;
+  std::streamsize binaryLength;
   std::istream &inStb;
   CryptBufBase *cbb;
   std::array<BinaryIstBuf::char_type, INPUT_BUFFER_SIZE> buffer;
@@ -1001,11 +1003,11 @@ BinaryIstBuf::BinaryIstBuf(CryptIstrBuf &ci, size_t len) {
   // Buffer zu Beginn leer
   std::streamsize sz = 0;
   if (ci.data->rest) {
-    sz = ci.data->rest->size();
+    sz = static_cast<std::streamsize>(ci.data->rest->size());
     if (sz > data->binaryLength)
       sz = data->binaryLength;
     std::copy_n(ci.data->rest->begin(), sz, data->buffer.begin());
-    if (ci.data->rest->size() > sz) {
+    if (static_cast<std::streamsize>(ci.data->rest->size()) > sz) {
       ci.data->rest->erase(ci.data->rest->begin(), ci.data->rest->begin() + sz);
       //std::copy_n(&(*ci.data->rest)[sz], ci.data->rest->size() - sz, ci.data->rest->begin());
       //ci.data->rest->resize(ci.data->rest->size() - sz);

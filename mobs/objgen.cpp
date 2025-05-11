@@ -3,7 +3,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2024 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -625,6 +625,15 @@ void ObjectBase::clear(bool null)
   else
     activate();
   cleared(); // Callback
+}
+
+/////////////////////////////////////////////////
+/// ObjectBase::doConfigObj
+/////////////////////////////////////////////////
+void ObjectBase::doConfigObj(const vector <mobs::MemVarCfg> &cv)
+{
+  for (auto c:cv)
+    doConfigObj(c);
 }
 
 

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.1.0)
 project(MObs LANGUAGES CXX)
-project(MObs VERSION 0.2.0)
+project(MObs VERSION 0.3.0)
 
 # alternative OpenSSL
 if(APPLE)
@@ -24,6 +24,14 @@ option(BUILD_INFORMIX_INTERFACE "Build the Informix database modules" OFF)
 if(NOT DEFINED CMAKE_CXX_STANDARD)
     set(CMAKE_CXX_STANDARD 11)
 endif()
+
+add_compile_options(-Wall -Wextra -Wconversion -Woverloaded-virtual -Wnon-virtual-dtor -Wpointer-arith -Wcast-align
+        -Wno-unused-local-typedef -Wno-unknown-pragmas -Wno-unused-function
+        #TODO
+        -Wno-unused-parameter -Wno-type-limits -Wno-sign-conversion
+        -Wno-unused-variable -Wno-braced-scalar-init -Wno-implicit-float-conversion -Wno-shorten-64-to-32
+        -Wno-deprecated-declarations -Wno-sign-compare -Wno-implicit-int-conversion -Wno-pessimizing-move
+        -Wno-unused-private-field -Wno-unused-but-set-variable)
 
 include_directories(${CMAKE_SOURCE_DIR}/mobs)
 

@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2024 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -481,15 +481,15 @@ public:
    @param pos Position des Fehlers im Xml-Buffer
    @return zu parsender Text-Buffer
    */
-  std::string info(size_t &pos) const {
+  std::string info(std::streamoff &pos) const {
     pos = istr.tellg();
 //    std::cerr << "CUR = " << Traits::to_char_type(curr) << " " << pos << std::endl;
     std::wstring w;
-    Traits::char_type c;
+    Traits::int_type c;
     w += Traits::to_char_type(curr);
     for (int i = 0; i < 50; i++) {
       if (Traits::not_eof((c = get())))
-        w += c;
+        w += Traits::to_char_type(c);
       else
         break;
     }
@@ -643,7 +643,7 @@ public:
           return;
         if (not inParse2LtWork) {
           eat('>');
-          //parse2LT();
+          // parsen bis der Arz kommt oder ein '<'
           buffer.clear();
           inParse2LtWork = true;
           continue;
@@ -691,7 +691,7 @@ public:
         if (lastKey == element)
         {
           if (in64)
-            saveValue(); // nur whitespace prüfen
+            saveValueCheckWS(); // nur whitespace prüfen
           if (xmlEncState > 0) {
 //            LOG(LM_DEBUG, "XV " << element << " " << xmlEncState);
             if (element == u8"CipherValue") {
@@ -759,7 +759,7 @@ public:
           buffer.clear();
           parse2CD();
           if (try64) {
-            saveValue();  // nur whitespace prüfen
+            saveValueCheckWS();  // nur whitespace prüfen
             base64.done();
             Base64(base64data);
             clearValue();
@@ -974,11 +974,11 @@ public:
     }
     if (Traits::not_eof(curr))
       THROW(u8"Syntax error");
-    // nur noch für check Whitespace bis eof
-    saveValue();
-    if (not tags.empty())
-      THROW(u8" expected tag at EOF: " + tags.top().element);
     endOfFile = true;
+    if (not tags.empty()) // Am Ende sollten keine offenen Tags übrig bleiben
+      THROW(u8" expected tag at EOF: " + tags.top().element);
+    // nur noch für check Whitespace bis eof
+    saveValueCheckWS();
   };
   std::istream &byteStream(size_t len, CryptBufBase *cbbp = nullptr) {
     auto wbufp = dynamic_cast<CryptIstrBuf*>(istr.rdbuf());
@@ -1009,13 +1009,13 @@ private:
     if (Traits::not_eof(curr)) {
       buffer += Traits::to_char_type(curr);
       while (Traits::not_eof((curr = get()))) {
-//      std::cout << "x " << mobs::to_string(Traits::to_char_type(curr));
+        // std::cout << "x " << mobs::to_string(Traits::to_char_type(curr));
         switch(Traits::to_char_type(curr)) {
           case '\n':
           case '\r':
           case '\t':
             curr = L' ';
-            // fallthrough;
+            __attribute__ ((fallthrough));
           case ' ':
           case '<':
           case '>':
@@ -1036,7 +1036,7 @@ private:
         //buffer += Traits::to_char_type(curr);
       }
       if (not Traits::not_eof(curr))
-        THROW("Syntax");
+        THROW("XmlParseW Syntax");
     }
   };
   void parse2Char(Traits::char_type c) {
@@ -1052,6 +1052,8 @@ private:
       }
       curr = get();
     }
+    if (not Traits::not_eof(curr))
+      LOG(LM_DEBUG, "XmlParse::parse2Char EOF");
   };
   void parse2Com() {
     for (;;) {
@@ -1096,7 +1098,7 @@ private:
   };
   void clearValue() { saved.clear(); }; // der Zwischenraum fand Verwendung
 /// Verwaltet den Zwischenraum zwischen den <..Tags..>
-  void saveValue() {
+  void saveValueCheckWS() {
     // wenn nicht verwendet, darf es nur white space sein
     if (not saved.empty())
     {
@@ -1203,7 +1205,7 @@ private:
       else if (conFun) // Wandlung bei ISO-Zeichensätzen
       {
         wchar_t (*cf)(wchar_t) = conFun;
-        std::transform(buf.cbegin()+posS, buf.cbegin()+posE, std::back_inserter(result),
+        std::transform(buf.cbegin()+int(posS), buf.cbegin()+int(posE), std::back_inserter(result),
                        [cf](const wchar_t c) -> wchar_t { return (c <= 127) ? c : cf(c); });
         break;
       }

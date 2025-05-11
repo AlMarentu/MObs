@@ -2,7 +2,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2024 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -559,7 +559,7 @@ TEST(objgenTest, const_iterator) {
   it += 4;
   EXPECT_EQ(u8"+40", it->number());
   int i = 0;
-  for(auto const a:cinfo.kontakte)
+  for(auto const &a:cinfo.kontakte)
     i++;
   EXPECT_EQ(5, i);
   std::string s;
@@ -1016,7 +1016,7 @@ public:
 
 class ObjE3b : public ObjE1 {
 public:
-  ObjInit(ObjE3b);
+  ObjInitDerived(ObjE3b, ObjE1);
 
   MemVar(int, xx);
   MemVar(int, zz);

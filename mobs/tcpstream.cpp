@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -144,7 +144,7 @@ socketHandle TcpAccept::acceptConnection(struct sockaddr &addr, size_t &len) con
   static std::mutex mutex;
   std::lock_guard<std::mutex> guard(mutex);
 
-  socklen_t addrLen = len;
+  socklen_t addrLen = socklen_t(len);
   LOG(LM_DEBUG, "Accepting " << fd);
   int fdneu = ::accept(fd, &addr, &addrLen);
   len = addrLen;
@@ -248,11 +248,11 @@ public:
   }
 
   std::string getRemoteHost() const {
-    return hostName((sockaddr &)remoteAddr, addrLen);
+    return hostName((sockaddr &)remoteAddr, socklen_t(addrLen));
   }
 
   std::string getRemoteIp() const {
-    return hostIp((sockaddr &)remoteAddr, addrLen);
+    return hostIp((sockaddr &)remoteAddr, socklen_t(addrLen));
   }
 
   bool setTOS(int tos) const {

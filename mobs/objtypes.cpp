@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -141,7 +141,7 @@ bool string2x(const std::string &str, char &t) {
     return false;
   if ((c & 0xffffff00))
     return false;
-  t = c;
+  t = static_cast<char>(c);
   return true;
 }
 
@@ -153,7 +153,7 @@ bool string2x(const std::string &str, signed char &t) {
     return false;
   if ((c & 0xffffff00))
     return false;
-  t = c;
+  t = static_cast<signed char>(c);
   return true;
 }
 
@@ -165,7 +165,7 @@ bool string2x(const std::string &str, unsigned char &t) {
     return false;
   if ((c & 0xffffff00))
     return false;
-  t = c;
+  t = static_cast<unsigned char>(c);
   return true;
 }
 
@@ -177,7 +177,7 @@ bool string2x(const std::string &str, char16_t &t) {
     return false;
   if ((c & 0xffff0000))
     return false;
-  t = c;
+  t = static_cast<char16_t>(c);
   return true;
 }
 

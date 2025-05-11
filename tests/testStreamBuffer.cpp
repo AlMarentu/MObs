@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2024 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -452,18 +452,18 @@ TEST(streamBufferTest, codecKill) {
   auto inputEnd = input + strlen(input);
   std::mbstate_t state{};
   const char *bp2;
-  std::array<wchar_t, 256> result;
+  std::array<wchar_t, 256> result{};
   wchar_t *bit2;
   std::use_facet<std::codecvt<wchar_t, char, std::mbstate_t>>(lo).in(state, input, inputEnd, bp2,
                      &result[0], &result[result.size()], bit2);
   //EXPECT_EQ(bp2, input + strlen(input));
   EXPECT_EQ('\200', *bp2);
-  EXPECT_EQ(wstring(L"Mümmelmännchen€"), wstring(&result[0], std::distance(&result[0], bit2)));
+  EXPECT_EQ(wstring(L"Mümmelmännchen€"), wstring(&result[0], size_t(std::distance(&result[0], bit2))));
   auto s2 = bp2 +4;
   std::use_facet<std::codecvt<wchar_t, char, std::mbstate_t>>(lo).in(state, s2, inputEnd, bp2,
                                                                      &result[0], &result[result.size()], bit2);
   EXPECT_EQ(bp2, inputEnd);
-  EXPECT_EQ(wstring(L"€Otto"), wstring(&result[0], std::distance(&result[0], bit2)));
+  EXPECT_EQ(wstring(L"€Otto"), wstring(&result[0], size_t(std::distance(&result[0], bit2))));
 
 }
 
@@ -482,7 +482,7 @@ TEST(streamBufferTest, dataInUTF8) {
   std::array<wchar_t, 1024> buf;
   auto sz = x2in.readsome(&buf[0], buf.size());
   ASSERT_GT(sz, 0);
-  EXPECT_EQ(std::wstring(L"Mümmelmännchen€"), std::wstring(&buf[0], sz));
+  EXPECT_EQ(std::wstring(L"Mümmelmännchen€"), std::wstring(&buf[0], size_t(sz)));
   //EXPECT_TRUE(x2in.eof());
 
   x2in.clear();
@@ -504,7 +504,7 @@ TEST(streamBufferTest, dataInUTF8) {
 
   sz = x2in.readsome(&buf[0], buf.size());
   ASSERT_GT(sz, 0);
-  EXPECT_EQ(std::wstring(L"€Otto"), std::wstring(&buf[0], sz));
+  EXPECT_EQ(std::wstring(L"€Otto"), std::wstring(&buf[0], size_t(sz)));
   EXPECT_FALSE(x2in.eof());
 
   x2in.clear();
@@ -524,7 +524,7 @@ TEST(streamBufferTest, dataInUTF8) {
 
   sz = x2in.readsome(&buf[0], buf.size());
   ASSERT_GT(sz, 0);
-  EXPECT_EQ(std::wstring(L"€ßß"), std::wstring(&buf[0], sz));
+  EXPECT_EQ(std::wstring(L"€ßß"), std::wstring(&buf[0], size_t(sz)));
   EXPECT_FALSE(x2in.eof());
 
   EXPECT_TRUE(x2in.get(ch).eof());
@@ -541,10 +541,10 @@ TEST(streamBufferTest, dataStreamInUTF8) {
   std::locale lo = std::locale(std::locale(), new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
   x2in.imbue(lo);
 
-  std::array<wchar_t, 1024> buf;
+  std::array<wchar_t, 1024> buf{};
   auto sz = x2in.readsome(&buf[0], buf.size());
   ASSERT_GT(sz, 0);
-  EXPECT_EQ(std::wstring(L"Mümmelmännchen€"), std::wstring(&buf[0], sz));
+  EXPECT_EQ(std::wstring(L"Mümmelmännchen€"), std::wstring(&buf[0], size_t(sz)));
   //EXPECT_TRUE(x2in.eof());
 
   x2in.clear();
@@ -571,7 +571,7 @@ TEST(streamBufferTest, dataStreamInUTF8) {
 
   sz = x2in.readsome(&buf[0], buf.size());
   ASSERT_GT(sz, 0);
-  EXPECT_EQ(std::wstring(L"€Otto"), std::wstring(&buf[0], sz));
+  EXPECT_EQ(std::wstring(L"€Otto"), std::wstring(&buf[0], size_t(sz)));
   EXPECT_FALSE(x2in.eof());
 
   x2in.clear();
@@ -597,7 +597,7 @@ TEST(streamBufferTest, dataStreamInUTF8) {
 
   sz = x2in.readsome(&buf[0], buf.size());
   ASSERT_GT(sz, 0);
-  EXPECT_EQ(std::wstring(L"€ßß"), std::wstring(&buf[0], sz));
+  EXPECT_EQ(std::wstring(L"€ßß"), std::wstring(&buf[0], size_t(sz)));
   wchar_t wch;
   EXPECT_TRUE(x2in.get(wch).eof());
 
@@ -643,7 +643,6 @@ TEST(streamBufferTest, StrBufUtf8WithBin) {
 #else
   istream &bin2 = xr.byteStream(3);
 #endif
-  char ch = ' ';
   ASSERT_FALSE(bin2.bad());
   std::string tmp;
   bin2 >> tmp;

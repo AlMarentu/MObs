@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -106,10 +106,10 @@ public:
 // z.B.: DBDATE=DMY4.
 std::string formatDate(const struct tm &ts) {
   int4 i_date;
-  static short mdy[3]; // = { 12, 10, 2007 };
-  mdy[0] = mint(ts.tm_mon + 1);
-  mdy[1] = mint(ts.tm_mday);
-  mdy[2] = mint(ts.tm_year + 1900);
+  int2 mdy[3]; // = { 12, 10, 2007 };
+  mdy[0] = int2(ts.tm_mon + 1);
+  mdy[1] = int2(ts.tm_mday);
+  mdy[2] = int2(ts.tm_year + 1900);
   int e;
   if ((e = rmdyjul(mdy, &i_date)))
     throw informix_exception("Error formatting date ", e);
@@ -161,8 +161,6 @@ public:
       res << "BOOLEAN"; //"SMALLINT";
     else if (mi.isFloat)
       res << "FLOAT";
-//    else if (mi.isBlob)
-//      res << "TEXT";
     else if (mem.is_chartype(mobs::ConvToStrHint(compact))) {
       if (mi.is_specialized and mi.size == 1)
         res << "CHAR(1)";
@@ -192,23 +190,23 @@ public:
 
   void startWriting() override
   {
-    LOG(LM_INFO, "START");
+    LOG(LM_DEBUG, "START");
     fldCnt = 0;
     pos = 0;
   }
 
   void finishWriting() override {
-    LOG(LM_INFO, "FINISH");
+    LOG(LM_DEBUG, "FINISH");
   }
 
   std::string valueStmtIndex(size_t i) override {
     LOG(LM_DEBUG, "Informix SqlVar index: " << fldCnt << "=" << i);
     ifx_sqlvar_t &sql_var = descriptor->sqlvar[fldCnt++];
     memset(&sql_var, 0, sizeof(ifx_sqlvar_t));
-    descriptor->sqld = fldCnt;
+    descriptor->sqld = int2(fldCnt);
     sql_var.sqltype = SQLINT;
     setBuffer(sql_var);
-    *(int32_t *)(sql_var.sqldata) = i;
+    *(int32_t *)(sql_var.sqldata) = int32_t(i);
     return "?";
   }
 
@@ -218,9 +216,9 @@ public:
       return isNull ? string("null"):mobs::to_quote(tx);
     ifx_sqlvar_t &sql_var = descriptor->sqlvar[fldCnt++];
     memset(&sql_var, 0, sizeof(ifx_sqlvar_t));
-    descriptor->sqld = fldCnt;
+    descriptor->sqld = int2(fldCnt);
     sql_var.sqltype = SQLVCHAR;
-    unsigned int sz = tx.length() + 1;
+    unsigned int sz = static_cast<unsigned int>(tx.length()) + 1;
     if (tx.empty()) {
       sql_var.sqltype = SQLCHAR;
       sz = 2;
@@ -325,7 +323,7 @@ public:
     }
     ifx_sqlvar_t &sql_var = descriptor->sqlvar[fldCnt++];
     memset(&sql_var, 0, sizeof(ifx_sqlvar_t));
-    descriptor->sqld = fldCnt;
+    descriptor->sqld = int2(fldCnt);
     int e = 0;
     if (mi.isTime and mi.granularity >= 86400000000) { // nur Datum
       struct tm ts{};
@@ -336,10 +334,10 @@ public:
       if (mem.isNull())
         e = rsetnull(sql_var.sqltype, sql_var.sqldata);
       else {
-        short mdy[3]; //  { 12, 21, 2007 };
-        mdy[0] = mint(ts.tm_mon + 1);
-        mdy[1] = mint(ts.tm_mday);
-        mdy[2] = mint(ts.tm_year + 1900);
+        int2 mdy[3]; //  { 12, 21, 2007 };
+        mdy[0] = int2(ts.tm_mon + 1);
+        mdy[1] = int2(ts.tm_mday);
+        mdy[2] = int2(ts.tm_year + 1900);
         e = rmdyjul(mdy, (int4 *) sql_var.sqldata);
       }
     }
@@ -489,7 +487,7 @@ public:
         // strip trailing blanks
         for (char *cp = col.sqldata + col.sqllen - 2; *cp == ' ' and cp >= col.sqldata; --cp)
           *cp = '\0';
-        // fall into
+        __attribute__ ((fallthrough));
       case SQLLVARCHAR:
       case SQLNVCHAR:
       case SQLVCHAR:
@@ -567,7 +565,6 @@ public:
 //          ok = false;
 //        break;
       case SQLBYTES:
-      case SQLTEXT:
       default:
         throw runtime_error(u8"conversion error in " + mem.getElementName() + " Type=" + to_string(col.sqltype));
     }
@@ -593,8 +590,6 @@ public:
       return;
     }
     null = false;
-    bool ok = true;
-    int e = 0;
 
     switch (col.sqltype) {
       case SQLCHAR:
@@ -602,7 +597,7 @@ public:
         // strip trailing blanks
         for (char *cp = col.sqldata + col.sqllen - 2; *cp == ' ' and cp >= col.sqldata; --cp)
           *cp = '\0';
-        // fall into
+        __attribute__ ((fallthrough));
       case SQLLVARCHAR:
       case SQLNVCHAR:
       case SQLVCHAR:

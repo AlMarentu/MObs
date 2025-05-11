@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2024 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -226,9 +226,9 @@ static const char tab_7up[] =
 wchar_t to_7up(wchar_t c) {
   if (sizeof(tab_7up) != 581)
     abort();
-  if (c < 0 or c > sizeof(tab_7up))
+  if (c < 0 or c > static_cast<size_t>(sizeof(tab_7up)))
     return L' ';
-  return tab_7up[size_t(c)];
+  return static_cast<size_t>(tab_7up[size_t(c)]);
 }
 
 codec_iso8859_1::result codec_iso8859_1::do_out(mbstate_t& state,
@@ -457,6 +457,7 @@ std::wstring::const_iterator to7Up(std::wstring::const_iterator begin, std::wstr
       case 'E':
         if (last == 'A' or last == 'O' or last == 'U') // Umschrift AE OE UE ignorieren
           break;
+        __attribute__ ((fallthrough));
       default:
         if (n == last)
           continue;
@@ -544,7 +545,7 @@ void Base64Reader::put(wchar_t c) {
         case 3:
           base64.push_back(b64Value >> 10);
           base64.push_back((b64Value >> 2) & 0xff);
-          // fall into
+          __attribute__ ((fallthrough));
         case 100:
           b64Cnt = 999; // Wenn noch ein = kommt ⇒ fehler
           break;
@@ -704,7 +705,7 @@ bool StringFormatter::empty() const {
 int StringFormatter::format(const wstring &input, wstring &result, int ruleBegin) const {
   if (ruleBegin < 1)
     ruleBegin = 1;
-  for (int i = ruleBegin -1; i < data->rules.size(); i++) {
+  for (size_t i = ruleBegin -1; i < data->rules.size(); i++) {
     StringFormatterData::Rule &rule = data->rules[i];
     wsmatch match;
     if (regex_match(input, match, rule.regex)) {

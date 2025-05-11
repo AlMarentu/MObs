@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -57,7 +57,7 @@ public:
 
 class Obj0 : virtual public BaseObj, virtual public mobs::ObjectBase {
 public:
-  ObjInit(Obj0);
+  ObjInitDerived(Obj0, BaseObj);
 
   MemVar(int, aa);
   MemVar(int, bb);
@@ -70,7 +70,7 @@ ObjRegister(Obj0);
 
 class Obj1 : virtual public BaseObj, virtual public mobs::ObjectBase {
   public:
-  ObjInit(Obj1);
+  ObjInitDerived(Obj1, BaseObj);
   MemVar(int, i1,);
   MemVar(std::string, xx);
   MemVar(int, zz);
@@ -82,7 +82,7 @@ ObjRegister(Obj1);
 
 class Obj2 : virtual BaseObj, virtual public mobs::ObjectBase {
   public:
-  ObjInit(Obj2);
+  ObjInitDerived(Obj2, BaseObj);
   MemVar(int, id, KEYELEMENT1);
   MemVar(int, xx);
   Obj2 &toObj2() override { return *this; };

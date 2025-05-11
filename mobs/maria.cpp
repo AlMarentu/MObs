@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -436,7 +436,7 @@ void MariaDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &obj
     LOG(LM_DEBUG, "SQL " << s);
     if (mysql_real_query(connection, s.c_str(), s.length()))
       throw mysql_exception(u8"save failed", connection);
-    int rows = mysql_affected_rows(connection);
+    auto rows = mysql_affected_rows(connection);
     LOG(LM_DEBUG, "ROWS " << rows);
     // update: wenn sich, obwohl gefunden, nichts geändert hat, wird hier auch 0 geliefert - die Version muss sich aber immer ändern
     // replace: 2, wenn zuvor delete nötig

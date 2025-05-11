@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2024 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -154,7 +154,7 @@ void FileMultiLog::logString(const std::string &str) {
   if (written != str.size())
     throw std::runtime_error("Cannot write log file");
 #else
-  if (write(handle, str.c_str(), str.size()) != str.size())
+  if (write(handle, str.c_str(), str.size()) != ssize_t(str.size()))
     throw std::runtime_error("Cannot write log file");
 #endif
 }
@@ -174,7 +174,7 @@ LogMultiBuf::int_type LogMultiBuf::overflow(int_type ch) {
   }
 
   if (not Traits::eq_int_type(ch, Traits::eof()))
-    Base::sputc(ch);
+    Base::sputc(Traits::to_char_type(ch));
   return ch;
 }
 

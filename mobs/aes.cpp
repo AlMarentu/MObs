@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2024 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -91,13 +91,13 @@ public:
     // plaintext. We use a single iteration (the 6th parameter).
 //    key.fill(0);
 //    iv.fill(0);
-    if (not EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha1(), &salt[0], (u_char*)passwd.c_str(), passwd.length(), 1, &key[0], &iv[0]))
+    if (not EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha1(), &salt[0], (u_char*)passwd.c_str(), int(passwd.length()), 1, &key[0], &iv[0]))
       throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
   }
 
   void newSalt()
   {
-    int r = RAND_bytes(&salt[0], salt.size());
+    int r = RAND_bytes(&salt[0], int(salt.size()));
     if (r < 0)
       throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
   }
@@ -148,7 +148,7 @@ void mobs::CryptBufAes::hashAlgorithm(const std::string &algo) {
 }
 
 void mobs::CryptBufAes::getRand(std::vector<u_char> &rand) {
-  int r = RAND_bytes(&rand[0], rand.size());
+  int r = RAND_bytes(&rand[0], int(rand.size()));
   if (r < 0)
     throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
 }
@@ -234,27 +234,28 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::underflow() {
 int mobs::CryptBufAes::underflowWorker(bool nowait) {
   int len;
   std::streamsize sz = std::distance(&data->inputBuf[0], data->inputStart);
-  do {
-    std::streamsize s = nowait ? canRead() : data->inputBuf.size() - EVP_MAX_BLOCK_LENGTH - sz;
-    if (s > data->inputBuf.size() - EVP_MAX_BLOCK_LENGTH - sz)
-      s = data->inputBuf.size() - EVP_MAX_BLOCK_LENGTH - sz;
+  do
+  {
+    auto maxFree = std::streamsize(data->inputBuf.size()) - EVP_MAX_BLOCK_LENGTH - sz;
+    std::streamsize s = nowait ? canRead() : maxFree;
+    if (s < 0 or s > maxFree)
+      s = maxFree;
     if (nowait and s <= 0)
       break;
-    std::streamsize n = doRead((char *)data->inputStart, s);
-    if (not n) {
+    std::streamsize n = doRead((char *) data->inputStart, s);
+    if (n == 0) {
       data->finished = true;
       break;
     }
     data->inputStart += n;
     sz += n;
-  } while (sz < data->inputBuf.size() / 2); // Buffer wenigstens halb voll kriegen
-
+  } while (sz < std::streamsize(data->inputBuf.size()) / 2); // Buffer wenigstens halb voll kriegen
   {
     u_char *start = &data->inputBuf[0];
     if (not data->ctx) {
 //        LOG(LM_INFO, "AES init");
       if (data->initIV) {
-        size_t is = iv_size();
+        auto is = std::streamsize(iv_size());
         if (sz < is) {
           if (nowait)
             return 0;
@@ -280,7 +281,7 @@ int mobs::CryptBufAes::underflowWorker(bool nowait) {
       data->initIV = false;
     }
     data->inputStart = &data->inputBuf[0];
-    if (1 != EVP_DecryptUpdate(data->ctx, (u_char *) &data->buffer[0], &len, start, sz))
+    if (1 != EVP_DecryptUpdate(data->ctx, (u_char *) &data->buffer[0], &len, start, int(sz)))
       throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
   }
   if (data->finished) {
@@ -331,10 +332,10 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::overflow(mobs::CryptBufAes::int_t
     if (Base::pbase() != Base::pptr()) {
       int len;
       std::array<u_char, INPUT_BUFFER_LEN + EVP_MAX_BLOCK_LENGTH> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
-      size_t ofs = 0;
+      int ofs = 0;
       if (data->initIV) {
         data->initIV = false;
-        ofs = iv_size();
+        ofs = int(iv_size());
         memcpy(&buf[0], &data->iv[0], ofs);
       }
       if (data->mdctx)
@@ -344,7 +345,7 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::overflow(mobs::CryptBufAes::int_t
 //    size_t  s = std::distance(Base::pbase(), Base::pptr());
 //    char *cp =  (Base::pbase());
       if (1 != EVP_EncryptUpdate(data->ctx, &buf[ofs], &len, (u_char *) (Base::pbase()),
-                                 std::distance(Base::pbase(), Base::pptr())))
+                                 int(std::distance(Base::pbase(), Base::pptr()))))
         throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
 //    CSBLOG(LM_DEBUG, "Writing " << len << "  was " << std::distance(Base::pbase(), Base::pptr()));
       len += ofs;
@@ -354,7 +355,7 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::overflow(mobs::CryptBufAes::int_t
       CryptBufBase::setp(data->buffer.begin(), data->buffer.end()); // buffer zurücksetzen
     }
     if (not Traits::eq_int_type(ch, Traits::eof()))
-      Base::sputc(ch);
+      Base::sputc(Traits ::to_char_type(ch));
     if (isGood())
       return ch;
   } catch (std::exception &e) {

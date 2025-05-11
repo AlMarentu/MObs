@@ -2,7 +2,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -279,7 +279,7 @@ public:
 
 class DMGR_TemplatePool : virtual public TemplateInfo {
 public:
-  ObjInit(DMGR_TemplatePool);
+  ObjInitDerived(DMGR_TemplatePool, TemplateInfo);
   MemVar(int64_t, version, VERSIONFIELD);
 
 };

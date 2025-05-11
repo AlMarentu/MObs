@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2021 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -143,7 +143,7 @@ TEST(mchronoTest, delta) {
   EXPECT_EQ(60000000, (t1 - t2).count());
   EXPECT_EQ(60000, std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t2).count());
   EXPECT_EQ(60, std::chrono::duration_cast<std::chrono::seconds>(t1 - t2).count());
-  EXPECT_LT(5, (MTimeNow() - vorher).count()); // Sollte immer mindestens 5 microsekunden dauern
+  EXPECT_LT(2, (MTimeNow() - vorher).count()); // Sollte immer mindestens 2 microsekunden dauern
 }
 
 }

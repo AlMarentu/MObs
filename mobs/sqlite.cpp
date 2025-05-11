@@ -490,6 +490,7 @@ void SQLiteDatabaseConnection::save(DatabaseInterface &dbi, const ObjectBase &ob
             else
               throw mobs::optLock_error(LOGSTR(u8"SQLite save optLock CONSTRAINT: " << e.what()));
         }
+        __attribute__ ((fallthrough));
       default:
         failed();
         THROW(u8"SQLite save: " << e.what());
@@ -781,6 +782,7 @@ size_t SQLiteDatabaseConnection::doSql(const string &sql)
           case SQLITE_CONSTRAINT_PRIMARYKEY:
             throw sqlite_exception(u8"CONSTRAINT", connection);
         }
+        __attribute__ ((fallthrough));
       default:
         throw sqlite_exception(u8"step failed", connection);
     }

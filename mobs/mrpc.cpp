@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2024 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -514,7 +514,7 @@ bool Mrpc::parseServer()
       break;
     case readyRead:
       state = connected;
-      // fallthrough  // kein break
+      __attribute__ ((fallthrough));
     case connected:
       parse();
       LOG(LM_DEBUG, "pars done " << std::boolalpha << bool(resultObj));

@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -459,7 +459,7 @@ public:
       if (mode == Values) {
         res << delimiter() << sqldb.valueStmtText(tx, obj.isNull());
         mobs::MemVarCfg c = obj.hasFeature(mobs::LengthBase);
-        if (c and tx.length() > (c - mobs::LengthBase))
+        if (c and tx.length() > static_cast<size_t>(c - mobs::LengthBase))
           throw runtime_error("SQL: DBJSON-element to big für column");
         return false;
       }
@@ -487,7 +487,7 @@ public:
         fields++;
         sqldb.valueStmtText(tx, obj.isNull());
         mobs::MemVarCfg c = obj.hasFeature(mobs::LengthBase);
-        if (c and tx.length() > (c - mobs::LengthBase))
+        if (c and tx.length() > static_cast<size_t>(c - mobs::LengthBase))
           throw runtime_error("SQL: DBJSON-element to big für column");
       } else if (mode == Create)  {
         if (dupl.find(mobs::toUpper(name)) != dupl.end())
@@ -1649,7 +1649,7 @@ std::string convLikeToRegexp(const string &like) {
       case '^':
       case '$':
         result += '\\';
-        // fall into
+        __attribute__ ((fallthrough));
       default:
         result += c;
     }
@@ -1806,7 +1806,7 @@ public:
         xw.writeTagBegin(L"restriction");
         xw.writeAttribute(L"base", type);
         if (mi.isEnum) {
-          for (int i = 0; i <= mi.max; i++) {
+          for (int i = 0; i <= int(mi.max); i++) {
             auto s = mi.eToStr(i);
             xw.writeTagBegin(L"enumeration");
             xw.writeAttribute(L"value", to_wstring(s));
@@ -1833,7 +1833,7 @@ public:
         xw.writeTagBegin(L"restriction");
         xw.writeAttribute(L"base", type);
         if (mi.isEnum) {
-          for (int i = 0; i <= mi.max; i++) {
+          for (int i = 0; i <= int(mi.max); i++) {
             auto s = mi.eToStr(i);
             xw.writeTagBegin(L"enumeration");
             xw.writeAttribute(L"value", to_wstring(s));
