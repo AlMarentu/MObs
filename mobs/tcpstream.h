@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -131,10 +131,10 @@ public:
   /// Rückgabe ob Verbindung offen
   bool is_open() const;
 
-  /// liefert remote host bei passiver Verbindung
+  /// liefert remote host
   std::string getRemoteHost() const;
 
-  /// liefert remote ip bei passiver Verbindung
+  /// liefert remote ip
   std::string getRemoteIp() const;
 
   /** \brief Setze Einstellungen für QoS des Streams
@@ -144,6 +144,13 @@ public:
    * @return Erfolg
    */
   bool setTOS(int tos) const;
+
+ /** \brief Setze Timeout für open() sowie read/write
+   *
+   * @param milliseconds
+   * @return Erfolg
+   */
+  bool setTimeout(int milliseconds);
 
   /// Rückgabe ob Fehlerstatus
   bool bad() const;
@@ -193,6 +200,8 @@ public:
 
   /** \brief offnet eine TCP-Verbindung
    *
+   * Der Erfolg kann über is_open() geprüft werden. In beiden Fällen ist getRemoteHost/Ip gesetzt.
+   * errno wird entsprechend gesetzt
    * @param host Hostname oder IP
    * @param service Port
    */
@@ -227,12 +236,20 @@ public:
   bool poll(std::ios_base::openmode which = std::ios_base::in | std::ios_base::out);
 
   /** \brief Setze Einstellungen für QoS des Streams
- *
- * benötiget include <netinet/ip.h>
- * @param tos IPTOS_LOWDELAY, IPTOS_THROUGHPUT, IPTOS_RELIABILITY, IPTOS_MINCOST
- * @return Erfolg
- */
+  *
+  * benötigt include <netinet/ip.h>
+  * @param tos IPTOS_LOWDELAY, IPTOS_THROUGHPUT, IPTOS_RELIABILITY, IPTOS_MINCOST
+  * @return Erfolg
+  */
   bool setTOS(int tos) const;
+
+  /** \brief Setze Timeout für open() sowie read/write
+  *
+  * @param milliseconds
+  * @return Erfolg
+  */
+  bool setTimeout(int milliseconds);
+
 };
 
 

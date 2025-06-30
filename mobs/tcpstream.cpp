@@ -176,10 +176,14 @@ public:
     fd = invalidSocket;
     for (res = res0; res; res = res->ai_next) {
       LOG(LM_DEBUG, "TRY " << hostIp(*res->ai_addr, res->ai_addrlen));
+      (sockaddr &)remoteAddr = *res->ai_addr;
+      addrLen = res->ai_addrlen;
       if ((fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) == invalidSocket) {
         LOG(LM_ERROR, "socket failed " << errno);
         continue;
       }
+      if (timeout >= 0)
+        setTimeout(timeout);
       if (::connect(fd, res->ai_addr, res->ai_addrlen) == SOCKET_ERROR) {
 #ifdef __MINGW32__
         if (errno == WSAECONNREFUSED)
@@ -196,10 +200,8 @@ public:
       break;
     }
     if (fd == invalidSocket) {
-      LOG(LM_ERROR, "can't connect");
       return;
     }
-    LOG(LM_INFO, "Connected " << hostIp(*res->ai_addr, res->ai_addrlen));
 
     int i = 1;
     char *parp = (char *)&i;
@@ -259,14 +261,33 @@ public:
 #ifdef __MINGW32__
 #define TOS_CAST (const char *)
 #else
-#define TOS_CAST
+#define SOCK_CAST
 #endif
-  if (setsockopt(fd, IPPROTO_IP, IP_TOS, TOS_CAST &tos, sizeof(tos)) < 0) {
+    if (setsockopt(fd, IPPROTO_IP, IP_TOS, SOCK_CAST &tos, sizeof(tos)) < 0) {
       LOG(LM_ERROR, "setTOS IP_TOS " << strerror(errno));
       return false;
-}
+    }
     return true;
-}
+  }
+
+  bool setTimeout(int milliseconds) {
+    timeout = milliseconds; // wenn noch nicht offen, dann nur merken
+    if (fd != invalidSocket)
+    {
+      struct timeval timeout_tv {milliseconds / 1000, (milliseconds % 1000) * 1000 };
+      if (setsockopt (fd, SOL_SOCKET, SO_SNDTIMEO, SOCK_CAST &timeout_tv, sizeof timeout_tv) < 0)
+      {
+        LOG(LM_ERROR, "setTOS SO_SNDTIMEO " << strerror(errno));
+        return false;
+      }
+      if (setsockopt (fd, SOL_SOCKET, SO_RCVTIMEO, SOCK_CAST &timeout_tv, sizeof timeout_tv) < 0)
+      {
+        LOG(LM_ERROR, "setTOS SO_RCVTIMEO " << strerror(errno));
+        return false;
+      }
+    }
+    return true;
+  }
 
 
   socketHandle fd = invalidSocket;
@@ -277,6 +298,7 @@ public:
   std::streamsize wrPos = 0;
   sockaddr_storage remoteAddr{};
   size_t addrLen = sizeof(remoteAddr);
+  int timeout = -1;
 };
 
 TcpStBuf::TcpStBuf() : Base() {
@@ -317,9 +339,9 @@ bool TcpStBuf::poll(std::ios_base::openmode which) const {
     return false;
   struct pollfd pf = { data->fd, 0, 0 };
   if (which & std::ios_base::in)
-    pf.events += POLLIN;
+    pf.events |= POLLIN;
   if (which & std::ios_base::out)
-    pf.events += POLLOUT;
+    pf.events |= POLLOUT;
 #ifdef __MINGW32__
   auto res = WSAPoll(&pf, 1, 0);
 #else
@@ -447,6 +469,11 @@ bool TcpStBuf::setTOS(int tos) const {
   return data->setTOS(tos);
 }
 
+bool TcpStBuf::setTimeout(int milliseconds)
+{
+  return data->setTimeout(milliseconds);
+}
+
 
 tcpstream::tcpstream() : std::iostream ( new TcpStBuf()) {}
 
@@ -467,10 +494,9 @@ tcpstream::~tcpstream() {
 }
 
 void tcpstream::open(const std::string &host, const std::string &service) {
+  clear(); // Fehlerstatus löschen
   auto *tp = dynamic_cast<TcpStBuf *>(rdbuf());
-  if (not tp) THROW("bad cast");
-  tp->open(host, service);
-  if (not is_open())
+  if (not tp or not tp->open(host, service))
     setstate(std::ios_base::badbit);
 }
 
@@ -524,6 +550,13 @@ bool tcpstream::setTOS(int tos) const {
   auto *tp = dynamic_cast<TcpStBuf *>(rdbuf());
   if (not tp) THROW("bad cast");
   return tp->setTOS(tos);
+}
+
+bool tcpstream::setTimeout(int milliseconds)
+{
+  auto *tp = dynamic_cast<TcpStBuf *>(rdbuf());
+  if (not tp) THROW("bad cast");
+  return tp->setTimeout(milliseconds);
 }
 
 #ifdef __MINGW32__
