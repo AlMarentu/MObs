@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2024 Matthias Lautner
+// Copyright 2025 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -53,13 +53,19 @@ public:
  */
 class Mrpc : public XmlReader {
   enum State { fresh, getPubKey, connectingClient, connectingServer, reconnectingClient, reconnectingClientTest,
-    connected, readyRead, closing };
+    connected, readyRead, closing, reconRead };
 public:
   enum SessionMode { dontKeep, keep, speedup }; ///< Modus für die Session-Verwaltung im Client
   /** \brief Konstruktor für Client
    *
    * Soll der Server einen Reconnect anbieten, so muss session->sessionReuseTime gesetzt sein und der Server die
    * reconnectReceived-Methode implementieren.
+   *
+   * Bei einem Client Aufruf entscheidet der vorangegangene Aufruf darüber, ob ein reconnect versucht wird.
+   * Soll die verhindert werden so muss mrpcSession->sessionId = 0 gesetzt werden.
+   * Ist der mode != dontKeep, so wird, falls vom Server erlaubt, die reconnect-Info in der mrpcSession vermerkt.
+   *
+   * Ist der mode == speedup, so scheitert der Connect, falls die Session serverseitig nicht mehr existiert.
    * @param inStr Eingabestream
    * @param outStr Ausgabestream
    * @param mrpcSession Zeiger auf die Session-Info, darf nicht null sein

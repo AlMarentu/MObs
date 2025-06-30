@@ -139,6 +139,8 @@ void Mrpc::EncryptionFinished()
   encrypted = false;
   if (state == connected and level() == 2)
     state = readyRead;
+  else if (state == reconRead  and level() == 2)
+    state = connected;
   // weiteres parsen anhalten
   stop();
 }
@@ -487,7 +489,7 @@ bool Mrpc::parseServer()
         }
         resultObj = nullptr;
       }
-      else if (auto *sess = dynamic_cast<MrpcGetPublickey *>(resultObj.get())) {
+      else if (/*auto *sess =*/ dynamic_cast<MrpcGetPublickey *>(resultObj.get())) {
         std::string key;
         std::string info;
         try {
@@ -515,6 +517,7 @@ bool Mrpc::parseServer()
     case readyRead:
       state = connected;
       __attribute__ ((fallthrough));
+    case reconRead:
     case connected:
       parse();
       LOG(LM_DEBUG, "pars done " << std::boolalpha << bool(resultObj));
@@ -660,7 +663,7 @@ bool Mrpc::waitForConnected(const std::string &keyId, const std::string &softwar
         break;
       if (dynamic_cast<MrpcSessionTestConnection *>(resultObj.get())) {
         LOG(LM_DEBUG, "Connection verified ID " << session->sessionId << " " << session->info);
-        state = connected;
+        state = reconRead; // noch auf encryption finished warten
         resultObj = nullptr;
       } else if (auto *sess = dynamic_cast<MrpcSessionReturnError *>(resultObj.get())) {
         LOG(LM_ERROR, "SESSIONERROR " << sess->error());
@@ -698,6 +701,7 @@ bool Mrpc::waitForConnected(const std::string &keyId, const std::string &softwar
     case reconnectingClient:
     case connected:
     case readyRead:
+    case reconRead:
     case closing:
       return true;
     case connectingServer:
@@ -705,14 +709,14 @@ bool Mrpc::waitForConnected(const std::string &keyId, const std::string &softwar
   }
   if (state == reconnectingClient and sessionMode == SessionMode::speedup)
     return true;
-  return state == connected or state == readyRead;
+  return state == connected or state == readyRead or state == reconRead;
 }
 
 bool Mrpc::isConnected() const
 {
   if (state == reconnectingClient and sessionMode == SessionMode::speedup)
     return true;
-  return state == connected or state == readyRead;
+  return state == connected or state == readyRead or state == reconRead;
 }
 
 bool Mrpc::clientAboutToRead() const
@@ -724,6 +728,7 @@ bool Mrpc::clientAboutToRead() const
     case reconnectingClient:
     case reconnectingClientTest:
     case readyRead:
+    case reconRead:
       return true;
     case fresh:
     case closing:
