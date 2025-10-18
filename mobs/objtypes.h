@@ -476,6 +476,9 @@ template <> inline signed char mobsempty(const signed char &) { return ' '; };
 class ConvToStrHint {
 public:
   ConvToStrHint() = delete;
+  ConvToStrHint(const ConvToStrHint&) = default;
+  ConvToStrHint &operator=(const ConvToStrHint&) = default;
+  ConvToStrHint(ConvToStrHint &&) = default;
   /// Konstruktor
   /// @param print_compact führt bei einigen Typen zur vereinfachten Ausgabe als ganzzahliger Wert
   /// @param altNames verwende alternative Namen wenn Vorhanden
@@ -511,6 +514,9 @@ protected:
 /// Hilfsklasse für Konvertierungsklasse - Basisklasse
 class ConvFromStrHint {
 public:
+  ConvFromStrHint() = default;
+  ConvFromStrHint(const ConvFromStrHint &) = default;
+  ConvFromStrHint &operator=(const ConvFromStrHint &) = default;
   virtual ~ConvFromStrHint() = default;
   /// darf ein nicht-kompakter Wert als Eingabe fungieren
   virtual bool acceptExtended() const = 0;

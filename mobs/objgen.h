@@ -365,6 +365,7 @@ protected:
   /// \private
   MemberBase(mobs::MemBaseVector *m, mobs::ObjectBase *o, const std::vector<MemVarCfg>& cv) : NullValue(), m_parent(o), m_parVec(m) {
     for (auto c:cv) doConfig(c); }
+  MemberBase(const MemberBase &) = default;
 public:
   virtual ~MemberBase() = default;
   /// Abfrage des Namen der Membervariablen
@@ -517,7 +518,8 @@ public:
   size_t getInitialSize() const { return m_oldSize; }
   /// Ausgabe der Vector-Elemente als String
   std::string to_string(const ConvObjToString& cth) const;
-
+protected:
+  MemBaseVector(const MemBaseVector &b) = default;
 private:
   virtual void doCopy(const MemBaseVector &other) = 0;
   virtual void carelessCopy(const MemBaseVector &other) = 0;
@@ -948,6 +950,7 @@ public:
   using reference = T&;
 
   MemberVectorIterator() = default;
+  MemberVectorIterator(const MemberVectorIterator &) = default;
   explicit MemberVectorIterator(const typename std::vector<T *>::iterator it) { m_iter = std::move(it); }
   ~MemberVectorIterator() = default;
   explicit operator bool() const { return m_iter; }
