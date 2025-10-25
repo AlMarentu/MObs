@@ -26,7 +26,7 @@
 #include <openssl/ssl.h>
 #include <openssl/rand.h>
 #include <openssl/evp.h>
-//#include <openssl/err.h>
+#include <openssl/err.h>
 #include <vector>
 #include <array>
 #include <iomanip>
@@ -42,29 +42,11 @@
 #define INPUT_BUFFER_LEN 8192
 
 namespace mobs_internal {
-
-// -> rsa.cpp
 std::string openSslGetError();
-
 }
 
 namespace {
 
-//std::string getError() {
-//  u_long e;
-//  std::string res = "OpenSSL: ";
-//  while ((e = ERR_get_error())) {
-//    static bool errLoad = false;
-//    if (not errLoad) {
-//      errLoad = true;
-////      ERR_load_crypto_strings(); // nur crypto-fehler laden
-//      SSL_load_error_strings(); // NOLINT(hicpp-signed-bitwise)
-//      atexit([](){ ERR_free_strings(); });
-//    }
-//    res += ERR_error_string(e, nullptr);
-//  }
-//  return res;
-//}
 
 class openssl_exception : public std::runtime_error {
 public:
@@ -73,6 +55,23 @@ public:
   }
 };
 
+}
+
+std::string mobs_internal::openSslGetError() {
+  u_long e;
+  std::string res = "OpenSSL: ";
+  while ((e = ERR_get_error())) {
+    static bool errLoad = false;
+    if (not errLoad) {
+      errLoad = true;
+//      ERR_load_crypto_strings(); // nur crypto-fehler laden
+      SSL_load_error_strings(); // NOLINT(hicpp-signed-bitwise)
+      //ERR_load_BIO_strings();
+      atexit([]() { ERR_free_strings(); });
+    }
+    res += ERR_error_string(e, nullptr);
+  }
+  return res;
 }
 
 class mobs::CryptBufAesData { // NOLINT(cppcoreguidelines-pro-type-member-init)

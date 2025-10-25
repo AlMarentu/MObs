@@ -100,15 +100,15 @@ TEST(cryptTest, aes2) {
 }
 
 TEST(cryptTest, rsa1) {
-  ASSERT_NO_THROW(mobs::generateRsaKey("priv.pem", "pup.pem", "12345"));
+  ASSERT_NO_THROW(mobs::generateRsaKey("priv.pem", "pub.pem", ""));
 
   std::vector<u_char> sessionKey = {'H', 'a', 'L', 'L', 'o', '\0'};
   std::vector<u_char> cipher;
 //  sessionKey.resize()
-  ASSERT_NO_THROW(mobs::encryptPrivateRsa(sessionKey, cipher, "priv.pem", "12345"));
+  ASSERT_NO_THROW(mobs::encryptPrivateRsa(sessionKey, cipher, "priv.pem", ""));
   EXPECT_EQ(256, cipher.size());
   std::vector<u_char> sessionKey2;
-  ASSERT_NO_THROW(mobs::decryptPublicRsa(cipher, sessionKey2, "pup.pem"));
+  ASSERT_NO_THROW(mobs::decryptPublicRsa(cipher, sessionKey2, "pub.pem"));
   EXPECT_EQ(sessionKey, sessionKey2);
 
   unlink("priv.pem");
@@ -117,16 +117,17 @@ TEST(cryptTest, rsa1) {
 }
 
 TEST(cryptTest, rsa2) {
-  ASSERT_NO_THROW(mobs::generateRsaKey("priv.pem", "pup.pem", "12345"));
+  ASSERT_NO_THROW(mobs::generateRsaKey("priv.pem", "pub.pem", "12345"));
 
   std::vector<u_char> sessionKey = {'H', 'a', 'L', 'L', 'o', '\0'};
   std::vector<u_char> cipher;
 //  sessionKey.resize()
-  ASSERT_NO_THROW(mobs::encryptPublicRsa(sessionKey, cipher, "pup.pem"));
+  ASSERT_NO_THROW(mobs::encryptPublicRsa(sessionKey, cipher, "pub.pem"));
   EXPECT_EQ(256, cipher.size());
   std::vector<u_char> sessionKey2;
   ASSERT_NO_THROW(mobs::decryptPrivateRsa(cipher, sessionKey2,  "priv.pem", "12345"));
   EXPECT_EQ(sessionKey, sessionKey2);
+  ASSERT_ANY_THROW(mobs::decryptPrivateRsa(cipher, sessionKey2,  "priv.pem", "54321"));
 
   unlink("priv.pem");
   unlink("pub.pem");
@@ -135,8 +136,9 @@ TEST(cryptTest, rsa2) {
 
 
 TEST(cryptTest, rsa3) {
-  string priv, pub;
+  string priv, pub, priv2, pub2;
   ASSERT_NO_THROW(mobs::generateRsaKeyMem(priv, pub, "12345"));
+  ASSERT_NO_THROW(mobs::generateRsaKeyMem(priv2, pub2, "54321"));
 
   std::vector<u_char> sessionKey = {'H', 'a', 'L', 'L', 'o', '\0'};
   std::vector<u_char> cipher;
@@ -146,12 +148,17 @@ TEST(cryptTest, rsa3) {
   std::vector<u_char> sessionKey2;
   ASSERT_NO_THROW(mobs::decryptPublicRsa(cipher, sessionKey2, pub));
   EXPECT_EQ(sessionKey, sessionKey2);
+  std::vector<u_char> sessionKey3;
+  ASSERT_NO_THROW(mobs::decryptPublicRsa(cipher, sessionKey3, pub));
+  EXPECT_EQ(sessionKey, sessionKey3);
+  ASSERT_ANY_THROW(mobs::decryptPublicRsa(cipher, sessionKey2, pub2));
 
 }
 
 TEST(cryptTest, rsa4) {
-  string priv, pub;
+  string priv, pub, priv2, pub2;
   ASSERT_NO_THROW(mobs::generateRsaKeyMem(priv, pub, "12345"));
+  ASSERT_NO_THROW(mobs::generateRsaKeyMem(priv2, pub2, "54321"));
 
   std::vector<u_char> sessionKey = {'H', 'a', 'L', 'L', 'o', '\0'};
   std::vector<u_char> cipher;
@@ -161,7 +168,12 @@ TEST(cryptTest, rsa4) {
   std::vector<u_char> sessionKey2;
   ASSERT_NO_THROW(mobs::decryptPrivateRsa(cipher, sessionKey2,  priv, "12345"));
   EXPECT_EQ(sessionKey, sessionKey2);
+  std::vector<u_char> sessionKey3;
+  ASSERT_NO_THROW(mobs::decryptPrivateRsa(cipher, sessionKey3,  priv, "12345"));
+  EXPECT_EQ(sessionKey, sessionKey3);
 
+  EXPECT_ANY_THROW(mobs::decryptPrivateRsa(cipher, sessionKey2,  priv, "54321"));
+  EXPECT_ANY_THROW(mobs::decryptPrivateRsa(cipher, sessionKey2,  priv2, "54321"));
 }
 
 
@@ -178,7 +190,29 @@ TEST(cryptTest, rsa5) {
   ASSERT_NO_THROW(mobs::decryptPrivateRsa(cipher, sessionKey2,  priv, "beliebig da unverschlüsselt"));
   EXPECT_EQ(sessionKey, sessionKey2);
 
+  cipher.clear();
+  ASSERT_NO_THROW(mobs::encryptPrivateRsa(sessionKey, cipher, priv, "beliebig da unverschlüsselt"));
+  EXPECT_EQ(256, cipher.size());
+  std::vector<u_char> sessionKey3;
+  ASSERT_NO_THROW(mobs::decryptPublicRsa(cipher, sessionKey3,  pub));
+  EXPECT_EQ(sessionKey, sessionKey3);
+
 }
+
+TEST(cryptTest, rsa6) {
+  string privU, pubU;
+  string privS, pubS;
+  string priv2, pub2;
+  ASSERT_NO_THROW(mobs::generateRsaKeyMem(privU, pubU, "12345"));
+  ASSERT_NO_THROW(mobs::generateRsaKeyMem(privS, pubS, "54321"));
+
+  list<mobs::CryptBufRsa::PubKey> keys({mobs::CryptBufRsa::PubKey(pubU, "U"), mobs::CryptBufRsa::PubKey(pubS, "S")});
+
+  mobs::CryptBufRsa *ep;
+  ASSERT_NO_THROW(ep = new mobs::CryptBufRsa(keys));
+
+}
+
 
 TEST(cryptTest, rsaCheck) {
   string priv, pub;
@@ -194,10 +228,13 @@ TEST(cryptTest, rsaCheck) {
 TEST(cryptTest, rsaChange) {
   string priv, pub, priv2, pub2;
   ASSERT_NO_THROW(mobs::generateRsaKeyMem(priv, pub, "12345"));
+  ASSERT_GE(mobs::getRsaInfo(priv, "12345").size(), 100);
+  ASSERT_GE(mobs::getRsaFingerprint(pub).size(), 32);
   EXPECT_TRUE(mobs::checkPasswordRsa(priv, "12345"));
   ASSERT_NO_THROW(mobs::exportKey(priv, "12345", priv2, pub2, "55555"));
   EXPECT_TRUE(mobs::checkPasswordRsa(priv2, "55555"));
-  EXPECT_TRUE(pub == pub2);
+  EXPECT_TRUE(mobs::getRsaFingerprint(pub)== mobs::getRsaFingerprint(pub2));
+  EXPECT_TRUE(mobs::getRsaInfo(priv, "12345") == mobs::getRsaInfo(priv2, "55555"));
 }
 
 
