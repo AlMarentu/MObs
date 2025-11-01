@@ -22,6 +22,7 @@
 #include "objgen.h"
 #include "objgen.h"
 #include "jsonparser.h"
+#include "jsonstr.h"
 
 #include <stdio.h>
 #include <sstream>
@@ -1224,6 +1225,92 @@ TEST(objgenTest, readnull) {
   EXPECT_TRUE(n2.String.isNull());
   EXPECT_TRUE(n2.Wstring.isNull());
 
+}
+
+
+TEST(objgenTest, jsonstr1) {
+  stringstream str;
+  using JS = mobs::JsonStream;
+  JS js(str);
+  EXPECT_TRUE(js.isRoot());
+  EXPECT_NO_THROW(
+      js << JS::ObjectBegin
+
+         << JS::Tag("Zahl") << 1
+         << JS::Tag("bool") << true
+         << JS::Tag("nix") << nullptr
+         << JS::Tag("Objekt1")
+         << JS::ObjectBegin
+         <<  JS::Tag("eins") << 11
+         <<  JS::Tag("zwei") << 22
+         << JS::ObjectEnd
+         << JS::Tag("Objekt2")
+         << JS::ObjectBegin
+         <<  JS::Tag("eins1") << 111
+         <<  JS::Tag("zwei") << 222
+         << JS::ObjectEnd
+         << JS::Tag("Gruss") << "Hallo"
+         << JS::Tag("Array") << JS::ArrayBegin << "AA" << "BB" << JS::ArrayEnd
+         << JS::Tag("Text") << "Blah Fasel"
+         << JS::Tag("Objekte")
+         << JS::ArrayBegin
+         <<  JS::ObjectBegin
+         <<   JS::Tag("eins1") << 10111
+         <<   JS::Tag("zwei") << 10222
+         <<  JS::ObjectEnd
+         <<  JS::ObjectBegin
+         <<   JS::Tag("eins1") << 20111
+         <<   JS::Tag("zwei") << 20222
+         <<  JS::ObjectEnd
+         << JS::ArrayEnd
+         << JS::Tag("LongArray") << JS::ArrayBegin
+  );
+  for (int i = 1; i < 500; i++)
+    js << i;
+
+  EXPECT_NO_THROW(
+      js << JS::ArrayEnd
+
+         << JS::ObjectEnd
+  );
+  EXPECT_TRUE(js.isRoot());
+
+  cout << str.str() << endl;
+  //EXPECT_EQ(str.str(), "Hallo");
+
+}
+
+TEST(objgenTest, jsonstr2) {
+  stringstream str;
+  using JS = mobs::JsonStream;
+  JS js(str, mobs::ConvObjToString().noIndent());
+
+  Rechnung rech;
+  rech.position[3].anzahl(1);
+  rech.position[2].anzahl(2);
+  rech.position[2].einzelpreis(3);
+  rech.position[2].artikel("nnn");
+
+  EXPECT_NO_THROW(js << rech);
+  EXPECT_TRUE(js.isRoot());
+  EXPECT_EQ(string(str.str()), rech.to_string(mobs::ConvObjToString().exportJson().noIndent()));
+  cout << str.str() << endl;
+}
+
+TEST(objgenTest, jsonstr3) {
+  stringstream str;
+  using JS = mobs::JsonStream;
+  JS js(str, mobs::ConvObjToString().doIndent());
+
+  Rechnung rech;
+  rech.position[3].anzahl(1);
+  rech.position[2].anzahl(2);
+  rech.position[2].einzelpreis(3);
+  rech.position[2].artikel("nnn");
+
+  EXPECT_NO_THROW(js << JS::ArrayBegin << rech << rech << rech << JS::ArrayEnd);
+  EXPECT_TRUE(js.isRoot());
+  cout << str.str() << endl;
 }
 
 #if 0
