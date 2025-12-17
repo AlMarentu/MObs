@@ -132,7 +132,7 @@ socketHandle TcpAccept::initService(const std::string &service) {
     return invalidSocket;
   }
 
-  if (listen(fd, 10) == SOCKET_ERROR) {
+  if (listen(fd, 128) == SOCKET_ERROR) {
     LOG(LM_ERROR, "Fehler bei listen: " << strerror(errno));
     return invalidSocket;
   }
@@ -235,7 +235,7 @@ public:
     TcpStBuf::char_type *cp = &wrBuf[0];
     while (sz > 0) {
       auto res = send(fd, cp, int(sz), MSG_NOSIGNAL); // buffersize immer < INT_MAX
-      LOG(LM_DEBUG, "WRITE TCP " << res );
+      //LOG(LM_DEBUG, "WRITE TCP " << res );
       if (res <= 0) {
         LOG(LM_ERROR, "write error " << errno);
         if (res == -1 and errno == EPIPE)
@@ -320,8 +320,10 @@ TcpStBuf::TcpStBuf(const std::string &host, const std::string &service) : Base()
 }
 
 TcpStBuf::~TcpStBuf() {
-  if (not bad() and is_open())
-    close();
+  if (not is_open())
+    return;
+  shutdown(std::ios_base::in | std::ios_base::out);
+  close();
 }
 
 bool TcpStBuf::open(const std::string &host, const std::string &service) {
@@ -364,6 +366,7 @@ bool TcpStBuf::bad() const {
 
 TcpStBuf::int_type TcpStBuf::overflow(TcpStBuf::int_type ch) {
   TRACE(PARAM(ch));
+  //LOG(LM_DEBUG, "write " << std::string(Base::pbase(), std::distance(Base::pbase(), Base::pptr())));
   data->writeBuf(std::distance(Base::pbase(), Base::pptr()));
   Base::setp(data->wrBuf.begin(), data->wrBuf.end()); // buffer zurücksetzen
   if (bad())
@@ -401,11 +404,13 @@ TcpStBuf::int_type TcpStBuf::underflow() {
 }
 
 bool TcpStBuf::close() {
-  pubsync();
-  if (bad() or not is_open())
+  if (not is_open())
     return false;
+  pubsync();
   int res = closesocket(data->fd);
   data->fd = invalidSocket;
+  if (bad())
+    return false;
   return res == 0;
 }
 
@@ -421,22 +426,22 @@ std::basic_streambuf<char>::pos_type
 TcpStBuf::seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which) {
   if (which & std::ios_base::in) {
     if ((which & std::ios_base::out) or dir != std::ios_base::cur or off != 0)
-      return pos_type(off_type(-1));
-    return pos_type(data->rdPos - off_type(std::distance(Base::gptr(), Base::egptr())));
+      return {off_type(-1)};
+    return {data->rdPos - off_type(std::distance(Base::gptr(), Base::egptr()))};
   }
   if (which & std::ios_base::out) {
     if ((which & std::ios_base::in) or dir != std::ios_base::cur or off != 0)
-      return pos_type(off_type(-1));
-    return pos_type(data->wrPos + off_type(std::distance(Base::pbase(), Base::pptr())));
+      return {off_type(-1)};
+    return {data->wrPos + off_type(std::distance(Base::pbase(), Base::pptr()))};
   }
   return {off_type(-1)};
 }
 
 void TcpStBuf::shutdown(std::ios_base::openmode which) {
-  if (which & std::ios_base::out)
-    pubsync();
-  if (bad() or not is_open())
+  if (not is_open())
     return;
+  if ((which & std::ios_base::out) and not bad())
+    pubsync();
   int how = 0;
 #ifdef __MINGW32__
 #define SHUT_RDWR SD_BOTH
@@ -452,7 +457,8 @@ void TcpStBuf::shutdown(std::ios_base::openmode which) {
   else
     return;
   if (::shutdown(data->fd, how) != 0) {
-    LOG(LM_ERROR, "shutdown error " << strerror(errno));
+    if (errno != ENOTCONN)
+      LOG(LM_ERROR, "shutdown error " << strerror(errno));
     data->bad = true;
   }
 }

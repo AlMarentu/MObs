@@ -65,21 +65,19 @@ void logMessage(loglevel l, std::function<std::string()> message)
     case lm_error: c = 'E'; break;
     case lm_warn: c = 'W'; break;
   }
-  std::string tmp;
-  tmp += c;
-  tmp += ' ';
-  tmp += message();
-  for (auto c:tmp) {
-    switch(c) {
-      case '\n': std::cerr << "<NL>"; break;
-      case '\r': std::cerr << "<CR>"; break;
+  std::stringstream out;
+  out << c << ' ';
+  for (auto i:message()) {
+    switch(i) {
+      case '\n': out << "<NL>"; break;
+      case '\r': out << "<CR>"; break;
       case '\0' ... 0x09:
       case 0x0b:
-      case 0x0e ... 0x1f: std::cerr << '<' << std::hex << std::setfill('0') << std::setw(2) << int(u_char(c)) << '>'; break;
-      default: std::cerr << c;
+      case 0x0e ... 0x1f: out << '<' << std::hex << std::setfill('0') << std::setw(2) << int(u_char(c)) << '>'; break;
+      default: out << i;
     }
   }
-  std::cerr  << std::endl;
+  std::cerr << out.str() << std::endl;
 }
 
 

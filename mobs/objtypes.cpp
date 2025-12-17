@@ -309,7 +309,12 @@ std::wstring to_wstring(const std::u16string &t) {
   return result;
 }
 
-
+std::string to_string(const std::vector<u_char> &buf) {
+  std::stringstream x;
+  for (auto c:buf)
+    x << std::hex << std::setfill('0') << std::setw(2) << u_int(c);
+  return x.str();
+}
 
 
 

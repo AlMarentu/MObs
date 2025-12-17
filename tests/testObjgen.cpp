@@ -651,6 +651,7 @@ class Rechnung : virtual public mobs::ObjectBase {
 public:
   ObjInit(Rechnung);
   MemVar(int, id, USENULL);
+  MemVar(double, rabatt, USENULL);
 
   MemObj(Person, kunde, USENULL);
   MemVector(RechPos, position, USENULL, USEVECNULL);
@@ -667,20 +668,23 @@ TEST(objgenTest, usenullAndIndent) {
   EXPECT_TRUE(rech.id.isNull());
   EXPECT_TRUE(rech.kunde.isNull());
   EXPECT_TRUE(rech.position.isNull());
-  EXPECT_EQ("{id:null,kunde:null,position:null}", to_string(rech));
+  EXPECT_TRUE(rech.rabatt.isNull());
+  EXPECT_EQ("{id:null,rabatt:null,kunde:null,position:null}", to_string(rech));
   rech.position.setEmpty();
-  EXPECT_EQ("{id:null,kunde:null,position:[]}", to_string(rech));
+  EXPECT_EQ("{id:null,rabatt:null,kunde:null,position:[]}", to_string(rech));
 
   rech.position[3].anzahl(1);
   rech.position[2].anzahl(2);
   rech.position[2].einzelpreis(3);
   rech.position[2].artikel("nnn");
-  EXPECT_EQ("{id:null,kunde:null,position:[null,null,{artikel:\"nnn\",anzahl:2,einzelpreis:3},{artikel:\"\",anzahl:1,einzelpreis:0}]}", to_string(rech));
+  rech.rabatt(0.1);
+  EXPECT_EQ("{id:null,rabatt:0.1,kunde:null,position:[null,null,{artikel:\"nnn\",anzahl:2,einzelpreis:3},{artikel:\"\",anzahl:1,einzelpreis:0}]}", to_string(rech));
 
   string xml =
       R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <root>
   <id/>
+  <rabatt>0.1</rabatt>
   <kunde/>
   <position/>
   <position/>
@@ -698,6 +702,7 @@ TEST(objgenTest, usenullAndIndent) {
 )";
   string json = R"({
   "id":null,
+  "rabatt":0.1,
   "kunde":null,
   "position":[
   null,
@@ -1248,6 +1253,7 @@ TEST(objgenTest, jsonstr1) {
          << JS::ObjectBegin
          <<  JS::Tag("eins1") << 111
          <<  JS::Tag("zwei") << 222
+         <<  JS::Tag("drei") << 3.33
          << JS::ObjectEnd
          << JS::Tag("Gruss") << "Hallo"
          << JS::Tag("Array") << JS::ArrayBegin << "AA" << "BB" << JS::ArrayEnd
@@ -1290,6 +1296,7 @@ TEST(objgenTest, jsonstr2) {
   rech.position[2].anzahl(2);
   rech.position[2].einzelpreis(3);
   rech.position[2].artikel("nnn");
+  rech.rabatt(0.25);
 
   EXPECT_NO_THROW(js << rech);
   EXPECT_TRUE(js.isRoot());
@@ -1307,6 +1314,7 @@ TEST(objgenTest, jsonstr3) {
   rech.position[2].anzahl(2);
   rech.position[2].einzelpreis(3);
   rech.position[2].artikel("nnn");
+  rech.rabatt(0.25);
 
   EXPECT_NO_THROW(js << JS::ArrayBegin << rech << rech << rech << JS::ArrayEnd);
   EXPECT_TRUE(js.isRoot());

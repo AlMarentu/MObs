@@ -376,6 +376,11 @@ void XmlWriter::clearString()
   data->wstrBuff.clear();
 }
 
+wstring XmlWriter::getWString() const
+{
+  return data->wstrBuff.str();
+}
+
 string XmlWriter::getString() const
 {
   string result;
@@ -460,6 +465,28 @@ void XmlWriter::startEncrypt(CryptBufBase *cbbp) {
     //data->wostr = new std::wostream(data->cryptBufp.get());
   } else {
     auto lo = data->buffer.getloc();
+    switch (data->cs)
+    {
+      case CS_utf8_bom:
+      case CS_utf8:
+        lo = std::locale(lo, new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
+        break;
+      case CS_iso8859_1:
+        lo = std::locale(lo, new codec_iso8859_1);
+        break;
+      case CS_iso8859_9:
+        lo = std::locale(lo, new codec_iso8859_9);
+        break;
+      case CS_iso8859_15:
+        lo = std::locale(lo, new codec_iso8859_15);
+        break;
+      case CS_utf16_be:
+        lo = std::locale(lo, new std::codecvt_utf16<wchar_t, 0x10ffff>);
+        break;
+      case CS_utf16_le:
+        lo = std::locale(lo, new std::codecvt_utf16<wchar_t, 0x10ffff, std::little_endian>);
+        break;
+    }
     data->cryptBufp = std::unique_ptr<CryptOstrBuf>(new CryptOstrBuf(data->cryptss, cbbp));
     data->wostr = new std::wostream(data->cryptBufp.get());
     data->wostr->imbue(lo);

@@ -102,6 +102,8 @@ public:
   /// Streamoperator
   JsonStream &operator<<(int t);
   /// Streamoperator
+  JsonStream &operator<<(double t);
+  /// Streamoperator
   JsonStream &operator<<(u_int64_t t);
   /// Streamoperator
   JsonStream &operator<<(int64_t t);
@@ -151,6 +153,12 @@ public:
    * @return true, wenn Klammerebene null ist
    */
   bool isRoot() const;
+
+  /** \brief Zeigt an, ob sich die Ausgabe innerhalb eines Array-Elementes befindet.
+   *
+   * @return true, wenn innerhalb eines Array-Elementes
+   */
+  bool inArray() const;
 
 private:
   JsonStr_Data *data;

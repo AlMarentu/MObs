@@ -74,7 +74,7 @@ public:
   void writeHead();
   /// Schreibe eine Start-Tag
   void writeTagBegin(const std::wstring &tag);
-  /// Schreibe ein Attribut/Werre-Paar
+  /// Schreibe ein Attribut/Werte-Paar
   void writeAttribute(const std::wstring &attribute, const std::wstring &value);
   /// Schreibe einen Wert
   void writeValue(const std::wstring &value);
@@ -96,6 +96,8 @@ public:
   bool attributeAllowed() const;
   /// lesen des XML-Ergebnisses im gewählten Charset, nur bei Verwendung des internen Buffers
   std::string getString() const;
+  /// lesen des XML-Ergebnisses im gewählten Charset, nur bei Verwendung des internen Buffers
+  std::wstring getWString() const;
   /// löschen des internen Buffers
   void clearString();
   /// setzte ein XML-Prefix

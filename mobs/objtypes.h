@@ -379,6 +379,10 @@ std::wstring to_wstring(double t);
 /// @param t Wert
 /// @return Wert als std::wstring
 std::wstring to_wstring(long double t);
+/// \brief Konvertierung nach std::string
+/// @param t Wert
+/// @return Wert als hex-Bytes in std::string
+std::string to_string(const std::vector<u_char> &buf);
 
 
 //template <typename T>

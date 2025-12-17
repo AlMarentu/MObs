@@ -26,6 +26,7 @@
 
 #include <memory>
 #include <string>
+using u_int64_t = uint64_t;
 
 namespace mobs {
 

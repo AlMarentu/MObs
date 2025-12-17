@@ -35,7 +35,7 @@ public:
       return false;
     if (not obj.isModified() and jstr.cts().modOnly())
       return false;
-    if (not obj.getElementName().empty() and not jstr.isRoot())
+    if (not obj.getElementName().empty() and not jstr.isRoot() and not jstr.inArray())
       jstr << JS::Tag(obj.getName(jstr.cts()));
     if (obj.isNull())
     {
@@ -214,6 +214,13 @@ JsonStream &JsonStream::operator<<(int64_t t) {
   return *this;
 }
 
+JsonStream &JsonStream::operator<<(double t) {
+  data->elementCheck();
+  data->delimElement(data->lastTag);
+  data->ostr << t;
+  return *this;
+}
+
 JsonStream &JsonStream::operator<<(bool t) {
   data->elementCheck();
   data->delimElement(data->lastTag);
@@ -303,6 +310,10 @@ const ConvObjToString &JsonStream::cts() const {
 
 bool JsonStream::isRoot() const {
   return data->info.empty();
+}
+
+bool JsonStream::inArray() const {
+  return not data->info.empty() and data->info.top().array;
 }
 
 JsonStream &JsonStream::operator<<(const char *t) {

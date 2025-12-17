@@ -278,7 +278,7 @@ objname(const std::string &name, ObjectBase *t, const std::vector<mobs::MemVarCf
 objname &operator=(const objname &rhs) { doCopy(rhs); return *this; }  \
 objname &operator=(objname &&rhs) noexcept = delete; \
 void operator()(const objname &other) { doCopy(other); } \
-static ObjectBase *createMe(ObjectBase *parent = nullptr) { if (parent) return new objname(#objname, parent, { }); else return new objname(); } \
+static ObjectBase *createMe(ObjectBase *parent = nullptr) { if (parent) return new objname(#objname, parent, { }); return new objname(); } \
 ObjectBase *createNew() const override { return new objname(); } \
 std::string getObjectName() const override { return #objname; } \
 static std::string objName() { return #objname; }

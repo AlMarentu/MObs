@@ -194,6 +194,7 @@ public:
 class ConnectionInformation {
 public:
   ConnectionInformation() = default;
+  ConnectionInformation(const ConnectionInformation &) = default;
 
   /// Informationen für eine Datenbankverbindung
   ConnectionInformation(std::string url, std::string database, std::string user = "", std::string password = "") :
