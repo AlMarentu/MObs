@@ -25,6 +25,7 @@
 #include "logging.h"
 #include "converter.h"
 #include "digest.h"
+#include "crypt.h"
 
 #include <openssl/ssl.h>
 #include <openssl/rand.h>
@@ -33,6 +34,8 @@
 #include <openssl/engine.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
+#include <openssl/provider.h>
+#include <openssl/crypto.h>
 #include <utility>
 #include <array>
 #include <vector>
@@ -43,10 +46,25 @@
 #define KEYBUFLEN 32
 #define INPUT_BUFFER_LEN 1024
 
-namespace mobs_internal {
-std::string openSslGetError();
-}
 
+
+
+namespace mobs_internal {
+class SSL_Delete {
+public:
+  SSL_Delete() = default;
+  void operator()(BIO *p);
+  void operator()(OSSL_ENCODER_CTX *p);
+  void operator()(EVP_PKEY *p);
+  void operator()(EVP_PKEY_CTX *p);
+  void operator()(EVP_CIPHER_CTX *p);
+};
+std::string openSslGetError();
+std::unique_ptr<EVP_PKEY, SSL_Delete> readPrivateKey(const std::string &file, const std::string &passphrase);
+std::unique_ptr<EVP_PKEY, SSL_Delete> readPublicKey(const std::string &file);
+
+}
+using mobs_internal::SSL_Delete;
 
 namespace {
 
@@ -57,19 +75,7 @@ public:
   }
 };
 
-class SSL_Delete {
-  SSL_Delete() = default;
-public:
-  void operator()(BIO *p) { BIO_free_all(p); }
-  void operator()(OSSL_ENCODER_CTX *p) { OSSL_ENCODER_CTX_free(p); }
-  void operator()(EVP_PKEY *p) { EVP_PKEY_free(p); }
-  void operator()(EVP_PKEY_CTX *p) { EVP_PKEY_CTX_free(p); }
-  void operator()(EVP_CIPHER_CTX *p) { EVP_CIPHER_CTX_free(p); }
-};
-
 }
-
-
 
 class mobs::CryptBufRsaData { // NOLINT(cppcoreguidelines-pro-type-member-init)
 public:
@@ -81,57 +87,6 @@ public:
   }
 
 
-  static std::unique_ptr<EVP_PKEY, SSL_Delete> readPrivateKey2(const std::string &file, const std::string &passphrase) {
-    std::unique_ptr<BIO, SSL_Delete> bp{nullptr, SSL_Delete{}};
-    if (file.length() > 10 and file.compare(0, 10, "-----BEGIN") == 0) {
-      bp.reset(BIO_new_mem_buf(file.c_str(), file.length()));
-      if (not bp)
-        THROW("alloc mem");
-    }
-    else {
-      bp.reset(BIO_new(BIO_s_file()));
-      if (not bp)
-        return {nullptr, SSL_Delete{}};
-      if (1 != BIO_read_filename(bp.get(), file.c_str()))
-        return {nullptr, SSL_Delete{}};
-    }
-
-// Load the RSA key from the BIO
-    EVP_PKEY* rsaPrivKey = nullptr;
-// wenn nullptr statt passphrase, wird auf der Konsole nachgefragt
-    if (not PEM_read_bio_PrivateKey( bp.get(), &rsaPrivKey, nullptr, (void *)passphrase.c_str() ))
-      throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
-    std::unique_ptr<EVP_PKEY, SSL_Delete> key(rsaPrivKey, SSL_Delete{});
-    if (not EVP_PKEY_is_a(key.get(), "RSA") and not EVP_PKEY_is_a(key.get(), "EC"))
-      THROW("IS NO RSA KEY: "); // << EVP_PKEY_get0_type_name(rsaPrivKey));
-    return key;
-  }
-
-  static std::unique_ptr<EVP_PKEY, SSL_Delete> readPublicKey2(const std::string &file) {
-    std::unique_ptr<BIO, SSL_Delete> bp{nullptr, SSL_Delete{}};
-    if (file.length() > 10 and file.compare(0, 10, "-----BEGIN") == 0) {
-      bp.reset(BIO_new_mem_buf(file.c_str(), file.length()));
-      if (not bp)
-        THROW("alloc mem");
-    }
-    else {
-      bp.reset(BIO_new(BIO_s_file()));
-      if (not bp)
-        return {nullptr, SSL_Delete{}};
-      if (1 != BIO_read_filename(bp.get(), file.c_str()))
-        return {nullptr, SSL_Delete{}};
-    }
-
-    // Load the RSA key from the BIO
-    EVP_PKEY* rsaPubKey = nullptr;
-    if (not PEM_read_bio_PUBKEY(bp.get(), &rsaPubKey, nullptr, nullptr ))
-      throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
-    std::unique_ptr<EVP_PKEY, SSL_Delete> key(rsaPubKey, SSL_Delete{});
-
-    if (not EVP_PKEY_is_a(key.get(), "RSA") and not EVP_PKEY_is_a(key.get(), "EC"))
-      THROW("IS NO RSA KEY"); // << EVP_PKEY_get0_type_name(rsaPubKey));
-    return key;
-  }
 
   void initPubkeys(const std::list<CryptBufRsa::PubKey> &pubkeys) {
 
@@ -139,7 +94,7 @@ public:
       throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
 
     for (auto &k:pubkeys) {
-      auto rsaPupKey = readPublicKey2(k.filename);
+      auto rsaPupKey = mobs_internal::readPublicKey(k.filename);
       if (not rsaPupKey)
         THROW("can't load public key " << k.filename);
       recipients.emplace_back(rsaPupKey, k.id);
@@ -214,7 +169,7 @@ mobs::CryptBufRsa::CryptBufRsa(const std::string &filename, const std::vector<u_
   TRACE("");
   data = std::unique_ptr<mobs::CryptBufRsaData>(new mobs::CryptBufRsaData);
   data->cipher = cipher;
-  if (not (data->priv_key = mobs::CryptBufRsaData::readPrivateKey2(filename, passphrase)))
+  if (not (data->priv_key = mobs_internal::readPrivateKey(filename, passphrase)))
     throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
   if (not (data->ctx = EVP_CIPHER_CTX_new()))
     throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
@@ -373,126 +328,18 @@ void mobs::CryptBufRsa::finalize() {
 
 
 
-
-static void exportPrivateKeyToFile(EVP_PKEY *pkey, const std::string &filePriv, const std::string &passphrase, const std::string &format = "PEM")
-{
-  // bei DER: *structure = "PrivateKeyInfo"; /* PKCS#8 structure */ oder EncryptedPrivateKeyInfo
-  // OSSL_KEYMGMT_SELECT_KEYPAIR
-  std::unique_ptr<BIO, SSL_Delete> bp_private(BIO_new_file(filePriv.c_str(), "w+"), SSL_Delete{});
-  std::unique_ptr<OSSL_ENCODER_CTX, SSL_Delete> ectx(OSSL_ENCODER_CTX_new_for_pkey(pkey,
-                               OSSL_KEYMGMT_SELECT_PRIVATE_KEY
-                                       | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS,
-                                       format.c_str(), nullptr,
-                                       nullptr), SSL_Delete{});
-  if (not ectx or not bp_private)
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa no suitable potential encoders found"));
-  if (not passphrase.empty()) {
-    OSSL_ENCODER_CTX_set_passphrase(ectx.get(), (const unsigned char *)passphrase.c_str(), passphrase.length());
-    //OSSL_ENCODER_CTX_set_cipher(ectx.get(), "AES-256-CBC", nullptr);
-    OSSL_ENCODER_CTX_set_cipher(ectx.get(), "DES-EDE3-CBC", nullptr);
-  }
-  if (not OSSL_ENCODER_to_bio(ectx.get(), bp_private.get()))
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa write failed"));
-}
-
-static void exportPublicKeyToFile(EVP_PKEY *pkey, const std::string &filePub, const std::string &format = "PEM")
-{
-  std::unique_ptr<BIO, SSL_Delete> bp_public(BIO_new_file(filePub.c_str(), "w+"), SSL_Delete{});
-  std::unique_ptr<OSSL_ENCODER_CTX, SSL_Delete> ectx(OSSL_ENCODER_CTX_new_for_pkey(pkey,
-                                       OSSL_KEYMGMT_SELECT_PUBLIC_KEY
-                                       | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS,
-                                       format.c_str(), nullptr,
-                                       nullptr), SSL_Delete{});
-  if (not ectx or not bp_public)
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa no suitable potential encoders found"));
-  if (not OSSL_ENCODER_to_bio(ectx.get(), bp_public.get()))
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa write failed"));
-}
-
-std::string exportPrivateKey(EVP_PKEY *pkey, const std::string &passphrase)
-{
-  const char *format = "PEM";
-  std::unique_ptr<OSSL_ENCODER_CTX, SSL_Delete> ectx(OSSL_ENCODER_CTX_new_for_pkey(pkey,
-                                       OSSL_KEYMGMT_SELECT_PRIVATE_KEY
-                                       | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS,
-                                       format, nullptr,
-                                       nullptr), SSL_Delete{});
-  if (not ectx)
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa no suitable potential encoders found"));
-  if (not passphrase.empty()) {
-    OSSL_ENCODER_CTX_set_passphrase(ectx.get(), (const unsigned char *)passphrase.c_str(), passphrase.length());
-    //OSSL_ENCODER_CTX_set_cipher(ectx.get(), "AES-256-CBC", nullptr);
-    OSSL_ENCODER_CTX_set_cipher(ectx.get(), "DES-EDE3-CBC", nullptr);
-  }
-  unsigned char *data = nullptr;
-  size_t datalen;
-  if (not OSSL_ENCODER_to_data(ectx.get(), &data, &datalen))
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa write failed"));
-  auto mem = std::string((char *)data, datalen);
-  free(data);
-  return mem;
-}
-
-std::string exportPublicKey(EVP_PKEY *pkey)
-{
-  const char *format = "PEM";
-  std::unique_ptr<OSSL_ENCODER_CTX, SSL_Delete> ectx(OSSL_ENCODER_CTX_new_for_pkey(pkey,
-                                       OSSL_KEYMGMT_SELECT_PUBLIC_KEY
-                                       | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS,
-                                       format, nullptr,
-                                       nullptr), SSL_Delete{});
-  if (not ectx)
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa no suitable potential encoders found"));
-  unsigned char *data = nullptr;
-  size_t datalen;
-  if (not OSSL_ENCODER_to_data(ectx.get(), &data, &datalen))
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa write failed"));
-  auto mem = std::string((char *)data, datalen);
-  free(data);
-  return mem;
-}
-
-
 void mobs::generateRsaKey(const std::string &filePriv, const std::string &filePub, const std::string &passphrase) {
-  std::unique_ptr<EVP_PKEY_CTX, SSL_Delete> ctx(EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, nullptr), SSL_Delete{});
-  if (!ctx)
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
-  if (EVP_PKEY_keygen_init(ctx.get()) <= 0)
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
-  if (EVP_PKEY_CTX_set_rsa_keygen_bits(ctx.get(), 2048) <= 0)
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
-  /* Generate key */
-  EVP_PKEY *pkey = nullptr;
-  if (EVP_PKEY_keygen(ctx.get(), &pkey) <= 0)
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
-  std::unique_ptr<EVP_PKEY, SSL_Delete> key(pkey, SSL_Delete{});
-
-  exportPublicKeyToFile(key.get(), filePub);
-  exportPrivateKeyToFile(key.get(), filePriv, passphrase);
+  generateCryptoKey(mobs::CryptRSA2048, filePriv, filePub, passphrase, "PEM");
 }
 
 void mobs::generateRsaKeyMem(std::string &priv, std::string &pub, const std::string &passphrase) {
-  std::unique_ptr<EVP_PKEY_CTX, SSL_Delete> ctx(EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, nullptr), SSL_Delete{});
-  if (!ctx)
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
-  if (EVP_PKEY_keygen_init(ctx.get()) <= 0)
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
-  if (EVP_PKEY_CTX_set_rsa_keygen_bits(ctx.get(), 2048) <= 0)
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
-  /* Generate key */
-  EVP_PKEY *pkey = nullptr;
-  if (EVP_PKEY_keygen(ctx.get(), &pkey) <= 0)
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
-  std::unique_ptr<EVP_PKEY, SSL_Delete> key(pkey, SSL_Delete{});
-
-  pub = exportPublicKey(key.get());
-  priv = exportPrivateKey(key.get(), passphrase);
+  generateCryptoKeyMem(mobs::CryptRSA2048, priv, pub, passphrase);
 }
 
 
 void
 mobs::decryptPublicRsa(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePup) {
-  auto rsaPubKey = mobs::CryptBufRsaData::readPublicKey2(filePup);
+  auto rsaPubKey = mobs_internal::readPublicKey(filePup);
   if (not rsaPubKey)
     THROW(u8"can't load pub key");
   if (cipher.size() != EVP_PKEY_size(rsaPubKey.get()))
@@ -518,7 +365,7 @@ mobs::decryptPublicRsa(const std::vector<u_char> &cipher, std::vector<u_char> &s
 void
 mobs::encryptPrivateRsa(const std::vector<u_char> &sessionKey, std::vector<u_char> &cipher, const std::string &filePriv,
                         const std::string &passphrase) {
-  auto rsaPrivKey = mobs::CryptBufRsaData::readPrivateKey2(filePriv, passphrase);
+  auto rsaPrivKey = mobs_internal::readPrivateKey(filePriv, passphrase);
   if (not rsaPrivKey)
     THROW(u8"can't load priv key");
   if (sessionKey.size() >= EVP_PKEY_size(rsaPrivKey.get()) - 11)
@@ -533,6 +380,8 @@ mobs::encryptPrivateRsa(const std::vector<u_char> &sessionKey, std::vector<u_cha
     throw openssl_exception(LOGSTR("mobs::encryptPrivateRsa"));
   //if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0)
     //throw openssl_exception(LOGSTR("mobs::encryptPrivateRsa"));
+  //if (EVP_PKEY_CTX_set_signature_md(ctx.get(), EVP_sha256()) <= 0)
+  //  throw openssl_exception(LOGSTR("mobs::encryptPrivateRsa"));
   size_t sz = cipher.size();
   if (EVP_PKEY_sign(ctx.get(), &cipher[0], &sz, &sessionKey[0], sessionKey.size()) <= 0)
     throw openssl_exception(LOGSTR("mobs::encryptPrivateRsa"));
@@ -541,7 +390,7 @@ mobs::encryptPrivateRsa(const std::vector<u_char> &sessionKey, std::vector<u_cha
 void
 mobs::decryptPrivateRsa(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePriv,
                         const std::string &passphrase) {
-  auto rsaPrivKey = mobs::CryptBufRsaData::readPrivateKey2(filePriv, passphrase);
+  auto rsaPrivKey = mobs_internal::readPrivateKey(filePriv, passphrase);
   if (not rsaPrivKey)
     THROW(u8"can't load priv key");
   if (cipher.size() != EVP_PKEY_size(rsaPrivKey.get()))
@@ -563,13 +412,15 @@ mobs::decryptPrivateRsa(const std::vector<u_char> &cipher, std::vector<u_char> &
   sessionKey.resize(sz);
 }
 
+
 void
 mobs::encryptPublicRsa(const std::vector<u_char> &sessionKey, std::vector<u_char> &cipher, const std::string &filePup) {
-  auto rsaPubKey = mobs::CryptBufRsaData::readPublicKey2(filePup);
+  auto rsaPubKey = mobs_internal::readPublicKey(filePup);
   if (not rsaPubKey)
     THROW(u8"can't load pub key");
   if (sessionKey.size() >= EVP_PKEY_size(rsaPubKey.get()) - 41)
     THROW(u8"array to big");
+  LOG(LM_INFO, "MAX= " << EVP_PKEY_size(rsaPubKey.get()) - 41 << " res " << EVP_PKEY_size(rsaPubKey.get()));
   cipher.resize(EVP_PKEY_size(rsaPubKey.get()), 0);
   std::unique_ptr<EVP_PKEY_CTX, SSL_Delete>ctx(EVP_PKEY_CTX_new_from_pkey(nullptr, rsaPubKey.get(), nullptr), SSL_Delete{});
   if (!ctx)
@@ -585,56 +436,9 @@ mobs::encryptPublicRsa(const std::vector<u_char> &sessionKey, std::vector<u_char
     throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
 }
 
-void
-mobs::encapsulatePublicRsa(std::vector<u_char> &cipher, std::vector<u_char> &key, const std::string &filePup, const std::string &filePriv,
-                           const std::string &passphrase) {
-  auto rsaPubKey = mobs::CryptBufRsaData::readPublicKey2(filePup);
-  if (not rsaPubKey)
-    THROW(u8"can't load pub key");
-  auto rsaPrivKey = mobs::CryptBufRsaData::readPrivateKey2(filePriv, passphrase);
-  if (not rsaPrivKey)
-    THROW(u8"can't load priv key");
-  //if (sessionKey.size() >= EVP_PKEY_size(rsaPubKey) - 41)
-  //  THROW(u8"array to big");
-  //cipher.resize(EVP_PKEY_size(rsaPubKey), 0);
-  std::unique_ptr<EVP_PKEY_CTX, SSL_Delete>ctx(EVP_PKEY_CTX_new_from_pkey(nullptr, rsaPubKey.get(), nullptr), SSL_Delete{});
-  if (!ctx)
-    throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
-  if (1 != EVP_PKEY_public_check(ctx.get()))
-    THROW("mobs::encryptPublicRsa: THIS IS NO PUBLIC KEY");
-  const EVP_MD *md = EVP_MD_fetch(nullptr, "SHA512", NULL); // Example with SM3
-  if (!md)
-    throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
-
-  if (EVP_PKEY_CTX_set_signature_md(ctx.get(), md) <= 0)
-    throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
-
-  if (EVP_PKEY_CTX_set_kem_op(ctx.get(), "DHKEM") <= 0) // RSASVE
-    throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
-  if (EVP_PKEY_auth_encapsulate_init(ctx.get(), rsaPrivKey.get(), nullptr) <= 0)
-  //if (EVP_PKEY_encapsulate_init(ctx, nullptr) <= 0)
-    throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
-
-  size_t sz = cipher.size();
-  size_t secretlen = 0, outlen = 0;
-  unsigned char *out = NULL, *secret = NULL;
-
-  if (EVP_PKEY_encapsulate(ctx.get(), nullptr, &outlen, nullptr, &secretlen) <= 0)
-    throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
-  cipher.resize(outlen);
-  key.resize(secretlen);
-  if (EVP_PKEY_encapsulate(ctx.get(), &cipher[0], &outlen, &key[0], &secretlen) <= 0)
-    throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
-  cipher.resize(outlen);
-  key.resize(secretlen);
-
-  std::cout << mobs::to_string_base64(cipher) << "   " << mobs::to_string_base64(key) << std::endl;
-
-}
-
 bool mobs::checkPasswordRsa(const std::string &filePriv, const std::string &passphrase) {
   try {
-    auto rsaPrivKey = mobs::CryptBufRsaData::readPrivateKey2(filePriv, passphrase);
+    auto rsaPrivKey = mobs_internal::readPrivateKey(filePriv, passphrase);
     if (not rsaPrivKey)
       return false;
     std::unique_ptr<EVP_PKEY_CTX, SSL_Delete>ctx(EVP_PKEY_CTX_new_from_pkey(nullptr, rsaPrivKey.get(), nullptr), SSL_Delete{});
@@ -647,18 +451,10 @@ bool mobs::checkPasswordRsa(const std::string &filePriv, const std::string &pass
 }
 
 
-void mobs::exportKey(const std::string &filePriv, const std::string &passphraseOld, std::string &priv, std::string &pub, const std::string &passphraseNew) {
-  auto rsa = mobs::CryptBufRsaData::readPrivateKey2(filePriv, passphraseOld);
-  if (not rsa)
-    throw openssl_exception(LOGSTR("mobs::exportKey"));
-
-  pub = exportPublicKey(rsa.get());
-  priv = exportPrivateKey(rsa.get(), passphraseNew);
-}
 
 std::string mobs::getRsaInfo(const std::string &filePriv, const std::string &passphrase) {
   try {
-    auto rsaPrivKey = mobs::CryptBufRsaData::readPrivateKey2(filePriv, passphrase);
+    auto rsaPrivKey = mobs_internal::readPrivateKey(filePriv, passphrase);
     if (not rsaPrivKey)
       throw openssl_exception(LOGSTR("mobs::getRsaInfo"));
     std::unique_ptr<BIO, SSL_Delete> bp_private(BIO_new(BIO_s_mem()), SSL_Delete{});
@@ -675,9 +471,11 @@ std::string mobs::getRsaInfo(const std::string &filePriv, const std::string &pas
 }
 
 std::string mobs::getRsaFingerprint(const std::string &filePub) {
-  auto rsaPubKey = mobs::CryptBufRsaData::readPublicKey2(filePub);
+  auto rsaPubKey = mobs_internal::readPublicKey(filePub);
   if (not rsaPubKey)
     throw openssl_exception(LOGSTR("mobs::getRsaFingerprint"));
+  if (not EVP_PKEY_is_a(rsaPubKey.get(), "RSA"))
+    throw openssl_exception(LOGSTR("mobs::getRsaFingerprint is no RSA"));
   BIGNUM *modulus{};
   if (not EVP_PKEY_get_bn_param(rsaPubKey.get(), "n", &modulus))
     throw openssl_exception(LOGSTR("mobs::getRsaFingerprint"));

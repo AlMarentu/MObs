@@ -189,18 +189,6 @@ void decryptPrivateRsa(const std::vector<u_char> &cipher, std::vector<u_char> &s
   */
  bool checkPasswordRsa(const std::string &filePriv, const std::string &passphrase);
 
- /** \brief Schlüsselpaar erneut ausgeben
-  *
-  * Aus dem privat key / File wird ein public/private Key-Paar erzeugt mit neuem Passwort.
-  * So kann der öffentliche Schlüssel neu generiert werden oder das Passwort der privaten geändert
-  * @param filePriv Dateipfad eines private Keys oder der Schlüssel selbst im PEM-Format
-  * @param passphraseOld Kennwort zum private Key
-  * @param priv String des erzeugten private-key im PEM-Format
-  * @param pub String des erzeugten public-key im PEM-Format
-  * @param passphraseNew neues Kennwort zum neu gespeicherten private Key
-  */
- void exportKey(const std::string &filePriv, const std::string &passphraseOld, std::string &priv, std::string &pub,
-                const std::string &passphraseNew);
 
  /** \brief info zum Schlüssel ausgeben
   *

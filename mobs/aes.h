@@ -81,7 +81,7 @@ public:
   explicit CryptBufAes(const std::vector<u_char> &key, const std::string &id = "");
   ~CryptBufAes() override;
   /// Länge des keys
-  static size_t key_size() { return 32; }
+  static size_t key_size();
   /// Länge des iv
   static size_t iv_size();
   /// Länge einer verschlüsselten Datei
@@ -99,6 +99,9 @@ public:
   size_t recipients() const override { return 1; }
   /// liefert bei pos==0 die Id des des Empfängers wie im Konstruktor angegeben
   std::string getRecipientId(size_t pos) const override;
+  std::string getRecipientKeyBase64(size_t pos) const override;
+  CryptBufAes *setRecipientKeyBase64(const std::string &b64);
+
 
   /** \brief ermittle einen Hash-Wert über die bearbeiteten Daten
    *

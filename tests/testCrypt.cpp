@@ -21,6 +21,8 @@
 
 #include "aes.h"
 #include "aes.h"
+#include "crypt.h"
+#include "crypt.h"
 #include "rsa.h"
 #include "rsa.h"
 #include "digest.h"
@@ -33,6 +35,11 @@
 #include <gtest/gtest.h>
 
 #include "logging.h"
+#include "xmlwriter.h"
+#include "xmlout.h"
+#include "converter.h"
+#include "xmlparser.h"
+
 using namespace std;
 
 
@@ -41,6 +48,8 @@ namespace {
 
 
 TEST(cryptTest, aes1) {
+  EXPECT_EQ(32, mobs::CryptBufAes::key_size());
+  EXPECT_EQ(16, mobs::CryptBufAes::iv_size());
   EXPECT_EQ("Guten Tag", mobs::from_aes_string("U2FsdGVkX19ACrvmZL5NXmtnoX4yH4wJkOTSYk+ZCSM=", "12345"));
   EXPECT_EQ("", mobs::from_aes_string("U2FsdGVkX18kKGguEw9kaylIrxvjzwnl5ncwmab9WoQ=", "12345"));
   EXPECT_EQ("Otto", mobs::from_aes_string(mobs::to_aes_string("Otto", "12345"), "12345"));
@@ -134,6 +143,25 @@ TEST(cryptTest, rsa2) {
 
 }
 
+TEST(cryptTest, rsa2max) {
+  ASSERT_NO_THROW(mobs::generateRsaKey("priv.pem", "pub.pem", "12345"));
+
+  std::vector<u_char> sessionKey;
+  sessionKey.resize(214);
+  mobs::CryptBufAes::getRand(sessionKey);
+  std::vector<u_char> cipher;
+//  sessionKey.resize()
+  ASSERT_NO_THROW(mobs::encryptPublicRsa(sessionKey, cipher, "pub.pem"));
+  EXPECT_EQ(256, cipher.size());
+  std::vector<u_char> sessionKey2;
+  ASSERT_NO_THROW(mobs::decryptPrivateRsa(cipher, sessionKey2,  "priv.pem", "12345"));
+  EXPECT_EQ(sessionKey, sessionKey2);
+
+  unlink("priv.pem");
+  unlink("pub.pem");
+
+}
+
 
 TEST(cryptTest, rsa3) {
   string priv, pub, priv2, pub2;
@@ -152,6 +180,25 @@ TEST(cryptTest, rsa3) {
   ASSERT_NO_THROW(mobs::decryptPublicRsa(cipher, sessionKey3, pub));
   EXPECT_EQ(sessionKey, sessionKey3);
   ASSERT_ANY_THROW(mobs::decryptPublicRsa(cipher, sessionKey2, pub2));
+
+}
+
+TEST(cryptTest, rsa3max) {
+  string priv, pub, priv2, pub2;
+  ASSERT_NO_THROW(mobs::generateRsaKeyMem(priv, pub, "12345"));
+
+  std::vector<u_char> sessionKey ;
+  std::vector<u_char> cipher;
+  sessionKey.resize(240);
+  mobs::CryptBufAes::getRand(sessionKey);
+  ASSERT_NO_THROW(mobs::encryptPrivateRsa(sessionKey, cipher, priv, "12345"));
+  EXPECT_EQ(256, cipher.size());
+  std::vector<u_char> sessionKey2;
+  ASSERT_NO_THROW(mobs::decryptPublicRsa(cipher, sessionKey2, pub));
+  EXPECT_EQ(sessionKey, sessionKey2);
+  std::vector<u_char> sessionKey3;
+  ASSERT_NO_THROW(mobs::decryptPublicRsa(cipher, sessionKey3, pub));
+  EXPECT_EQ(sessionKey, sessionKey3);
 
 }
 
@@ -213,16 +260,103 @@ TEST(cryptTest, rsa6) {
 
 }
 
+void buffOut(const std::vector<u_char> &buf) {
+  cerr << "SZ: " << buf.size() << " " << mobs::to_string(buf) << endl;
+}
+
+TEST(cryptTest, rsa7) {
+  string privU, pubU;
+  string privS, pubS;
+  string priv2, pub2;
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, privU, pubU, "12345"));
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, privS, pubS, "54321"));
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, priv2, pub2, "00000"));
+  cerr << privU << endl;
+  cerr << pubU << endl;
+
+  std::vector<u_char> cipher;
+  std::vector<u_char> key;
+  ASSERT_NO_THROW(mobs::encapsulatePublic(cipher, key, pubS, privU, "12345"));
+  buffOut(cipher);
+  buffOut(key);
+  std::vector<u_char> key2;
+  ASSERT_NO_THROW(mobs::decapsulatePublic(cipher,key2, privS, "54321",  pubU));
+  buffOut(key2);
+  EXPECT_EQ(key, key2);
+  ASSERT_NO_THROW(mobs::decapsulatePublic(cipher,key2,  priv2, "00000",  pubU));
+  buffOut(key2);
+  EXPECT_NE(key, key2);
+  ASSERT_NO_THROW(mobs::decapsulatePublic(cipher,key2, privS, "54321",  pub2));
+  buffOut(key2);
+  EXPECT_NE(key, key2);
+
+}
+
+#if 0
+[openssl_init]
+providers = provider_sect
+
+[provider_sect]
+default = default_sect
+legacy = legacy_sect
+
+[default_sect]
+activate = 1
+
+[legacy_sect]
+activate = 1
+
+#endif
+
+TEST(cryptTest, rsa8) {
+  string privS, pubS;
+  string priv2, pub2;
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptRSA2048, privS, pubS, "54321"));
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptRSA2048, priv2, pub2, "00000"));
+
+  cerr << privS<< endl;
+  cerr << pubS << endl;
+
+  std::vector<u_char> cipher;
+  std::vector<u_char> key;
+  ASSERT_NO_THROW(mobs::encapsulatePublic(cipher, key,  pubS));
+  buffOut(cipher);
+  buffOut(key);
+  std::vector<u_char> key2;
+  ASSERT_NO_THROW(mobs::decapsulatePublic(cipher,key2, privS, "54321"));
+  buffOut(key2);
+  EXPECT_EQ(key, key2);
+  ASSERT_NO_THROW(mobs::decapsulatePublic(cipher,key2, priv2, "00000"));
+  buffOut(key2);
+  EXPECT_NE(key, key2);
+}
+
+
+
 
 TEST(cryptTest, rsaCheck) {
   string priv, pub;
   ASSERT_NO_THROW(mobs::generateRsaKeyMem(priv, pub, "12345"));
-  EXPECT_TRUE(mobs::checkPasswordRsa(priv, "12345"));
+  EXPECT_TRUE(mobs::checkPassword(priv, "12345"));
 //  std::cerr << mobs::printRsa(priv, "12345") << std::endl;
-  EXPECT_FALSE(mobs::checkPasswordRsa(priv, "54321"));
+  EXPECT_FALSE(mobs::checkPassword(priv, "54321"));
   auto hash = mobs::getRsaFingerprint(pub);
   //std::cerr << hash << std::endl;
   EXPECT_EQ(32, hash.length());
+}
+
+TEST(cryptTest, keyChange) {
+  string priv, pub, priv2, pub2;
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, priv, pub, "12345"));
+  cerr << mobs::getKeyInfo(priv, "12345") << endl;
+  ASSERT_GE(mobs::getKeyInfo(priv, "12345").size(), 70);
+  //ASSERT_GE(mobs::getKeyFingerprint(pub).size(), 32);
+  EXPECT_TRUE(mobs::checkPassword(priv, "12345"));
+  ASSERT_NO_THROW(mobs::exportKey(priv, "12345", priv2, pub2, "55555"));
+  EXPECT_TRUE(mobs::checkPassword(priv2, "55555"));
+  //EXPECT_TRUE(mobs::getKeyFingerprint(pub)== mobs::getRsaFingerprint(pub2));
+  EXPECT_EQ(pub, pub2);
+  EXPECT_TRUE(mobs::getKeyInfo(priv, "12345") == mobs::getKeyInfo(priv2, "55555"));
 }
 
 TEST(cryptTest, rsaChange) {
@@ -404,7 +538,7 @@ TEST(cryptTest, xml) {
   f1.id(1);
   f1.typ("Brauereigespann");
   f1.fahrer("Otto");
-  f1.zugmaschine.typ("Sechsspänner");
+  f1.zugmaschine.typ("Sechsspaenner");
   f1.zugmaschine.achsen(0);
   f1.zugmaschine.antrieb(true);
   f1.haenger[0].typ("Bräuwagen");
@@ -427,7 +561,99 @@ TEST(cryptTest, xml) {
   EXPECT_EQ("Otto", f2.fahrer());
 
 
+};
+
+class XParserW: public mobs::XmlParserW {
+public:
+  explicit XParserW(const wstring &i) : mobs::XmlParserW(str), str(i) { }
+  void NullTag(const std::string &element) override { LOG(LM_INFO, "NULL " << element << " " << currentXmlns()); }
+  void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) override { LOG(LM_INFO, "ATTRIBUT " << attribut <<
+                                                                                                                                         " VALUE >" << mobs::to_string(value) << "<"); lastValue = mobs::to_string(value); }
+  void Value(const std::wstring &value) override { LOG(LM_INFO, "VALUE >" << mobs::to_string(value) << "<"); lastValue = mobs::to_string(value);}
+  void Base64(const std::vector<u_char> &base64) override {
+    std::string s;
+    std::copy(base64.cbegin(), base64.cend(), back_inserter(s));
+    lastCdata = s;
+    LOG(LM_INFO, "BASE64 >" << s << "< " << base64.size());
+  }
+  void StartTag(const std::string &element) override { LOG(LM_INFO, "START " << element << " " << currentXmlns()); }
+  void EndTag(const std::string &element) override { LOG(LM_INFO, "END " << element << " " << currentXmlns()); }
+  void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) override { LOG(LM_INFO, "PI" << element); }
+  void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, mobs::CryptBufBase *&cryptBufp) override {
+    LOG(LM_INFO, "Encrypt algorithm=" << algorithm << " keyName=" << keyName << " cipher=" << cipher);
+    std::vector<u_char> cip;
+    mobs::from_string_base64(cipher, cip);
+    buffOut(cip);
+    mobs::decapsulatePublic(cip, key, privS, "54321", pubC);
+    buffOut(key);
+    cryptBufp = new mobs::CryptBufAes(key, keyName);
+  };
+
+  std::wistringstream str;
+  std::string lastCdata;
+  std::string lastValue;
+  std::string privS;
+  std::string pubC;
+  std::vector<u_char> key;
+
+
+};
+
+
+TEST(cryptTest, xmlenc) {
+  Gespann f1, f2;
+
+  f1.id(1);
+  f1.typ("Brauereigespann");
+  f1.fahrer("Otto");
+  f1.zugmaschine.typ(u8"Sechsspänner");
+  f1.zugmaschine.achsen(0);
+  f1.zugmaschine.antrieb(true);
+  f1.haenger[0].typ(u8"Bräuwagenä");
+  f1.haenger[0].achsen(2);
+
+  string privU, pubU;
+  string privS, pubS;
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, privU, pubU, "12345"));
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, privS, pubS, "54321"));
+  cerr << privU << endl;
+  cerr << pubU << endl;
+
+  std::vector<u_char> cipher;
+  mobs::RecipientKey recpt(pubS, "Client", "Server");
+  std::vector<u_char> key;
+  ASSERT_NO_THROW(mobs::encapsulatePublic(recpt.cipher, key, recpt.keyFile, privU, "12345"));
+  buffOut(key);
+  buffOut(recpt.cipher);
+  std::vector<u_char> iv;
+  iv.resize(mobs::CryptBufAes::iv_size());
+  mobs::CryptBufAes::getRand(iv);
+
+
+
+  mobs::XmlWriter xw(mobs::XmlWriter::CS_utf8, true);
+  mobs::XmlOut xo(&xw, mobs::ConvObjToString());
+  xw.writeHead();
+  xw.writeTagBegin(L"Root");
+  xw.startEncrypt((new mobs::CryptBufAes(key, iv, "Client", true))->setRecipientKeyBase64(mobs::to_string_base64(recpt.cipher)));
+  f1.traverse(xo);
+
+  xo.sync();
+  xw.sync();
+  xw.stopEncrypt();
+  xw.writeTagEnd();
+  xw.sync();
+  cerr << xw.getString() << endl;
+
+  XParserW pw(mobs::to_wstring(xw.getString()));
+  pw.privS = privS;
+  pw.pubC = pubU;
+  while (not pw.eof())
+  {
+    pw.parse();
+  }
 }
+
 
 }
 

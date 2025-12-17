@@ -38,6 +38,7 @@
 #define CSBLOG(x, y)
 #endif
 
+// >= iv_size && >= key_size
 #define KEYBUFLEN 32
 #define INPUT_BUFFER_LEN 8192
 
@@ -57,22 +58,6 @@ public:
 
 }
 
-std::string mobs_internal::openSslGetError() {
-  u_long e;
-  std::string res = "OpenSSL: ";
-  while ((e = ERR_get_error())) {
-    static bool errLoad = false;
-    if (not errLoad) {
-      errLoad = true;
-//      ERR_load_crypto_strings(); // nur crypto-fehler laden
-      SSL_load_error_strings(); // NOLINT(hicpp-signed-bitwise)
-      //ERR_load_BIO_strings();
-      atexit([]() { ERR_free_strings(); });
-    }
-    res += ERR_error_string(e, nullptr);
-  }
-  return res;
-}
 
 class mobs::CryptBufAesData { // NOLINT(cppcoreguidelines-pro-type-member-init)
 public:
@@ -124,6 +109,7 @@ public:
   std::string md_algo;
   std::string passwd;
   std::string id;
+  std::string rcptKey;
   CryptBufAes::pos_type inPos = 0;
   CryptBufAes::pos_type outPos = 0;
   bool initIV = false;  // iv aus stream lesen
@@ -166,8 +152,8 @@ mobs::CryptBufAes::CryptBufAes(const std::vector<u_char> &key, const std::vector
   data = std::unique_ptr<CryptBufAesData>(new mobs::CryptBufAesData);
   data->id = id;
   data->initIV = writeIV;
-  memcpy(&data->key[0], &key[0], std::min(key.size(), size_t(KEYBUFLEN)));
-  memcpy(&data->iv[0], &iv[0], std::min(iv.size(), size_t(KEYBUFLEN)));
+  memcpy(&data->key[0], &key[0], std::min(key.size(), sizeof(data->key)));
+  memcpy(&data->iv[0], &iv[0], std::min(iv.size(), sizeof(data->iv)));
 }
 
 mobs::CryptBufAes::CryptBufAes(const std::vector<u_char> &key, const std::string &id) {
@@ -175,7 +161,7 @@ mobs::CryptBufAes::CryptBufAes(const std::vector<u_char> &key, const std::string
   data = std::unique_ptr<CryptBufAesData>(new mobs::CryptBufAesData);
   data->id = id;
   data->initIV = true;
-  memcpy(&data->key[0], &key[0], std::min(key.size(), size_t(KEYBUFLEN)));
+  memcpy(&data->key[0], &key[0], std::min(key.size(), sizeof(data->key)));
 }
 
 mobs::CryptBufAes::~CryptBufAes() {
@@ -340,6 +326,8 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::overflow(mobs::CryptBufAes::int_t
       if (data->mdctx)
         EVP_DigestUpdate(data->mdctx, (u_char *) Base::pbase(), std::distance(Base::pbase(), Base::pptr()));
       data->outPos += std::distance(Base::pbase(), Base::pptr());
+      //std::cerr << "\nDDD " << std::string((char *)Base::pbase(), std::distance(Base::pbase(), Base::pptr())) << std::endl;
+
 
 //    size_t  s = std::distance(Base::pbase(), Base::pptr());
 //    char *cp =  (Base::pbase());
@@ -413,6 +401,13 @@ size_t mobs::CryptBufAes::iv_size() {
   return size_t(i);
 }
 
+size_t mobs::CryptBufAes::key_size() {
+  int i = EVP_CIPHER_key_length(EVP_aes_256_cbc());
+  if (i < 0)
+    throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
+  return size_t(i);
+}
+
 // für ausschließlich tellp/g verwenden
 mobs::CryptBufAes::pos_type mobs::CryptBufAes::seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which) {
   //LOG(LM_INFO, "CryptBufAes::seekoff " << off << " " << dir << " " << which);
@@ -423,6 +418,17 @@ mobs::CryptBufAes::pos_type mobs::CryptBufAes::seekoff(off_type off, std::ios_ba
   if (which & std::ios_base::in)
     return pos_type(data->inPos - off_type(std::distance(Base::gptr(), Base::egptr())));
   return pos_type(off_type(-1));
+}
+
+std::string mobs::CryptBufAes::getRecipientKeyBase64(size_t pos) const {
+  if (pos == 0)
+    return data->rcptKey;
+  return CryptBufBase::getRecipientKeyBase64(pos);
+}
+
+mobs::CryptBufAes *mobs::CryptBufAes::setRecipientKeyBase64(const std::string &b64) {
+  data->rcptKey = b64;
+  return this;
 }
 
 
