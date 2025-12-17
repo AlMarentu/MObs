@@ -33,53 +33,97 @@ using namespace std;
 
 namespace {
 
-class JParser: public mobs::JsonParser {
+class JParser : public mobs::JsonParser {
 public:
   explicit JParser(const string &i) : mobs::JsonParser(i) {};
+
   void Key(const std::string &value) override { LOG(LM_INFO, "KEY " << value); };
-  void Value(const std::string &value, bool charType) override { LOG(LM_INFO, "VALUE " << value); lastValue = value; };
+
+  void Value(const std::string &value, bool charType) override {
+    LOG(LM_INFO, "VALUE " << value);
+    lastValue = value;
+  };
+
   void StartArray() override { LOG(LM_INFO, "START ARRAY"); }
+
   void EndArray() override { LOG(LM_INFO, "END ARRAY"); }
+
   void StartObject() override { LOG(LM_INFO, "START OBJECT"); }
+
   void EndObject() override { LOG(LM_INFO, "END OBJECT"); }
+
   string lastValue;
 };
 
-class XParser: public mobs::XmlParser {
+class XParser : public mobs::XmlParser {
 public:
   explicit XParser(const string &i) : mobs::XmlParser(i) {}
+
   void NullTag(const std::string &element) override { LOG(LM_INFO, "NULL"); }
-  void Attribute(const std::string &element, const std::string &attribut, const std::string &value) override { LOG(LM_INFO, "ATTRIBUT " << element); }
+
+  void Attribute(const std::string &element, const std::string &attribut, const std::string &value) override {
+    LOG(LM_INFO, "ATTRIBUT " << element);
+  }
+
   void Value(const std::string &value) override { LOG(LM_INFO, "VALUE"); }
+
   void Cdata(const char *value, size_t len) override { LOG(LM_INFO, "CDATA >" << string(value, len) << "<"); }
+
   void StartTag(const std::string &element) override { LOG(LM_INFO, "START " << element); }
+
   void EndTag(const std::string &element) override { LOG(LM_INFO, "END " << element); }
-  void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::string &value) override { LOG(LM_INFO, "PI" << element); }
+
+  void ProcessingInstruction(const std::string &element, const std::string &attribut,
+                             const std::string &value) override { LOG(LM_INFO, "PI" << element); }
 };
 
-class XParserW: public mobs::XmlParserW {
+class XParserW : public mobs::XmlParserW {
 public:
-  explicit XParserW(const wstring &i) : mobs::XmlParserW(str), str(i) { }
-  void NullTag(const std::string &element) override { LOG(LM_INFO, "NULL"); }
-  void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) override { LOG(LM_INFO, "ATTRIBUT " << attribut <<
-                  " VALUE >" << mobs::to_string(value) << "<"); lastValue = mobs::to_string(value); }
-  void Value(const std::wstring &value) override { LOG(LM_INFO, "VALUE >" << mobs::to_string(value) << "<"); lastValue = mobs::to_string(value);}
+  explicit XParserW(const wstring &i) : mobs::XmlParserW(str), str(i) {}
+
+  void NullTag(const std::string &element) override { LOG(LM_INFO, "NULL " << element); }
+
+  void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) override {
+    LOG(LM_INFO, "ATTRIBUT " << attribut <<
+                             " VALUE >" << mobs::to_string(value) << "<");
+    lastValue = mobs::to_string(value);
+  }
+
+  void Value(const std::wstring &value) override {
+    LOG(LM_INFO, "VALUE >" << mobs::to_string(value) << "<");
+    lastValue = mobs::to_string(value);
+    if (wait)
+      stop();
+  }
+
   void Base64(const std::vector<u_char> &base64) override {
     std::string s;
     std::copy(base64.cbegin(), base64.cend(), back_inserter(s));
     lastCdata = s;
     LOG(LM_INFO, "BASE64 >" << s << "< " << base64.size());
   }
-  void StartTag(const std::string &element) override { LOG(LM_INFO, "START " << element); }
+
+  void StartTag(const std::string &element) override { LOG(LM_INFO, "START " << element);
+    lastKey += currentXmlns() + element + "|";
+  }
+
   void EndTag(const std::string &element) override { LOG(LM_INFO, "END " << element); }
-  void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) override { LOG(LM_INFO, "PI" << element); }
-  void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, mobs::CryptBufBase *&cryptBufp) override { };
+
+  void ProcessingInstruction(const std::string &element, const std::string &attribut,
+                             const std::wstring &value) override { LOG(LM_INFO, "PI" << element); }
+
+  void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher,
+               mobs::CryptBufBase *&cryptBufp) override {
+    LOG(LM_INFO, "Encrypt algorithm=" << algorithm << " keyName=" << keyName << " cipher=" << cipher);
+  }
+
 
   std::wistringstream str;
   std::string lastCdata;
   std::string lastValue;
+  std::string lastKey;
+  bool wait = false;
 };
-
 
 
 TEST(parserTest, jsonTypes) {
@@ -92,8 +136,8 @@ TEST(parserTest, jsonTypes) {
 TEST(parserTest, jsonParser) {
 
   string jjj =
-  // aus https://de.wikipedia.org/wiki/JavaScript_Object_Notation
-  R"(
+      // aus https://de.wikipedia.org/wiki/JavaScript_Object_Notation
+      R"(
   {
   "Herausgeber": "Xema",
   "Nummer": "1234-5678-9012-3456",
@@ -110,18 +154,25 @@ TEST(parserTest, jsonParser) {
   "Partner": null
   }
   })";
-  
- 
+
+
   JParser p(jjj);
-  ASSERT_NO_THROW(p.parse());   
+  ASSERT_NO_THROW(p.parse());
 }
 
-void parse(string s) { JParser p(s); p.parse(); };
+void parse(string s) {
+  JParser p(s);
+  p.parse();
+};
 
-std::string parseValue(string s) { JParser p(s); p.parse(); return p.lastValue; };
+std::string parseValue(string s) {
+  JParser p(s);
+  p.parse();
+  return p.lastValue;
+};
 
 TEST(parserTest, jsonStruct1) {
-  
+
   EXPECT_NO_THROW(parse(u8"{}"));
   EXPECT_NO_THROW(parse(u8"[{}]"));
   EXPECT_NO_THROW(parse(u8"{ \"a\" : 1 }"));
@@ -142,9 +193,23 @@ TEST(parserTest, jsonStruct1) {
 
 }
 
-void xparse(string s) { XParser p(s); p.parse(); };
-std::string xparse(wstring s) { XParserW p(s);  p.parse(); return p.lastValue;};
-std::string xparseCdata(wstring s) { XParserW p(s); p.setBase64(true); p.parse(); return p.lastCdata; };
+void xparse(string s) {
+  XParser p(s);
+  p.parse();
+};
+
+std::string xparse(wstring s) {
+  XParserW p(s);
+  p.parse();
+  return p.lastValue;
+};
+
+std::string xparseCdata(wstring s) {
+  XParserW p(s);
+  p.setBase64(true);
+  p.parse();
+  return p.lastCdata;
+};
 
 // aus https://de.wikipedia.org/wiki/Extensible_Markup_Language
 const string x1 = R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -160,7 +225,7 @@ const string x1 = R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
      </eintrag>
 </verzeichnis>
                     )";
-                    
+
 TEST(parserTest, xmlStruct1) {
   EXPECT_NO_THROW(xparse(x1));
   EXPECT_NO_THROW(xparse(u8"<abc/>"));
@@ -169,7 +234,7 @@ TEST(parserTest, xmlStruct1) {
   EXPECT_NO_THROW(xparse(u8"<abc>   <cde/> </abc>"));
   EXPECT_NO_THROW(xparse(u8"<abc>   <!-- sdfsdf -->  <cde/>  </abc>"));
   EXPECT_NO_THROW(xparse(u8"<abc>  <cde/> </abc> <!-- sdfs<< df --> "));
-  
+
   EXPECT_ANY_THROW(xparse(u8"<abc  />"));
   EXPECT_ANY_THROW(xparse(u8"<abc>   <cde/> </abce>"));
   EXPECT_ANY_THROW(xparse(u8"<abc a =\"xx\" bcd=\"9999\"/>"));
@@ -184,8 +249,10 @@ TEST(parserTest, xmlStructW1) {
   EXPECT_NO_THROW(xparse(L"<abc a=\"xx\"  bcd=\"9999\"/>"));
   EXPECT_EQ(u8"xx¼ ö<ä>ü", xparse(L"<abc f=\"ä&amp;\n\">xx&#188;&#x20;ö&lt;ä&gt;ü</abc>"));
   ASSERT_ANY_THROW(xparse(L"<!ENTITY greet \"Hallo !!\" x ><abc>xx&#188;&#x20;ö&lt;ä&gt;ü</abc>"));
-  ASSERT_NO_THROW(xparse(L"<!ENTITY greet \"Hallo !!\" ><!ENTITY   xxx   \"XXX&#10;\"><abc>xx&#188;&#x20;ö&lt;ä&gt;ü&xxx;</abc>"));
-  EXPECT_EQ(u8"xx¼ ö<Hallo !!>üXXX\n&lt;", xparse(L"<!ENTITY greet \"Hallo !!\" ><!ENTITY   xxx   \"XXX&#10;&lt;\"><abc>xx&#188;&#x20;ö&lt;&greet;&gt;ü&xxx;</abc>"));
+  ASSERT_NO_THROW(
+      xparse(L"<!ENTITY greet \"Hallo !!\" ><!ENTITY   xxx   \"XXX&#10;\"><abc>xx&#188;&#x20;ö&lt;ä&gt;ü&xxx;</abc>"));
+  EXPECT_EQ(u8"xx¼ ö<Hallo !!>üXXX\n&lt;", xparse(
+      L"<!ENTITY greet \"Hallo !!\" ><!ENTITY   xxx   \"XXX&#10;&lt;\"><abc>xx&#188;&#x20;ö&lt;&greet;&gt;ü&xxx;</abc>"));
   EXPECT_NO_THROW(xparse(L"<abc>   <cde/> </abc>"));
   EXPECT_NO_THROW(xparse(L"<abc \t>   <cde \n /> </abc \t >"));
   EXPECT_NO_THROW(xparse(L"<ggg>   <!-- sdfsdf --><cde/>  </ggg>"));
@@ -214,13 +281,17 @@ TEST(parserTest, xmlStructW1) {
 }
 
 TEST(parserTest, base64) {
-  EXPECT_NO_THROW(xparse(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n  biwgSm9naHVydCB1bmQgUXVhcms= ]]>  </abc>"));
+  EXPECT_NO_THROW(xparse(
+      L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n  biwgSm9naHVydCB1bmQgUXVhcms= ]]>  </abc>"));
   EXPECT_EQ(u8"Polyfon zwitschernd aßen Mäxchens Vögel Rüben, Joghurt und Quark",
-            xparseCdata(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n  biwgSm9naHVydCB1bmQgUXVhcms= ]]>  </abc>"));
+            xparseCdata(
+                L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n  biwgSm9naHVydCB1bmQgUXVhcms= ]]>  </abc>"));
   // missing padding
   EXPECT_EQ(u8"Polyfon zwitschernd aßen Mäxchens Vögel Rüben, Joghurt und Quark",
-            xparseCdata(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n  biwgSm9naHVydCB1bmQgUXVhcms ]]>  </abc>"));
-  EXPECT_ANY_THROW(xparseCdata(L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n =  biwgSm9naHVydCB1bmQgUXVhcms= ]]>  </abc>"));
+            xparseCdata(
+                L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n  biwgSm9naHVydCB1bmQgUXVhcms ]]>  </abc>"));
+  EXPECT_ANY_THROW(xparseCdata(
+      L"<abc>   <![CDATA[UG9seWZvbiB6d2l0c2NoZXJuZCBhw59lbiBNw6R4Y2hlbnMgVsO2Z2VsIFLDvGJl\n =  biwgSm9naHVydCB1bmQgUXVhcms= ]]>  </abc>"));
   EXPECT_EQ("A\n", xparseCdata(L"<abc>   <![CDATA[QQo= ]]>  </abc>"));
   EXPECT_NO_THROW(xparseCdata(L"<abc>   <![CDATA[Q+/= ]]> \t </abc>"));
   EXPECT_ANY_THROW(xparseCdata(L"<abc>   <![CDATA[Q+/= ]]> x </abc>"));
@@ -228,5 +299,105 @@ TEST(parserTest, base64) {
   EXPECT_ANY_THROW(xparseCdata(L"<abc>   <![CDATA[Q-o= ]]>  </abc>"));
 }
 
+
+TEST(parserTest, xmlns1) {
+  // KeyInfo xmlns ohne Name (globaler ns)
+  std::wstring x = LR"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Root>
+  <XXXData Type="http://www.w3.org/2001/04/xmlenc#" xmlns:xenc="http://www.w3.org/2001/04/xmlenc#" xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+    <ds:EncryptionMethod Algorithm="http://www.w3.org/2001/04/xmlenc#aes-256-cbc"/>
+    <ds:KeyInfo xmlns="https://www.w3.org/2000/09/xmldsig#">
+      <KeyName>Client</KeyName>
+      <CipherData>
+        <CipherValue>ABC</CipherValue>
+      </CipherData>
+   </ds:KeyInfo>
+  </XXXData>
+  <Wert>55</Wert>
+</Root>
+)";
+  XParserW p(x);
+  p.wait = true;
+  ASSERT_NO_THROW(p.parse());
+  EXPECT_EQ(p.lastValue, "Client");
+  EXPECT_EQ(p.lastKey, "Root|XXXData|http://www.w3.org/2000/09/xmldsig#EncryptionMethod|http://www.w3.org/2000/09/xmldsig#KeyInfo|https://www.w3.org/2000/09/xmldsig#KeyName|");
+  p.lastKey.clear();
+  ASSERT_NO_THROW(p.parse());
+  EXPECT_EQ(p.lastValue, "ABC");
+  EXPECT_EQ(p.lastKey, "https://www.w3.org/2000/09/xmldsig#CipherData|https://www.w3.org/2000/09/xmldsig#CipherValue|");
+  p.lastKey.clear();
+  ASSERT_NO_THROW(p.parse());
+  EXPECT_EQ(p.lastValue, "55");
+  EXPECT_EQ(p.lastKey, "Wert|");
 }
 
+TEST(parserTest, xmlns2) {
+  // KeyInfo xmlns mit Name
+
+  std::wstring x = LR"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Root>
+  <XXXData Type="http://www.w3.org/2001/04/xmlenc#" xmlns:xenc="http://www.w3.org/2001/04/xmlenc#" xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+    <ds:EncryptionMethod Algorithm="http://www.w3.org/2001/04/xmlenc#aes-256-cbc"/>
+    <ds:KeyInfo xmlns:xx="https://www.w3.org/2000/09/xmlxxx#">
+      <KeyName>Client</KeyName>
+      <xx:CipherData>
+        <CipherValue>ABC</CipherValue>
+      </xx:CipherData>
+   </ds:KeyInfo>
+  </XXXData>
+  <Wert>55</Wert>
+</Root>
+)";
+  XParserW p(x);
+  p.wait = true;
+  ASSERT_NO_THROW(p.parse());
+  EXPECT_EQ(p.lastValue, "Client");
+  EXPECT_EQ(p.lastKey, "Root|XXXData|http://www.w3.org/2000/09/xmldsig#EncryptionMethod|http://www.w3.org/2000/09/xmldsig#KeyInfo|KeyName|");
+  p.lastKey.clear();
+  ASSERT_NO_THROW(p.parse());
+  EXPECT_EQ(p.lastValue, "ABC");
+  EXPECT_EQ(p.lastKey, "https://www.w3.org/2000/09/xmlxxx#CipherData|CipherValue|");
+  p.lastKey.clear();
+  ASSERT_NO_THROW(p.parse());
+  EXPECT_EQ(p.lastValue, "55");
+  EXPECT_EQ(p.lastKey, "Wert|");
+}
+
+TEST(parserTest, xmlns4) {
+  // KeyInfo xmlns mit Name
+
+  std::wstring x = LR"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Root>
+  <XXXData xmlns:ds="http://www.w3.org/2001/04/xmlenc#" >
+    <xx:KeyInfo>
+      <KeyName>Client</KeyName>
+   </xx:KeyInfo>
+</Root>
+)";
+  XParserW p(x);
+  p.wait = true;
+  ASSERT_NO_THROW(p.parse());
+  EXPECT_EQ(p.lastValue, "Client");
+  EXPECT_EQ(p.lastKey, "Root|XXXData|xx:KeyInfo|KeyName|");
+  p.lastKey.clear();
+  ASSERT_ANY_THROW(p.parse());
+}
+
+TEST(parserTest, xmlns5) {
+  std::wstring x = LR"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Root xmlns="http://www.mobs.org/test#" xmlns:ds="http://www.w3.org/2001/04/xmlenc#">
+    <ds:KeyInfo>
+      <KeyName>Client</KeyName>
+   </ds:KeyInfo>
+</Root>
+)";
+  XParserW p(x);
+  p.wait = true;
+  ASSERT_NO_THROW(p.parse());
+  EXPECT_EQ(p.lastValue, "Client");
+  EXPECT_EQ(p.lastKey, "http://www.mobs.org/test#Root|http://www.w3.org/2001/04/xmlenc#KeyInfo|http://www.mobs.org/test#KeyName|");
+  p.lastKey.clear();
+  ASSERT_NO_THROW(p.parse());
+}
+
+}
