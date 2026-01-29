@@ -96,13 +96,13 @@ public:
       }
   }
 
-  void write(wchar_t c) {
+  void write(wchar_t c) const {
 //    if (conFun and (c & ~0x7f))
 //      buffer << wchar_t(conFun(c));
 //    else
     *wostr << c;
   }
-  void writeIndent() {
+  void writeIndent() const {
     if (indent)
     {
       wstring s;
@@ -135,12 +135,11 @@ public:
       binaryStart = binaryStream->tellp();
       cbbp->setOstr(wbufp->getOstream());
       return *binaryStream;
-    } else {
-      if (delimiter)
-        wbufp->getOstream() << delimiter;
-      binaryStart = wbufp->getOstream().tellp();
-      return wbufp->getOstream();
     }
+    if (delimiter)
+      wbufp->getOstream() << delimiter;
+    binaryStart = wbufp->getOstream().tellp();
+    return wbufp->getOstream();
   }
 
   std::streamsize closeByteStream() {
@@ -310,7 +309,7 @@ void XmlWriter::writeBase64(const u_char *value, uint64_t size) {
   string lBreak;
   if (data->indent) {
     lBreak = "\n";
-    lBreak.resize(data->level * 2 +1, ' ');
+    lBreak.resize((data->level * 2) +1, ' ');
   }
   copy_base64(&value[0], &value[size], std::ostreambuf_iterator<wchar_t>(*data->wostr), lBreak);
   *data->wostr << L"]]>";
@@ -323,7 +322,7 @@ void XmlWriter::writeBase64(const std::vector<u_char> &value) {
   string lBreak;
   if (data->indent) {
     lBreak = "\n";
-    lBreak.resize(data->level * 2 +1, ' ');
+    lBreak.resize((data->level * 2) +1, ' ');
   }
   copy_base64(value.cbegin(), value.cend(), std::ostreambuf_iterator<wchar_t>(*data->wostr), lBreak);
   *data->wostr << L"]]>";

@@ -136,8 +136,12 @@ public:
     } else if (mi.isSigned) {
       mi.setInt(2);
       mem.fromMemInfo(mi);
-    } else if (mem.is_chartype(mobs::ConvToStrHint(compact)))
-      mem.fromStr("x", not compact ? mobs::ConvFromStrHint::convFromStrHintExplizit : mobs::ConvFromStrHint::convFromStrHintDflt);
+    } else if (mem.is_chartype(mobs::ConvToStrHint(compact))) {
+      auto ch = mobs::ConvObjFromStr();
+      if (not compact)
+        ch = ch.useExtendedValues();
+      mem.fromStr("x", ch);
+    }
   }
 
   virtual void readValueText(const std::string &name, std::string &text, bool &null) override {

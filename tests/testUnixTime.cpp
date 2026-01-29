@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -34,6 +34,7 @@
 using namespace std;
 using namespace mobs;
 
+// Die Tests benötigen die Timezone Europe/Berlin
 
 namespace {
 
@@ -74,7 +75,11 @@ TEST(dateTimeTest, string2x) {
 
 TEST(dateTimeTest, timeBeforeEpochIsInvalid) {
   UxTime t5(1802, 9, 17, 1, 59, 58);
+#if GTEST_OS_LINUX
+  EXPECT_EQ(-5279208810, t5.toUxTime());
+#else
   EXPECT_EQ(-1, t5.toUxTime());
+#endif
 }
 
 class TimeStamp : virtual public mobs::ObjectBase {

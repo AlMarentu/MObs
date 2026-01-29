@@ -832,7 +832,7 @@ public:
   bool fromStr(const std::string &sin, const ConvFromStrHint &cfh) override { doAudit(); if (this->c_string2x(sin, wert, cfh)) { activate(); return true; } return false; }
   /// Einlesen der Variablen aus einem String im erweiterten Modus
   /// \throw runtime_error bei Konvertierungsfehler
-  void fromStrExplizit(const std::string &sin)  { if (not fromStr(sin, ConvFromStrHint::convFromStrHintExplizit)) throw std::runtime_error("fromStrExplizit input error"); }
+  void fromStrExplizit(const std::string &sin)  { if (not fromStr(sin, ConvFromStrHintExplizit())) throw std::runtime_error("fromStrExplizit input error"); }
   /// Einlesen der Variable aus einem \c std::wstring
   bool fromStr(const std::wstring &sin, const ConvFromStrHint &cfh) override { doAudit(); if (this->c_wstring2x(sin, wert, cfh)) { activate(); return true; } return false; }
   /// Info zum aktuellen Datentyp mit Inhalt

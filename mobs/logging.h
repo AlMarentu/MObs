@@ -62,7 +62,7 @@ extern loglevel currentLevel;
 class Trace {
 public:
   /// \private
-  Trace (const char *f, std::function<std::string()> str);
+  Trace (const char *f, const std::function<std::string()> &str);
   ~Trace ();
   static bool traceOn; ///< schaltet Tracing zur Laufzeit ein und aus
 private:
@@ -89,9 +89,9 @@ private:
   std::string fileName;
   int version = -1;
 #ifdef __MINGW32__
-  HANDLE handle;
+  HANDLE handle{};
 #else
-  int handle;
+  int handle{};
 #endif
 
 };
@@ -100,9 +100,9 @@ private:
 class LogMultiBuf : public std::basic_streambuf<char> {
 public:
   using Base = std::basic_streambuf<char>; ///< Basis-Typ
-  using char_type = typename Base::char_type; ///< Element-Typ
+  using char_type = Base::char_type; ///< Element-Typ
   using Traits = std::char_traits<char_type>; ///< Traits-Typ
-  using int_type = typename Base::int_type; ///< zugehöriger int-Typ
+  using int_type = Base::int_type; ///< zugehöriger int-Typ
 
   explicit LogMultiBuf(const std::string & filenamePart);
   /// \private
@@ -130,7 +130,7 @@ public:
 
 
 
-void logMessage(loglevel l, std::function<std::string()> message);
+void logMessage(loglevel l, const std::function<std::string()>& message);
 
 }
 

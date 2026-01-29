@@ -457,25 +457,6 @@ std::string MobsMemberInfoDb::toString(bool *needQuotes) const {
 }
 
 
-class ConvFromStrHintDefault : virtual public ConvFromStrHint {
-public:
-  ConvFromStrHintDefault() = default;
-  ~ConvFromStrHintDefault() override = default;
-  bool acceptCompact() const override { return true; }
-  bool acceptExtended() const override { return true; }
-};
-
-class ConvFromStrHintExplizit : virtual public ConvFromStrHint {
-public:
-  ConvFromStrHintExplizit() = default;
-  ~ConvFromStrHintExplizit() override = default;
-  bool acceptCompact() const override { return false; }
-  bool acceptExtended() const override { return true; }
-};
-
-const ConvFromStrHint &ConvFromStrHint::convFromStrHintDflt = ConvFromStrHintDefault();
-const ConvFromStrHint &ConvFromStrHint::convFromStrHintExplizit = ConvFromStrHintExplizit();
-
 void MobsMemberInfo::toLocalTime(struct ::tm &ts) const {
   if (granularity >= 86400000000 ) {
     toGMTime(ts);

@@ -811,7 +811,7 @@ bool ObjectBase::setVariable(const std::string &path, const std::string &value) 
   if (not m)
     return false;
 
-  return m->fromStr(value, ConvFromStrHint::convFromStrHintDflt);
+  return m->fromStr(value, ConvFromStrHintDefault());
 }
 
 std::string ObjectBase::getVariable(const std::string &path, bool *found, bool compact) const {

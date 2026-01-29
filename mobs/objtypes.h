@@ -526,13 +526,26 @@ public:
   virtual bool acceptExtended() const = 0;
   /// darf ein kompakter Wert (Zahlenwert bei MobsEnum oder Datum) als Eingabe fungieren
   virtual bool acceptCompact() const = 0;
-
-  /// Standard Konvertierungshinweis, kompakte und erweiterte Eingaben sind erlaubt
-  static const ConvFromStrHint &convFromStrHintDflt;
-  /// Konvertierungshinweis, der nur erweiterte Eingabe zulässt
-  static const ConvFromStrHint &convFromStrHintExplizit;
-
 };
+
+/// Standard Konvertierungshinweis, kompakte und erweiterte Eingaben sind erlaubt
+class ConvFromStrHintDefault : virtual public ConvFromStrHint {
+public:
+  ConvFromStrHintDefault() = default;
+  ~ConvFromStrHintDefault() override = default;
+  bool acceptCompact() const override { return true; }
+  bool acceptExtended() const override { return true; }
+};
+
+/// Konvertierungshinweis, der nur erweiterte Eingabe zulässt
+class ConvFromStrHintExplizit : virtual public ConvFromStrHint {
+public:
+  ConvFromStrHintExplizit() = default;
+  ~ConvFromStrHintExplizit() override = default;
+  bool acceptCompact() const override { return false; }
+  bool acceptExtended() const override { return true; }
+};
+
 class CryptBufBase;
 /// Ausgabeformat für \c to_string() Methode von Objekten
 class ConvObjToString : virtual public ConvToStrHint {

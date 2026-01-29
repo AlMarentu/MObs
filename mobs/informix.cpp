@@ -478,6 +478,9 @@ public:
     }
     bool ok = true;
     int e = 0;
+    auto ch = ConvObjFromStr();
+    if (not compact)
+      ch = ch.useExtendedValues();
     MobsMemberInfo mi;
     mem.memInfo(mi);
     mi.changeCompact(compact);
@@ -491,8 +494,7 @@ public:
       case SQLLVARCHAR:
       case SQLNVCHAR:
       case SQLVCHAR:
-        ok = mem.fromStr(string(col.sqldata),
-                         not compact ? ConvFromStrHint::convFromStrHintExplizit : ConvFromStrHint::convFromStrHintDflt);
+        ok = mem.fromStr(string(col.sqldata), ch);
         if (not ok)
           throw runtime_error(u8"conversion error in " + mem.getElementName() + " Value=" + string(col.sqldata));
         return;

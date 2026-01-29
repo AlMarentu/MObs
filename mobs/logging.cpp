@@ -21,6 +21,7 @@
 
 #include <iostream>
 #include <iomanip>
+#include <cstring>
 #include "logging.h"
 
 #ifdef __MINGW32__
@@ -51,7 +52,7 @@ loglevel currentLevel = lm_trace;
 /// \see LOG(l, x)
 /// @param l Log-Level
 /// @param message Inhalt der Log-Meldung als lambda
-void logMessage(loglevel l, std::function<std::string()> message)
+void logMessage(loglevel l, const std::function<std::string()>& message)
 {
   if (l < currentLevel)
     return;
@@ -82,7 +83,7 @@ void logMessage(loglevel l, std::function<std::string()> message)
 
 
 
-Trace::Trace (const char *f, std::function<std::string()> str) : fun(f)
+Trace::Trace (const char *f, const std::function<std::string()>& str) : fun(f)
 {
   if (traceOn)
     std::cerr << "T B(" << ++lev << ") " << fun

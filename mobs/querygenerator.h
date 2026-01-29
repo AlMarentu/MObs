@@ -212,7 +212,7 @@ QueryInfo Member<T, C>::QiEq(const T &value) const {
 template<typename T, class C>
 QueryInfo Member<T, C>::Qi(const char *oper, const char *val) const {
   T t;
-  if (not this->c_string2x(val, t, ConvFromStrHint::convFromStrHintExplizit))
+  if (not this->c_string2x(val, t, ConvFromStrHintExplizit()))
     throw std::runtime_error("fromStrExplizit input error (Qi)");
   return Qi(oper, t);
 }
@@ -220,7 +220,7 @@ QueryInfo Member<T, C>::Qi(const char *oper, const char *val) const {
 template<typename T, class C>
 QueryInfo Member<T, C>::QiEq(const char *val) const {
   T t;
-  if (not this->c_string2x(val, t, ConvFromStrHint::convFromStrHintExplizit))
+  if (not this->c_string2x(val, t, ConvFromStrHintExplizit()))
     throw std::runtime_error("fromStrExplizit input error (Qi)");
   return Qi("=", t);
 }
@@ -247,8 +247,8 @@ return t;
 template<typename T, class C>
 QueryInfo Member<T, C>::QiBetween(const char *value1, const char *value2) const {
 T t1, t2;
-if (not this->c_string2x(value1, t1, ConvFromStrHint::convFromStrHintExplizit) or
-    not this->c_string2x(value2, t2, ConvFromStrHint::convFromStrHintExplizit))
+if (not this->c_string2x(value1, t1, ConvFromStrHintExplizit()) or
+    not this->c_string2x(value2, t2, ConvFromStrHintExplizit()))
   throw std::runtime_error("fromStrExplizit input error (Qi)");
 return QiBetween(t1, t2);
 }
@@ -275,7 +275,7 @@ QueryInfo t(this, "IN");
 for (auto &it:value) {
   MobsMemberInfo mi;
   T v;
-  if (not this->c_string2x(it, v, ConvFromStrHint::convFromStrHintExplizit))
+  if (not this->c_string2x(it, v, ConvFromStrHintExplizit()))
     throw std::runtime_error("fromStrExplizit input error (Qi)");
   memInfo(mi, v);
   if (mi.isNumber())

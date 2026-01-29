@@ -191,7 +191,10 @@ public:
           ok = mem.fromMemInfo(mi);
         }
       } else if (mi.isTime) {
-        ok = mem.fromStr(value, not compact ? ConvFromStrHint::convFromStrHintExplizit : ConvFromStrHint::convFromStrHintDflt);
+        auto ch = ConvObjFromStr();
+        if (not compact)
+          ch = ch.useExtendedValues();
+        ok = mem.fromStr(value, ch);
 #if 0
         MTime t;
         ok = string2x(value, t);
@@ -217,8 +220,12 @@ public:
       } else if (mi.isUnsigned and mi.max == 1) {// bool
         mi.u64 = value == "0" ? 0 : 1;
         ok = mem.fromMemInfo(mi);
-      } else //if (mem.is_chartype(mobs::ConvToStrHint(compact)))
-        ok = mem.fromStr(value, not compact ? ConvFromStrHint::convFromStrHintExplizit : ConvFromStrHint::convFromStrHintDflt);
+      } else {
+        auto ch = ConvObjFromStr();
+        if (not compact)
+          ch = ch.useExtendedValues();
+        ok = mem.fromStr(value, ch);
+      }
 
       if (not ok)
         throw runtime_error(u8"conversion error in " + mem.getElementName() + " Value=" + value);

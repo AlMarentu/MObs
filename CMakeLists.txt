@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1.0)
+cmake_minimum_required(VERSION 3.13)
 project(MObs LANGUAGES CXX)
 project(MObs VERSION 0.3.0)
 

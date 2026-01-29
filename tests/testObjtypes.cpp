@@ -208,11 +208,11 @@ TEST(objtypeTest, mobsconv) {
   EXPECT_EQ(std::to_string(int(Dup)), c.c_to_string(Dup, ctht));
   enum direction d;
 
-  ASSERT_TRUE(c.c_string2x("right", d, mobs::ConvFromStrHint::convFromStrHintDflt));
+  ASSERT_TRUE(c.c_string2x("right", d, mobs::ConvFromStrHintDefault()));
   EXPECT_EQ(Dright, d);
-  ASSERT_TRUE(c.c_string2x("down", d, mobs::ConvFromStrHint::convFromStrHintDflt));
+  ASSERT_TRUE(c.c_string2x("down", d, mobs::ConvFromStrHintDefault()));
   EXPECT_EQ(Ddown, d);
-  EXPECT_FALSE(c.c_string2x("middle", d, mobs::ConvFromStrHint::convFromStrHintDflt));
+  EXPECT_FALSE(c.c_string2x("middle", d, mobs::ConvFromStrHintDefault()));
 }
 
 TEST(objtypeTest, fromhtml) {
