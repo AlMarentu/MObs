@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2021 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -134,12 +134,21 @@ std::string hash_value(const std::string &s, const std::string &algo = "sha1");
 
 /** \brief hash wert eines Char-Buffers ermitteln
  *
- * @param s String
+ * @param s Eingabe
  * @param algo Algorithmus
  * @return hashwert
  * \throws runtime_error im Fehlerfall
- */std::string hash_value(const std::vector<u_char > &s, const std::string &algo = "sha1");
+ */
+std::string hash_value(const std::vector<u_char > &s, const std::string &algo = "sha1");
 
+/** \brief hash wert eines Char-Buffers ermitteln
+ *
+ * @param s Eingabe
+ * @param hash hash-buffer
+ * @param algo Algorithmus
+ * \throws runtime_error im Fehlerfall
+ */
+void hash_value(const std::vector<u_char> &s, std::vector<u_char> &hash, const std::string &algo);
 
 
 }

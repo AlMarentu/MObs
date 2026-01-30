@@ -378,8 +378,8 @@ mobs::encryptPrivateRsa(const std::vector<u_char> &sessionKey, std::vector<u_cha
     THROW("IS NO PRIVATE KEY");
   if (EVP_PKEY_sign_init(ctx.get()) <= 0)
     throw openssl_exception(LOGSTR("mobs::encryptPrivateRsa"));
-  //if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0)
-    //throw openssl_exception(LOGSTR("mobs::encryptPrivateRsa"));
+  //if (EVP_PKEY_CTX_set_rsa_padding(ctx.get(), RSA_PKCS1_OAEP_PADDING) <= 0)
+  //  throw openssl_exception(LOGSTR("mobs::encryptPrivateRsa"));
   //if (EVP_PKEY_CTX_set_signature_md(ctx.get(), EVP_sha256()) <= 0)
   //  throw openssl_exception(LOGSTR("mobs::encryptPrivateRsa"));
   size_t sz = cipher.size();

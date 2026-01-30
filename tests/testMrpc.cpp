@@ -22,6 +22,7 @@
 #include "csb.h"
 #include "aes.h"
 #include "rsa.h"
+#include "crypt.h"
 
 #include "objtypes.h"
 #include "nbuf.h"
@@ -32,6 +33,7 @@
 #include "xmlparser.h"
 #include "mrpcsession.h"
 #include "mrpc.h"
+#include "mrpc2.h"
 #include "tcpstream.h"
 
 #include <stdio.h>
@@ -94,6 +96,47 @@ public:
   void getPupKeyReceived(std::string &key, std::string &info) override {
     key = pubKey;
     info = "server up and running";
+  }
+
+
+  mobs::MrpcSession mrpcSession{};
+  std::string pubKey;
+  std::string privKey;
+};
+
+
+class MrpcServer2 : public mobs::Mrpc2 {
+public:
+  MrpcServer2(std::istream &iStr, std::ostream &oStr, const std::string &pub, const std::string &priv) :
+      Mrpc2(iStr, oStr, &mrpcSession, false), pubKey(pub), privKey(priv) {}
+
+  std::string getSenderPublicKey(const std::string &keyId) override {
+    if (keyId != "testkey")
+      return {};
+    return pubKey;
+  }
+
+  void loginReceived(const std::vector<u_char> &cipher, const std::string &keyId) override {
+
+    LOG(LM_INFO, "SRV LOGIN RECEIVED " << keyId);
+    std::vector<u_char> key;
+    session->sessionId = 2;
+    session->sessionReuseTime = 120;
+    session->keyValidTime = 5400;
+    static string lastCipher;
+    static vector<u_char> lastKey;
+    if (lastKey.empty() or lastCipher != mobs::to_string_base64(cipher)) {
+      setSessionKey(cipher, keyId, privKey, "");
+      lastKey = session->sessionKey;
+      lastCipher = mobs::to_string_base64(cipher);
+    } else {
+      session->sessionKey = lastKey;
+      LOG(LM_INFO, "REUSE OLD SESSION");
+    }
+  }
+
+  std::string getServerPublicKey() override {
+    return mobs::readPublicKey(pubKey);
   }
 
 
@@ -224,6 +267,422 @@ TEST(mrpcTest, MrpcClientServer) {
   auto res3 = client.getResult<MrpcPerson>();
   EXPECT_FALSE(res3);
   EXPECT_EQ(res2->name(), "Heinrich");
+
+}
+
+TEST(mrpcTest, MrpcClientServerEcc) {
+  string cpriv, cpub, spriv, spub;
+  mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, spriv, spub);
+  mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, cpriv, cpub);
+
+  stringstream strStoC;
+  stringstream strCtoS;
+
+  MrpcServer2 server(strCtoS, strStoC, cpub, spriv);
+
+  LOG(LM_INFO, "CLI");
+  mobs::MrpcSession clientSession{};
+  mobs::Mrpc2 client(strStoC, strCtoS, &clientSession, false);
+
+  ASSERT_NO_THROW(client.startSession("testkey", "googletest", cpriv, "", spub));
+
+  MrpcPerson p1;
+  client.sendSingle(p1);
+  LOG(LM_INFO, "XXX C->S " << strCtoS.str());
+
+
+  LOG(LM_INFO, "SRV");
+  for  (int i= 0; i < 5; i++) {
+    ASSERT_NO_THROW(server.parseServer());
+    LOG(LM_INFO, "LLL S=" << server.level() << " E=" << server.isEncrypted() << " con=" << server.isConnected());
+    LOG(LM_INFO, "XXX S->C " << strStoC.str());
+    if (server.resultObj)
+      break;
+  }
+  EXPECT_TRUE(server.isConnected());
+
+  EXPECT_TRUE(bool(server.resultObj));
+  EXPECT_NE(dynamic_cast<MrpcPerson *>(server.resultObj.get()), nullptr);
+  MrpcPerson p2;
+  p2.name("Heinrich");
+  server.sendSingle(p2);
+  LOG(LM_INFO, "XXX S->C " << strStoC.str());
+
+  LOG(LM_INFO, "CLI");
+  for  (int i= 0; i < 5; i++) {
+    ASSERT_NO_THROW(client.parseClient());
+    LOG(LM_INFO, "C-CON " << client.isConnected());
+    if (client.resultObj)
+      break;
+  }
+  EXPECT_TRUE(client.isConnected());
+
+  ASSERT_TRUE(bool(client.resultObj));
+  to_string(*client.resultObj);
+  ASSERT_NE(dynamic_cast<MrpcPerson *>(client.resultObj.get()), nullptr);
+  EXPECT_EQ(dynamic_cast<MrpcPerson *>(client.resultObj.get())->name(), "Heinrich");
+  auto res1 = client.getResult<MrpcPing>();
+  EXPECT_FALSE(res1);
+  auto res2 = client.getResult<MrpcPerson>();
+  ASSERT_TRUE(res2);
+  auto res3 = client.getResult<MrpcPerson>();
+  EXPECT_FALSE(res3);
+  EXPECT_EQ(res2->name(), "Heinrich");
+
+
+  LOG(LM_INFO, "------- 2. Runde -----");
+
+
+  //clientSession.clear();
+  ASSERT_NO_THROW(client.startSession("testkey", "googletest", cpriv, "", spub));
+  p1.name("Walther");
+  client.sendSingle(p1);
+  LOG(LM_INFO, "XXX C->S " << strCtoS.str());
+
+  LOG(LM_INFO, "SRV");
+  ASSERT_NO_THROW(server.parseServer());
+  LOG(LM_INFO, "XXX S->C " << strStoC.str());
+
+  //ASSERT_NO_THROW(server.parseServer());
+
+  EXPECT_TRUE(bool(server.resultObj));
+  EXPECT_NE(dynamic_cast<MrpcPerson *>(server.resultObj.get()), nullptr);
+
+
+}
+
+TEST(mrpcTest, MrpcClientServerGetPub) {
+  string cpriv, cpub, spriv, spub;
+  mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, spriv, spub);
+  mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, cpriv, cpub);
+
+  stringstream strStoC;
+  stringstream strCtoS;
+
+  MrpcServer2 server(strCtoS, strStoC, cpub, spriv);
+
+  LOG(LM_INFO, "CLI");
+  mobs::MrpcSession clientSession{};
+  mobs::Mrpc2 client(strStoC, strCtoS, &clientSession, false);
+
+  client.getPublicKey();
+  LOG(LM_INFO, "XXX C->S " << strCtoS.str());
+
+  LOG(LM_INFO, "SRV");
+  ASSERT_NO_THROW(server.parseServer());
+  LOG(LM_INFO, "XXX S->C " << strStoC.str());
+
+  LOG(LM_INFO, "CLI");
+  ASSERT_NO_THROW(client.parseClient());
+
+
+  ASSERT_NO_THROW(client.startSession("testkey", "googletest", cpriv, "", spub));
+
+  MrpcPerson p1;
+  client.sendSingle(p1);
+  LOG(LM_INFO, "XXX C->S " << strCtoS.str());
+
+
+  LOG(LM_INFO, "SRV");
+  for  (int i= 0; i < 5; i++) {
+    ASSERT_NO_THROW(server.parseServer());
+    LOG(LM_INFO, "LLL S=" << server.level() << " E=" << server.isEncrypted() << " con=" << server.isConnected());
+    LOG(LM_INFO, "XXX S->C " << strStoC.str());
+    if (server.resultObj)
+      break;
+  }
+  EXPECT_TRUE(server.isConnected());
+
+  EXPECT_TRUE(bool(server.resultObj));
+  EXPECT_NE(dynamic_cast<MrpcPerson *>(server.resultObj.get()), nullptr);
+  MrpcPerson p2;
+  p2.name("Heinrich");
+  server.sendSingle(p2);
+  LOG(LM_INFO, "XXX S->C " << strStoC.str());
+
+  LOG(LM_INFO, "CLI");
+  for  (int i= 0; i < 5; i++) {
+    ASSERT_NO_THROW(client.parseClient());
+    LOG(LM_INFO, "C-CON " << client.isConnected());
+    if (client.resultObj)
+      break;
+  }
+  EXPECT_TRUE(client.isConnected());
+
+  ASSERT_TRUE(bool(client.resultObj));
+  to_string(*client.resultObj);
+  ASSERT_NE(dynamic_cast<MrpcPerson *>(client.resultObj.get()), nullptr);
+  EXPECT_EQ(dynamic_cast<MrpcPerson *>(client.resultObj.get())->name(), "Heinrich");
+  auto res1 = client.getResult<MrpcPing>();
+  EXPECT_FALSE(res1);
+  auto res2 = client.getResult<MrpcPerson>();
+  ASSERT_TRUE(res2);
+  auto res3 = client.getResult<MrpcPerson>();
+  EXPECT_FALSE(res3);
+  EXPECT_EQ(res2->name(), "Heinrich");
+
+
+}
+
+TEST(mrpcTest, MrpcClientServerEccWait) {
+  string cpriv, cpub, spriv, spub;
+  mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, spriv, spub);
+  mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, cpriv, cpub);
+
+  stringstream strStoC;
+  stringstream strCtoS;
+
+  MrpcServer2 server(strCtoS, strStoC, cpub, spriv);
+
+  LOG(LM_INFO, "CLI");
+  mobs::MrpcSession clientSession{};
+  mobs::Mrpc2 client(strStoC, strCtoS, &clientSession, false);
+  ASSERT_NO_THROW(client.startSession("testkey", "googletest", cpriv, "", spub));
+
+  // wird nur benötigt, wenn vor Senden des ersten Kommandos die Verbindung gecheckt werden soll
+  client.stopEncrypt();
+  client.flush();
+
+  LOG(LM_INFO, "SRV");
+  for  (int i= 0; i < 5; i++) {
+    ASSERT_NO_THROW(server.parseServer());
+    LOG(LM_INFO, "LLL S=" << server.level() << " E=" << server.isEncrypted() << " con=" << server.isConnected());
+    LOG(LM_INFO, "XXX S->C " << strStoC.str());
+    if (server.isConnected())
+      break;
+  }
+  EXPECT_TRUE(server.isConnected());
+
+  MrpcPerson p1;
+  client.sendSingle(p1);
+  LOG(LM_INFO, "XXX C->S " << strCtoS.str());
+
+
+  LOG(LM_INFO, "SRV");
+  for  (int i= 0; i < 5; i++) {
+    ASSERT_NO_THROW(server.parseServer());
+    LOG(LM_INFO, "LLL S=" << server.level() << " E=" << server.isEncrypted() << " con=" << server.isConnected());
+    LOG(LM_INFO, "XXX S->C " << strStoC.str());
+    if (server.resultObj)
+      break;
+  }
+  EXPECT_TRUE(server.isConnected());
+
+  EXPECT_TRUE(bool(server.resultObj));
+  EXPECT_NE(dynamic_cast<MrpcPerson *>(server.resultObj.get()), nullptr);
+  MrpcPerson p2;
+  p2.name("Heinrich");
+  server.sendSingle(p2);
+  LOG(LM_INFO, "XXX S->C " << strStoC.str());
+
+  LOG(LM_INFO, "CLI");
+  for  (int i= 0; i < 5; i++) {
+    ASSERT_NO_THROW(client.parseClient());
+    LOG(LM_INFO, "C-CON " << client.isConnected());
+    if (client.resultObj)
+      break;
+  }
+  EXPECT_TRUE(client.isConnected());
+
+  ASSERT_TRUE(bool(client.resultObj));
+  to_string(*client.resultObj);
+  ASSERT_NE(dynamic_cast<MrpcPerson *>(client.resultObj.get()), nullptr);
+  EXPECT_EQ(dynamic_cast<MrpcPerson *>(client.resultObj.get())->name(), "Heinrich");
+  auto res1 = client.getResult<MrpcPing>();
+  EXPECT_FALSE(res1);
+  auto res2 = client.getResult<MrpcPerson>();
+  ASSERT_TRUE(res2);
+  auto res3 = client.getResult<MrpcPerson>();
+  EXPECT_FALSE(res3);
+  EXPECT_EQ(res2->name(), "Heinrich");
+
+
+}
+
+TEST(mrpcTest, MrpcClientServerEccWOauth) {
+  string cpriv, cpub, spriv, spub;
+  mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, spriv, spub);
+  mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, cpriv, cpub);
+
+  stringstream strStoC;
+  stringstream strCtoS;
+
+  MrpcServer2 server(strCtoS, strStoC, cpub, spriv);
+
+  LOG(LM_INFO, "CLI");
+  mobs::MrpcSession clientSession{};
+  mobs::Mrpc2 client(strStoC, strCtoS, &clientSession, false);
+  //ASSERT_NO_THROW(client.startSession("testkey", "googletest", cpriv, "", spub));
+  client.writer.writeHead();
+  client.writer.writeTagBegin(L"methodCall");
+  // neuen SessionKey und Cipher generieren
+  std::vector<u_char> cipher;
+  mobs::encapsulatePublic(cipher, clientSession.sessionKey, spub);
+  clientSession.info = mobs::to_string_base64(cipher);
+  clientSession.generated = time(nullptr);
+  clientSession.keyName = "testkey";
+  clientSession.sessionReuseTime = 0;
+  clientSession.keyValidTime = 0;
+  std::vector<u_char> iv;
+  iv.resize(mobs::CryptBufAes::iv_size());
+  mobs::CryptBufAes::getRand(iv);
+  client.writer.startEncrypt((new mobs::CryptBufAes(clientSession.sessionKey, iv, "", true))->setRecipientKeyBase64(clientSession.info));
+  LOG(LM_INFO, "New Session startet, cipher " << clientSession.info);
+
+  MrpcPerson p1;
+  client.sendSingle(p1);
+  client.sendSingle(p1);
+  client.sendSingle(p1);
+  LOG(LM_INFO, "XXX C->S " << strCtoS.str());
+
+
+
+  LOG(LM_INFO, "SRV");
+  ASSERT_ANY_THROW(server.parseServer());
+
+  EXPECT_FALSE(server.isConnected());
+
+  LOG(LM_INFO, "XXX S->C " << strStoC.str());
+
+  LOG(LM_INFO, "CLI");
+  ASSERT_ANY_THROW(client.parseClient());
+  EXPECT_FALSE(client.isConnected());
+  EXPECT_EQ(clientSession.info, "login failed");
+
+}
+
+TEST(mrpcTest, MrpcClientServerEccRecon) {
+  string cpriv, cpub, spriv, spub;
+  mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, spriv, spub);
+  mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, cpriv, cpub);
+  mobs::MrpcSession clientSession{};
+
+  {
+    stringstream strStoC;
+    stringstream strCtoS;
+
+    MrpcServer2 server(strCtoS, strStoC, cpub, spriv);
+
+    LOG(LM_INFO, "CLI");
+    mobs::Mrpc2 client(strStoC, strCtoS, &clientSession, false);
+    ASSERT_NO_THROW(client.startSession("testkey", "googletest", cpriv, "", spub));
+    MrpcPerson p1;
+    client.sendSingle(p1);
+    LOG(LM_INFO, "XXX C->S " << strCtoS.str());
+
+
+    LOG(LM_INFO, "SRV");
+    ASSERT_NO_THROW(server.parseServer());
+    LOG(LM_INFO, "XXX S->C " << strStoC.str());
+
+    ASSERT_NO_THROW(server.parseServer());
+
+    EXPECT_TRUE(bool(server.resultObj));
+    EXPECT_NE(dynamic_cast<MrpcPerson *>(server.resultObj.get()), nullptr);
+    server.resultObj = nullptr; // Server-Objekt entfernen;
+    MrpcPerson p2;
+    p2.name("Heinrich");
+    server.sendSingle(p2);
+    LOG(LM_INFO, "XXX S->C " << strStoC.str());
+
+    LOG(LM_INFO, "CLI");
+    ASSERT_NO_THROW(client.parseClient());
+    ASSERT_NO_THROW(client.parseClient());
+    ASSERT_TRUE(bool(client.resultObj));
+    to_string(*client.resultObj);
+    ASSERT_NE(dynamic_cast<MrpcPerson *>(client.resultObj.get()), nullptr);
+    EXPECT_EQ(dynamic_cast<MrpcPerson *>(client.resultObj.get())->name(), "Heinrich");
+    auto res1 = client.getResult<MrpcPing>();
+    EXPECT_FALSE(res1);
+    auto res2 = client.getResult<MrpcPerson>();
+    ASSERT_TRUE(res2);
+    auto res3 = client.getResult<MrpcPerson>();
+    EXPECT_FALSE(res3);
+    EXPECT_EQ(res2->name(), "Heinrich");
+    EXPECT_FALSE(bool(client.resultObj));
+
+    // jetzt eine 2. Datensatz senden
+
+    MrpcPerson p3;
+    p3.name("Goethe");
+    client.sendSingle(p3);
+    LOG(LM_INFO, "XXX C->S " << strCtoS.str());
+
+    LOG(LM_INFO, "SRV");
+    EXPECT_FALSE(server.resultObj);
+    ASSERT_NO_THROW(server.parseServer());
+    ASSERT_NO_THROW(server.parseServer());
+    ASSERT_NO_THROW(server.parseServer());
+    EXPECT_TRUE(bool(server.resultObj));
+    auto res4 = server.getResult<MrpcPerson>();
+    ASSERT_TRUE(res4);
+    EXPECT_EQ(res4->name(), "Goethe");
+
+    // Antwort bearbeiten und zurück
+    MrpcPerson p4;
+    p4.name("Johann Wolfgang von");
+    server.sendSingle(p4);
+    LOG(LM_INFO, "XXX S->C " << strStoC.str());
+
+    LOG(LM_INFO, "CLI");
+    ASSERT_NO_THROW(client.parseClient());
+    ASSERT_NO_THROW(client.parseClient());
+    EXPECT_TRUE(bool(client.resultObj));
+    auto res5 = client.getResult<MrpcPerson>();
+    ASSERT_TRUE(res5);
+    EXPECT_EQ(res5->name(), "Johann Wolfgang von");
+  }
+
+  // jetzt neue Connection mit alter Session
+  // damit ist die Cipher sowie der Session-Key identisch und kann am Server gecached werden.
+  LOG(LM_INFO, "------- reconnect -----");
+
+  {
+    stringstream strStoC;
+    stringstream strCtoS;
+
+    MrpcServer2 server(strCtoS, strStoC, cpub, spriv);
+
+    LOG(LM_INFO, "CLI");
+    mobs::Mrpc2 client(strStoC, strCtoS, &clientSession, false);
+    ASSERT_NO_THROW(client.startSession("testkey", "googletest", cpriv, "", spub));
+    MrpcPerson p1;
+    client.sendSingle(p1);
+    LOG(LM_INFO, "XXX C->S " << strCtoS.str());
+
+
+    LOG(LM_INFO, "SRV");
+
+    for (int i = 0; i < 5; i++) {
+      ASSERT_NO_THROW(server.parseServer());
+      LOG(LM_INFO, "XXX S->C " << strStoC.str());
+      if (server.resultObj)
+        break;
+    }
+
+    EXPECT_TRUE(bool(server.resultObj));
+    EXPECT_NE(dynamic_cast<MrpcPerson *>(server.resultObj.get()), nullptr);
+    MrpcPerson p2;
+    p2.name("Heinrich");
+    server.sendSingle(p2);
+    LOG(LM_INFO, "XXX S->C " << strStoC.str());
+
+    LOG(LM_INFO, "CLI");
+    ASSERT_NO_THROW(client.parseClient());
+    ASSERT_NO_THROW(client.parseClient());
+    ASSERT_TRUE(bool(client.resultObj));
+    to_string(*client.resultObj);
+    ASSERT_NE(dynamic_cast<MrpcPerson *>(client.resultObj.get()), nullptr);
+    EXPECT_EQ(dynamic_cast<MrpcPerson *>(client.resultObj.get())->name(), "Heinrich");
+    auto res1 = client.getResult<MrpcPing>();
+    EXPECT_FALSE(res1);
+    auto res2 = client.getResult<MrpcPerson>();
+    ASSERT_TRUE(res2);
+    auto res3 = client.getResult<MrpcPerson>();
+    EXPECT_FALSE(res3);
+    EXPECT_EQ(res2->name(), "Heinrich");
+
+  }
 
 }
 

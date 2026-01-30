@@ -58,6 +58,13 @@ add_executable(db db.cpp)
 target_link_libraries(db mobs)
 
 
+add_executable(mrpcsrv mrpcsrv.cpp)
+target_link_libraries(mrpcsrv mobs)
+
+add_executable(mrpccli mrpccli.cpp)
+target_link_libraries(mrpccli mobs)
+
+
 
 # Doxygen Build
 if(BUILD_DOC)

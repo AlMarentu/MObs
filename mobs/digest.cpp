@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2025 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -377,5 +377,20 @@ std::string mobs::hash_value(const std::vector<u_char> &s, const std::string &al
   for (auto c:md_value)
     x << std::hex << std::setfill('0') << std::setw(2) << u_int(c);
   return x.str();
+}
+
+void mobs::hash_value(const std::vector<u_char> &s, std::vector<u_char> &hash, const std::string &algo) {
+  auto md = EVP_get_digestbyname(algo.c_str());
+  if (not md)
+    throw std::runtime_error(LOGSTR("mobs::CryptBufDigest '" << algo << "' doesn't exist"));
+  auto mdctx = EVP_MD_CTX_new();
+  if (not EVP_DigestInit_ex(mdctx, md, nullptr))
+    throw openssl_exception(LOGSTR("mobs::CryptBufDigest"));
+  EVP_DigestUpdate(mdctx, &s[0], s.size());
+
+  hash.resize(EVP_MAX_MD_SIZE);
+  u_int md_len;
+  EVP_DigestFinal_ex(mdctx, &hash[0], &md_len);
+  hash.resize(md_len);
 }
 

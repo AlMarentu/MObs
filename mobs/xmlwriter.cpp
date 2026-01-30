@@ -414,39 +414,72 @@ string XmlWriter::getString() const
 }
 
 
-void XmlWriter::startEncrypt(CryptBufBase *cbbp) {
+void XmlWriter::startEncrypt(CryptBufBase *cbbp, bool oldStyle) {
   if (data->cryptBufp or data->cryptSwap or not cbbp or data->level == 0)
     THROW("invalid state encryption");
   data->cryptLevel = data->level;
   std::wstring pfx;
   data->prefix.swap(pfx);
   writeTagBegin(L"EncryptedData");
-  writeAttribute(L"Type", L"https://www.w3.org/2001/04/xmlenc#Element");
-  writeAttribute(L"xmlns", L"https://www.w3.org/2001/04/xmlenc#");
-  writeTagBegin(L"EncryptionMethod");
-  writeAttribute(L"Algorithm", L"https://www.w3.org/2001/04/xmlenc#" + to_wstring(cbbp->name()));
-  writeTagEnd();
-  size_t rcpt = cbbp->recipients();
-  for (size_t i = 0; i < rcpt; i++) {
-    writeTagBegin(L"KeyInfo");
-    writeAttribute(L"xmlns", L"https://www.w3.org/2000/09/xmldsig#");
-    writeTagBegin(L"KeyName");
-    string k = cbbp->getRecipientId(i);
-    if (not k.empty())
-      writeValue(to_wstring(k));
+  if (oldStyle) {
+    writeAttribute(L"Type", L"https://www.w3.org/2001/04/xmlenc#Element");
+    writeAttribute(L"xmlns", L"https://www.w3.org/2001/04/xmlenc#");
+    writeTagBegin(L"EncryptionMethod");
+    writeAttribute(L"Algorithm", L"https://www.w3.org/2001/04/xmlenc#" + to_wstring(cbbp->name()));
     writeTagEnd();
-    string c = cbbp->getRecipientKeyBase64(i);
-    if (not c.empty()) {
-      writeTagBegin(L"CipherData");
-      writeTagBegin(L"CipherValue");
-      writeValue(to_wstring(c));
+    size_t rcpt = cbbp->recipients();
+    for (size_t i = 0; i < rcpt; i++) {
+      writeTagBegin(L"KeyInfo");
+      writeAttribute(L"xmlns", L"https://www.w3.org/2000/09/xmldsig#");
+      writeTagBegin(L"KeyName");
+      string k = cbbp->getRecipientId(i);
+      if (not k.empty())
+        writeValue(to_wstring(k));
       writeTagEnd();
+      string c = cbbp->getRecipientKeyBase64(i);
+      if (not c.empty()) {
+        writeTagBegin(L"CipherData");
+        writeTagBegin(L"CipherValue");
+        writeValue(to_wstring(c));
+        writeTagEnd();
+        writeTagEnd();
+      }
       writeTagEnd();
     }
+    writeTagBegin(L"CipherData");
+    writeTagBegin(L"CipherValue");
+  } else {
+#define xenc L"http://www.w3.org/2001/04/xmlenc#"
+#define ds L"http://www.w3.org/2000/09/xmldsig#"
+//#define xenc11 L"http://www.w3.org/2009/xmlenc11#"
+//#define dsig11 L"http://www.w3.org/2009/xmldsig11#"
+    writeAttribute(L"Type", xenc "Element");
+    writeAttribute(L"xmlns:xenc", xenc);
+    writeAttribute(L"xmlns:ds", ds);
+    writeTagBegin(L"xenc:EncryptionMethod");
+    writeAttribute(L"Algorithm", xenc + to_wstring(cbbp->name()));
     writeTagEnd();
+    size_t rcpt = cbbp->recipients();
+    for (size_t i = 0; i < rcpt; i++) {
+      writeTagBegin(L"ds:KeyInfo");
+      writeTagBegin(L"ds:KeyName");
+      string k = cbbp->getRecipientId(i);
+      if (not k.empty())
+        writeValue(to_wstring(k));
+      writeTagEnd();
+      string c = cbbp->getRecipientKeyBase64(i);
+      if (not c.empty()) {
+        writeTagBegin(L"xenc:CipherData");
+        writeTagBegin(L"xenc:CipherValue");
+        writeValue(to_wstring(c));
+        writeTagEnd();
+        writeTagEnd();
+      }
+      writeTagEnd();
+    }
+    writeTagBegin(L"xenc:CipherData");
+    writeTagBegin(L"xenc:CipherValue");
   }
-  writeTagBegin(L"CipherData");
-  writeTagBegin(L"CipherValue");
   data->prefix.swap(pfx);
   data->indentSave = data->indent;
   data->indent = false;

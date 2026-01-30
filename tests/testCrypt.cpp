@@ -333,6 +333,157 @@ TEST(cryptTest, rsa8) {
 
 
 
+TEST(cryptTest, key) {
+  string priv, pub;
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, priv, pub, "12345"));
+  cout << pub << endl;
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptRSA2048, priv, pub, "12345"));
+  cout << pub << endl;
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptRSA3072, priv, pub, "12345"));
+  cout << pub << endl;
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptRSA4096, priv, pub, "12345"));
+  cout << pub << endl;
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptX25519, priv, pub, "12345"));
+  cout << pub << endl;
+
+}
+
+
+
+TEST(cryptTest, sign1) {
+  string priv, pub, priv2, pub2;
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, priv, pub, "12345"));
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, priv2, pub2, "54321"));
+
+  std::vector<u_char> sessionKey = {'H', 'a', 'L', 'L', 'o', '\0'};
+  std::vector<u_char> cipher;
+//  sessionKey.resize()
+  ASSERT_NO_THROW(mobs::digestSign(sessionKey, cipher, priv, "12345"));
+  EXPECT_LT(8, cipher.size());
+  buffOut(cipher);
+  bool ret;
+  ASSERT_NO_THROW(ret = mobs::digestVerify(sessionKey, cipher, pub));
+  EXPECT_TRUE(ret);
+  ASSERT_NO_THROW(ret = mobs::digestVerify(sessionKey, cipher, pub2));
+  EXPECT_FALSE(ret);
+  sessionKey[1] = 'b';
+  ASSERT_NO_THROW(ret = mobs::digestVerify(sessionKey, cipher, pub));
+  EXPECT_FALSE(ret);
+}
+
+TEST(cryptTest, sign2) {
+  string priv, pub, priv2, pub2;
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptRSA2048, priv, pub, "12345"));
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptRSA2048, priv2, pub2, "54321"));
+
+  std::vector<u_char> sessionKey = {'H', 'a', 'L', 'L', 'o', '\0'};
+  std::vector<u_char> cipher;
+//  sessionKey.resize()
+  ASSERT_NO_THROW(mobs::digestSign(sessionKey, cipher, priv, "12345"));
+  //EXPECT_EQ(256, cipher.size());
+  EXPECT_LT(8, cipher.size());
+  buffOut(cipher);
+  bool ret;
+  ASSERT_NO_THROW(ret = mobs::digestVerify(sessionKey, cipher, pub));
+  EXPECT_TRUE(ret);
+  ASSERT_NO_THROW(ret = mobs::digestVerify(sessionKey, cipher, pub2));
+  EXPECT_FALSE(ret);
+  sessionKey[1] = 'b';
+  ASSERT_NO_THROW(ret = mobs::digestVerify(sessionKey, cipher, pub));
+  EXPECT_FALSE(ret);
+}
+
+
+TEST(cryptTest, sharedSecret) {
+  string privU, pubU;
+  string privS, pubS;
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, privU, pubU, "12345"));
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, privS, pubS, "54321"));
+  cerr << privU << endl;
+  cerr << pubU << endl;
+
+  std::vector<u_char> cipherU;
+  std::vector<u_char> cipherS;
+  ASSERT_NO_THROW(mobs::deriveSharedSecret(cipherU, pubS, privU, "12345"));
+  buffOut(cipherU);
+  ASSERT_NO_THROW(mobs::deriveSharedSecret(cipherS, pubU, privS, "54321"));
+  buffOut(cipherS);
+  EXPECT_EQ(cipherU, cipherS);
+
+  ASSERT_NO_THROW(mobs::deriveSharedSecret(cipherU, pubS, privU, "12345"));
+  buffOut(cipherU);
+  ASSERT_NO_THROW(mobs::deriveSharedSecret(cipherS, pubU, privS, "54321"));
+  buffOut(cipherS);
+
+}
+
+
+TEST(cryptTest, ecdh) {
+  string privS, pubS;
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, privS, pubS, "54321"));
+  std::vector<u_char> cipherU;
+  std::vector<u_char> cipherS;
+  string ephemeral;
+
+  ASSERT_NO_THROW(mobs::ecdhGenerate(cipherU, ephemeral, pubS));
+  cerr << ephemeral << endl;
+  // pub-key vom DER ins PEM-Format bringen
+  std::vector<u_char> buf;
+  mobs::from_string_base64(ephemeral, buf);
+  string ephemeralU = mobs::getPublicKey(buf);
+  cerr << ephemeralU << endl;
+  LOG(LM_INFO, " OLD " << mobs::getKeyInfo(privS, "54321"));
+  LOG(LM_INFO, " NEW " << mobs::getKeyInfo(ephemeralU));
+
+  buffOut(cipherU);
+  ASSERT_NO_THROW(mobs::deriveSharedSecret(cipherS, ephemeralU, privS, "54321"));
+  buffOut(cipherS);
+  EXPECT_EQ(cipherU, cipherS);
+  // das gemeinsame secret soll nie als session key verwendetn werden. Es soll ein Hash-Wert gebildet werden
+  std::vector<u_char> key;
+  mobs::hash_value(cipherU, key, "SHA256");
+  buffOut(key);
+
+}
+
+
+TEST(cryptTest, ecdh2) {
+  string privS, pubS;
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptECsecp384r1, privS, pubS, "54321"));
+  std::vector<u_char> cipherU;
+  string ephemeral;
+  ASSERT_NO_THROW(mobs::ecdhGenerate(cipherU, ephemeral, pubS));
+  cerr << ephemeral << endl;
+  // pub-key vom DER ins PEM-Format bringen
+  std::vector<u_char> buf;
+  mobs::from_string_base64(ephemeral, buf);
+  string ephemeralU = mobs::getPublicKey(buf);
+  cerr << ephemeralU << endl;
+  LOG(LM_INFO, " OLD " << mobs::getKeyInfo(privS, "54321"));
+  LOG(LM_INFO, " NEW " << mobs::getKeyInfo(ephemeralU));
+  EXPECT_EQ(mobs::getKeyInfo(privS, "54321"), mobs::getKeyInfo(ephemeralU));
+
+}
+
+TEST(cryptTest, ecdh3) {
+  string privS, pubS;
+  ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptECbrainpoolP384r1, privS, pubS, "54321"));
+  std::vector<u_char> cipherU;
+  string ephemeral;
+  ASSERT_NO_THROW(mobs::ecdhGenerate(cipherU, ephemeral, pubS));
+  cerr << ephemeral << endl;
+  // pub-key vom DER ins PEM-Format bringen
+  std::vector<u_char> buf;
+  mobs::from_string_base64(ephemeral, buf);
+  string ephemeralU = mobs::getPublicKey(buf);
+  cerr << ephemeralU << endl;
+  LOG(LM_INFO, " OLD " << mobs::getKeyInfo(privS, "54321"));
+  LOG(LM_INFO, " NEW " << mobs::getKeyInfo(ephemeralU));
+  EXPECT_EQ(mobs::getKeyInfo(privS, "54321"), mobs::getKeyInfo(ephemeralU));
+
+}
+
+
 
 TEST(cryptTest, rsaCheck) {
   string priv, pub;

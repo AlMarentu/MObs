@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2025 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -53,9 +53,12 @@ public:
   SSL_Delete() = default;
   void operator()(BIO *p) { BIO_free_all(p); }
   void operator()(OSSL_ENCODER_CTX *p) { OSSL_ENCODER_CTX_free(p); }
+  void operator()(OSSL_DECODER_CTX *p) { OSSL_DECODER_CTX_free(p); }
   void operator()(EVP_PKEY *p) { EVP_PKEY_free(p); }
   void operator()(EVP_PKEY_CTX *p) { EVP_PKEY_CTX_free(p); }
   void operator()(EVP_CIPHER_CTX *p) { EVP_CIPHER_CTX_free(p); }
+  void operator()(EVP_MD_CTX *p) { EVP_MD_CTX_free(p); }
+  void operator()(EVP_MD *p) { EVP_MD_free(p); }
 };
 
 std::string openSslGetError();
@@ -121,7 +124,7 @@ std::unique_ptr<EVP_PKEY, SSL_Delete> mobs_internal::readPrivateKey(const std::s
     return {nullptr, SSL_Delete{}};
   std::unique_ptr<BIO, SSL_Delete> bp{nullptr, SSL_Delete{}};
   if (file.length() > 10 and file.compare(0, 10, "-----BEGIN") == 0) {
-    bp.reset(BIO_new_mem_buf(file.c_str(), file.length()));
+    bp.reset(BIO_new_mem_buf(file.c_str(), int(file.length())));
     if (not bp)
       THROW("alloc mem");
   }
@@ -149,7 +152,7 @@ std::unique_ptr<EVP_PKEY, SSL_Delete> mobs_internal::readPublicKey(const std::st
     return {nullptr, SSL_Delete{}};
   std::unique_ptr<BIO, SSL_Delete> bp{nullptr, SSL_Delete{}};
   if (file.length() > 10 and file.compare(0, 10, "-----BEGIN") == 0) {
-    bp.reset(BIO_new_mem_buf(file.c_str(), file.length()));
+    bp.reset(BIO_new_mem_buf(file.c_str(), int(file.length())));
     if (not bp)
       THROW("alloc mem");
   }
@@ -251,69 +254,112 @@ static std::string exportPublicKey(EVP_PKEY *pkey)
   return mem;
 }
 
+static void exportPublicKey(EVP_PKEY *pkey, std::vector<u_char> &key)
+{
+  std::unique_ptr<OSSL_ENCODER_CTX, SSL_Delete> ectx(OSSL_ENCODER_CTX_new_for_pkey(pkey,
+                                       OSSL_KEYMGMT_SELECT_PUBLIC_KEY
+                                       | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS,
+                                       "DER", "SubjectPublicKeyInfo",
+                                       nullptr), SSL_Delete{});
+  if (not ectx)
+    throw openssl_exception(LOGSTR("mobs::exportPublicKey no suitable potential encoders found"));
+  unsigned char *data = nullptr;
+  size_t datalen;
+  if (not OSSL_ENCODER_to_data(ectx.get(), &data, &datalen))
+    throw openssl_exception(LOGSTR("mobs::exportPublicKey write failed"));
+  key.reserve(datalen);
+  std::copy((char *)data, (char *)data + datalen, std::back_inserter(key));
+  free(data);
+}
 
-void mobs::generateCryptoKey(enum CryptKeyType type, const std::string &filePriv, const std::string &filePub, const std::string &passphrase, const std::string &format) {
+// erzeuge neuen Schlüssel mit denselben Parametern wie oldKey
+static std::unique_ptr<EVP_PKEY, SSL_Delete> genKey(EVP_PKEY *oldKey) {
+  std::unique_ptr<EVP_PKEY_CTX, SSL_Delete> ctx(EVP_PKEY_CTX_new_from_pkey(nullptr, oldKey, nullptr), SSL_Delete{});
+  if (!ctx)
+    throw openssl_exception(LOGSTR("mobs::genKey"));
+  if (EVP_PKEY_keygen_init(ctx.get()) <= 0)
+    throw openssl_exception(LOGSTR("mobs::genKey"));
+  /* Neuen Schlüssel generieren (basiert auf den übernommenen Parametern) */
+  if (EVP_PKEY_is_a(oldKey, "RSA")) {
+    int numbits = EVP_PKEY_get_bits(oldKey);
+    if (EVP_PKEY_CTX_set_rsa_keygen_bits(ctx.get(), numbits) <= 0)
+      throw openssl_exception(LOGSTR("mobs::genKey"));
+  }
+  EVP_PKEY *pkey = nullptr;
+  if (EVP_PKEY_keygen(ctx.get(), &pkey) <= 0)
+    throw openssl_exception(LOGSTR("mobs::genKey"));
+  std::unique_ptr<EVP_PKEY, SSL_Delete> key(pkey, SSL_Delete{});
+  return key;
+}
+
+
+static std::unique_ptr<EVP_PKEY, SSL_Delete> genKey(enum mobs::CryptKeyType type) {
   auto id = EVP_PKEY_RSA;
   auto nid = NID_X9_62_prime256v1;
+  int numbits = 2048;
   switch(type) {
-    case CryptRSA2048: id = EVP_PKEY_RSA; break;
-    case CryptX25519: id = EVP_PKEY_X25519; break;
-    case CryptECprime256v1: id = EVP_PKEY_EC; nid = NID_X9_62_prime256v1; break;
-    case CryptECsecp256k1: id = EVP_PKEY_EC; nid = NID_X9_62_prime256v1; break;
+    case mobs::CryptRSA2048: id = EVP_PKEY_RSA; numbits = 2048; break;
+    case mobs::CryptRSA3072: id = EVP_PKEY_RSA; numbits = 3072; break;
+    case mobs::CryptRSA4096: id = EVP_PKEY_RSA; numbits = 4096; break;
+    case mobs::CryptX25519: id = EVP_PKEY_X25519; break;
+    case mobs::CryptECprime256v1: id = EVP_PKEY_EC; nid = NID_X9_62_prime256v1; break;
+    case mobs::CryptECsecp256k1: id = EVP_PKEY_EC; nid = NID_secp256k1; break;
+    case mobs::CryptECsecp384r1: id = EVP_PKEY_EC; nid = NID_secp384r1; break;
+    case mobs::CryptECsecp521r1: id = EVP_PKEY_EC; nid = NID_secp521r1; break;
+    case mobs::CryptECbrainpoolP256r1: id = EVP_PKEY_EC; nid = NID_brainpoolP256r1; break;
+    case mobs::CryptECbrainpoolP384r1: id = EVP_PKEY_EC; nid = NID_brainpoolP384r1; break;
+    case mobs::CryptECbrainpoolP512r1: id = EVP_PKEY_EC; nid = NID_brainpoolP512r1; break;
   }
   std::unique_ptr<EVP_PKEY_CTX, SSL_Delete> ctx(EVP_PKEY_CTX_new_id(id, nullptr), SSL_Delete{});
   if (!ctx)
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
+    throw openssl_exception(LOGSTR("mobs::genKey"));
   if (EVP_PKEY_keygen_init(ctx.get()) <= 0)
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
+    throw openssl_exception(LOGSTR("mobs::genKey"));
   if (id == EVP_PKEY_RSA) {
-    if (EVP_PKEY_CTX_set_rsa_keygen_bits(ctx.get(), 2048) <= 0)
-      throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
+    if (EVP_PKEY_CTX_set_rsa_keygen_bits(ctx.get(), numbits) <= 0)
+      throw openssl_exception(LOGSTR("mobs::genKey"));
   }
   else if (id == EVP_PKEY_EC)
   {
     if (EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx.get(), nid) <= 0)
-      throw openssl_exception(LOGSTR("mobs::CryptBufEcc"));
+      throw openssl_exception(LOGSTR("mobs::genKey"));
   }
   /* Generate key */
   EVP_PKEY *pkey = nullptr;
   if (EVP_PKEY_keygen(ctx.get(), &pkey) <= 0)
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
+    throw openssl_exception(LOGSTR("mobs::genKey"));
   std::unique_ptr<EVP_PKEY, SSL_Delete> key(pkey, SSL_Delete{});
+  return key;
+}
 
+
+std::string mobs::getPublicKey(const std::vector<u_char> &data) {
+  EVP_PKEY *pkey{};
+  std::unique_ptr<OSSL_DECODER_CTX, SSL_Delete> ectx(OSSL_DECODER_CTX_new_for_pkey(&pkey,
+                                     "DER", "SubjectPublicKeyInfo",
+                                     nullptr,
+                                     OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
+                                     nullptr, nullptr), SSL_Delete{});
+  if (not ectx)
+    throw openssl_exception(LOGSTR(R"(mobs::getPublicKey no suitable potential encoders found)"));
+  size_t len = data.size();
+  const unsigned char *p = &data[0];
+  if (not OSSL_DECODER_from_data(ectx.get(), &p, &len))
+    throw openssl_exception(LOGSTR("mobs::getPublicKey read failed"));
+
+  std::unique_ptr<EVP_PKEY, SSL_Delete> key(pkey, SSL_Delete{});
+  return exportPublicKey(key.get());
+}
+
+
+void mobs::generateCryptoKey(enum CryptKeyType type, const std::string &filePriv, const std::string &filePub, const std::string &passphrase, const std::string &format) {
+  auto key = genKey(type);
   exportPublicKeyToFile(key.get(), filePub, "PEM");
   exportPrivateKeyToFile(key.get(), filePriv, passphrase, "PEM");
 }
 
 void mobs::generateCryptoKeyMem(enum CryptKeyType type, std::string &priv, std::string &pub, const std::string &passphrase) {
-  auto id = EVP_PKEY_RSA;
-  auto nid = NID_X9_62_prime256v1;
-  switch(type) {
-    case CryptRSA2048: id = EVP_PKEY_RSA; break;
-    case CryptX25519: id = EVP_PKEY_X25519; break;
-    case CryptECprime256v1: id = EVP_PKEY_EC; nid = NID_X9_62_prime256v1; break;
-    case CryptECsecp256k1: id = EVP_PKEY_EC; nid = NID_X9_62_prime256v1; break;
-  }
-  std::unique_ptr<EVP_PKEY_CTX, SSL_Delete> ctx(EVP_PKEY_CTX_new_id(id, nullptr), SSL_Delete{});
-  if (!ctx)
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
-  if (EVP_PKEY_keygen_init(ctx.get()) <= 0)
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
-  if (id == EVP_PKEY_RSA) {
-    if (EVP_PKEY_CTX_set_rsa_keygen_bits(ctx.get(), 2048) <= 0)
-      throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
-  }
-  else if (id == EVP_PKEY_EC)
-  {
-    if (EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx.get(), nid) <= 0)
-      throw openssl_exception(LOGSTR("mobs::CryptBufEcc"));
-  }
-  /* Generate key */
-  EVP_PKEY *pkey = nullptr;
-  if (EVP_PKEY_keygen(ctx.get(), &pkey) <= 0)
-    throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
-  std::unique_ptr<EVP_PKEY, SSL_Delete> key(pkey, SSL_Delete{});
-
+  auto key = genKey(type);
   pub = exportPublicKey(key.get());
   priv = exportPrivateKey(key.get(), passphrase);
 }
@@ -430,11 +476,49 @@ OSSL_PARAM params[] = {
 
 #endif
 
+void
+mobs::digestSign(const std::vector<u_char> &buffer, std::vector<u_char> &cipher, const std::string &filePriv,
+                 const std::string &passphrase) {
+  auto eckey = mobs_internal::readPrivateKey(filePriv, passphrase);
+  if (not eckey)
+    THROW(u8"can't load priv key");
+  std::unique_ptr<EVP_MD_CTX, SSL_Delete>mdCtx(EVP_MD_CTX_new(), SSL_Delete{});
+  auto md = EVP_get_digestbyname("sha256");
+  if (not md)
+    throw openssl_exception(LOGSTR("mobs::digestSign"));
+  if (1 != EVP_DigestSignInit(mdCtx.get(), nullptr, md, nullptr,  eckey.get()))
+    throw openssl_exception(LOGSTR("mobs::digestSign"));
+  cipher.resize(1024);
+  size_t sz = cipher.size();
+  if (1 != EVP_DigestSign(mdCtx.get(), &cipher[0], &sz, &buffer[0], buffer.size()))
+    throw openssl_exception(LOGSTR("mobs::digestSign"));
+  cipher.resize(sz);
+}
+
+bool
+mobs::digestVerify(const std::vector<u_char> &buffer, const std::vector<u_char> &cipher, const std::string &filePup) {
+  auto eckey = mobs_internal::readPublicKey(filePup);
+  if (not eckey)
+    THROW(u8"can't load pub key");
+  std::unique_ptr<EVP_MD_CTX, SSL_Delete>mdCtx(EVP_MD_CTX_new(), SSL_Delete{});
+  auto md = EVP_get_digestbyname("sha256");
+  if (not md)
+    throw openssl_exception(LOGSTR("mobs::digestVerify"));
+  if (1 != EVP_DigestVerifyInit(mdCtx.get(), nullptr, md, nullptr,  eckey.get()))
+    throw openssl_exception(LOGSTR("mobs::digestVerify"));
+  int ret = EVP_DigestVerify(mdCtx.get(), &cipher[0], cipher.size(), &buffer[0], buffer.size());
+  if (ret == 1)
+    return true;
+  if (ret == 0)
+    return false;
+  throw openssl_exception(LOGSTR("mobs::digestVerify"));
+}
+
 
 // EVP_PKEY_ML_KEM (and specific sizes like ML-KEM-768)
 // EVP_PKEY_X448
 
-// cipher für Verschlüsselung, secret-key an empfänger
+// cipher für Verschlüsselung, secret-key an empfänger Key Encapsulation Mechanism (KEM)
 void
 mobs::encapsulatePublic(std::vector<u_char> &cipher, std::vector<u_char> &key, const std::string &filePup, const std::string &filePriv,
                            const std::string &passphrase) {
@@ -443,18 +527,16 @@ mobs::encapsulatePublic(std::vector<u_char> &cipher, std::vector<u_char> &key, c
   if (not rsaPubKey)
     THROW(u8"can't load pub key");
   auto rsaPrivKey = mobs_internal::readPrivateKey(filePriv, passphrase);
-  //if (sessionKey.size() >= EVP_PKEY_size(rsaPubKey) - 41)
-  //  THROW(u8"array to big");
-  //cipher.resize(EVP_PKEY_size(rsaPubKey), 0);
   std::unique_ptr<EVP_PKEY_CTX, SSL_Delete>ctx(EVP_PKEY_CTX_new_from_pkey(nullptr, rsaPubKey.get(), nullptr), SSL_Delete{});
   if (!ctx)
     throw openssl_exception(LOGSTR("mobs::encapsulatePublic"));
   if (1 != EVP_PKEY_public_check(ctx.get()))
-    THROW("mobs::encryptPublicRsa: THIS IS NO PUBLIC KEY");
+    THROW("mobs::encapsulatePublic: THIS IS NO PUBLIC KEY");
   if (filePriv.empty()) {
      if (EVP_PKEY_encapsulate_init(ctx.get(), nullptr) <= 0)
       throw openssl_exception(LOGSTR("mobs::encapsulatePublic"));
   } else {
+#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR >= 2
     if (not rsaPrivKey)
       THROW(u8"can't load priv key");
     // EVP_PKEY_ML_KEM "ML-KEM"
@@ -464,6 +546,9 @@ mobs::encapsulatePublic(std::vector<u_char> &cipher, std::vector<u_char> &key, c
     }
     if (EVP_PKEY_auth_encapsulate_init(ctx.get(), rsaPrivKey.get(), nullptr) <= 0)
       throw openssl_exception(LOGSTR("mobs::encapsulatePublic"));
+#else
+    throw std::runtime_error(LOGSTR("mobs::encapsulatePublic function not supported"));
+#endif
   }
 
   size_t keylen = 0, outlen = 0;
@@ -474,32 +559,6 @@ mobs::encapsulatePublic(std::vector<u_char> &cipher, std::vector<u_char> &key, c
   if (EVP_PKEY_encapsulate(ctx.get(), &cipher[0], &outlen, &key[0], &keylen) <= 0)
     throw openssl_exception(LOGSTR("mobs::encapsulatePublic"));
 
-  return;
-
-  //const EVP_MD *md = EVP_MD_fetch(nullptr, "SHA512", NULL); // Example with SM3
-  const EVP_MD* md = EVP_get_digestbyname("sha256");
-  if (!md)
-    throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
-  if (EVP_PKEY_CTX_set_signature_md(ctx.get(), md) <= 0)
-
-    //if (EVP_PKEY_CTX_set_signature_md(ctx.get(), EVP_sha256()) <= 0)
-    throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
-
-
-  //const EVP_MD *md = EVP_MD_fetch(nullptr, "SHA512", NULL); // Example with SM3
-  //if (!md)
-  //  throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
-
-  //if (EVP_PKEY_CTX_set_signature_md(ctx.get(), md) <= 0)
-  //if (EVP_PKEY_CTX_set_signature_md(ctx.get(), EVP_sha256()) <= 0)
-  //  throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
-
-   //if (EVP_PKEY_auth_encapsulate_init(ctx.get(), rsaPrivKey.get(), nullptr) <= 0)
-  //if (EVP_PKEY_encapsulate_init(ctx, nullptr) <= 0)
-    throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
-
-
-  std::cout << mobs::to_string_base64(cipher) << "   " << mobs::to_string_base64(key) << std::endl;
 
 }
 
@@ -512,28 +571,32 @@ mobs::decapsulatePublic(const std::vector<u_char> &cipher, std::vector<u_char> &
   auto rsaPubKey = mobs_internal::readPublicKey(filePup);
   std::unique_ptr<EVP_PKEY_CTX, SSL_Delete>ctx(EVP_PKEY_CTX_new_from_pkey(nullptr, rsaPrivKey.get(), nullptr), SSL_Delete{});
   if (!ctx)
-    throw openssl_exception(LOGSTR("mobs::decryptPrivateRsa"));
+    throw openssl_exception(LOGSTR("mobs::decapsulatePublic"));
   if (1 != EVP_PKEY_private_check(ctx.get()))
     THROW("IS NO PRIVATE KEY");
   if (filePup.empty()) {
     if (EVP_PKEY_decapsulate_init(ctx.get(), nullptr) <= 0)
-      throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
+      throw openssl_exception(LOGSTR("mobs::decapsulatePublic"));
   } else {
+#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR >= 2
     if (not rsaPubKey)
       THROW(u8"can't load pub key");
     if (EVP_PKEY_is_a(rsaPrivKey.get(), "RSA")) {
       if (EVP_PKEY_CTX_set_kem_op(ctx.get(), "RSASVE") <= 0) // DHKEM
-        throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
+        throw openssl_exception(LOGSTR("mobs::decapsulatePublic"));
     }
     if (EVP_PKEY_auth_decapsulate_init(ctx.get(), rsaPubKey.get(), nullptr) <= 0)
-      throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
+      throw openssl_exception(LOGSTR("mobs::decapsulatePublic"));
+#else
+    throw std::runtime_error(LOGSTR("mobs::decapsulatePublic function not supported"));
+#endif
   }
   size_t secretlen = 0;
   if (EVP_PKEY_decapsulate(ctx.get(), nullptr, &secretlen, &cipher[0], cipher.size()) <= 0)
-    throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
+    throw openssl_exception(LOGSTR("mobs::decapsulatePublic"));
   key.resize(secretlen);
   if (EVP_PKEY_decapsulate(ctx.get(), &key[0], &secretlen, &cipher[0], cipher.size()) <= 0)
-    throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
+    key.clear();
 }
 
 bool mobs::checkPassword(const std::string &filePriv, const std::string &passphrase) {
@@ -560,15 +623,15 @@ void mobs::exportKey(const std::string &filePriv, const std::string &passphraseO
   priv = exportPrivateKey(rsa.get(), passphraseNew);
 }
 
-std::string mobs::readPrivateKey(const std::string &filePriv, const std::string &passphrase) {
+std::string mobs::readPrivateKey(const std::string &filePriv, const std::string &passphrase, const std::string &passphraseNew) {
   auto rsa = mobs_internal::readPrivateKey(filePriv, passphrase);
   if (not rsa)
     throw openssl_exception(LOGSTR("mobs::readPrivateKey"));
 
-  return exportPrivateKey(rsa.get(), "");
+  return exportPrivateKey(rsa.get(), passphraseNew);
 }
 
-std::string mobs::readPublicKey(const std::string &filePub, std::string &pub) {
+std::string mobs::readPublicKey(const std::string &filePub) {
   auto rsa = mobs_internal::readPublicKey(filePub);
   if (not rsa)
     throw openssl_exception(LOGSTR("mobs::readPublicKey"));
@@ -580,13 +643,13 @@ std::string mobs::getKeyInfo(const std::string &filePriv, const std::string &pas
   try {
     auto rsaPrivKey = mobs_internal::readPrivateKey(filePriv, passphrase);
     if (not rsaPrivKey)
-      throw openssl_exception(LOGSTR("mobs::getRsaInfo"));
-    std::unique_ptr<BIO, SSL_Delete> bp_private(BIO_new(BIO_s_mem()), SSL_Delete{});
+      throw openssl_exception(LOGSTR("mobs::getKeyInfo"));
+    std::unique_ptr<BIO, SSL_Delete> biop(BIO_new(BIO_s_mem()), SSL_Delete{});
     //if (1 != RSA_print(bp_private, rsaPrivKey, 3))
-    if (1 != EVP_PKEY_print_params(bp_private.get(), rsaPrivKey.get(), 2, nullptr))
-      throw openssl_exception(LOGSTR("mobs::getRsaInfo"));
+    if (1 != EVP_PKEY_print_params(biop.get(), rsaPrivKey.get(), 2, nullptr))
+      throw openssl_exception(LOGSTR("mobs::getKeyInfo"));
     char *bptr;
-    auto n = BIO_get_mem_data(bp_private.get(), &bptr);
+    auto n = BIO_get_mem_data(biop.get(), &bptr);
     auto res = std::string(bptr, n);
     return res;
   } catch (openssl_exception &e) {
@@ -594,4 +657,90 @@ std::string mobs::getKeyInfo(const std::string &filePriv, const std::string &pas
   }
 }
 
+std::string mobs::getKeyInfo(const std::string &filePub) {
+  try {
+    auto rsa = mobs_internal::readPublicKey(filePub);
+    if (not rsa)
+      throw openssl_exception(LOGSTR("mobs::getKeyInfo"));
+    std::unique_ptr<BIO, SSL_Delete> biop(BIO_new(BIO_s_mem()), SSL_Delete{});
+    if (1 != EVP_PKEY_print_params(biop.get(), rsa.get(), 2, nullptr))
+      throw openssl_exception(LOGSTR("mobs::getKeyInfo"));
+    char *bptr;
+    auto n = BIO_get_mem_data(biop.get(), &bptr);
+    auto res = std::string(bptr, n);
+    return res;
+  } catch (openssl_exception &e) {
+    return {};
+  }
+}
 
+void mobs::deriveSharedSecret(std::vector<u_char> &cipher, const std::string &filePubPeer, const std::string &filePriv,
+  const std::string &passphrase) {
+  auto rsaPubKey = mobs_internal::readPublicKey(filePubPeer);
+  if (not rsaPubKey)
+    THROW(u8"can't load pub key");
+  auto rsaPrivKey = mobs_internal::readPrivateKey(filePriv, passphrase);
+
+  /* Create the context for the shared secret derivation */
+  std::unique_ptr<EVP_PKEY_CTX, SSL_Delete>ctx(EVP_PKEY_CTX_new_from_pkey(nullptr, rsaPrivKey.get(), nullptr), SSL_Delete{});
+  if (!ctx)
+    throw openssl_exception(LOGSTR("mobs::deriveSharedSecret"));
+  /* Initialise */
+  int res;
+  if ((res = EVP_PKEY_derive_init(ctx.get())) <= 0) {
+    if (res == -2)
+      THROW("mobs::deriveSharedSecret algorithm not supported");
+    throw openssl_exception(LOGSTR("mobs::deriveSharedSecret"));
+  }
+  /* Provide the peer public key */
+  if (EVP_PKEY_derive_set_peer(ctx.get(), rsaPubKey.get()) <= 0)
+    throw openssl_exception(LOGSTR("mobs::deriveSharedSecret"));
+  /* Determine buffer length for shared secret */
+  size_t outlen = 0;
+  if (EVP_PKEY_derive(ctx.get(), nullptr, &outlen) <= 0)
+    throw openssl_exception(LOGSTR("mobs::deriveSharedSecret"));
+  cipher.resize(outlen);
+  if (EVP_PKEY_derive(ctx.get(), &cipher[0], &outlen) <= 0)
+    throw openssl_exception(LOGSTR("mobs::deriveSharedSecret"));
+}
+
+// public ephemeral key erzeugen
+void mobs::ecdhGenerate(std::vector<u_char> &secret, std::string &ephemeralPubKey, const std::string &serverPub) {
+  //mobs_internal::LegacyProvider::init();
+  auto rsaPubKey = mobs_internal::readPublicKey(serverPub);
+  if (not rsaPubKey)
+    THROW(u8"can't load pub key");
+
+  // Schlüssel passend zum Server-Key erzeugen
+  auto peerkey = genKey(rsaPubKey.get());
+
+  /* Create the context for the shared secret derivation */
+  std::unique_ptr<EVP_PKEY_CTX, SSL_Delete>ctx(EVP_PKEY_CTX_new_from_pkey(nullptr, peerkey.get(), nullptr), SSL_Delete{});
+  if (!ctx)
+    throw openssl_exception(LOGSTR("mobs::ecdhGenerate"));
+  /* Initialise */
+  int res;
+  if ((res = EVP_PKEY_derive_init(ctx.get())) <= 0) {
+    if (res == -2)
+      THROW("mobs::ecdhGenerate algorithm not supported");
+    throw openssl_exception(LOGSTR("mobs::ecdhGenerate"));
+  }
+  /* Provide the peer public key */
+  if (EVP_PKEY_derive_set_peer(ctx.get(), rsaPubKey.get()) <= 0)
+    throw openssl_exception(LOGSTR("mobs::ecdhGenerate"));
+  /* Determine buffer length for shared secret */
+  size_t outlen = 0;
+  if (EVP_PKEY_derive(ctx.get(), nullptr, &outlen) <= 0)
+    throw openssl_exception(LOGSTR("mobs::ecdhGenerate"));
+  secret.resize(outlen);
+  if (EVP_PKEY_derive(ctx.get(), &secret[0], &outlen) <= 0)
+    throw openssl_exception(LOGSTR("mobs::ecdhGenerate"));
+
+  std::vector<u_char> key;
+  exportPublicKey(peerkey.get(), key);
+  ephemeralPubKey = mobs::to_string_base64(key);
+
+
+
+
+}

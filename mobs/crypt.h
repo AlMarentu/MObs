@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2025 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -27,12 +27,8 @@
 #define MOBS_CRYPT_H
 
 
-#include <utility>
-#include <list>
-#include <memory>
-
-
-#include "csb.h"
+#include <string>
+#include <vector>
 
 namespace mobs {
 
@@ -41,10 +37,11 @@ class RecipientKey {
 public:
   /** \brief Konstruktor
    *
-   * @param f Dateiname der public-key Datei im PEM-Format
-   * @param i Bezeichnung des Empfängers
+   * @param pubKey Dateiname oder public-key Datei im PEM-Format
+   * @param from Bezeichnung des Senders
+   * @param to Bezeichnung des Empfängers
    */
-  RecipientKey(std::string pubKey, std::string from = "", std::string to = "") : keyFile(std::move(pubKey)), idFrom(std::move(from)), idTo(std::move(to)) {}
+  explicit RecipientKey(std::string pubKey, std::string from = "", std::string to = "") : keyFile(std::move(pubKey)), idFrom(std::move(from)), idTo(std::move(to)) {}
   std::string keyFile; ///< Dateiname oder PEM-Format des public-keys
   std::string idFrom; ///< Bezeichnung des Senders
   std::string idTo; ///< Bezeichnung des Empfängers
@@ -53,9 +50,16 @@ public:
 
 enum CryptKeyType {
   CryptRSA2048, //< RSA mit 2048 Bit
+  CryptRSA3072, //< RSA mit 3072 Bit
+  CryptRSA4096, //< RSA mit 4096 Bit
   CryptX25519,
-  CryptECprime256v1, //< ephemeren Elliptic-Curve P256
+  CryptECprime256v1, //< Elliptic-Curve P256
   CryptECsecp256k1,
+  CryptECsecp384r1,
+  CryptECsecp521r1,
+  CryptECbrainpoolP256r1,
+  CryptECbrainpoolP384r1,
+  CryptECbrainpoolP512r1,
 };
 
 /** \brief Erzeugung eines Schlüsselpaares (Datei)
@@ -66,6 +70,7 @@ enum CryptKeyType {
  * @param filePub Dateiname für die zu erzeugende public-key Datei im PEM-Format
  * @param passphrase Passphrase für den private-key
  * @param format Format für Ausgabe, default ist "PEM"
+ * \throw runtime_error im Fehlerfall
  */
 void generateCryptoKey(enum CryptKeyType type, const std::string &filePriv, const std::string &filePub, const std::string &passphrase, const std::string &format = "PEM");
 
@@ -77,8 +82,17 @@ void generateCryptoKey(enum CryptKeyType type, const std::string &filePriv, cons
  * @param priv String des erzeugten private-key im PEM-Format
  * @param pub String des erzeugten public-key im PEM-Format
  * @param passphrase Passphrase für den private-key, wenn leer dann unverschlüsselt
+ * \throw runtime_error im Fehlerfall
  */
 void generateCryptoKeyMem(enum CryptKeyType type, std::string &priv, std::string &pub, const std::string &passphrase = "");
+
+/** \brief lese eine Public-Key aus dem DER-Format ins PEM-Format in den Speicher
+ *
+ * @param data Schlüssel im DER-Format
+ * @return String des erzeugten public-key im PEM-Format
+ * \throw runtime_error im Fehlerfall
+ */
+std::string getPublicKey(const std::vector<u_char> &data);
 
 /** \brief Verschlüsselung eine Keys mit einem public Key
  *
@@ -86,6 +100,7 @@ void generateCryptoKeyMem(enum CryptKeyType type, std::string &priv, std::string
  * @param sessionKey zu verschlüsselnde Zeichenkette
  * @param cipher verschlüsseltes Ergebnis
  * @param filePub Dateipfad eines public Keys oder der Schlüssel selbst im PEM-Format
+ * \throw runtime_error im Fehlerfall
  */
 void encryptPublic(const std::vector<u_char> &sessionKey, std::vector<u_char> &cipher, const std::string &filePub);
 
@@ -95,6 +110,7 @@ void encryptPublic(const std::vector<u_char> &sessionKey, std::vector<u_char> &c
  * @param sessionKey entschlüsselte Zeichenkette
  * @param filePriv Dateipfad eines private Keys oder der Schlüssel selbst im PEM-Format
  * @param passphrase Kennwort zum private Key
+ * \throw runtime_error im Fehlerfall
 */
 void decryptPrivate(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePriv, const std::string &passphrase);
 
@@ -105,15 +121,39 @@ void decryptPrivate(const std::vector<u_char> &cipher, std::vector<u_char> &sess
  * @param cipher verschlüsseltes Ergebnis
  * @param filePriv Dateipfad eines private Keys oder der Schlüssel selbst im PEM-Format
  * @param passphrase Kennwort zum private Key
- */void encryptPrivate(const std::vector<u_char> &sessionKey, std::vector<u_char> &cipher, const std::string &filePriv, const std::string &passphrase);
+ * \throw runtime_error im Fehlerfall
+ */
+void encryptPrivate(const std::vector<u_char> &sessionKey, std::vector<u_char> &cipher, const std::string &filePriv, const std::string &passphrase);
 
 /** \brief Entschlüsselung mit einem public Key
  *
  * @param cipher verschlüsselte Eingabe
  * @param sessionKey entschlüsselte Zeichenkette
  * @param filePup Dateipfad eines public Keys oder der Schlüssel selbst im PEM-Format
+ * \throw runtime_error im Fehlerfall
  */
 void decryptPublic(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePup);
+
+/** \brief Erzeuge eine Signatur aus einem Buffer
+ *
+ * @param buffer zu signierende Eingabe, zB, Hash-Wert
+ * @param cipher erzeugte Signatur
+ * @param filePriv Dateipfad eines private Keys oder der Schlüssel selbst im PEM-Format
+ * @param passphrase Kennwort zum private Key
+ * \throw runtime_error im Fehlerfall
+ */
+void digestSign(const std::vector<u_char> &buffer, std::vector<u_char> &cipher, const std::string &filePriv,
+                const std::string &passphrase);
+
+/** \brief Prüfe eine Signatur zu einem Buffer
+ *
+ * @param buffer zu überprüfende Eingabe, zB, Hash-Wert
+ * @param cipher Signatur die überprüft werden soll
+ * @param filePup Dateipfad eines öffentlichen Keys oder der Schlüssel selbst im PEM-Format
+ * @return true, wenn die Signatur übereinstimmt
+ * \throw runtime_error im Fehlerfall
+ */
+bool digestVerify(const std::vector<u_char> &buffer, const std::vector<u_char> &cipher, const std::string &filePup);
 
 /** \brief Test ob Passwort und Schlüssel OK
  *
@@ -136,13 +176,14 @@ bool checkPassword(const std::string &filePriv, const std::string &passphrase);
 void exportKey(const std::string &filePriv, const std::string &passphraseOld, std::string &priv, std::string &pub,
                const std::string &passphraseNew);
 
-/** \brief privat key aus File in unverschlüsselten string lesen
+/** \brief privat key aus File in string lesen
  *
  * @param filePriv Dateipfad eines private Keys oder der Schlüssel selbst im PEM-Format
  * @param passphrase Kennwort zum private Key
+ * @param passphraseNew Kennwort zum returnierten Key
  * @return priv String des erzeugten private-key im PEM-Format
  */
-std::string readPrivateKey(const std::string &filePriv, const std::string &passphrase);
+std::string readPrivateKey(const std::string &filePriv, const std::string &passphrase, const std::string &passphraseNew = "");
 
 /** \brief public key File in string lesen
  *
@@ -150,7 +191,7 @@ std::string readPrivateKey(const std::string &filePriv, const std::string &passp
  * @return pub String des erzeugten public-key im PEM-Format
  * \throw runtime_error im Fehlerfall
 */
-std::string readPublicKey(const std::string &filePub, std::string &pub);
+std::string readPublicKey(const std::string &filePub);
 
 /** \brief info zum Schlüssel ausgeben
  *
@@ -160,6 +201,14 @@ std::string readPublicKey(const std::string &filePub, std::string &pub);
  * \throw runtime_error im Fehlerfall
  */
 std::string getKeyInfo(const std::string &filePriv, const std::string &passphrase);
+
+/** \brief info zum Schlüssel ausgeben
+ *
+ * @param filePub Dateipfad eines öffentlichen Keys oder der Schlüssel selbst im PEM-Format
+ * @return Info in Textform oder Leerstring im Fehlerfall
+ * \throw runtime_error im Fehlerfall
+ */
+std::string getKeyInfo(const std::string &filePub);
 
 /** \brief Fingerprint zum Public-Key
  *
@@ -171,11 +220,18 @@ std::string getKeyFingerprint(const std::string &filePub);
 
 /** \brief Authentifizierungsschlüssel für Session-Key erzeugen
  *
+ * Key Encapsulation Mechanism (KEM)
+ *
+ * Ist der private Schlüssel angegeben, so wird eine zusätzliche authentifizierung des Client-Keys
+ * hinzugefügt (ab openSSL 3.2)
+ *
+ * When ECDH is used in Ephemeral-Static (ES) mode, the recipient has a static key pair, but the sender generates a ephemeral key pair for each message.
  * @param cipher generierte Cipher die dem Server mitgeteilt wird
  * @param sessionKey generierter Session-Key der symmetrischen Verschlüsselung
  * @param filePup öffentlicher-Schlüssel des Servers
- * @param filePriv privater Schlüssel des Clients oder leer
+ * @param filePriv privater Schlüssel des Clients oder leer (ab openSSL 3.2)
  * @param passphrase Passwort zum privaten Schlüssel oder leer
+ * \throw runtime_error im Fehlerfall
  */
 void encapsulatePublic(std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePup, const std::string &filePriv = "",
                        const std::string &passphrase = "");
@@ -186,10 +242,36 @@ void encapsulatePublic(std::vector<u_char> &cipher, std::vector<u_char> &session
  * @param sessionKey generierter Session-Key der symmetrischen Verschlüsselung
  * @param filePriv privater Schlüssel des Server
  * @param passphrase Passwort zum privaten Schlüssel
- * @param filePup öffentlicher-Schlüssel des Clients zur Authentisierung oder leer
+ * @param filePup öffentlicher-Schlüssel des Clients zur Authentisierung oder leer (ab openSSL 3.2)
+ * \throw runtime_error im Fehlerfall
  */
 void decapsulatePublic(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePriv,
                        const std::string &passphrase, const std::string &filePup = "");
+
+/** \brief Ermittel das gemeinsame shared secret zwischen zwei Schlusselpaaren
+ *
+ * Beide Seiten erhalten mit dem jeweiligen eigenen privaten und dem anderen öffentlichen Schlüssel dasselbe shared secret
+ * @param secret generiertes shared secret
+ * @param filePubPeer öffentlicher Schlüssel der Gegenstelle
+ * @param filePriv privater eigener Schlüssel
+ * @param passphrase Passwort zum privaten Schlüssel
+ * \throw runtime_error im Fehlerfall
+ */
+void deriveSharedSecret(std::vector<u_char> &secret, const std::string &filePubPeer, const std::string &filePriv,
+                        const std::string &passphrase);
+
+/** \brief erzeuge einen public ephemeral key und bereite einen EHDC Schlüsselaustausch vor (KEM)
+ *
+ * Der temporäre Schlüssel wird passend zum filePubPeer-Schlüssel erzeugt;
+ * das erzeugte shared Secret darf nicht direkt als session key verwendet werden, es ist zuvor in eine Hash zu wandeln
+ *
+ * Die Rückwandlung erfolgt mit deriveSharedSecret
+ * @param secret generiertes shared secret das dem Server mitgeteilt wird
+ * @param ephemeralPubKey generierter publicKey des ephemeral keys im DER-Format base64
+ * @param serverPub öffentlicher-Schlüssel des Servers
+ * \throw runtime_error im Fehlerfall
+ */
+void ecdhGenerate(std::vector<u_char> &secret, std::string &ephemeralPubKey, const std::string &serverPub);
 
 }
 

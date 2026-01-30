@@ -98,8 +98,8 @@ public:
   void clearString();
   /// setzte ein XML-Prefix
   void setPrefix(const std::wstring &pf);
-  /// Encryption aktivieren \see moba::CryptBufBase
-  void startEncrypt(CryptBufBase *cbbp);
+  /// Encryption aktivieren \see mobs::CryptBufBase
+  void startEncrypt(CryptBufBase *cbbp, bool oldStyle = false);
   /// Encryption wieder beenden
   void stopEncrypt();
   /// darunter liegenden Buffer flushen
