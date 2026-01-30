@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2025 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -167,6 +167,7 @@ public:
 #endif
     struct addrinfo hints{};
     struct addrinfo *res, *res0;
+    std::stringstream error;
     hints.ai_family = PF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     if (auto error = getaddrinfo(host.c_str(), service.c_str(), &hints, &res0)) {
@@ -190,9 +191,9 @@ public:
 #else
         if (errno == ECONNREFUSED)
 #endif
-          LOG(LM_ERROR, "connection refused " << hostIp(*res->ai_addr, res->ai_addrlen));
+          error <<  " connection refused " << hostIp(*res->ai_addr, res->ai_addrlen);
         else
-          LOG(LM_ERROR, "connect failed " << errno << " " << hostIp(*res->ai_addr, res->ai_addrlen));
+          error <<  "connect failed " << errno << " " << hostIp(*res->ai_addr, res->ai_addrlen);
         closesocket(fd);
         fd = invalidSocket;
         continue;
@@ -200,6 +201,7 @@ public:
       break;
     }
     if (fd == invalidSocket) {
+      LOG(LM_ERROR, error.str());
       return;
     }
 
