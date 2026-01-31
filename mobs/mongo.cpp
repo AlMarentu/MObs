@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2024 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -829,7 +829,7 @@ public:
     try {
       for (auto const &e:v) {
         bool skip = false;
-        std::string key = e.key().to_string();
+        std::string key(e.key().data(), e.key().length());
         //      cerr << "K " << key << " - " << array << endl;
         if (not array.empty())
           enter(array);
@@ -884,8 +884,8 @@ public:
             switch (e.type()) {
               case bsoncxx::type::k_oid:
                 break; // skipped
-              case bsoncxx::type::k_utf8:
-                if (not member()->fromStr(e.get_string().value.to_string(), cfs))
+              case bsoncxx::type::k_string:
+                if (not member()->fromStr(std::string(e.get_string().value.data(), e.get_string().value.length()), cfs))
                   throw runtime_error(u8"invalid type, can't assign");
                 break;
               case bsoncxx::type::k_bool:
