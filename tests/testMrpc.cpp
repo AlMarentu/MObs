@@ -126,13 +126,17 @@ public:
     static string lastCipher;
     static vector<u_char> lastKey;
     if (lastKey.empty() or lastCipher != mobs::to_string_base64(cipher)) {
-      setSessionKey(cipher, keyId, privKey, "");
+      setEcdhSessionKey(cipher, privKey, "");
       lastKey = session->sessionKey;
       lastCipher = mobs::to_string_base64(cipher);
     } else {
       session->sessionKey = lastKey;
       LOG(LM_INFO, "REUSE OLD SESSION");
     }
+  }
+
+  void authenticated(const std::string &login, const std::string &host, const std::string &software) override {
+    LOG(LM_INFO, "AUTH " << login << '@' << host << ' ' << software);
   }
 
   std::string getServerPublicKey() override {
@@ -684,6 +688,129 @@ TEST(mrpcTest, MrpcClientServerEccRecon) {
 
   }
 
+}
+
+TEST(mrpcTest, MrpcClientServerEccRefresh) {
+  string cpriv, cpub, spriv, spub;
+  mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, spriv, spub);
+  mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, cpriv, cpub);
+  mobs::MrpcSession clientSession{};
+
+
+  stringstream strStoC;
+  stringstream strCtoS;
+
+  MrpcServer2 server(strCtoS, strStoC, cpub, spriv);
+
+  LOG(LM_INFO, "CLI");
+  mobs::Mrpc2 client(strStoC, strCtoS, &clientSession, false);
+  ASSERT_NO_THROW(client.startSession("testkey", "googletest", cpriv, "", spub));
+  MrpcPerson p1;
+  client.sendSingle(p1);
+  LOG(LM_INFO, "XXX C->S " << strCtoS.str());
+
+
+  LOG(LM_INFO, "SRV");
+  ASSERT_NO_THROW(server.parseServer());
+  LOG(LM_INFO, "XXX S->C " << strStoC.str());
+
+  ASSERT_NO_THROW(server.parseServer());
+
+  EXPECT_TRUE(bool(server.resultObj));
+  EXPECT_NE(dynamic_cast<MrpcPerson *>(server.resultObj.get()), nullptr);
+  server.resultObj = nullptr; // Server-Objekt entfernen;
+  MrpcPerson p2;
+  p2.name("Heinrich");
+  server.sendSingle(p2);
+  LOG(LM_INFO, "XXX S->C " << strStoC.str());
+
+  LOG(LM_INFO, "CLI");
+  ASSERT_NO_THROW(client.parseClient());
+  ASSERT_NO_THROW(client.parseClient());
+  ASSERT_TRUE(bool(client.resultObj));
+  to_string(*client.resultObj);
+  ASSERT_NE(dynamic_cast<MrpcPerson *>(client.resultObj.get()), nullptr);
+  EXPECT_EQ(dynamic_cast<MrpcPerson *>(client.resultObj.get())->name(), "Heinrich");
+  auto res1 = client.getResult<MrpcPing>();
+  EXPECT_FALSE(res1);
+  auto res2 = client.getResult<MrpcPerson>();
+  ASSERT_TRUE(res2);
+  auto res3 = client.getResult<MrpcPerson>();
+  EXPECT_FALSE(res3);
+  EXPECT_EQ(res2->name(), "Heinrich");
+  EXPECT_FALSE(bool(client.resultObj));
+
+  // jetzt eine 2. Datensatz senden
+
+  MrpcPerson p3;
+  p3.name("Goethe");
+  client.sendSingle(p3);
+  LOG(LM_INFO, "XXX C->S " << strCtoS.str());
+
+  LOG(LM_INFO, "SRV");
+  EXPECT_FALSE(server.resultObj);
+  ASSERT_NO_THROW(server.parseServer());
+  ASSERT_NO_THROW(server.parseServer());
+  ASSERT_NO_THROW(server.parseServer());
+  EXPECT_TRUE(bool(server.resultObj));
+  auto res4 = server.getResult<MrpcPerson>();
+  ASSERT_TRUE(res4);
+  EXPECT_EQ(res4->name(), "Goethe");
+
+  // Antwort bearbeiten und zurück
+  MrpcPerson p4;
+  p4.name("Johann Wolfgang von");
+  server.sendSingle(p4);
+  LOG(LM_INFO, "XXX S->C " << strStoC.str());
+
+  LOG(LM_INFO, "CLI");
+  ASSERT_NO_THROW(client.parseClient());
+  ASSERT_NO_THROW(client.parseClient());
+  EXPECT_TRUE(bool(client.resultObj));
+  auto res5 = client.getResult<MrpcPerson>();
+  ASSERT_TRUE(res5);
+  EXPECT_EQ(res5->name(), "Johann Wolfgang von");
+
+  LOG(LM_INFO, "------- refresh -----");
+
+  ASSERT_NO_THROW(client.clientRefreshKey(spub));
+  {
+    MrpcPerson p1;
+    client.sendSingle(p1);
+    LOG(LM_INFO, "XXX C->S " << strCtoS.str());
+
+
+    LOG(LM_INFO, "SRV");
+
+    for (int i = 0; i < 5; i++) {
+      ASSERT_NO_THROW(server.parseServer());
+      LOG(LM_INFO, "XXX S->C " << strStoC.str());
+      if (server.resultObj)
+        break;
+    }
+
+    EXPECT_TRUE(bool(server.resultObj));
+    EXPECT_NE(dynamic_cast<MrpcPerson *>(server.resultObj.get()), nullptr);
+    MrpcPerson p2;
+    p2.name("Heinrich");
+    server.sendSingle(p2);
+    LOG(LM_INFO, "XXX S->C " << strStoC.str());
+
+    LOG(LM_INFO, "CLI");
+    ASSERT_NO_THROW(client.parseClient());
+    ASSERT_NO_THROW(client.parseClient());
+    ASSERT_TRUE(bool(client.resultObj));
+    to_string(*client.resultObj);
+    ASSERT_NE(dynamic_cast<MrpcPerson *>(client.resultObj.get()), nullptr);
+    EXPECT_EQ(dynamic_cast<MrpcPerson *>(client.resultObj.get())->name(), "Heinrich");
+    auto res1 = client.getResult<MrpcPing>();
+    EXPECT_FALSE(res1);
+    auto res2 = client.getResult<MrpcPerson>();
+    ASSERT_TRUE(res2);
+    auto res3 = client.getResult<MrpcPerson>();
+    EXPECT_FALSE(res3);
+    EXPECT_EQ(res2->name(), "Heinrich");
+  }
 }
 
 

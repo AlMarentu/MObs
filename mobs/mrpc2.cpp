@@ -58,6 +58,12 @@ public:
   MemVar(std::string, pubkey);
 };
 
+class MrpcNewEphemeralKey : virtual public mobs::ObjectBase {
+public:
+  ObjInit(MrpcNewEphemeralKey);
+  MemVar(std::vector<u_char>, key);
+};
+
 
 class MrpcSessionReturnError : virtual public mobs::ObjectBase {
 public:
@@ -171,19 +177,13 @@ void Mrpc2::Encrypt(const std::string &algorithm, const std::string &keyName, co
     state = readyRead;
   encrypted = true;
   if (algorithm == "aes-256-cbc") {
-    if (cipher.empty() and session and not session->sessionKey.empty()) // TODO state, da nur für Server
+    if (cipher.empty() and not session->sessionKey.empty()) // TODO state, da nur für Server
       cryptBufp = new mobs::CryptBufAes(session->sessionKey);
     else {
       std::vector<u_char> cip;
       mobs::from_string_base64(cipher, cip);
-      bool keyChange = state != connectingServer;
       try {
-        if (keyChange and session and session->sessionId) {
-          session->generated = 0;
-          keyChanged(cip, keyName);
-        }
-        else
-          loginReceived(cip, keyName);
+        loginReceived(cip, keyName);
       }
       catch (std::exception &e) {
         LOG(LM_ERROR, "login failed: " << e.what());
@@ -199,18 +199,8 @@ void Mrpc2::Encrypt(const std::string &algorithm, const std::string &keyName, co
       }
       if (not session->generated)
         session->generated = time(nullptr);
-      LOG(LM_INFO, "New Session key retrieved " << mobs::to_string(session->sessionKey));
+      //LOG(LM_DEBUG, "New Session key retrieved " << mobs::to_string(session->sessionKey));
       cryptBufp = new mobs::CryptBufAes(session->sessionKey, keyName);
-      if (state == connectingServerAuthorized) {
-        LOG(LM_DEBUG, "Send MrpcSessionLoginResult");
-        encrypt();
-        MrpcSessionLoginResult answer;
-        answer.sessId(session->sessionId);
-        answer.sessionKeyValidTime(session->keyValidTime);
-        answer.sessionReuseTime(session->sessionReuseTime);
-        xmlOut(answer);
-        state = connectingServerConfirmed;
-      }
     }
   }
   session->last = time(nullptr);
@@ -239,7 +229,7 @@ void Mrpc2::StartTag(const std::string &element)
 {
   LOG(LM_DEBUG, "start " << element);
   // Wenn passendes Tag gefunden, dann Objekt einlesen
-  if (state == connectingServer or state == connectingServerAuthorized or state == connectingClient or state == getPubKey) { // ohne Login nur fixe Auswahl
+  if (state == connectingServer or state == connectingClient or state == getPubKey) { // ohne Login nur fixe Auswahl
     if (element == "MrpcSessionLoginResult")
       fill(new MrpcSessionLoginResult);
     else if (element == "MrpcSessionAuth")
@@ -258,6 +248,8 @@ void Mrpc2::StartTag(const std::string &element)
     }
   } else if (element == "MrpcSessionReturnError") {
     fill(new MrpcSessionReturnError);
+  } else if (element == "MrpcNewEphemeralKey") {
+    fill(new MrpcNewEphemeralKey);
   } else {
     auto o = ObjectBase::createObj(element);
     if (o)
@@ -365,7 +357,6 @@ bool Mrpc2::parseServer()
       state = connectingServer;
           __attribute__ ((fallthrough));
     case connectingServer:
-    case connectingServerAuthorized:
       setMaxElementSize(4096);
       parse();
       LOG(LM_DEBUG, "pars done " << std::boolalpha << bool(resultObj));
@@ -373,42 +364,34 @@ bool Mrpc2::parseServer()
         LOG(LM_ERROR, "SESSIONERROR (ignored) " << sess->error.toStr(mobs::ConvObjToString()));
       }
       else if (auto *sess = dynamic_cast<MrpcSessionAuth *>(resultObj.get())) {
-        session->info = resultObj->to_string();
-        LOG(LM_INFO, "Connection establised ID " << session->sessionId << " " << session->info);
-        if (state != connectingServerAuthorized) {
-          std::string pubKey = getSenderPublicKey(sess->keyId());
-          if (sess->auth().empty() or
-              pubKey.empty() or
-              not digestVerify(session->sessionKey, sess->auth(), pubKey)) {
-            MrpcSessionReturnError eanswer;
-            eanswer.error("auth failed");
-            xmlOut(eanswer);
-            flush();
-            resultObj = nullptr;
-            throw std::runtime_error("login failed");
-          }
-          else {
-            session->keyName = sess->keyId();
-            LOG(LM_DEBUG, "mrpc: auth OK");
-            if (state == connectingServer) {
-              LOG(LM_DEBUG, "Send MrpcSessionLoginResult");
-              encrypt();
-              MrpcSessionLoginResult answer;
-              answer.sessId(session->sessionId);
-              answer.sessionKeyValidTime(session->keyValidTime);
-              answer.sessionReuseTime(session->sessionReuseTime);
-              xmlOut(answer);
-              state = connectingServerConfirmed;
-              //stopEncrypt(); // result muss sicher empfangen sein
-              //flush();
-            }
-          }
+        session->info = STRSTR(sess->login() << '@' << sess->hostname() << '/' << sess->software());
+        session->keyName = sess->keyId();
+        LOG(LM_DEBUG, "Connection establised ID " << session->sessionId << " " << session->info);
+        std::string pubKey = getSenderPublicKey(sess->keyId());
+        if (sess->auth().empty() or
+            pubKey.empty() or
+            not digestVerify(session->sessionKey, sess->auth(), pubKey)) {
+          MrpcSessionReturnError eanswer;
+          eanswer.error("auth failed");
+          xmlOut(eanswer);
+          flush();
+          resultObj = nullptr;
+          throw std::runtime_error("login failed");
         }
-        if (state != connectingServerConfirmed)
-          state = connected;
+        LOG(LM_DEBUG, "Send MrpcSessionLoginResult");
+        encrypt();
+        MrpcSessionLoginResult answer;
+        answer.sessId(session->sessionId);
+        answer.sessionKeyValidTime(session->keyValidTime);
+        answer.sessionReuseTime(session->sessionReuseTime);
+        xmlOut(answer);
+        // ist der State 'connectingServerConfirmed', dann wird der Ausgabestrom geflusht, wenn der Client ebenfalls
+        // die Verschlüsselung flusht. (siehe isConnected() im client)
+        // Ansonsten werden die Verschlüsselungen nicht unterbrochen
+        state = connectingServerConfirmed;
         setMaxElementSize(256*1024*1024);
-
-        // TODO callback??
+        // callback
+        authenticated(sess->login(), sess->hostname(), sess->software());
       } else if (auto *gp = dynamic_cast<MrpcGetPublickey *>(resultObj.get())) {
         LOG(LM_INFO, "MrpcGetPublickey");
         MrpcGetPublickey answer;
@@ -442,6 +425,10 @@ bool Mrpc2::parseServer()
         flush();
         throw std::runtime_error("reconnect: session key expired");
       }
+      if (auto *ek = dynamic_cast<MrpcNewEphemeralKey *>(resultObj.get())) {
+        keyChanged(ek->key(), session->keyName);
+        resultObj = nullptr;
+      }
       break;
     case closing:
       return false;
@@ -464,7 +451,7 @@ bool Mrpc2::parseClient()
     parse();
   if (resultObj and state == connectingClient) {
     if (auto *sess = dynamic_cast<MrpcSessionLoginResult *>(resultObj.get())) {
-      LOG(LM_INFO, "Session answer received " << sess->sessId());
+      LOG(LM_DEBUG, "Session answer received " << sess->sessId());
       session->sessionId = sess->sessId();
       session->sessionReuseTime = sess->sessionReuseTime();
       session->keyValidTime = sess->sessionKeyValidTime();
@@ -486,45 +473,38 @@ bool Mrpc2::parseClient()
     THROW("session error received: " << err->error());
   }
 
-  state = connected;
-
   bool ret = state == readyRead;
-  if (ret)
-    state = connected;
+  state = connected;
   return ret;
 }
 
-void Mrpc2::clientRefreshKey(const std::string &privkey, const std::string &passphrase, std::string &serverkey, bool keyAuth) {
+void Mrpc2::clientRefreshKey(std::string &serverkey) {
   if (not session)
     THROW("no session");
   if (state == fresh) { // ohne Connection einfach nur den Reconnect verhindern
     session->sessionKey.clear();
     return;
   }
-  stopEncrypt();
-  // neuen SessionKey und Cipher generieren
-  if (keyAuth) {
-    std::vector<u_char> cipher;
-    mobs::encapsulatePublic(cipher, session->sessionKey, serverkey, keyAuth ? privkey : "", keyAuth ? passphrase : "");
-    session->info = mobs::to_string_base64(cipher);
-  } else {
-    std::vector<u_char> secret;
-    mobs::ecdhGenerate(secret, session->info, serverkey);
-    // aus shared secret den session-key erzeugen
-    mobs::hash_value(secret, session->sessionKey, "sha256");
-  }
+  // neuen ephemeren Schlüssel generieren
+  std::vector<u_char> secret;
+  ecdhGenerate(secret, session->info, serverkey);
   session->generated = time(nullptr);
-  std::vector<u_char> iv;
-  iv.resize(mobs::CryptBufAes::iv_size());
-  mobs::CryptBufAes::getRand(iv);
-  writer.startEncrypt((new mobs::CryptBufAes(session->sessionKey, iv, keyAuth? session->keyName: "", true))->setRecipientKeyBase64(session->info));
-  LOG(LM_INFO, "Refresh Session key, cipher " << session->info);
-  //sendSingle(loginData);
+  // Verschlüsselung mit altem Schlüssel starten
+  encrypt();
+  // aus shared secret den session-key erzeugen
+  hash_value(secret, session->sessionKey, "sha256");
+  MrpcNewEphemeralKey newKey;
+  std::vector<u_char> v;
+  from_string_base64(session->info, v);
+  newKey.key(v);
+  LOG(LM_INFO, "Sende MrpcNewEphemeralKey");
+  xmlOut(newKey);
+  // Verschlüsselung beenden, damit neuer Schlüssel wirksam wird
+  stopEncrypt();
 }
 
-// keyAuth erst ab openSSL 3.2
 void Mrpc2::startSession(const std::string &keyId, const std::string &software, const std::string &privkey,
-                         const std::string &passphrase, std::string &serverkey, bool keyAuth) {
+                         const std::string &passphrase, std::string &serverkey) {
   if (not session)
     THROW("no session");
   LOG(LM_DEBUG, "Start Session NewMode " << session->sessionId  << " reuse="
@@ -539,17 +519,10 @@ void Mrpc2::startSession(const std::string &keyId, const std::string &software, 
     LOG(LM_DEBUG, "Reuse key unconnected");
   } else {
     // neuen SessionKey und Cipher generieren
-    if (keyAuth) {
-       std::vector<u_char> cipher;
-      mobs::encapsulatePublic(cipher, session->sessionKey, serverkey, keyAuth? privkey: "", keyAuth? passphrase: "");
-      session->info = mobs::to_string_base64(cipher);
-    } else {
-      std::vector<u_char> secret;
-      mobs::ecdhGenerate(secret, session->info, serverkey);
-      LOG(LM_INFO, "USING EPHEMERAL " << session->info);
-      // aus shared secret den session-key erzeugen
-      mobs::hash_value(secret, session->sessionKey, "sha256");
-    }
+    std::vector<u_char> secret;
+    ecdhGenerate(secret, session->info, serverkey);
+    // aus shared secret den session-key erzeugen
+    hash_value(secret, session->sessionKey, "sha256");
     session->generated = time(nullptr);
     if (state == fresh) {
       session->keyName = keyId;
@@ -560,26 +533,23 @@ void Mrpc2::startSession(const std::string &keyId, const std::string &software, 
   std::vector<u_char> iv;
   iv.resize(mobs::CryptBufAes::iv_size());
   mobs::CryptBufAes::getRand(iv);
-  writer.startEncrypt((new mobs::CryptBufAes(session->sessionKey, iv, keyAuth ? keyId: "", true))->setRecipientKeyBase64(session->info));
-  LOG(LM_INFO, "New Session startet, cipher " << session->info);
+  writer.startEncrypt((new mobs::CryptBufAes(session->sessionKey, iv, "", true))->setRecipientKeyBase64(session->info));
+  //LOG(LM_DEBUG, "New Session startet, cipher " << session->info);
 
   if (state != fresh) // MrpcSessionAuth nur beim Öffnen der Connection senden
     return;
   state = connectingClient;
 
   MrpcSessionAuth loginData;
-  //data.login(fingerprint);
   loginData.software(software);
   loginData.hostname(getNodeName());
-  //loginData.key(keyId);
   loginData.login(getLoginName());
   loginData.keyId(keyId);
-  if (not keyAuth) {
-    std::vector<u_char> auth;
-    digestSign(session->sessionKey, auth, privkey, passphrase);
-    loginData.auth(auth);
-  }
-  LOG(LM_INFO, "Send AUTH");
+  // Zu Bestätigung der Authentizität den Session-Key signieren
+  std::vector<u_char> auth;
+  digestSign(session->sessionKey, auth, privkey, passphrase);
+  loginData.auth(auth);
+  LOG(LM_DEBUG, "Send MrpcSessionAuth");
   xmlOut(loginData);
 }
 
@@ -599,32 +569,26 @@ void Mrpc2::getPublicKey() {
   state = getPubKey;
 }
 
-void Mrpc2::setSessionKey(const std::vector<u_char> &cipher, const std::string &keyId, const std::string &privKey, const std::string &passwd) {
+void Mrpc2::setEcdhSessionKey(const std::vector<u_char> &cipher, const std::string &privKey, const std::string &passwd) {
   if (not session)
     throw std::runtime_error("session missing");
-  std::string pubKey;
-  if (not keyId.empty()) {
-    pubKey = getSenderPublicKey(keyId);
-    if (pubKey.empty())
-      throw std::runtime_error("unknown client id");
-    mobs::decapsulatePublic(cipher, session->sessionKey, privKey, passwd, pubKey); // erst ab openSSL 3.2
-  } else {
-    // pub-key vom DER ins PEM-Format bringen
-    std::string ephemeralKey = mobs::getPublicKey(cipher);
-    LOG(LM_INFO, "Ephemeral Key " << ephemeralKey);
-    std::vector<u_char> secret;
-    // aus ephemeral key das shared secret ermitteln
-    mobs::deriveSharedSecret(secret, ephemeralKey, privKey, passwd);
-    // aus shared secret den session-key erzeugen
-    mobs::hash_value(secret, session->sessionKey, "sha256");
+  if (not session->sessionKey.empty()) {
+    LOG(LM_DEBUG, "Refresh Key");
+    session->generated = 0;
+    session->sessionKey.clear();
   }
-  if (not keyId.empty())
-    session->keyName = keyId;
+  // keyId leer, der Sender ist hier noch nicht bekannt; SessionAuth erfolgt später
+  // pub-key vom DER ins PEM-Format bringen
+  std::string ephemeralKey = mobs::getPublicKey(cipher);
+  LOG(LM_DEBUG, "Ephemeral Key " << ephemeralKey);
+  std::vector<u_char> secret;
+  // aus ephemeral key das shared secret ermitteln
+  deriveSharedSecret(secret, ephemeralKey, privKey, passwd);
+  // aus shared secret den session-key erzeugen
+  hash_value(secret, session->sessionKey, "sha256");
   session->last = time(nullptr);
   if (not session->generated)
     session->generated = session->last;
-  if (not keyId.empty() and state == connectingServer)
-    state = connectingServerAuthorized;
 }
 
 
@@ -644,7 +608,6 @@ bool Mrpc2::clientAboutToRead() const
     case fresh:
     case closing:
     case connectingServer:
-    case connectingServerAuthorized:
     case connectingServerConfirmed:
       break;
   }

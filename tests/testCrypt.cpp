@@ -274,7 +274,7 @@ TEST(cryptTest, rsa7) {
   cerr << privU << endl;
   cerr << pubU << endl;
 
-  std::vector<u_char> cipher;
+  std::vector<u_char> cipher, cipher2;
   std::vector<u_char> key;
   ASSERT_NO_THROW(mobs::encapsulatePublic(cipher, key, pubS, privU, "12345"));
   buffOut(cipher);
@@ -290,6 +290,10 @@ TEST(cryptTest, rsa7) {
   buffOut(key2);
   EXPECT_NE(key, key2);
 
+  ASSERT_NO_THROW(mobs::encapsulatePublic(cipher2, key, pubS, privU, "12345"));
+  buffOut(cipher2);
+  // Eine neu erzeugte Cipher darf nie identisch sein
+  EXPECT_NE(cipher, cipher2);
 }
 
 #if 0
@@ -410,6 +414,7 @@ TEST(cryptTest, sharedSecret) {
   buffOut(cipherS);
   EXPECT_EQ(cipherU, cipherS);
 
+  // kommt jedes Mal dasselbe Ergebnis
   ASSERT_NO_THROW(mobs::deriveSharedSecret(cipherU, pubS, privU, "12345"));
   buffOut(cipherU);
   ASSERT_NO_THROW(mobs::deriveSharedSecret(cipherS, pubU, privS, "54321"));
@@ -443,6 +448,7 @@ TEST(cryptTest, ecdh) {
   std::vector<u_char> key;
   mobs::hash_value(cipherU, key, "SHA256");
   buffOut(key);
+  EXPECT_EQ(mobs::getKeyInfo(privS, "54321"), mobs::getKeyInfo(ephemeralU));
 
 }
 

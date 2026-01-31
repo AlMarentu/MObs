@@ -80,7 +80,7 @@ public:
     }
     if (not session)
       throw std::runtime_error("session missing");
-    setSessionKey(cipher, keyId, privKey, "");
+    setEcdhSessionKey(cipher, privKey, "");
     lastSessions.emplace(cipherStr, *session);
     clientCipher = cipherStr;
   }
@@ -94,7 +94,7 @@ public:
     if (it == lastSessions.end() or (not keyId.empty() and keyId != it->second.keyName)) {
       if (not session)
         throw std::runtime_error("session missing");
-      setSessionKey(cipher, keyId, privKey, "");
+      setEcdhSessionKey(cipher, privKey, "");
 
       {
         static int snr = 0;
@@ -128,6 +128,10 @@ public:
       *session = it->second;
       LOG(LM_INFO, "REUSE OLD SESSION KEY " << session->sessionId);
     }
+  }
+
+  void authenticated(const std::string &login, const std::string &host, const std::string &software) override {
+    LOG(LM_INFO, "AUTH " << session->info);
   }
 
 

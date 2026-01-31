@@ -74,7 +74,7 @@ void clientWorker(mobs::MrpcSession &clientSession) {
     string id = clientSession.keyName;
     LOG(LM_INFO, "KVALID " << clientSession.keyValid());
     client.startSession(id, "test", id + ".priv", "12345", clientSession.publicServerKey);
-//#define WAIT4CONNECTED
+#define WAIT4CONNECTED
     // ist WAIT4CONNECTED gesetzt, so wird jede Verbindung geprüft, bevor Kommandos gesendet werden, ansonsten nur bei Key refresh
 #ifndef WAIT4CONNECTED
     // wenn 80% der Key-Time abgelaufen, Session verlängern; kann nur stattfinden, wenn Connection bereits besteht und idle ist
@@ -91,7 +91,7 @@ void clientWorker(mobs::MrpcSession &clientSession) {
     if (clientSession.keyNeedsRefresh()) {
 #endif
       LOG(LM_INFO, "AUTOREFRESH");
-      client.clientRefreshKey(id + ".priv", "12345", clientSession.publicServerKey);
+      client.clientRefreshKey(clientSession.publicServerKey);
     }
 
     MrpcPerson p1;

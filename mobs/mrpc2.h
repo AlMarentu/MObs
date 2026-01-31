@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2025 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -44,21 +44,31 @@ public:
  *
  * die Verschlüsselung der Nutzdaten ist anhand RFC 4051 implementiert.
  * Der Schlüsselaustausch erfolgt mittels Diffie-Hellman auf Basis elliptischer Kurven.
- * Zusätzlich besteht die Möglichkeit Roh-Daten zwischen den XML-Paketen zu übermitteln
+ * Zusätzlich besteht die Möglichkeit Roh-Daten zwischen den XML-Paketen zu übermitteln.
  *
  * Ist im Server eine reuseTime gesetzt, so wird vom Client versucht eine bestehende Session zu verwenden.
  * gelingt dies nicht, so wird ein neuer Login-Vorgang gestartet. Der Server-Kontext geht dabei verloren.
  * Dies erlaubt eine schnelle Wiederverwendung einer bestehenden Session inklusive deren Kontext.
  * Wenn die Variable sessionReuseSpeedup gesetzt ist, so wird bei einer erfolgreichen Session-Reuse sofort ein Kommando gesendet.
  * Ist bei sessionReuseSpeedup der Session-Reuse nicht erfolgreich, so wird eine Exception geworfen.
+ *
+ * Soll die Verbindung auf Erfolg geprüft werden, bevor weitere Kommandos gesendet werden, so ist das folgend auszuführen:
+ * \verbatim
+    client.stopEncrypt();
+    client.flush();
+    while (not client.isConnected()) {
+      LOG(LM_INFO, "WAIT for connected");
+      client.parseClient();
+    }
+ * \endverbatim
  */
 class Mrpc2 : public XmlReader {
-  enum State { fresh, getPubKey, connectingServerAuthorized, connectingServer, connectingServerConfirmed, connectingClient, connected, readyRead, closing };
+  enum State { fresh, getPubKey, connectingServer, connectingServerConfirmed, connectingClient, connected, readyRead, closing };
 public:
   /** \brief Konstruktor für Client
    *
-   * Soll der Server einen Reconnect anbieten, so muss session->sessionReuseTime gesetzt sein und der Server die
-   * reconnectReceived-Methode implementieren.
+   * Soll der Server einen Reconnect anbieten, so muss session->sessionReuseTime gesetzt sein und der Server anhand
+   * des ephemeren Schlüssels auf den alten Kontext verbinden.
    *
    * Bei einem Client Aufruf entscheidet der vorangegangene Aufruf darüber, ob ein reconnect versucht wird.
    * Soll die verhindert werden so muss mrpcSession->sessionId = 0 gesetzt werden.
@@ -67,7 +77,7 @@ public:
    * Ist der mode == speedup, so scheitert der Connect, falls die Session serverseitig nicht mehr existiert.
    * @param inStr Eingabestream
    * @param outStr Ausgabestream
-   * @param mrpcSession Zeiger auf die Session-Info, darf nicht null sein
+   * @param mrpcSession Zeiger auf die Session-Info darf nicht null sein
    * @param nonBlocking true, wenn statt blocking read nur die im Stream vorhandenen Daten gelesen werden sollen
    */
   Mrpc2(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking);
@@ -89,18 +99,18 @@ public:
   std::istream &inByteStream(size_t sz);
   /// Senden eines Byte-streams; der XML-Stream darf dabei nicht verschlüsselt sein
   std::ostream &outByteStream();
- /** \brief Senden eines Byte-streams beenden (ohne flush())
+ /** \brief Senden eines Byte-streams beenden (ohne flush()).
   *
   * Die gesendete Anzahl der Bytes sollte überprüft werden.
-  * @return Anzahl der übertragenen Bytes oder -1 wenn vom darunterliegenden Stream nicht unterstützt
+  * @return Anzahl der übertragenen Bytes oder -1, wenn vom darunterliegenden Stream nicht unterstützt
   */
   std::streamsize closeOutByteStream();
 
 
   /** \brief Arbeitsroutine des Clients
   *
-  * die Routine muss solange aufgerufen werden bis true zurückgeliefert wird.
-  * Danaach ist mindestens 1 Objekt empfangen und die XML-Ebene auf den Grundzustand zurückgesetzt.
+  * die Routine muss so lange aufgerufen werden, bis true zurückgeliefert wird.
+  * Danach ist mindestens 1 Objekt empfangen und die XML-Ebene auf den Grundzustand zurückgesetzt.
   * @return true, wenn ein Objekt empfangen wurde und die Kommunikation abgeschlossen ist
   * \throws runtime_error wenn ein Fehler im Stream bzw im Login/Reconnect aufgetreten ist;
   */
@@ -112,35 +122,43 @@ public:
   void closeServer();
 
 
-  /** \brief Arbeitsroutine des Server
+  /** \brief Arbeitsroutine des Servers
    *
    * @return Connected-Status; d.H. der Server darf normale Anfragen bearbeiten
    * \throws runtime_error wenn ein Fehler im Stream bzw im Login/Reconnect aufgetreten ist;
    */
   bool parseServer();
 
-  /** \brief callback für Server: Eingang einer Login-Anforderung
+  /** \brief callback für Server: Eingang einer Login-Anforderung.
    *
    * Die Login-Anforderung cipher muss mit setSessionKey(cipher, keyId, serverPrivKey, passwd) quittiert werden.
-   * Über die Callback-Methode getSenderPublicKey muss aus der keyId der public key des Senders ermittelt werden können
+   * Über die Callback-Methode getSenderPublicKey muss aus der keyId der public key des Senders ermittelt werden können.
 .  *
    * Bei einer exception wird die Login-Anforderung abgelehnt
-   * @param cipher verschlüsselte Info des Logins
-   * @param keyId id zum public key des Senders
+   * @param cipher ephemeral key
+   * @param keyId id zum public key des Senders oder leer
    * \throws runtime_error bei Fehler
    */
   virtual void loginReceived(const std::vector<u_char> &cipher, const std::string &keyId) { throw std::runtime_error("loginReceived not implemented"); }
 
-  /** \brief callback für Server wenn der Schlüssel bei bestehender Verbindung geändert wurde
+  /** \brief callback für Server: Nach erfolgreicher Login-Authentifizierung
+   *
+   * @param login Info Logins des Clients
+   * @param host Info Hostname des Clients
+   * @param software Info Software des Clients
+   */
+  virtual void authenticated(const std::string &login, const std::string &host, const std::string &software) { }
+
+  /** \brief callback für Server, wenn der Schlüssel bei bestehender Verbindung geändert wurde.
   *
   * Die Login-Anforderung cipher muss mit setSessionKey(cipher, keyId, serverPrivKey, passwd) quittiert werden.
-  * Über die Callback-Methode getSenderPublicKey muss aus der keyId der public key des Senders ermittelt werden können
+  * Über die Callback-Methode getSenderPublicKey muss, aus der keyId, der public key des Senders ermittelt werden können
   *
-  * zusätzlich müssen in der Session-Struktur die sessionId, sessionReuseTime sowie keyValidTime gesetzt werden
+  * zusätzlich müssen in der Session-Struktur die sessionId, sessionReuseTime sowie keyValidTime gesetzt werden.
 . *
   * Die Methode muss nur implementiert werden, wenn ein Schlüsselwechsel benötigt wird und wenn eine abweichende Behandlung
-  * zum login von Nöten ist
-  * @param cipher verschlüsselte Info des Logins
+  * zum login vonnöten ist
+  * @param cipher ephemeral key
   * @param keyId id zum public key des Senders
   * \throws runtime_error bei Fehler
   */
@@ -153,25 +171,24 @@ public:
    */
   virtual std::string getSenderPublicKey(const std::string &keyId) { return {}; }
 
-  /** \brief callback für Server: Anfrage des Public keys
+  /** \brief callback für Server: Anfrage des public keys.
    *
-   * Wird kein Schlüssel zurückgeliefert so erhält der Client eine Fehlermeldung
+   * Wird kein Schlüssel zurückgeliefert, so erhält der Client eine Fehlermeldung
    * \return Rückgabe des PupKeys im PEM-Format "-----BEGIN ..." oder leer bei Fehler
    */
   virtual std::string getServerPublicKey() { return {}; }
 
-  /** \brief Ermittle Session-Informationen aus Cipher (für Server)
+  /** \brief Ermittle Session-Informationen aus dem ephemeren Schlüssel nach Diffie-Hellman auf Basis elliptischer Kurven (für Server).
    *
-   * Der Schlüssel wird in der Session-Variable publicServerKey gespeichert
-   * Der Server muss eine gültige Session haben, dann werden dort sessionKey, keyName (falls nicht leer), last und
-   * generated (falls leer) gesetzt
-   * @param cipher cipher der Client-Message
-   * @param keyId Id der Client-Schlüssels (falls authentication über Client-Signatur ab openSSL 3.2)
+   * Der Schlüssel wird in der Session-Variable publicServerKey gespeichert.
+   * Der Server muss eine gültige Session haben, dann werden dort sessionKey, last und generated  gesetzt.
+   * Der sessionKey wird mittels sha256 aus dem shared secret berechnet.
+   * @param ephemeralKey ephemerer Schlüssel der Client-Message
    * @param privKey private key des Servers
    * @param passwd zugehöriges Passwort
    * \throw std::runtime_error im Fehlerfall
    */
-  void setSessionKey(const std::vector<u_char> &cipher, const std::string &keyId, const std::string &privKey, const std::string &passwd);
+  void setEcdhSessionKey(const std::vector<u_char> &ephemeralKey, const std::string &privKey, const std::string &passwd);
 
 
   /// senden eines Objektes ohne flush()
@@ -192,30 +209,26 @@ public:
   /// Rückgabe, ob die Session wiederverwendet werden kann (für den Server)
   bool serverKeepSession() const;
 
-  /** \brief Starte eine Verbindung zum Server
+  /** \brief Starte eine Verbindung zum Server.
    *
    * Danach muss parseClient verwendet werden
    * @param keyId Id des Client-Schlüssels
-   * @param software Info-String des Aufrufenden Programmes
+   * @param software Info-String des aufrufenden Programmes
    * @param privkey private Key des Clients
    * @param passphrase zugehöriges Passwort
    * @param serverPubKey public Key des Servers
-   * @param keyAuth true, wenn die Authentifikation des Clients in der Cipher eingebettet werden soll (erst ab openSSL 3.2)
    */
   void startSession(const std::string &keyId, const std::string &software, const std::string &privkey,
-                    const std::string &passphrase, std::string &serverPubKey, bool keyAuth = false);
+                    const std::string &passphrase, std::string &serverPubKey);
 
-  /** \brief Erzeuge einen neuen Schlüssel mit cipher und sende ihn an den Server
+  /** \brief Erzeuge einen neuen Schlüssel mit cipher und sende ihn an den Server.
    *
    * Die Verbindung zum Server muss bestehen und in beide Richtungen Idle sein
-   * @param privkey private Key des Clients
-   * @param passphrase zugehöriges Passwort
    * @param serverPubKey public Key des Servers
-   * @param keyAuth true, wenn die Authentifikation des Clients in der Cipher eingebettet werden soll (erst ab openSSL 3.2)
    */
-  void clientRefreshKey(const std::string &privkey, const std::string &passphrase, std::string &serverPubKey, bool keyAuth = false); // erst ab openSSL 3.2
+  void clientRefreshKey(std::string &serverPubKey);
 
-  /** \brief Sende eine Anfrage an den Server um dessen public Key abzufragen
+  /** \brief Sende eine Anfrage an den Server, um dessen public Key abzufragen
    *
    * Achtung, die Authentizität des Servers/Schlüssels muss anderweitig geprüft werden
    */
