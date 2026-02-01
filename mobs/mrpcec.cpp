@@ -217,6 +217,8 @@ void MrpcEc::filled(mobs::ObjectBase *obj, const std::string &error)
       LOG(LM_WARNING, "overwrite result");
       resultObj = nullptr;
     }
+    session->info = err->error();
+    THROW("session error received: " << err->error());
   }
   if (resultObj)
     THROW("result object bereits vorhanden: " << resultObj->getObjectName());
@@ -360,17 +362,15 @@ bool MrpcEc::parseServer()
       setMaxElementSize(4096);
       parse();
       LOG(LM_DEBUG, "pars done " << std::boolalpha << bool(resultObj));
-      if (auto *sess = dynamic_cast<MrpcSessionReturnError *>(resultObj.get())) {  // sollte der Server eigentlich nie bekommen
-        LOG(LM_ERROR, "SESSIONERROR (ignored) " << sess->error.toStr(mobs::ConvObjToString()));
-      }
-      else if (auto *sess = dynamic_cast<MrpcSessionAuth *>(resultObj.get())) {
+      if (auto *sess = dynamic_cast<MrpcSessionAuth *>(resultObj.get())) {
         session->info = STRSTR(sess->login() << '@' << sess->hostname() << '/' << sess->software());
         session->keyName = sess->keyId();
-        LOG(LM_DEBUG, "Connection establised ID " << session->sessionId << " " << session->info);
+        LOG(LM_DEBUG, "MrpcSessionAuth received ID " << session->sessionId << " " << session->info);
         std::string pubKey = getSenderPublicKey(sess->keyId());
         if (sess->auth().empty() or
             pubKey.empty() or
             not digestVerify(session->sessionKey, sess->auth(), pubKey)) {
+          LOG(LM_ERROR, "Auth failed");
           MrpcSessionReturnError eanswer;
           eanswer.error("auth failed");
           xmlOut(eanswer);
@@ -467,10 +467,6 @@ bool MrpcEc::parseClient()
       resultObj = nullptr;
       return false;
     }
-  }
-  else if (auto *err = dynamic_cast<MrpcSessionReturnError *>(resultObj.get())) {
-      session->info = err->error();
-    THROW("session error received: " << err->error());
   }
 
   bool ret = state == readyRead;

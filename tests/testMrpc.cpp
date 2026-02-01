@@ -504,9 +504,10 @@ TEST(mrpcTest, MrpcClientServerEccWait) {
 }
 
 TEST(mrpcTest, MrpcClientServerEccWOauth) {
-  string cpriv, cpub, spriv, spub;
+  string cpriv, cpub, cpriv2, cpub2, spriv, spub;
   mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, spriv, spub);
-  mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, cpriv, cpub);
+  mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, cpriv, cpub); // Server-Version
+  mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, cpriv2, cpub2); // Client-Version
 
   stringstream strStoC;
   stringstream strCtoS;
@@ -516,21 +517,8 @@ TEST(mrpcTest, MrpcClientServerEccWOauth) {
   LOG(LM_INFO, "CLI");
   mobs::MrpcSession clientSession{};
   mobs::MrpcEc client(strStoC, strCtoS, &clientSession, false);
-  //ASSERT_NO_THROW(client.startSession("testkey", "googletest", cpriv, "", spub));
-  client.writer.writeHead();
-  client.writer.writeTagBegin(L"methodCall");
-  // neuen SessionKey und Cipher generieren
-  std::vector<u_char> cipher;
-  mobs::encapsulatePublic(cipher, clientSession.sessionKey, spub);
-  clientSession.info = mobs::to_string_base64(cipher);
-  clientSession.generated = time(nullptr);
-  clientSession.keyName = "testkey";
-  clientSession.sessionReuseTime = 0;
-  clientSession.keyValidTime = 0;
-  std::vector<u_char> iv;
-  iv.resize(mobs::CryptBufAes::iv_size());
-  mobs::CryptBufAes::getRand(iv);
-  client.writer.startEncrypt((new mobs::CryptBufAes(clientSession.sessionKey, iv, "", true))->setRecipientKeyBase64(clientSession.info));
+  // Start des Clients mit falschem Zertifikat
+  ASSERT_NO_THROW(client.startSession("testkey", "googletest", cpriv2, "", spub));
   LOG(LM_INFO, "New Session startet, cipher " << clientSession.info);
 
   MrpcPerson p1;
@@ -551,8 +539,7 @@ TEST(mrpcTest, MrpcClientServerEccWOauth) {
   LOG(LM_INFO, "CLI");
   ASSERT_ANY_THROW(client.parseClient());
   EXPECT_FALSE(client.isConnected());
-  EXPECT_EQ(clientSession.info, "login failed");
-
+  EXPECT_EQ(clientSession.info, "auth failed");
 }
 
 TEST(mrpcTest, MrpcClientServerEccRecon) {
