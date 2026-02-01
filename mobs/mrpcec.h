@@ -21,8 +21,8 @@
 /** \file mrpc.h
 \brief Framework für Client-Server Modul  */
 
-#ifndef MOBS_MRPC2_H
-#define MOBS_MRPC2_H
+#ifndef MOBS_MRPCEC_H
+#define MOBS_MRPCEC_H
 
 #include "xmlparser.h"
 #include "xmlread.h"
@@ -54,6 +54,9 @@ public:
  *
  * Soll die Verbindung auf Erfolg geprüft werden, bevor weitere Kommandos gesendet werden, so ist das folgend auszuführen:
  * \verbatim
+    // connect
+    client.startSession(...);
+    // wait for connected
     client.stopEncrypt();
     client.flush();
     while (not client.isConnected()) {
@@ -62,10 +65,10 @@ public:
     }
  * \endverbatim
  */
-class Mrpc2 : public XmlReader {
+class MrpcEc : public XmlReader {
   enum State { fresh, getPubKey, connectingServer, connectingServerConfirmed, connectingClient, connected, readyRead, closing };
 public:
-  /** \brief Konstruktor für Client
+  /** \brief Konstruktor für Client-Server Klasse mit Schlüsselaustausch nach Diffie-Hellman auf Basis elliptischer Kurven
    *
    * Soll der Server einen Reconnect anbieten, so muss session->sessionReuseTime gesetzt sein und der Server anhand
    * des ephemeren Schlüssels auf den alten Kontext verbinden.
@@ -80,8 +83,8 @@ public:
    * @param mrpcSession Zeiger auf die Session-Info darf nicht null sein
    * @param nonBlocking true, wenn statt blocking read nur die im Stream vorhandenen Daten gelesen werden sollen
    */
-  Mrpc2(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking);
-  ~Mrpc2() override = default;
+  MrpcEc(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking);
+  ~MrpcEc() override = default;
 
   /** \brief senden eines einzelnen Objektes mit Verschlüsselung und sync()
    *
@@ -209,7 +212,7 @@ public:
   /// Rückgabe, ob die Session wiederverwendet werden kann (für den Server)
   bool serverKeepSession() const;
 
-  /** \brief Starte eine Verbindung zum Server.
+  /** \brief Starte eine Verbindung zum Server (für Client).
    *
    * Danach muss parseClient verwendet werden
    * @param keyId Id des Client-Schlüssels
@@ -221,14 +224,15 @@ public:
   void startSession(const std::string &keyId, const std::string &software, const std::string &privkey,
                     const std::string &passphrase, std::string &serverPubKey);
 
-  /** \brief Erzeuge einen neuen Schlüssel mit cipher und sende ihn an den Server.
+  /** \brief Erzeuge einen neuen Schlüssel mit cipher und sende ihn an den Server (für Client).
    *
-   * Die Verbindung zum Server muss bestehen und in beide Richtungen Idle sein
+   * Die Verbindung zum Server muss bestehen und in beide Richtungen Idle sein. Am sichersten erfolgt der
+   * Schlüsselwechsel, nach dem "wait for connected"
    * @param serverPubKey public Key des Servers
    */
   void clientRefreshKey(std::string &serverPubKey);
 
-  /** \brief Sende eine Anfrage an den Server, um dessen public Key abzufragen
+  /** \brief Sende eine Anfrage an den Server, um dessen public Key abzufragen (for Client).
    *
    * Achtung, die Authentizität des Servers/Schlüssels muss anderweitig geprüft werden
    */
@@ -272,7 +276,7 @@ private:
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wpotentially-evaluated-expression"
 template<class T>
-std::unique_ptr<T> Mrpc2::getResult()
+std::unique_ptr<T> MrpcEc::getResult()
 {
   if (resultObj and typeid(T) == typeid(*resultObj))
     return std::unique_ptr<T>(dynamic_cast<T *>(resultObj.release()));
@@ -281,4 +285,4 @@ std::unique_ptr<T> Mrpc2::getResult()
 #pragma clang diagnostic pop
 } // mobs
 
-#endif //MOBS_MRPC2_H
+#endif //MOBS_MRPCEC_H

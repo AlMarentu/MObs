@@ -28,7 +28,7 @@
 #include "xmlread.h"
 #include "xmlparser.h"
 #include "mrpcsession.h"
-#include "mrpc2.h"
+#include "mrpcec.h"
 #include "tcpstream.h"
 
 #include <getopt.h>
@@ -56,10 +56,10 @@ public:
 ObjRegister(MrpcPing);
 
 
-class MrpcServer : public mobs::Mrpc2 {
+class MrpcServer : public mobs::MrpcEc {
 public:
   explicit MrpcServer(mobs::tcpstream &tcpstr, const std::string &priv = "") :
-      Mrpc2(tcpstr, tcpstr, &mrpcSession, false), tcpstream(tcpstr), privKey(priv) {}
+      MrpcEc(tcpstr, tcpstr, &mrpcSession, false), tcpstream(tcpstr), privKey(priv) {}
 
   std::string getSenderPublicKey(const std::string &keyId) override {
     string pub = keyId + ".pub";

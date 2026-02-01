@@ -19,7 +19,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <unistd.h>
-#include "mrpc2.h"
+#include "mrpcec.h"
 #include "xmlwriter.h"
 #include "xmlout.h"
 #include "aes.h"
@@ -127,7 +127,7 @@ bool MrpcSession::keyNeedsRefresh() const {
   return keyValidTime >= 10 and keyValid() <= keyValidTime * 2 / 10;
 }
 
-void Mrpc2::encrypt()
+void MrpcEc::encrypt()
 {
   std::vector<u_char> iv;
   if (not session)
@@ -140,12 +140,12 @@ void Mrpc2::encrypt()
   }
 }
 
-void Mrpc2::stopEncrypt()
+void MrpcEc::stopEncrypt()
 {
   writer.stopEncrypt();
 }
 
-void Mrpc2::EncryptionFinished()
+void MrpcEc::EncryptionFinished()
 {
   LOG(LM_DEBUG, "Encryption finished " << level());
   encrypted = false;
@@ -163,7 +163,7 @@ void Mrpc2::EncryptionFinished()
   stop();
 }
 
-void Mrpc2::Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher,
+void MrpcEc::Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher,
                     CryptBufBase *&cryptBufp)
 {
   LOG(LM_DEBUG, "Encryption " << algorithm << " keyName " << keyName << " cipher " << cipher);
@@ -206,7 +206,7 @@ void Mrpc2::Encrypt(const std::string &algorithm, const std::string &keyName, co
   session->last = time(nullptr);
 }
 
-void Mrpc2::filled(mobs::ObjectBase *obj, const std::string &error)
+void MrpcEc::filled(mobs::ObjectBase *obj, const std::string &error)
 {
   LOG(LM_DEBUG, "filled " << obj->getObjectName() << ": " << obj->to_string(ConvObjToString().exportWoNull()) << (isEncrypted()? " OK":" UNENCRYPTED"));
   if (not error.empty())
@@ -225,7 +225,7 @@ void Mrpc2::filled(mobs::ObjectBase *obj, const std::string &error)
   stop();
 }
 
-void Mrpc2::StartTag(const std::string &element)
+void MrpcEc::StartTag(const std::string &element)
 {
   LOG(LM_DEBUG, "start " << element);
   // Wenn passendes Tag gefunden, dann Objekt einlesen
@@ -259,20 +259,20 @@ void Mrpc2::StartTag(const std::string &element)
   }
 }
 
-void Mrpc2::EndTag(const std::string &element)
+void MrpcEc::EndTag(const std::string &element)
 {
   LOG(LM_DEBUG, "end " << element << " lev " << level());
   if (state == connected and not encrypted and level() == 2)
     state = readyRead;
 }
 
-bool Mrpc2::inByteStreamAvail() {
+bool MrpcEc::inByteStreamAvail() {
   // es muss mindestens ein Zeichen im Buffer sein, für den Delimiter
   auto s = streambufI.getIstream().rdbuf()->in_avail();
   return s > 0;
 }
 
-std::istream &Mrpc2::inByteStream(size_t sz)
+std::istream &MrpcEc::inByteStream(size_t sz)
 {
   LOG(LM_DEBUG, "Mrpc::inByteStream " << mobs::CryptBufAes::aes_size(sz));
   if (not session)
@@ -280,7 +280,7 @@ std::istream &Mrpc2::inByteStream(size_t sz)
   return byteStream(mobs::CryptBufAes::aes_size(sz), new mobs::CryptBufAes(session->sessionKey));
 }
 
-std::ostream &Mrpc2::outByteStream()
+std::ostream &MrpcEc::outByteStream()
 {
   std::vector<u_char> iv;
   iv.resize(mobs::CryptBufAes::iv_size());
@@ -290,13 +290,13 @@ std::ostream &Mrpc2::outByteStream()
   return writer.byteStream("\200", new mobs::CryptBufAes(session->sessionKey, iv, "", true));
 }
 
-std::streamsize Mrpc2::closeOutByteStream()
+std::streamsize MrpcEc::closeOutByteStream()
 {
   return writer.closeByteStream();
 }
 
 
-Mrpc2::Mrpc2(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking) :
+MrpcEc::MrpcEc(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession, bool nonBlocking) :
     XmlReader(iStr), streambufI(inStr), streambufO(outStr),
     iStr(&streambufI), oStr(&streambufO),
     writer(oStr, mobs::XmlWriter::CS_utf8, false),
@@ -311,14 +311,14 @@ Mrpc2::Mrpc2(std::istream &inStr, std::ostream &outStr, MrpcSession *mrpcSession
 
 
 
-void Mrpc2::xmlOut(const ObjectBase &obj)
+void MrpcEc::xmlOut(const ObjectBase &obj)
 {
   XmlOut xo(&writer, mobs::ConvObjToString().exportXml().exportWoNull());
   obj.traverse(xo);
   //writer.putc('\n');
 }
 
-void Mrpc2::sendSingle(const ObjectBase &obj)
+void MrpcEc::sendSingle(const ObjectBase &obj)
 {
   encrypt();
   xmlOut(obj);
@@ -327,19 +327,19 @@ void Mrpc2::sendSingle(const ObjectBase &obj)
   flush();
 }
 
-void Mrpc2::closeServer()
+void MrpcEc::closeServer()
 {
   writer.writeTagEnd();
   flush();
 }
 
-void Mrpc2::flush()
+void MrpcEc::flush()
 {
   writer.sync();
 }
 
 // Server
-bool Mrpc2::parseServer()
+bool MrpcEc::parseServer()
 {
   LOG(LM_DEBUG, "parseServer " << int(state));
   if (level() <= 0 and state != fresh and state != closing) {
@@ -440,7 +440,7 @@ bool Mrpc2::parseServer()
 }
 
 
-bool Mrpc2::parseClient()
+bool MrpcEc::parseClient()
 {
   LOG(LM_DEBUG, "parseClient " << int(state));
   if (level() <= 0 and state != fresh and state != connectingClient and state != getPubKey) {
@@ -478,7 +478,7 @@ bool Mrpc2::parseClient()
   return ret;
 }
 
-void Mrpc2::clientRefreshKey(std::string &serverkey) {
+void MrpcEc::clientRefreshKey(std::string &serverkey) {
   if (not session)
     THROW("no session");
   if (state == fresh) { // ohne Connection einfach nur den Reconnect verhindern
@@ -503,7 +503,7 @@ void Mrpc2::clientRefreshKey(std::string &serverkey) {
   stopEncrypt();
 }
 
-void Mrpc2::startSession(const std::string &keyId, const std::string &software, const std::string &privkey,
+void MrpcEc::startSession(const std::string &keyId, const std::string &software, const std::string &privkey,
                          const std::string &passphrase, std::string &serverkey) {
   if (not session)
     THROW("no session");
@@ -553,7 +553,7 @@ void Mrpc2::startSession(const std::string &keyId, const std::string &software, 
   xmlOut(loginData);
 }
 
-void Mrpc2::getPublicKey() {
+void MrpcEc::getPublicKey() {
   if (not session)
     THROW("no session");
   LOG(LM_DEBUG, "getPublicKey");
@@ -569,7 +569,7 @@ void Mrpc2::getPublicKey() {
   state = getPubKey;
 }
 
-void Mrpc2::setEcdhSessionKey(const std::vector<u_char> &cipher, const std::string &privKey, const std::string &passwd) {
+void MrpcEc::setEcdhSessionKey(const std::vector<u_char> &cipher, const std::string &privKey, const std::string &passwd) {
   if (not session)
     throw std::runtime_error("session missing");
   if (not session->sessionKey.empty()) {
@@ -592,12 +592,12 @@ void Mrpc2::setEcdhSessionKey(const std::vector<u_char> &cipher, const std::stri
 }
 
 
-bool Mrpc2::isConnected() const
+bool MrpcEc::isConnected() const
 {
   return state == connected or state == readyRead or state == connectingServerConfirmed;
 }
 
-bool Mrpc2::clientAboutToRead() const
+bool MrpcEc::clientAboutToRead() const
 {
   switch (state) {
     case connectingClient:
@@ -615,7 +615,7 @@ bool Mrpc2::clientAboutToRead() const
   return false;
 }
 
-bool Mrpc2::serverKeepSession() const
+bool MrpcEc::serverKeepSession() const
 {
   return session and session->sessionReuseTime > 0;
 }

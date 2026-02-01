@@ -33,7 +33,7 @@
 #include "xmlparser.h"
 #include "mrpcsession.h"
 #include "mrpc.h"
-#include "mrpc2.h"
+#include "mrpcec.h"
 #include "tcpstream.h"
 
 #include <stdio.h>
@@ -105,10 +105,10 @@ public:
 };
 
 
-class MrpcServer2 : public mobs::Mrpc2 {
+class MrpcServer2 : public mobs::MrpcEc {
 public:
   MrpcServer2(std::istream &iStr, std::ostream &oStr, const std::string &pub, const std::string &priv) :
-      Mrpc2(iStr, oStr, &mrpcSession, false), pubKey(pub), privKey(priv) {}
+      MrpcEc(iStr, oStr, &mrpcSession, false), pubKey(pub), privKey(priv) {}
 
   std::string getSenderPublicKey(const std::string &keyId) override {
     if (keyId != "testkey")
@@ -286,7 +286,7 @@ TEST(mrpcTest, MrpcClientServerEcc) {
 
   LOG(LM_INFO, "CLI");
   mobs::MrpcSession clientSession{};
-  mobs::Mrpc2 client(strStoC, strCtoS, &clientSession, false);
+  mobs::MrpcEc client(strStoC, strCtoS, &clientSession, false);
 
   ASSERT_NO_THROW(client.startSession("testkey", "googletest", cpriv, "", spub));
 
@@ -367,7 +367,7 @@ TEST(mrpcTest, MrpcClientServerGetPub) {
 
   LOG(LM_INFO, "CLI");
   mobs::MrpcSession clientSession{};
-  mobs::Mrpc2 client(strStoC, strCtoS, &clientSession, false);
+  mobs::MrpcEc client(strStoC, strCtoS, &clientSession, false);
 
   client.getPublicKey();
   LOG(LM_INFO, "XXX C->S " << strCtoS.str());
@@ -440,7 +440,7 @@ TEST(mrpcTest, MrpcClientServerEccWait) {
 
   LOG(LM_INFO, "CLI");
   mobs::MrpcSession clientSession{};
-  mobs::Mrpc2 client(strStoC, strCtoS, &clientSession, false);
+  mobs::MrpcEc client(strStoC, strCtoS, &clientSession, false);
   ASSERT_NO_THROW(client.startSession("testkey", "googletest", cpriv, "", spub));
 
   // wird nur benötigt, wenn vor Senden des ersten Kommandos die Verbindung gecheckt werden soll
@@ -515,7 +515,7 @@ TEST(mrpcTest, MrpcClientServerEccWOauth) {
 
   LOG(LM_INFO, "CLI");
   mobs::MrpcSession clientSession{};
-  mobs::Mrpc2 client(strStoC, strCtoS, &clientSession, false);
+  mobs::MrpcEc client(strStoC, strCtoS, &clientSession, false);
   //ASSERT_NO_THROW(client.startSession("testkey", "googletest", cpriv, "", spub));
   client.writer.writeHead();
   client.writer.writeTagBegin(L"methodCall");
@@ -568,7 +568,7 @@ TEST(mrpcTest, MrpcClientServerEccRecon) {
     MrpcServer2 server(strCtoS, strStoC, cpub, spriv);
 
     LOG(LM_INFO, "CLI");
-    mobs::Mrpc2 client(strStoC, strCtoS, &clientSession, false);
+    mobs::MrpcEc client(strStoC, strCtoS, &clientSession, false);
     ASSERT_NO_THROW(client.startSession("testkey", "googletest", cpriv, "", spub));
     MrpcPerson p1;
     client.sendSingle(p1);
@@ -648,7 +648,7 @@ TEST(mrpcTest, MrpcClientServerEccRecon) {
     MrpcServer2 server(strCtoS, strStoC, cpub, spriv);
 
     LOG(LM_INFO, "CLI");
-    mobs::Mrpc2 client(strStoC, strCtoS, &clientSession, false);
+    mobs::MrpcEc client(strStoC, strCtoS, &clientSession, false);
     ASSERT_NO_THROW(client.startSession("testkey", "googletest", cpriv, "", spub));
     MrpcPerson p1;
     client.sendSingle(p1);
@@ -703,7 +703,7 @@ TEST(mrpcTest, MrpcClientServerEccRefresh) {
   MrpcServer2 server(strCtoS, strStoC, cpub, spriv);
 
   LOG(LM_INFO, "CLI");
-  mobs::Mrpc2 client(strStoC, strCtoS, &clientSession, false);
+  mobs::MrpcEc client(strStoC, strCtoS, &clientSession, false);
   ASSERT_NO_THROW(client.startSession("testkey", "googletest", cpriv, "", spub));
   MrpcPerson p1;
   client.sendSingle(p1);

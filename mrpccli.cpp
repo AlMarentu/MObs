@@ -32,7 +32,7 @@
 #include "xmlread.h"
 #include "xmlparser.h"
 #include "mrpcsession.h"
-#include "mrpc2.h"
+#include "mrpcec.h"
 #include "tcpstream.h"
 
 #include <stdio.h>
@@ -63,35 +63,31 @@ ObjRegister(MrpcPing);
 int errors = 0;
 int queries = 0;
 
-void clientWorker(mobs::MrpcSession &clientSession) {
+// ist wait4connected gesetzt, so wird jede Verbindung geprüft, bevor Kommandos gesendet werden, ansonsten nur bei Key refresh
+void clientWorker(mobs::MrpcSession &clientSession, bool wait4connected) {
   try {
     mobs::tcpstream xstream(clientSession.host(), clientSession.port());
     if (not xstream.is_open())
       throw runtime_error("cann't connect");
     xstream.exceptions(std::iostream::failbit | std::iostream::badbit);
     LOG(LM_INFO, "CONNECTED");
-    mobs::Mrpc2 client(xstream, xstream, &clientSession, false);
+    mobs::MrpcEc client(xstream, xstream, &clientSession, false);
     string id = clientSession.keyName;
     LOG(LM_INFO, "KVALID " << clientSession.keyValid());
     client.startSession(id, "test", id + ".priv", "12345", clientSession.publicServerKey);
-#define WAIT4CONNECTED
-    // ist WAIT4CONNECTED gesetzt, so wird jede Verbindung geprüft, bevor Kommandos gesendet werden, ansonsten nur bei Key refresh
-#ifndef WAIT4CONNECTED
     // wenn 80% der Key-Time abgelaufen, Session verlängern; kann nur stattfinden, wenn Connection bereits besteht und idle ist
-    if (clientSession.keyNeedsRefresh()) {
-#endif
-    client.stopEncrypt();
-    client.flush();
-    while (not client.isConnected()) {
-      LOG(LM_INFO, "WAIT for connected");
-      client.parseClient();
-    }
-#ifdef WAIT4CONNECTED
-    // wenn 80% der Key-Time abgelaufen, Session verlängern; kann nur stattfinden, wenn Connection bereits besteht und idle ist
-    if (clientSession.keyNeedsRefresh()) {
-#endif
-      LOG(LM_INFO, "AUTOREFRESH");
-      client.clientRefreshKey(clientSession.publicServerKey);
+    bool needRefresh = clientSession.keyNeedsRefresh();
+    if (wait4connected or needRefresh) {
+      client.stopEncrypt();
+      client.flush();
+      while (not client.isConnected()) {
+        LOG(LM_INFO, "WAIT for connected");
+        client.parseClient();
+      }
+      if (needRefresh) {
+        LOG(LM_INFO, "AUTOREFRESH");
+        client.clientRefreshKey(clientSession.publicServerKey);
+      }
     }
 
     MrpcPerson p1;
@@ -136,12 +132,13 @@ void clientWorker(mobs::MrpcSession &clientSession) {
 void usage() {
   cerr << "usage: mrpcsrv \n"
        << " -P Port default = '4444'\n"
+       << " -w warte auf connected\n"
        << " -v Debug-Level\n";
 
   exit(1);
 }
 
-void doClient(string name, int)
+void doClient(string name, bool wait)
 {
   try {
     mobs::generateCryptoKey(mobs::CryptECprime256v1, name + ".priv", name + ".pub", "12345");
@@ -152,7 +149,7 @@ void doClient(string name, int)
 
     time_t finish = time(nullptr) + 10;
     while (time(nullptr) <= finish) {
-      clientWorker(clientSession);
+      clientWorker(clientSession, wait);
       //usleep(100000);
     }
   } catch (exception &e) {
@@ -163,10 +160,11 @@ void doClient(string name, int)
 int main(int argc, char* argv[]) {
   logging::currentLevel = logging::lm_info;
   string port = "4444";
+  bool wait = false; // wait
 
   try {
     int ch;
-    while ((ch = getopt(argc, argv, "P:v")) != -1) {
+    while ((ch = getopt(argc, argv, "P:vw")) != -1) {
       switch (ch) {
         case 'P':
           port = optarg;
@@ -174,20 +172,23 @@ int main(int argc, char* argv[]) {
         case 'v':
           logging::currentLevel = logging::lm_debug;
           break;
+        case 'w':
+          wait = true;
+          break;
         case '?':
         default:
           usage();
       }
     }
 
-    std::thread t1(doClient, "aaa", 1);
+    std::thread t1(doClient, "aaa", wait);
 #if 1
-    std::thread t2(doClient, "bbb", 2);
-    std::thread t3(doClient, "ccc", 3);
-    std::thread t4(doClient, "ddd", 4);
-    std::thread t5(doClient, "eee", 5);
-    std::thread t6(doClient, "fff", 6);
-    doClient("cli", 0);
+    std::thread t2(doClient, "bbb", wait);
+    std::thread t3(doClient, "ccc", wait);
+    std::thread t4(doClient, "ddd", wait);
+    std::thread t5(doClient, "eee", wait);
+    std::thread t6(doClient, "fff", wait);
+    doClient("cli", wait);
     t6.join();
     t5.join();
     t4.join();
