@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2024 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -27,6 +27,9 @@
 #include <stdio.h>
 #include <sstream>
 #include <gtest/gtest.h>
+
+#include "nbuf.h"
+#include "xmlread.h"
 
 using namespace std;
 
@@ -81,6 +84,50 @@ class XParserW : public mobs::XmlParserW {
 public:
   explicit XParserW(const wstring &i) : mobs::XmlParserW(str), str(i) {}
 
+  void NullTag(const string &ns, const std::string &element) override { LOG(LM_INFO, "NULL " << ns << element); }
+
+  void Attribute(const string &ns, const std::string &element, const std::string &attribut, const std::wstring &value) override {
+    LOG(LM_INFO, "ATTRIBUT " << attribut << " (" << ns << element <<
+                             ") VALUE >" << mobs::to_string(value) << "<");
+    lastValue = mobs::to_string(value);
+  }
+
+  void Value(const std::wstring &value) override {
+    LOG(LM_INFO, "VALUE >" << mobs::to_string(value) << "<");
+    lastValue = mobs::to_string(value);
+    if (wait)
+      stop();
+  }
+
+  void Base64(const std::vector<u_char> &base64) override {
+    std::string s;
+    std::copy(base64.cbegin(), base64.cend(), back_inserter(s));
+    lastCdata = s;
+    LOG(LM_INFO, "BASE64 >" << s << "< " << base64.size());
+  }
+
+  void StartTag(const string &ns, const std::string &element) override { LOG(LM_INFO, "START " << ns << element);
+    lastKey += ns  + element + "|";
+  }
+
+  void EndTag(const string &ns, const std::string &element) override { LOG(LM_INFO, "END " << ns << element); }
+
+  void ProcessingInstruction(const std::string &element, const std::string &attribut,
+                             const std::wstring &value) override { LOG(LM_INFO, "PI " << element << "." << attribut << "="
+                               << mobs::to_string(value)); }
+
+
+  std::wistringstream str;
+  std::string lastCdata;
+  std::string lastValue;
+  std::string lastKey;
+  bool wait = false;
+};
+
+class XParserReader : public mobs::XmlReader {
+public:
+  explicit XParserReader(const wstring &i) : XmlReader(str), str(i) {}
+
   void NullTag(const std::string &element) override { LOG(LM_INFO, "NULL " << element); }
 
   void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) override {
@@ -109,13 +156,17 @@ public:
 
   void EndTag(const std::string &element) override { LOG(LM_INFO, "END " << element); }
 
-  void ProcessingInstruction(const std::string &element, const std::string &attribut,
-                             const std::wstring &value) override { LOG(LM_INFO, "PI" << element); }
-
   void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher,
                mobs::CryptBufBase *&cryptBufp) override {
     LOG(LM_INFO, "Encrypt algorithm=" << algorithm << " keyName=" << keyName << " cipher=" << cipher);
+    cryptBufp = new mobs::CryptBufNone();
   }
+
+  void filled(mobs::ObjectBase *obj, const std::string &error) override {
+     LOG(LM_INFO, "Filled: " << obj->to_string());
+  }
+
+  void EncryptionFinished() override { }
 
 
   std::wistringstream str;
@@ -399,5 +450,85 @@ TEST(parserTest, xmlns5) {
   p.lastKey.clear();
   ASSERT_NO_THROW(p.parse());
 }
+
+TEST(parserTest, xmlns6) {
+  std::wstring x = LR"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<?aaa?>
+<Root>
+    <ds:KeyInfo  xmlns:ds="http://www.w3.org/2001/04/xmlenc#" name="hallo">
+      <KeyName>Client</KeyName>
+      <leer/>
+      <d:dings>Bums</d:dings>
+   </ds:KeyInfo>
+</Root>
+)";
+  XParserW p(x);
+  p.setGlobalNs("d", "Hallo#");
+  p.setGlobalNs("", "http://www.mobs.org/test#");
+  p.wait = true;
+  ASSERT_NO_THROW(p.parse());
+  EXPECT_EQ(p.lastValue, "Client");
+  EXPECT_EQ(p.lastKey, "http://www.mobs.org/test#Root|http://www.w3.org/2001/04/xmlenc#KeyInfo|http://www.mobs.org/test#KeyName|");
+  p.lastKey.clear();
+  ASSERT_NO_THROW(p.parse());
+  EXPECT_EQ(p.lastValue, "Bums");
+  EXPECT_EQ(p.lastKey, "http://www.mobs.org/test#leer|Hallo#dings|");
+  p.wait = false;
+  ASSERT_NO_THROW(p.parse());
+}
+
+
+TEST(parserTest, xmlEnc1) {
+
+  std::wstring x = LR"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Root>
+  <EncryptedData Type="http://www.w3.org/2001/04/xmlenc#Element" xmlns:xenc="http://www.w3.org/2001/04/xmlenc#"
+                   xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+        <xenc:EncryptionMethod Algorithm="http://www.w3.org/2001/04/xmlenc#aes-256-cbc"/>
+        <ds:KeyInfo>
+            <ds:KeyName>testkey</ds:KeyName>
+            <xenc:CipherData>
+                <xenc:CipherValue>
+                    BBWjL8H2dnkjw14oxEvxT80mqdhdf9plarUSfCTJ/tZT4lBuIuR0vyE5IjnSpkvj8o0DuEKk4EKYlMcihTr13Gw=
+                </xenc:CipherValue>
+            </xenc:CipherData>
+        </ds:KeyInfo>
+       <ds:KeyInfo>
+            <ds:KeyName>testkey2</ds:KeyName>
+            <xenc:CipherData>
+                <xenc:CipherValue>
+                    BBWjL8H2dnkjw14oxEvxT80mqdhdf9plarUSfCTJ/tZT4lBuIuR0vyE5IjnSpkvj8o0DuEKk4EKYlMcihTr13Gw=
+                </xenc:CipherValue>
+            </xenc:CipherData>
+        </ds:KeyInfo>
+        <xenc:CipherData>
+            <xenc:CipherValue>
+                <Feld>blah</Feld>
+            </xenc:CipherValue>
+        </xenc:CipherData>
+    </EncryptedData>
+  <Wert>55</Wert>
+</Root>
+)";
+  XParserReader p(x);
+  p.wait = true;
+  ASSERT_NO_THROW(p.parse());
+  EXPECT_FALSE(p.encrypted());
+  EXPECT_EQ(p.lastValue, "blah");
+  EXPECT_EQ(p.lastKey, "Root|Feld|");
+  p.lastKey.clear();
+  ASSERT_NO_THROW(p.parse());
+  EXPECT_EQ(p.lastValue, "55");
+  EXPECT_EQ(p.lastKey, "Wert|");
+
+#if 0
+  p.lastKey.clear();
+  ASSERT_NO_THROW(p.parse());
+  EXPECT_EQ(p.lastValue, "ABC");
+  EXPECT_EQ(p.lastKey, "https://www.w3.org/2000/09/xmlxxx#CipherData|CipherValue|");
+#endif
+
+}
+
 
 }

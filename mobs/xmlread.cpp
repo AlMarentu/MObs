@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2023 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -53,17 +53,27 @@ static std::wstring stow(const string &s, bool dontConvert) {
         return element.substr(prefix.length());
       throw runtime_error("Prefix mismatch");
     }
-    void NullTag(const std::string &element) override {
+    void NullTag(const string &ns, const std::string &element) override {
       TRACE(PARAM(element));
-      if (obj) {
+      if (levelStart and (encLevel != 1 or levelStartTmp)) {
         setNull();
-        EndTag(element);
+        EndTag(currentXmlns(), element);
       }
       else
         parent->NullTag(elementRemovePrefix(element));
     };
-    void Attribute(const std::string &element, const std::string &attribute, const std::wstring &value) override {
-      if (obj and not member()) {
+    void Attribute(const string &ns, const std::string &element, const std::string &attribute, const std::wstring &value) override {
+      if (element == "EncryptedData" and attribute == "Type" and value == L"http://www.w3.org/2001/04/xmlenc#Element") {
+        //LOG(LM_INFO, "ENCRYPTION BEGIN");
+        encLevel = 1;
+        encCbb = nullptr;
+      }
+      else if (encLevel == 1 and element == "EncryptionMethod" and attribute == "Algorithm" and ns == "http://www.w3.org/2001/04/xmlenc#") {
+        encAlgo =  mobs::to_string(value);
+        if (encAlgo.length() > ns.length() and encAlgo.substr(0, ns.length()) == ns)
+          encAlgo.erase(0, ns.length());
+      }
+      else if (levelStart and not member()) {
         enter(attribute);
         if (member() and member()->hasFeature(XmlAsAttr))
         {
@@ -76,7 +86,8 @@ static std::wstring stow(const string &s, bool dontConvert) {
         parent->Attribute(elementRemovePrefix(element), attribute, value);
     };
     void Value(const std::wstring &val) override {
-      if (obj) {
+      //LOG(LM_INFO, "XMLREAD VALUE  " << mobs::to_string(val) << " " << levelStart);
+      if (levelStart) {
         if (not member())
           error += string(error.empty() ? "":"\n") + showName() + u8" is no variable, can't assign";
         else if (not member()->fromStr(val, cfs))
@@ -86,7 +97,7 @@ static std::wstring stow(const string &s, bool dontConvert) {
         parent->Value(val);
     };
     void Base64(const std::vector<u_char> &base64) override {
-      if (obj) {
+      if (levelStart) {
         if (not member())
           error += string(error.empty() ? "":"\n") + showName() + u8" is no variable, can't assign";
         else //if (not member()->fromStr(val, cfs))
@@ -95,20 +106,74 @@ static std::wstring stow(const string &s, bool dontConvert) {
       else
         parent->Base64(base64);
     }
-    void StartTag(const std::string &element) override {
-      if (obj) {
+    void StartTag(const string &ns, const std::string &element) override {
+      //LOG(LM_INFO, "XMLREAD START TAG " << element);
+      if (encLevel == 2 and levelStartTmp == 0 and element == "CipherValue" and ns == "http://www.w3.org/2001/04/xmlenc#") {
+        encLevel = 3;
+        startEncryption(encCbb);
+        encCbb = nullptr;
+      }
+      else if (encLevel == 1 and levelStartTmp == 0 and element == "CipherData" and ns == "http://www.w3.org/2001/04/xmlenc#") {
+        encLevel = 2; // danach muss CipherValue kommen
+      }
+      else if (encLevel == 1 and (element == "EncryptedData" or element == "EncryptionMethod")) {
+        // Encryption-Start-Tags nicht weiterreichen
+      }
+      else if (encLevel == 1 and element == "KeyInfo" and ns == "http://www.w3.org/2000/09/xmldsig#") {
+        // KeyInfo-Objekt parsen
+        ki = new mobs::KeyInfo;
+        pushObject(*ki, "KeyInfo");
+        levelStartTmp = currentLevel();
+        if (not levelStart)
+          levelStart = levelStartTmp;
+      }
+      else if (levelStart) {
         if (not enter(elementRemovePrefix(element)) and cfs.exceptionIfUnknown())
           error += string(error.empty() ? "":"\n") + elementRemovePrefix(element) + u8"not found";
       }
       else
         parent->StartTag(element);
     }
-    void EndTag(const std::string &element) override {
-      if (obj) {
+    void EndTag(const string &ns, const std::string &element) override {
+      //LOG(LM_INFO, "XMLREAD END TAG " << element);
+      if (levelStartTmp > 0) {
+        if (currentLevel() == levelStartTmp) {
+          if (levelStartTmp == levelStart) // bei primären Objekt KeyInfo waren beide identisch
+            levelStart = 0;
+          levelStartTmp = 0;
+          popTemp();
+          if (ki) {
+            LOG(LM_DEBUG, "Filled Encryption KeyInfo: " << ki->to_string());
+            if (not encCbb) // mit allen KeyInfos versuch bis eine gefunden
+            {
+              parent->Encrypt(encAlgo, ki, encCbb);
+              //if (encCbb) LOG(LM_DEBUG, "ENCRYPT OK");
+            }
+            ki = nullptr;
+          }
+        }
+        else
+          leave(elementRemovePrefix(element));
+      }
+      else if (encLevel == 3 and levelStartTmp == 0 and element == "CipherValue") {
+        encLevel = 2;
+      }
+       else if (encLevel == 2 and levelStartTmp == 0 and element == "CipherData") {
+        encLevel = 1;
+      }
+      else if (encLevel == 1 and levelStartTmp == 0 and element == "EncryptedData") {
+        encLevel = 0;
+        parent->EncryptionFinished();
+      }
+      else if (encLevel == 1 and element == "EncryptionMethod") {
+        // Encryption-End-Tags nicht weiterreichen
+      }
+      else if (levelStart) {
         if (currentLevel() == levelStart)
         {
           parent->filled(obj, error);
           obj = nullptr;
+          levelStart = 0;
           error = "";
           parent->EndTag(element);
         }
@@ -119,6 +184,7 @@ static std::wstring stow(const string &s, bool dontConvert) {
         parent->EndTag(element);
     }
     void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) override {
+      TRACE(PARAM(element) << PARAM(attribut));
       if (element == "xml" and attribut == "encoding") {
         encoding = mobs::to_string(value);
         
@@ -146,14 +212,8 @@ static std::wstring stow(const string &s, bool dontConvert) {
           str.seekg(pos);
         }
       }
+      parent->ProcessingInstruction(element, attribut, value);
     }
-    void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, mobs::CryptBufBase *&cryptBufp) override {
-      parent->Encrypt(algorithm, keyName, cipher, cryptBufp);
-    }
-    void EncryptionFinished() override {
-      parent->EncryptionFinished();
-    }
-
 
     void setObj(ObjectBase *o) {
       obj = o;
@@ -161,6 +221,8 @@ static std::wstring stow(const string &s, bool dontConvert) {
       if (obj)
         pushObject(*obj);
       levelStart = currentLevel();
+      if (levelStart == 0)
+        THROW("NOT SUPPORTED TODO");
     }
     void setMaxElementSize(size_t s) {
       XmlParserW::maxElementSize = s;
@@ -169,10 +231,15 @@ static std::wstring stow(const string &s, bool dontConvert) {
     XmlReader *parent;
     std::wistringstream str;
     ObjectBase *obj = nullptr;
+    ObjectBase *ki = nullptr;
     size_t levelStart = 0;
+    size_t levelStartTmp = 0;
     std::string error;
     std::string encoding;
+    std::string encAlgo; // EncryptionMethod
+    CryptBufBase *encCbb{};
     std::string prefix;
+    int encLevel = 0; // off/EncryptedData/CipherData/CipherValue
     bool doConversion = false;
   };
 
@@ -206,15 +273,17 @@ std::istream &XmlReader::byteStream(size_t len, CryptBufBase *cbbp) {
 
 void XmlReader::setPrefix(const std::string &pf) { data->prefix = pf; }
 void XmlReader::setBase64(bool b) { data->setBase64(b); }
-void XmlReader::parse() { data->parse(); }
+bool XmlReader::parse() { return data->parse(); }
 bool XmlReader::eof() const { return data->eof(); }
 bool XmlReader::eot() const { return data->eot(); }
 void XmlReader::stop() { data->stop(); }
 void XmlReader::readTillEof(bool s) { data->readTillEof(s); }
 void XmlReader::readNonBlocking(bool s) { data->readNonBlocking(s); };
 size_t XmlReader::level() const { return data->currentLevel(); }
+std::string XmlReader::currentXmlns() const { return data->currentXmlns(); };
 void XmlReader::setMaxElementSize(size_t s) { data->setMaxElementSize(s); }
 std::wistream &XmlReader::getIstr() { return data->getIstr(); }
+bool XmlReader::encrypted() const { return data->encrypted(); }
 
 //  XmlReadData(const std::string &input, const ConvObjFromStr &c) : XmlParserW(str), str(to_wstring(input)) { cfs = c; };
 

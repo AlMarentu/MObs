@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2025 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -30,12 +30,15 @@
 #include "converter.h"
 #include "csb.h"
 
+#include <string>
 #include <stack>
 #include <map>
 #include <exception>
 #include <iostream>
 #include <codecvt>
 #include <utility>
+
+#include "objgen.h"
 
 
 namespace mobs {
@@ -508,15 +511,19 @@ public:
   std::string currentXmlns() const { return tags.empty() ? "" : tags.top().xmlns; };
 
   /** \brief Callback-Function: Ein Tag ohne Inhalt, impliziert EndTag(..)
+   *
+   * es wird zuerst ein StartTag geliefert, dann ein NullTag
+   @param ns namespace
    @param element Name des Elementes
    */
-  virtual void NullTag(const std::string &element) = 0;
+  virtual void NullTag(const std::string &ns, const std::string &element) = 0;
   /** \brief Callback-Function: Ein Attributwert eines Tags
+   @param ns namespace
    @param element Name des Elementes
    @param attribut Name des Attributes
    @param value Wert des Attributes
    */
-  virtual void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) = 0;
+  virtual void Attribute(const std::string &ns, const std::string &element, const std::string &attribut, const std::wstring &value) = 0;
   /** \brief Callback-Function: Ein Inhalt eines Tags inkl. CDATA
    @param value Inhalt des Tags
    */
@@ -528,32 +535,23 @@ public:
    */
   virtual void Base64(const std::vector<u_char> &input) { }
   /** \brief Callback-Function: Ein Start-Tag
+   @param ns namespace
    @param element Name des Elementes
    */
-  virtual void StartTag(const std::string &element) = 0;
+  virtual void StartTag(const std::string &ns, const std::string &element) = 0;
   /** \brief Callback-Function: Ein Ende-Tag , jedoch nicht bei NullTag(..)
+   @param ns namespace
    @param element Name des Elementes
    */
-  virtual void EndTag(const std::string &element) = 0;
+  virtual void EndTag(const std::string &ns, const std::string &element) = 0;
   /** \brief Callback-Function: Eine Verarbeitungsanweisung z.B, "xml", "encoding", "UTF-8"
+   *
+   * Es wird immer zusätzlich eine leere Info (attribut="" und value="") erzeugt:
    @param element Name des Tags
    @param attribut Name der Verarbeitungsanweisung
    @param value Inhalt der Verarbeitungsanweisung
    */
   virtual void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) = 0;
-  /** \brief Callback-Funktion: Ein Element "EncryptedData" wurde gefunden und ein decrypt-Modul wird benötigt
-   *
-   * Es wird  "https://www.w3.org/2001/04/xmlenc#Element" unterstützt
-   * Bei mehreren Recipients muss nur bei einer Id eine Entschlüsselungs-Klasse zurückgeliefert werden.
-   * Bei unbekannten Recipients kann nullptr zurückgegeben werden.
-   * @param algorithm Algorithmus um xmlns bereinigt zB.: aes-256-cbc, oder "https://www.w3.org/2001/04/xmlenc#aes-256-cbc"/
-   * @param keyName KeyInfo-Element
-   * @param cipher Schlüssel, falls vorhanden
-   * @param cryptBufp ein mit new erzeugtes Encryption-Module; wird automatisch freigegeben
-   */
-  virtual void Encrypt(const std::string &algorithm, const std::string &keyName,  const std::string &cipher, CryptBufBase *&cryptBufp) = 0;
-  /// Encryption-Element abgeschlossen
-  virtual void EncryptionFinished() { }
 
   /// Einstellung: Lese bis EOF
   void readTillEof(bool s) { reedEof = s; }
@@ -561,6 +559,8 @@ public:
   void readNonBlocking(bool s) { nonblocking = s; }
   /// ist beim Parsen das Ende der Datei erreicht
   bool eof() const { return endOfFile; }
+  /// ist der Stream verschlüsselt (läuft über CryptBuffer)
+  bool encrypted() const { return encryptedData.encrypted(); }
   /// ist beim Parsen das letzte Tag erreicht
   bool eot() const { return running and tags.empty(); }
   /// verlasse beim nächsten End-Tag den parser
@@ -571,15 +571,15 @@ public:
   /// Referenz auf input stream
   std::wistream &getIstr() { return istr; };
 
-  /// Starte den Parser
-  void parse() {
+  /// Starte den Parser return true, wenn nonblocking ohne daten
+  bool parse() {
     TRACE("");
     paused = false;
     if (not running)
     {
       if (nonblocking and not checkAvail(3)) {
         paused = true;
-        return;
+        return true;
       }
       std::locale lo1 = std::locale(istr.getloc(), new codec_iso8859_1);
       istr.imbue(lo1);
@@ -637,10 +637,12 @@ public:
     for (;;)
     {
       if (inParse2Lt) {
-        if (nonblocking and not checkAvail(1))
+        if (nonblocking and not checkAvail(1)) {
           paused = true;
+          return true;
+        }
         if (paused)
-          return;
+          return false;
         if (not inParse2LtWork) {
           eat('>');
           // parsen bis der Arz kommt oder ein '<'
@@ -671,7 +673,7 @@ public:
       if (nonblocking and not checkGT())
       {
         paused = true;
-        return;
+        return true;
       }
       decode(buffer);
       saved += buffer;
@@ -699,7 +701,7 @@ public:
         if (tags.empty())
           THROW(u8"unexpected closing tag " + element);
         if (tags.top().element != element) {
-//        while (Traits::not_eof((curr = get()))) ;
+          //while (Traits::not_eof((curr = get()))) ;
           THROW(u8"unmatching tag " + element + " expected " + tags.top().element);
         }
         //LOG(LM_INFO, "CURRENT NS " << element << " " << tags.top().xmlns << " ");
@@ -707,47 +709,18 @@ public:
         {
           if (in64)
             saveValueCheckWS(); // nur whitespace prüfen
-          if (xmlEncState > 0) {
-            //LOG(LM_DEBUG, "XV " << element << " " << xmlEncState);
-            if (name == u8"CipherValue") {
-              if (xmlEncState == 4) {
-                if (not encryptedData.valid())
-                  encryptedData.cipher = to_string(saved);
-              }
-            } else if (name == u8"KeyName" and xmlEncState == 3) {
-              if (not encryptedData.valid())
-                encryptedData.keyName = to_string(saved);
-            }
-          } else if (not in64 and xmlEncState <= 0)
+          if (not in64)
             Value(saved);
           clearValue();
           lastKey = "";
           in64 = false;
         }
-        if (xmlEncState <= 0)
-          EndTag(name);
-        else {
-//        LOG(LM_DEBUG, "EEE element " << element << " " << xmlEncState);
-          xmlEncState--;
-          if (name == u8"EncryptedData") {
-            // Wenn CipherData vollständig dann wieder alles auf normal
-            xmlEncState = 0;
-            EncryptionFinished();
-//          LOG(LM_DEBUG, "encrypting element " << xmlEncState);
-          } else if (name == u8"KeyInfo") {
-            if (not encryptedData.valid()) {
-              CryptBufBase *cbbp{};
-              Encrypt(encryptedData.algorithm, encryptedData.keyName, encryptedData.cipher, cbbp);
-              encryptedData.setCryptBuf(cbbp);
-              // wenn keine encryption, weitersuchen
-            }
-          }
-        }
+        EndTag(currentXmlns(), name);
         for (;;) { // alle Namespaces der vergangenen Level wieder löschen
           auto it = nameSpcs.begin();
           if (it == nameSpcs.end() or it->level < tags.size())
             break;
-          LOG(LM_DEBUG, "ERASE " << it->pfx << " " << it->level);
+          //LOG(LM_DEBUG, "ERASE ET " << it->pfx << " " << it->level);
           nameSpcs.erase(it);
         }
         tags.pop();
@@ -813,7 +786,7 @@ public:
           parse2Char(c);
           decode(buffer, true); // nur CharRef dekodieren, keine EntityRef
           std::wstring val = buffer;
-          LOG(LM_DEBUG, "ENTITY " << mobs::to_string(ent) << " " << mobs::to_string(val));
+          //LOG(LM_DEBUG, "ENTITY " << mobs::to_string(ent) << " " << mobs::to_string(val));
           if (not ent.empty())
             entities[ent] = val;
           eat(c);
@@ -923,34 +896,8 @@ public:
           break;
         }
       //LOG(LM_INFO, "CURRENT NS " << element << " " << ns);
-      bool needStart = false;
+      bool needStart = true;
       tags.emplace(element, ns);
-      if (xmlEncState > 0) {
-        xmlEncState++;
-      //LOG(LM_DEBUG, "III element " << element << " " << xmlEncState);
-        if (xmlEncState == 3 and name == "CipherValue") {
-          for (;;) { // alle Namespaces der vergangenen encryption wieder löschen
-            auto it = nameSpcs.begin();
-            if (it == nameSpcs.end() or it->level +3 < tags.size())
-              break;
-            //LOG(LM_DEBUG, "ERASEC " << it->pfx << " " << it->level);
-            nameSpcs.erase(it);
-          }
-          encryptedData.startEncryption(istr);
-          xmlEncState = 0;
-          encryptedData.tags.push(tags.top());
-          tags.pop();
-          encryptedData.tags.push(tags.top());
-          tags.pop();
-          encryptedData.tags.push(tags.top());
-          tags.pop();
-        }
-        if (xmlEncState == 2 and (name != u8"KeyInfo" and name != u8"CipherData" and name != u8"EncryptionMethod"))
-          THROW("invalid encryption element");
-      }
-      else
-        needStart = true;
-
       clearValue();
       for (;;)
       {
@@ -963,16 +910,12 @@ public:
         if (peek() == '/') // Leertag
         {
           eat();
-          if (xmlEncState > 0)
-            xmlEncState--;
-          else {
-            if (not found) // wenn kein passender Namespace, dann pfx wieder zurück
-              name = element;
-            if (needStart)
-              StartTag(name);
-            needStart = false;
-            NullTag(name);
-          }
+          if (not found) // wenn kein passender Namespace, dann pfx wieder zurück
+            name = element;
+          if (needStart)
+            StartTag(currentXmlns(), name);
+          needStart = false;
+          NullTag(currentXmlns(), name);
           tags.pop();
           inParse2Lt = true;
           break;
@@ -1011,37 +954,14 @@ public:
           //LOG(LM_DEBUG, "New Namespace p='" << nsId << "' = " << ns << " Level " << tags.size());
           nameSpcs.emplace_front(tags.size(), nsId, nameSpc);
         }
-        if (xmlEncState == 0 and name == u8"EncryptedData" and a == u8"Type" and
-          buffer == L"http://www.w3.org/2001/04/xmlenc#Element") { // TODO http://www.w3.org/2009/xmlenc11#
-          xmlEncState = 1;
-          encryptedData = EncryptedData();
-          needStart = false;
-          //LOG(LM_DEBUG, "encrypting element " << xmlEncState);
-        }
-        else if (xmlEncState > 0 ) {
-          //LOG(LM_DEBUG, "XmlEnc Att " << element << " " << xmlEncState << " " << to_string(buffer) << " " << currentXmlns());
-          if (xmlEncState == 2 and name == u8"EncryptionMethod" and a == u8"Algorithm") {
-            std::string t = to_string(buffer);
-            std::string nameSpc = currentXmlns();
-            if (not nameSpc.empty() and t.substr(0, nameSpc.length()) == nameSpc)
-              encryptedData.algorithm = t.substr(nameSpc.length());
-            else
-              encryptedData.algorithm = t;
-          }
-        }
         else
-          Attribute(element, a, buffer);
+          Attribute(currentXmlns(), name, a, buffer);
         eat(c);
       }
       if (not found) // wenn kein passender Namespace, dann pfx wieder zurück
         name = element;
-      if (xmlEncState == 0 and name == u8"EncryptedData" and
-          (currentXmlns() == "http://www.w3.org/2001/04/xmlenc#" or currentXmlns() == "https://www.w3.org/2001/04/xmlenc#") ) {
-        xmlEncState = 1;
-//      LOG(LM_DEBUG, "encrypting element " << xmlEncState);
-        encryptedData = EncryptedData();
-      } else if (needStart)
-        StartTag(name);
+      if (needStart)
+        StartTag(currentXmlns(), name);
       lastKey = element;
     }
     if (Traits::not_eof(curr))
@@ -1051,7 +971,8 @@ public:
       THROW(u8" expected tag at EOF: " + tags.top().element);
     // nur noch für check Whitespace bis eof
     saveValueCheckWS();
-  };
+    return false;
+  }
   std::istream &byteStream(size_t len, CryptBufBase *cbbp = nullptr) {
     auto wbufp = dynamic_cast<CryptIstrBuf*>(istr.rdbuf());
     if (not wbufp)
@@ -1072,6 +993,29 @@ public:
       binaryStream = std::unique_ptr<std::istream>(new std::istream(binaryBuffer.get()));
     }
     return *binaryStream;
+  }
+  void setGlobalNs(const std::string &id, const std::string &ns) {
+    nameSpcs.emplace_front(0, id, ns);
+  }
+  void startEncryption(CryptBufBase *cbb) {
+    //LOG(LM_DEBUG, "setEncryptionMode  " << cbb->getRecipientId(0));
+    // erst mal den XML-Stack temporär wegrümen, damit die Levels passen
+    for (;;) { // alle Namespaces der vergangenen encryption vorab schon mal löschen
+      auto it = nameSpcs.begin();
+      if (it == nameSpcs.end() or it->level +3 < tags.size())
+        break;
+      //LOG(LM_DEBUG, "ERASEC " << it->pfx << " " << it->level);
+      nameSpcs.erase(it);
+    }
+    encryptedData.tags.push(tags.top());
+    tags.pop();
+    encryptedData.tags.push(tags.top());
+    tags.pop();
+    encryptedData.tags.push(tags.top());
+    tags.pop();
+    // und jetzt die Verschlüsselung aktivieren
+    encryptedData.setCryptBuf(cbb);
+    encryptedData.startEncryption(istr);
   }
   size_t maxElementSize = 256 * 1024 * 1024; ///< Maximale Größe eines Elementes, default: 256MB
 
@@ -1333,7 +1277,6 @@ private:
       //std::cout << " " << (c >= 32 and c < 128 ? std::string() + char(c): to_string(c) );
       if (encryptedData.streamPtr()->eof()) {
         encryptedData.stopEncryption();
-        xmlEncState = 99;
         tags.push(encryptedData.tags.top()); // EncryptedData
         encryptedData.tags.pop();
         tags.push(encryptedData.tags.top()); // CipherData
@@ -1362,21 +1305,21 @@ private:
   class EncryptedData {
   public:
     std::string algorithm;
-    std::string keyName;
-    std::string cipher;
     mutable std::stack<Level> tags;
-
+    EncryptedData() = default;
+    ~EncryptedData() { clear(); }
+    void clear() { algorithm.clear();
+      tags = std::stack<Level>();
+      delete cryptBufp;
+      cryptBufp = nullptr;
+    }
     inline bool valid() { return cryptBufp; } // hat gültige encryption
     inline std::wistream *streamPtr() const { return istr; } // stream pointer bei aktiver encryption
     void setCryptBuf(mobs::CryptBufBase *cbbp) {
       cryptBufp = cbbp;
-      if (not valid() ) {
-        keyName = "";
-        cipher = "";
-      }
     }
     void startEncryption(std::wistream &inStr) {
-      LOG(LM_DEBUG, "START CRYPT " << keyName);
+      LOG(LM_DEBUG, "START CRYPT");
       if (not cryptBufp)
         THROW("no suitable decryption found");
       // Pipe aufbauen: filter base64 | bas64-encrypt
@@ -1384,6 +1327,7 @@ private:
       tmpstr = new std::istream(b64buf);
       //tmpstr->exceptions(std::ios::badbit | std::ios::failbit);
       cBuf = new mobs::CryptIstrBuf(*tmpstr, cryptBufp);
+      cryptBufp = nullptr;
       if (cBuf->bad())
         THROW("decryption failed");
       cBuf->getCbb()->setBase64(true);
@@ -1404,6 +1348,7 @@ private:
       tmpstr = nullptr;
       b64buf = nullptr;
     }
+    bool encrypted() const { return cBuf; }
   private:
     CryptBufBase *cryptBufp = nullptr;
     mutable std::wistream *istr = nullptr;
@@ -1432,7 +1377,6 @@ private:
   std::vector<u_char> base64data;
   Base64Reader base64;
   EncryptedData encryptedData;
-  mutable int xmlEncState = 0;
   std::unique_ptr<mobs::BinaryIstBuf> binaryBuffer;
   std::unique_ptr<CryptBufBase> binaryFilt;
   std::unique_ptr<std::istream> binaryFiltStream;

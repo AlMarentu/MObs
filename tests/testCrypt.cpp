@@ -39,6 +39,7 @@
 #include "xmlout.h"
 #include "converter.h"
 #include "xmlparser.h"
+#include "xmlread.h"
 
 using namespace std;
 
@@ -714,15 +715,18 @@ TEST(cryptTest, xml) {
     return new mobs::CryptBufAes( "12345");
   });
   ASSERT_NO_THROW(mobs::string2Obj(x, f2, cfs));
+  //LOG(LM_INFO, "RESULT " << f2.to_string());
+  EXPECT_EQ(1, f2.id());
   EXPECT_EQ("Brauereigespann", f2.typ());
   EXPECT_EQ("Otto", f2.fahrer());
+  EXPECT_EQ("Sechsspaenner", f2.zugmaschine.typ());
 
 
 };
 
-class XParserW: public mobs::XmlParserW {
+class XParserReader : public mobs::XmlReader {
 public:
-  explicit XParserW(const wstring &i) : mobs::XmlParserW(str), str(i) { }
+  explicit XParserReader(const wstring &i) : XmlReader(str), str(i) {}
   void NullTag(const std::string &element) override { LOG(LM_INFO, "NULL " << element << " " << currentXmlns()); }
   void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) override { LOG(LM_INFO, "ATTRIBUT " << attribut <<
                                                                                                                                          " VALUE >" << mobs::to_string(value) << "<"); lastValue = mobs::to_string(value); }
@@ -736,15 +740,22 @@ public:
   void StartTag(const std::string &element) override { LOG(LM_INFO, "START " << element << " " << currentXmlns()); }
   void EndTag(const std::string &element) override { LOG(LM_INFO, "END " << element << " " << currentXmlns()); }
   void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) override { LOG(LM_INFO, "PI" << element); }
-  void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, mobs::CryptBufBase *&cryptBufp) override {
+
+  void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher,
+              mobs::CryptBufBase *&cryptBufp) override {
     LOG(LM_INFO, "Encrypt algorithm=" << algorithm << " keyName=" << keyName << " cipher=" << cipher);
-    std::vector<u_char> cip;
-    mobs::from_string_base64(cipher, cip);
-    buffOut(cip);
-    mobs::decapsulatePublic(cip, key, privS, "54321", pubC);
-    buffOut(key);
-    cryptBufp = new mobs::CryptBufAes(key, keyName);
+    //LOG(LM_INFO, "Encrypt algorithm=" << algorithm << " keyInfo=" << (keyInfo ? keyInfo->to_string():"null"));
+      std::vector<u_char> cip;
+      mobs::from_string_base64(cipher, cip);
+      buffOut(cip);
+      mobs::decapsulatePublic(cip, key, privS, "54321", pubC);
+      buffOut(key);
+      cryptBufp = new mobs::CryptBufAes(key,keyName);
   };
+
+  void filled(mobs::ObjectBase *obj, const std::string &error) override {
+     LOG(LM_INFO, "Filled: " << obj->to_string());
+  }
 
   std::wistringstream str;
   std::string lastCdata;
@@ -802,7 +813,7 @@ TEST(cryptTest, xmlenc) {
   xw.sync();
   cerr << xw.getString() << endl;
 
-  XParserW pw(mobs::to_wstring(xw.getString()));
+  XParserReader pw(mobs::to_wstring(xw.getString()));
   pw.privS = privS;
   pw.pubC = pubU;
   while (not pw.eof())

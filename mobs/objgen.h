@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2025 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -157,6 +157,7 @@
 #ifndef MOBS_OBJGEN_H
 #define MOBS_OBJGEN_H
 
+#include <string>
 #include <list>
 #include <map>
 #include <utility>
@@ -1334,9 +1335,10 @@ public:
   /// setzte aktuelles Objekt im Pfad auf Null entsprechen der Einstellung \c ConvObjFromStr
   bool setNull();
   /// Objekt zurücksetzen
-  void reset() { while (not objekte.empty()) objekte.pop(); while (not path.empty()) path.pop(); memBase = nullptr; memVec = nullptr; memName = ""; }
+  void reset();
 
 protected:
+  void popTemp();
   /// Import-Konfiguration
   ConvObjFromStr cfs;
 

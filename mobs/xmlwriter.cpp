@@ -461,13 +461,13 @@ void XmlWriter::startEncrypt(CryptBufBase *cbbp, bool oldStyle) {
     writeTagEnd();
     size_t rcpt = cbbp->recipients();
     for (size_t i = 0; i < rcpt; i++) {
+      string k = cbbp->getRecipientId(i);
+      string c = cbbp->getRecipientKeyBase64(i);
       writeTagBegin(L"ds:KeyInfo");
       writeTagBegin(L"ds:KeyName");
-      string k = cbbp->getRecipientId(i);
       if (not k.empty())
         writeValue(to_wstring(k));
       writeTagEnd();
-      string c = cbbp->getRecipientKeyBase64(i);
       if (not c.empty()) {
         writeTagBegin(L"xenc:CipherData");
         writeTagBegin(L"xenc:CipherValue");

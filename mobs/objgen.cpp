@@ -874,6 +874,17 @@ bool ObjectNavigator::find(const std::string &varName) {
   return false;
 }
 
+void ObjectNavigator::reset() {
+  while (not objekte.empty()) objekte.pop(); while (not path.empty()) path.pop(); memBase = nullptr; memVec = nullptr; memName = "";
+}
+
+void ObjectNavigator::popTemp() {
+  if (not objekte.empty()) objekte.pop();
+  memName.clear();
+  memBase = nullptr;
+  memVec = nullptr;
+}
+
 bool ObjectNavigator::setNull() {
   TRACE("");
   if (memVec)
@@ -949,7 +960,7 @@ bool ObjectNavigator::setNull() {
 
 bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
   TRACE(PARAM(element) << PARAM(index));
-//  LOG(LM_INFO, "enter " << element << " " << index);
+  //LOG(LM_INFO, "enter " << element << " " << index);
   path.push(element);
 
   if (objekte.empty())
@@ -961,7 +972,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
   memVec = nullptr;
   memName = objekte.top().objName;
   memBase = nullptr;
-//  LOG(LM_DEBUG, "Im Object " << memName);
+  //LOG(LM_DEBUG, "Im Object " << memName);
   std::string elementFind = element;
   if (cfs.caseInsensitive())
     elementFind = mobs::toLower(element);
@@ -986,7 +997,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
           s = index;
         v->resize(s+1);
       }
-//      LOG(LM_INFO, ele << " ist ein Vector " << s);
+      //LOG(LM_INFO, element << " ist ein Vector " << s);
       memName += ".";
       memName += v->getElementName();
       memName += "[";
@@ -999,7 +1010,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
       ObjectBase *o = v->getObjInfo(s);
       if (o)
       {
-//        LOG(LM_INFO, "Obkekt")
+        //LOG(LM_INFO, "Obkekt");
         objekte.push(ObjectNavigator::Objekt(o, memName));
         return true;
       }
@@ -1007,7 +1018,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
       {
         memName += m->getElementName();
         memBase = m;
-        //        LOG(LM_INFO, "Member: " << memName)
+        //LOG(LM_INFO, "Member: " << memName);
         return true;
       }
       // Vector-element ist weder von MemberBase noch von ObjectBase abgeleitet
@@ -1018,7 +1029,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
     if (index >= MemBaseVector::nextpos) {
       mobs::ObjectBase *o = objekte.top().obj->getObjInfo(elementFind, cfs);
       if (o) {
-//        LOG(LM_INFO, ele << " ist ein Objekt");
+        //LOG(LM_INFO, element << " ist ein Objekt");
         memName += "." + o->getElementName();
         objekte.push(ObjectNavigator::Objekt(o, memName));
         return true;
@@ -1027,7 +1038,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
       if (m) {
         memName += "." + m->getElementName();
         memBase = m;
-        //        LOG(LM_INFO, "Member: " << memName);
+        //LOG(LM_INFO, "Member: " << memName);
         return true;
       }
     }
@@ -1038,13 +1049,13 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
   objekte.push(ObjectNavigator::Objekt(nullptr, memName));
   if (cfs.exceptionIfUnknown())
     throw runtime_error(u8"ObjectNavigator: Element " + memName + " not found");
-//  LOG(LM_DEBUG, u8"Element " + memName + " ist nicht vorhanden");
+  //LOG(LM_DEBUG, u8"Element " + memName + " ist nicht vorhanden");
   return false;
 }
 
 void ObjectNavigator::leave(const std::string &element) {
   TRACE(PARAM(element));
-//  LOG(LM_INFO, "leave " << element << " " << (path.empty() ? string("--") : path.top()));
+  //LOG(LM_INFO, "leave " << element << " " << (path.empty() ? string("--") : path.top()));
   if (memVec)  // letzte Ebene war der Vector selbst (ohne [])
     memVec = nullptr;
   else if (memBase)  // letzte Ebene war ein MemberVariable

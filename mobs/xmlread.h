@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2023 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -30,6 +30,24 @@
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "UnusedGlobalDeclarationInspection"
 namespace mobs {
+
+
+class Cipher : virtual public mobs::ObjectBase
+{
+public:
+  ObjInit(Cipher);
+  MemVar(std::string, CipherValue);
+};
+
+class KeyInfo : virtual public mobs::ObjectBase
+{
+public:
+  ObjInit(KeyInfo);
+  MemVar(std::string, KeyName, USENULL);
+  MemObj(Cipher, CipherData, USENULL);
+};
+
+
 
 class CryptBufBase;
 class XmlReadData;
@@ -78,6 +96,8 @@ public:
   virtual void StartTag(const std::string &element) { }
   /// Callback für Ende-Tag
   virtual void EndTag(const std::string &element) { }
+  /// Callback für ProcessingInstruction
+  virtual void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) { }
   /// Callback für gelesenes Objekt
   /// @param obj Zeiger auf das mit \c fill übergebene Objekt
   /// @param error ist bei Fehler gefüllt, ansonsten leer
@@ -91,6 +111,19 @@ public:
    * @param cryptBufp ein mit new erzeugtes Encryption-Module; wird automatisch freigegeben
    */
   virtual void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, mobs::CryptBufBase *&cryptBufp) { }
+  /** \brief Callback-Funktion: Ein Element "EncryptedData" wurde gefunden und ein decrypt-Modul wird benötigt
+   *
+   * Es wird  "https://www.w3.org/2001/04/xmlenc#Element" unterstützt.
+   * Bei mehreren Recipients muss nur bei einer Id eine Entschlüsselungs-Klasse zurückgeliefert werden.
+   * Bei unbekannten Recipients kann nullptr zurückgegeben werden.
+   * @param algorithm Algorithmus um xmlns bereinigt zB.: aes-256-cbc, oder "https://www.w3.org/2001/04/xmlenc#aes-256-cbc"/
+   * @param keyInfo KeyInfo-Element
+   * @returns cryptBufp ein mit new erzeugtes Encryption-Module; wird automatisch freigegeben oder nullptr, wenn unbekannt
+   */
+  virtual void Encrypt(const std::string &algorithm, const ObjectBase *keyInfo, mobs::CryptBufBase *&cryptBufp) {
+    if (auto ki = dynamic_cast<const mobs::KeyInfo *>(keyInfo))
+      Encrypt(algorithm, ki->KeyName(), ki->CipherData.CipherValue(), cryptBufp);
+  }
 
   /// Encryption-Element abgeschlossen
   virtual void EncryptionFinished() { }
@@ -113,10 +146,12 @@ public:
   bool eot() const;
   /// Parse-Level - root-element ist level 1
   size_t level() const;
+  /// liefert aktuellen Namespace
+  std::string currentXmlns() const;
   /// verlasse beim nächsten End-Tag den parser
   void stop();
-  /// parse den Input (weiter)
-  void parse();
+  /// parse den Input (weiter); Rückgabe true, wenn Warten auf Daten
+  bool parse();
   /// Objekt aus Daten füllen
   void fill(ObjectBase *obj);
   /// Referenz auf verwendeten input stream
@@ -125,6 +160,8 @@ public:
   std::istream &byteStream(size_t len, CryptBufBase *cbbp = nullptr);
   /// setze maximale Elementgröße
   void setMaxElementSize(size_t s);
+  /// ist der Stream verschlüsselt (läuft über CryptBuffer)
+  bool encrypted() const;
 
 private:
   std::unique_ptr<XmlReadData> data;
