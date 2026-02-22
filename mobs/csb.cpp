@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2025 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -96,6 +96,8 @@ public:
   // kann beim Lesen eines Blockes die Zeichensatzkonvertierung nicht bis zum Ende laufen,
   // dann denn Rest hier parken, bis ein weiterer Block vom input-Stream kommt.
   // Mit den Folge-Daten sollte dann die Zeichensatzkonvertierung klappen.
+  // Dadurch wird auch eine Umschaltung des Buffers ermöglicht z.B. von UTF-8 zu binär. Hier kann das
+  // Zeichen '\200' den aktuellen Lesebuffer abschließen und die folgenden Zeichen werden in Rest geparkt
   std::unique_ptr<std::vector<char>> rest;
 };
 
@@ -332,7 +334,9 @@ std::streamsize CryptIstrBuf::showmanyc() {
 
   if (not data->cbb)
     return 0;
-  // unabhängig von data->rest geht es nur weiter wenn der Input-Stream neue Daten hat oder EOF ist
+
+  if (data->rest)
+    return data->rest->size() + data->cbb->in_avail();
   return data->cbb->in_avail();
 }
 

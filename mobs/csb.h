@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020,2021 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -173,18 +173,22 @@ public:
 
 class CryptIstrBufData;
 
-/** \brief Stream-Buffer Wrapper-Klasse für std::istream Input-Streams des Typs wchar_t
+/** \brief Stream-Buffer Wrapper-Klasse für std::istream Input-Streams des Typs wchar_t.
  *
- * Der CryptIstrBuf liest seine Daten aus einen beliebigen std::istream (wie z.B.: std::ifstream oder std::stringstream)
+ * Der CryptIstrBuf liest seine Daten aus einen beliebigen std::istream (wie z.B.: std::ifstream oder std::stringstream).
  * Die Umwandlung des Datenstromes von Base64 ist standardmäßig,
- * für Verschlüsselte Daten werden Plugins benötigt.
+ * für verschlüsselte Daten werden Plugins benötigt.
  *
  * Wird mit imbue die locale geändert, wenn bereits der Lese-Buffer gefüllt ist,
  * so muss der Buffer nach neuer Kodierung immer noch ausreichend sein. Auch darf zuvor kein Zeichensatz
  * verwendet worden sein, der Multibyte-Character verwendet.
- * ISO nach beliebig geht, UTF8 bzw UTF16 darf nicht mehr geändert werden
+ * ISO nach beliebig geht, UTF8 bzw UTF16 darf nicht mehr geändert werden.
  *
- * Wird als Input ein UTF-8 Zeichensatz verwendet, so kann ,durch das in UTF-8 ungültige Zeichen 0x80, der Zeichenstrom
+ * Zu beachten ist, das ein rdbuf()->in_avalil() im Fall, dass der Read-Buffer leer ist die Anzahl der Zeichen des
+ * übergeordneten Streams liefert. Diese Zahl kann größer sein, da evtl. moch eine Konvertierung stattfindet.
+ * Hier kann man sicherheitshalber dann bei Bedarf immer nur zeichenweise lesen.
+ *
+ * Wird als Input ein UTF8 Zeichensatz verwendet, so kann durch das in UTF8 ungültige Zeichen 0x80, der Zeichenstrom
  * unterbrochen werden. Es werden bei readsome nur die Zeichen bis zum Trenner gelesen. die Übrigen verbleiben im Buffer.
  * An dieser Stelle kann durch BinaryIstBuf der binäre Datenstrom weitergelesen werden.
  * Wird der originäre Datenstrom weitergelesen, so wird erst dann ein Fehlerzustand erreicht.
@@ -269,7 +273,7 @@ private:
 
 class BinaryIstrBufData;
 
-/** \brief istream-buffer der von CryptIstrBuf abgeleitet wird um einen Block binärer Daten zu extrahieren
+/** \brief istream-buffer der von CryptIstrBuf abgeleitet wird, um einen Block binärer Daten zu extrahieren
  *
  * wird für das Auswerten binärer Elemente in (CryptIstrBuf) XML-Streams verwendet. Diese müssen in einer UTF-8 locale vorliegen.
  * Durch einen Delimiter 0x80 wird der UTF-8-Stream beendet, danach kann von diesem Stream der BinaryIstBuf abgeleitet werden,
@@ -308,7 +312,7 @@ class CryptOstrBufData;
 
 /** \brief Stream-Buffer Wrapper Klasse für std::ostream Output-Streams des Typs wchar_t
  *
- * Der CryptOstrBuf schreibt seine Daten in einen beliebigen std::ostream (wie z.B.: std::ofstream oder std::stringstream)
+ * Der CryptOstrBuf schreibt seine Daten in einen beliebigen std::ostream (wie z.B.: std::ofstream oder std::stringstream).
  * Die Umwandlung des Datenstromes nach Base64 ist standardmäßig,
  * für Verschlüsselung werden Plugins benötigt.
  *
