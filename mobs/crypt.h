@@ -260,10 +260,11 @@ void decapsulatePublic(const std::vector<u_char> &cipher, std::vector<u_char> &s
 void deriveSharedSecret(std::vector<u_char> &secret, const std::string &filePubPeer, const std::string &filePriv,
                         const std::string &passphrase);
 
-/** \brief erzeuge einen public ephemeral key und bereite einen EHDC Schlüsselaustausch vor (KEM)
+/** \brief erzeuge einen public ephemeral key und bereite einen Schlüsselaustausch vor (KEM).
  *
+ * Das Verfahren ist für EC oder DH Schlüssel möglich und als 'Ephemeral Diffie-Hellman' bekannt.
  * Der temporäre Schlüssel wird passend zum filePubPeer-Schlüssel erzeugt;
- * das erzeugte shared Secret darf nicht direkt als session key verwendet werden, es ist zuvor in eine Hash zu wandeln
+ * das erzeugte shared Secret darf nicht direkt als session key verwendet werden, es ist zuvor in eine Hash zu wandeln.
  *
  * Die Rückwandlung erfolgt mit deriveSharedSecret
  * @param secret generiertes shared secret das dem Server mitgeteilt wird

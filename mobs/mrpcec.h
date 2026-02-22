@@ -34,23 +34,15 @@ namespace mobs {
 
 
 
-/// Fehler des Clients beim Verbindungsaufbau
-class Mrpc2ConnectException : public std::runtime_error {
-public:
-  explicit Mrpc2ConnectException(const std::string &what) : std::runtime_error(what) {}
-};
-
-/** \brief Klasse für Client-Server Modul über XML-RPC-Calls
+/** \brief Klasse für Client-Server Modul über verschlüsselte XML-RPC-Calls
  *
- * die Verschlüsselung der Nutzdaten ist anhand RFC 4051 implementiert.
- * Der Schlüsselaustausch erfolgt mittels Diffie-Hellman auf Basis elliptischer Kurven.
+ * Die XML-Struktur der Nutzdaten ist anhand RFC 4051 implementiert.
+ * Der Schlüsselaustausch erfolgt mittels ephemeren Diffie-Hellman auf Basis elliptischer Kurven. Die Authentisierung
+ * des Clients erfolgt im Nachhinein.
  * Zusätzlich besteht die Möglichkeit Roh-Daten zwischen den XML-Paketen zu übermitteln.
  *
  * Ist im Server eine reuseTime gesetzt, so wird vom Client versucht eine bestehende Session zu verwenden.
- * gelingt dies nicht, so wird ein neuer Login-Vorgang gestartet. Der Server-Kontext geht dabei verloren.
- * Dies erlaubt eine schnelle Wiederverwendung einer bestehenden Session inklusive deren Kontext.
- * Wenn die Variable sessionReuseSpeedup gesetzt ist, so wird bei einer erfolgreichen Session-Reuse sofort ein Kommando gesendet.
- * Ist bei sessionReuseSpeedup der Session-Reuse nicht erfolgreich, so wird eine Exception geworfen.
+ * Ebenso kann über eine keyValidTime ein regelmäßiger Schlüsselwechsel erfolgen.
  *
  * Soll die Verbindung auf Erfolg geprüft werden, bevor weitere Kommandos gesendet werden, so ist das folgend auszuführen:
  * \verbatim
@@ -66,7 +58,7 @@ public:
  * \endverbatim
  */
 class MrpcEc : public XmlReader {
-  enum State { fresh, getPubKey, connectingServer, connectingServerConfirmed, connectingClient, connected, readyRead, closing };
+  enum State { fresh, getPubKey, connectingServer, connectingServerConfirmed, connectingClient, connected, readyRead, attachment, closing };
 public:
   /** \brief Konstruktor für Client-Server Klasse mit Schlüsselaustausch nach Diffie-Hellman auf Basis elliptischer Kurven
    *
@@ -89,23 +81,32 @@ public:
   /** \brief senden eines einzelnen Objektes mit Verschlüsselung und sync()
    *
    * @param obj zu sendendes Objekt
+   * @param attachmentSize
    */
-  void sendSingle(const ObjectBase &obj);
+  void sendSingle(const ObjectBase &obj, std::streamsize attachmentSize = 0);
   /// starte Verschlüsselung
   void encrypt();
   /// beende Verschlüsselung
   void stopEncrypt();
 
-  /// für den non-blocking Modus: Rückgabe, ob ein Byte-Stream verfügbar ist
+  /// für den non-blocking Modus: Rückgabe, ob ein Byte-Stream verfügbar ist um inByteStream() aufrufen zu dürfen
   bool inByteStreamAvail();
-  /// Einlesen eines Byte-streams der Größe sz
-  std::istream &inByteStream(size_t sz);
-  /// Senden eines Byte-streams; der XML-Stream darf dabei nicht verschlüsselt sein
+  /// Einlesen eines Byte-streams der Größe sz; wird die Größe nicht verwendet so wird getAttachmentLength() verwendet
+  std::istream &inByteStream(size_t sz = 0);
+  /// Liefert die Länge des nachfolgenden Attachments, as mit inByteStream gelesen werden kann. (Gegenpart von sendSingle())
+  std::streamsize getAttachmentLength() const;
+
+
+  /** \brief  Senden eines Byte-streams; der XML-Stream darf dabei nicht verschlüsselt sein.
+   *
+   *  Wird im Anschluss nach sendSingle() verwendet um genau die Anzahl Bytes die angegeben wurde zu senden.
+   */
   std::ostream &outByteStream();
  /** \brief Senden eines Byte-streams beenden (ohne flush()).
   *
-  * Die gesendete Anzahl der Bytes sollte überprüft werden.
+  * Die gesendete Anzahl der Bytes wird automatisch überprüft.
   * @return Anzahl der übertragenen Bytes oder -1, wenn vom darunterliegenden Stream nicht unterstützt
+  * \throws std::runtime_error wenn die angegebene Größe nicht der tatsächlichen entspricht
   */
   std::streamsize closeOutByteStream();
 
@@ -206,9 +207,6 @@ public:
    */
   bool isConnected() const;
 
-  /// Rückgabe, ob der nächste Lesevorgang blockiert
-  bool clientAboutToRead() const;
-
   /// Rückgabe, ob die Session wiederverwendet werden kann (für den Server)
   bool serverKeepSession() const;
 
@@ -261,15 +259,19 @@ protected:
   /// \private
   void EndTag(const std::string &element) override;
   /// \private
-  void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, CryptBufBase *&cryptBufp) override;
+  void Encrypt(const std::string &algorithm, const ObjectBase *keyInfo, CryptBufBase *&cryptBufp) override;
   /// \private
   void EncryptionFinished() override;
   /// \private
   void filled(mobs::ObjectBase *obj, const std::string &error) override;
+  /// \private
+  void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) override;
 
 private:
   bool encrypted = false;
   State state = fresh;
+  std::streamsize attachmentLength = 0; // Größe des Attachments das empfangen werden soll
+  std::streamsize checkAttachmentSize = 0; // Größe des Attachments während des Sendens
 
 };
 

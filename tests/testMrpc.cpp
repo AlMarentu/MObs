@@ -35,6 +35,7 @@
 #include "mrpc.h"
 #include "mrpcec.h"
 #include "tcpstream.h"
+//#include "encdata.h"
 
 #include <stdio.h>
 #include <sstream>
@@ -1530,5 +1531,150 @@ TEST(mrpcTest, MrpcRefreshKey) {
   EXPECT_TRUE(readyRead);
 
 }
+
+#if 0
+TEST(mrpcTest, MrpcDhEccKey) {
+  mobs::KeyInfo keyInfo;
+
+  keyInfo.EncryptedKey.EncryptionMethod.Algorithm("http://www.w3.org/2001/04/xmlenc#kw-aes128");
+  keyInfo.EncryptedKey.KeyInfo.AgreementMethod.Algorithm("http://www.w3.org/2009/xmlenc11#ECDH-ES");
+  keyInfo.EncryptedKey.KeyInfo.AgreementMethod.KeyDerivationMethod.Algorithm("http://www.w3.org/2009/xmlenc11#ConcatKDF");
+  keyInfo.EncryptedKey.KeyInfo.AgreementMethod.KeyDerivationMethod.ConcatKDFParams.AlgorithmID("00");
+  keyInfo.EncryptedKey.KeyInfo.AgreementMethod.KeyDerivationMethod.ConcatKDFParams.DigestMethod.Algorithm("http://www.w3.org/2001/04/xmlenc#sha256");
+
+  cout << keyInfo.to_string(mobs::ConvObjToString().exportXml().doIndent().exportPrefix()) << endl;
+}
+#endif
+
+TEST(mrpcTest, MrpcAttachmentEcc) {
+  string cpriv, cpub, spriv, spub;
+  mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, spriv, spub);
+  mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, cpriv, cpub);
+
+  stringstream strStoC;
+  stringstream strCtoS;
+
+  MrpcServer2 server(strCtoS, strStoC, cpub, spriv);
+
+  LOG(LM_INFO, "CLI");
+  mobs::MrpcSession clientSession{};
+  mobs::MrpcEc client(strStoC, strCtoS, &clientSession, false);
+
+  ASSERT_NO_THROW(client.startSession("testkey", "googletest", cpriv, "", spub));
+
+  MrpcPerson p1;
+  client.sendSingle(p1);
+  LOG(LM_INFO, "XXX C->S " << strCtoS.str());
+
+
+  LOG(LM_INFO, "SRV");
+  for  (int i= 0; i < 5; i++) {
+    ASSERT_NO_THROW(server.parseServer());
+    LOG(LM_INFO, "LLL S=" << server.level() << " E=" << server.isEncrypted() << " con=" << server.isConnected());
+    LOG(LM_INFO, "XXX S->C " << strStoC.str());
+    if (server.resultObj)
+      break;
+  }
+  EXPECT_TRUE(server.isConnected());
+
+  EXPECT_TRUE(bool(server.resultObj));
+  EXPECT_NE(dynamic_cast<MrpcPerson *>(server.resultObj.get()), nullptr);
+  MrpcPerson p2;
+  p2.name("Heinrich");
+  server.sendSingle(p2, 502);
+  auto &sbstr = server.outByteStream();
+  sbstr << "Hallo" << string(200, ' ') << endl;
+  LOG(LM_INFO, "XXX S->C " << strStoC.str());
+
+  LOG(LM_INFO, "CLI");
+  bool res = false;
+  for  (int i= 0; i < 5; i++) {
+    ASSERT_NO_THROW(res = client.parseClient());
+    LOG(LM_INFO, "C-CON " << client.isConnected());
+    if (res)
+      break;
+  }
+  LOG(LM_INFO, "CONNECTED");
+  EXPECT_TRUE(res);
+  EXPECT_TRUE(client.isConnected());
+
+  ASSERT_TRUE(bool(client.resultObj));
+  to_string(*client.resultObj);
+  ASSERT_NE(dynamic_cast<MrpcPerson *>(client.resultObj.get()), nullptr);
+  EXPECT_EQ(dynamic_cast<MrpcPerson *>(client.resultObj.get())->name(), "Heinrich");
+
+  LOG(LM_INFO, "WAIT STREAM");
+  for  (int i= 0; i < 5; i++) {
+    ASSERT_NO_THROW(res = client.parseClient());
+    LOG(LM_INFO, "C-AVA " << client.inByteStreamAvail());
+    if (res)
+      break;
+  }
+
+  EXPECT_TRUE(client.inByteStreamAvail());
+  EXPECT_EQ(502, client.getAttachmentLength());
+  auto &clistr = client.inByteStream();
+  char buf[1000];
+  auto s = clistr.readsome(buf, 16);
+  ASSERT_LT(0, s);
+  buf[s] = '\0';
+  EXPECT_EQ(16, s);
+  EXPECT_STREQ("Hallo           ", buf);
+
+
+
+  LOG(LM_INFO, "SRV");
+  sbstr << string(290, ' ') << "Hallo" << endl;
+
+  LOG(LM_INFO, "XXX S->C " << strStoC.str());
+  LOG(LM_INFO, "HHHHHHHHHHHH " << strStoC.rdbuf()->in_avail());
+
+  EXPECT_EQ(502, server.closeOutByteStream());
+  server.writer.writeTagBegin(L"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+  server.writer.writeTagEnd(true);
+  //server.writer.putc('\n');
+#if 1
+  server.writer.writeTagBegin(L"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+  server.writer.writeTagEnd(true);
+  server.writer.writeTagBegin(L"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+  server.writer.writeTagEnd(true);
+  server.writer.writeTagBegin(L"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+  server.writer.writeTagEnd(true);
+  server.writer.writeTagBegin(L"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+  server.writer.writeTagEnd(true);
+  server.writer.writeTagBegin(L"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+  server.writer.writeTagEnd(true);
+#endif
+  strStoC.flush();
+  LOG(LM_INFO, "HHHHHHHHHHHH " << strStoC.rdbuf()->in_avail());
+  server.writer.sync();
+  server.flush();
+  //server.encrypt();
+
+  LOG(LM_INFO, "CLI");
+
+
+  LOG(LM_INFO, "XXX S->C " << strStoC.str());
+  LOG(LM_INFO, "HHHHHHHHHHHH " << strStoC.rdbuf()->in_avail());
+
+  std::streamsize n = 480;
+  while (n > 0) {
+    s = clistr.readsome(buf, n);
+    ASSERT_LT(0, s);
+    LOG(LM_INFO, "C-RD " << s << "/" << n);
+    n -= s;
+  }
+  s = clistr.readsome(buf, 480);
+  ASSERT_LE(0, s);
+  buf[s] = '\0';
+  EXPECT_EQ(6, s);
+  EXPECT_STREQ("Hallo\n", buf);
+  s = clistr.readsome(buf, 480);
+  EXPECT_EQ(0, s);
+  EXPECT_TRUE(clistr.eof());
+
+
+}
+
 
 }

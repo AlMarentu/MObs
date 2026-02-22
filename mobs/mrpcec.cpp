@@ -155,26 +155,36 @@ void MrpcEc::EncryptionFinished()
     LOG(LM_INFO, "connection established with wait");
     stopEncrypt();
     flush();
-    state = readyRead;
+    //state = readyRead;
+    state = connected;
   }
+  //LOG(LM_INFO, "EF " << int(state) << " " << level());
   if (state == connected and level() == 2)
-    state = readyRead;
+    state = attachmentLength > 0 ? attachment : readyRead;
+  //LOG(LM_INFO, "EFS " << int(state));
   // weiteres parsen anhalten
   stop();
 }
 
-void MrpcEc::Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher,
+void MrpcEc::Encrypt(const std::string &algorithm, const ObjectBase *keyInfo,
                     CryptBufBase *&cryptBufp)
 {
-  LOG(LM_DEBUG, "Encryption " << algorithm << " keyName " << keyName << " cipher " << cipher);
+  LOG(LM_DEBUG, "Encryption " << algorithm << " keyInfo " << keyInfo->to_string());
   if (not session)
     throw std::runtime_error("session missing");
+  auto ki = dynamic_cast<const mobs::KeyInfo *>(keyInfo);
+  if (not ki)
+    throw std::runtime_error("KeyInfo missing");
+  std::string cipher = ki->CipherData.CipherValue();
+  std::string keyName = ki->KeyName();
+
   if (state == connectingServerConfirmed) {
     LOG(LM_INFO, "connection established without wait");
-    state = readyRead;
+    //state = readyRead;
+    state = connected;
   }
-  else if (state == connected)
-    state = readyRead;
+  else //if (state == connected)
+    //state = readyRead;
   encrypted = true;
   if (algorithm == "aes-256-cbc") {
     if (cipher.empty() and not session->sessionKey.empty()) // TODO state, da nur für Server
@@ -220,16 +230,36 @@ void MrpcEc::filled(mobs::ObjectBase *obj, const std::string &error)
     session->info = err->error();
     THROW("session error received: " << err->error());
   }
-  if (resultObj)
-    THROW("result object bereits vorhanden: " << resultObj->getObjectName());
-  resultObj = std::unique_ptr<mobs::ObjectBase>(obj);
+  else {
+    if (resultObj)
+      THROW("result object bereits vorhanden: " << resultObj->getObjectName());
+    resultObj = std::unique_ptr<mobs::ObjectBase>(obj);
+  }
   // parsen anhalten
   stop();
 }
 
+void MrpcEc::Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) {
+  LOG(LM_DEBUG, "Attribute " << element << "  " <<  attribut << " " << mobs::to_string(value));
+  if (element == "MrpcAttachment" and attribut == "size") {
+    std::streamsize s;
+    try {
+      s = std::stoi(value);
+    } catch (...) {
+      s = 0;
+    }
+    attachmentLength = s;
+    LOG(LM_INFO, "Attachment follows " << s);
+  }
+}
+
+std::streamsize MrpcEc::getAttachmentLength() const {
+  return attachmentLength;
+}
+
 void MrpcEc::StartTag(const std::string &element)
 {
-  LOG(LM_DEBUG, "start " << element);
+  LOG(LM_DEBUG, "start " << element << " s " <<  int(state));
   // Wenn passendes Tag gefunden, dann Objekt einlesen
   if (state == connectingServer or state == connectingClient or state == getPubKey) { // ohne Login nur fixe Auswahl
     if (element == "MrpcSessionLoginResult")
@@ -263,22 +293,29 @@ void MrpcEc::StartTag(const std::string &element)
 
 void MrpcEc::EndTag(const std::string &element)
 {
-  LOG(LM_DEBUG, "end " << element << " lev " << level());
-  if (state == connected and not encrypted and level() == 2)
+  LOG(LM_DEBUG, "end " << element << " lev " << level() << " encrypt=" << std::boolalpha << encrypted);
+  // Elemen-Ende auf letzter Verschlüsselter Ebene; hier kann das Objekt schon gelesen werden; Bei Attachment aber weitermachen
+  if (state == connected and not encrypted and level() == 2 and attachmentLength == 0)
     state = readyRead;
 }
 
 bool MrpcEc::inByteStreamAvail() {
   // es muss mindestens ein Zeichen im Buffer sein, für den Delimiter
   auto s = streambufI.getIstream().rdbuf()->in_avail();
-  return s > 0;
+  //LOG(LM_INFO, "IBSA " << s << " " << iStr.rdbuf()->in_avail());
+  return s > 0 or iStr.rdbuf()->in_avail() > 0;
 }
 
 std::istream &MrpcEc::inByteStream(size_t sz)
 {
+  if (sz == 0)
+    sz = getAttachmentLength();
   LOG(LM_DEBUG, "Mrpc::inByteStream " << mobs::CryptBufAes::aes_size(sz));
   if (not session)
     throw std::runtime_error("session missing");
+  // schon jetzt alles wieder zurück
+  state = connected;
+  attachmentLength = 0;
   return byteStream(mobs::CryptBufAes::aes_size(sz), new mobs::CryptBufAes(session->sessionKey));
 }
 
@@ -294,7 +331,11 @@ std::ostream &MrpcEc::outByteStream()
 
 std::streamsize MrpcEc::closeOutByteStream()
 {
-  return writer.closeByteStream();
+  auto s = writer.closeByteStream();
+  if (checkAttachmentSize > 0 and s != checkAttachmentSize)
+    THROW("byte size incorrect " << s << " written should be " << checkAttachmentSize);
+  checkAttachmentSize = 0;
+  return s;
 }
 
 
@@ -320,12 +361,17 @@ void MrpcEc::xmlOut(const ObjectBase &obj)
   //writer.putc('\n');
 }
 
-void MrpcEc::sendSingle(const ObjectBase &obj)
+void MrpcEc::sendSingle(const ObjectBase &obj, std::streamsize attachmentSize)
 {
+  checkAttachmentSize = attachmentSize;
   encrypt();
+  if (attachmentSize > 0) {
+    writer.writeTagBegin(L"MrpcAttachment");
+    writer.writeAttribute(L"size", std::to_wstring(attachmentSize));
+    writer.writeTagEnd();
+  }
   xmlOut(obj);
   stopEncrypt();
-  //writer.putc('\n');
   flush();
 }
 
@@ -432,6 +478,10 @@ bool MrpcEc::parseServer()
       break;
     case closing:
       return false;
+    case attachment:
+      // Bytestream Modus
+      //LOG(LM_INFO, "BLAH " << inByteStreamAvail());
+      return inByteStreamAvail();
     case connectingClient:
     case getPubKey:
       throw std::runtime_error("error while connecting");
@@ -446,6 +496,10 @@ bool MrpcEc::parseClient()
   if (level() <= 0 and state != fresh and state != connectingClient and state != getPubKey) {
     session->sessionId = 0;
     THROW("Session ended");
+  }
+  if (state == attachment) { // Bytestream Modus
+    //LOG(LM_INFO, "BLAH " << inByteStreamAvail());
+    return inByteStreamAvail();
   }
   if (state != readyRead)
     parse();
@@ -470,7 +524,8 @@ bool MrpcEc::parseClient()
   }
 
   bool ret = state == readyRead;
-  state = connected;
+  if (ret)
+    state = connected;
   return ret;
 }
 
@@ -590,26 +645,9 @@ void MrpcEc::setEcdhSessionKey(const std::vector<u_char> &cipher, const std::str
 
 bool MrpcEc::isConnected() const
 {
-  return state == connected or state == readyRead or state == connectingServerConfirmed;
+  return state == connected or state == readyRead or state == connectingServerConfirmed or state == attachment;
 }
 
-bool MrpcEc::clientAboutToRead() const
-{
-  switch (state) {
-    case connectingClient:
-    case getPubKey:
-    case connected:
-    case readyRead:
-      return true;
-    case fresh:
-    case closing:
-    case connectingServer:
-    case connectingServerConfirmed:
-      break;
-  }
-
-  return false;
-}
 
 bool MrpcEc::serverKeepSession() const
 {
