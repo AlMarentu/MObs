@@ -45,6 +45,8 @@ endif()
 
 add_subdirectory(mobs)
 
+add_subdirectory(qt)
+
 
 
 

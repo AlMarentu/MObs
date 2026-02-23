@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2025 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -18,6 +18,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#include <fstream>
 
 #include "csb.h"
 #include "crypt.h"
@@ -54,6 +55,45 @@ public:
   MemVar(std::string, comment);
 };
 ObjRegister(MrpcPing);
+
+class Progress : virtual public mobs::ObjectBase
+{
+public:
+  ObjInit(Progress);
+
+  MemVar(int, percent);
+  MemVar(std::string, comment);
+};
+
+class LangeListe : virtual public mobs::ObjectBase
+{
+public:
+  ObjInit(LangeListe);
+
+  MemVar(std::string, name);
+  MemVar(std::string, comment);
+};
+ObjRegister(LangeListe);
+
+class LoadFile : virtual public mobs::ObjectBase
+{
+public:
+  ObjInit(LoadFile);
+
+  MemVar(long int, length);
+  MemVar(std::string, name);
+};
+ObjRegister(LoadFile);
+
+class BigDat : virtual public mobs::ObjectBase
+{
+public:
+  ObjInit(BigDat);
+
+  MemVar(long int, length);
+  MemVar(std::string, name);
+};
+ObjRegister(BigDat);
 
 
 class MrpcServer : public mobs::MrpcEc {
@@ -132,6 +172,8 @@ public:
 
   void authenticated(const std::string &login, const std::string &host, const std::string &software) override {
     LOG(LM_INFO, "AUTH " << session->info);
+    if (software == "qttest")
+      session->keyValidTime = 30;
   }
 
 
@@ -159,6 +201,7 @@ void server(mobs::TcpAccept &tcpAccept, int t) {
                                    {"Schiller", "Friedrich"},
                                    {"Lessing", "Gotthold Ephraim"},
                                    {"Shakespeare", "William"},
+                                   {"Bach", "Johann Sebastian"},
                                    {"Weber", "Carl Maria von"}} ;
   for (;;) {
     try {
@@ -180,6 +223,62 @@ void server(mobs::TcpAccept &tcpAccept, int t) {
           auto it = vornamen.find(res->name());
           MrpcPerson p;
           p.name(it != vornamen.end() ? it->second : "unbekannt");
+          server.sendSingle(p);
+        }
+        else if (auto res = server.getResult<LangeListe>()) {
+          TLOG(LM_INFO, "Received " << res->name());
+          server.encrypt();
+          server.writer.writeTagBegin(L"liste");
+          for (auto i = 0; i < 1000; i++) {
+            Progress p;
+            p.percent(i/10);
+            p.comment("Bitte warten ...");
+            usleep(5000);
+            server.xmlOut(p);
+          }
+          server.writer.writeTagEnd();
+          auto it = vornamen.find(res->name());
+          LangeListe p;
+          p.name(it != vornamen.end() ? it->second : "unbekannt");
+          server.sendSingle(p);
+        }
+        else if (auto res = server.getResult<LoadFile>()) {
+          LoadFile p;
+          p.name("log");
+          struct stat sbuf;
+          if (::stat("log", &sbuf) != 0)
+            THROW("stat failed");
+          p.length(sbuf.st_size);
+          server.sendSingle(p, sbuf.st_size);
+          auto &str = server.outByteStream();
+          ifstream istr(p.name());
+          if (not istr.is_open())
+            THROW("open failed");
+          str << istr.rdbuf();
+          istr.close();
+          auto sz = server.closeOutByteStream();
+          LOG(LM_INFO, "Bytes written " << sz);
+          server.writer.putc('\n');
+          server.writer.sync();
+          server.flush();
+        }
+        else if (auto res = server.getResult<BigDat>()) {
+          LOG(LM_INFO, "Received BigDat");
+          while (server.isEncrypted() or not server.inByteStreamAvail()) {
+            LOG(LM_INFO, "WAIT DATA STARTS " << server.getAttachmentLength());
+            server.parseServer();
+          }
+          LOG(LM_INFO, "Start Attachment " << server.getAttachmentLength());
+          auto &istr = server.inByteStream();
+          std::ofstream ostr("raus");
+          ostr << istr.rdbuf();
+          ostr.close();
+          LOG(LM_INFO, "DATA STORED");
+
+          BigDat p;
+          p.name("log");
+          struct stat sbuf;
+          p.length(sbuf.st_size);
           server.sendSingle(p);
         }
       }
