@@ -32,6 +32,7 @@
 
 #include <stdio.h>
 #include <sstream>
+#include <strstream>
 #include <gtest/gtest.h>
 
 #include "logging.h"
@@ -822,6 +823,37 @@ TEST(cryptTest, xmlenc) {
   }
 }
 
+
+TEST(cryptTest, hkdf) {
+  // Beispiel aus RFC 5869, Test Case 1, 3, 4
+  std::vector<u_char> key, salt, info, result;
+  key = {0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, };
+  salt = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
+  info = {0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9 };
+  EXPECT_NO_THROW(mobs::hashHkdf(result, key, salt, info, 42));
+  {
+    std::strstream str;
+    for (unsigned char i : result) str << std::hex << std::setfill('0') << std::setw(2) << int(i);
+    EXPECT_STREQ(str.str(), "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865");
+  }
+
+  EXPECT_NO_THROW(mobs::hashHkdf(result, key, {}, {}, 42));
+  {
+    std::strstream str;
+    for (unsigned char i : result) str << std::hex << std::setfill('0') << std::setw(2) << int(i);
+    EXPECT_STREQ(str.str(), "8da4e775a563c18f715f802a063c5a31b8a11f5c5ee1879ec3454e5f3c738d2d9d201395faa4b61a96c8");
+  }
+
+  key = {0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, };
+
+  EXPECT_NO_THROW(mobs::hashHkdf(result, key, salt, info, 42, "sha-1"));
+  {
+    std::strstream str;
+    for (unsigned char i : result) str << std::hex << std::setfill('0') << std::setw(2) << int(i);
+    EXPECT_STREQ(str.str(), "085a01ea1b10f36933068b56efa5ad81a4f14b822f5b091568a9cdd4f155fda2c22e422478d305f3f896");
+  }
+
+}
 
 }
 

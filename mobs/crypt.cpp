@@ -35,6 +35,10 @@
 #include <openssl/pem.h>
 #include <openssl/provider.h>
 #include <openssl/crypto.h>
+#include <openssl/kdf.h>
+#include <openssl/params.h>
+#include <openssl/core_names.h>
+
 #include <utility>
 #include <array>
 #include <vector>
@@ -59,6 +63,7 @@ public:
   void operator()(EVP_CIPHER_CTX *p) { EVP_CIPHER_CTX_free(p); }
   void operator()(EVP_MD_CTX *p) { EVP_MD_CTX_free(p); }
   void operator()(EVP_MD *p) { EVP_MD_free(p); }
+  void operator()(EVP_KDF_CTX *p) { EVP_KDF_CTX_free(p); }
 };
 
 std::string openSslGetError();
@@ -743,4 +748,41 @@ void mobs::ecdhGenerate(std::vector<u_char> &secret, std::string &ephemeralPubKe
 
 
 
+}
+
+void mobs::hashHkdf(std::vector<u_char> &out, const std::vector<u_char> &secret, const std::vector<u_char> &salt,
+                const std::vector<u_char> &info, size_t length, const std::string &digest) {
+  OSSL_PARAM params[5], *p = params;
+
+  // 1. HKDF Algorithmus laden
+  auto kdf = EVP_KDF_fetch(nullptr, "HKDF", nullptr);
+  if (not kdf)
+    throw openssl_exception(LOGSTR("mobs::hashHkdf"));
+
+  // 2. Kontext für die Operation erstellen
+  std::unique_ptr<EVP_KDF_CTX, SSL_Delete>kctx(EVP_KDF_CTX_new(kdf), SSL_Delete{});
+  EVP_KDF_free(kdf); // Wird nach Context-Erstellung nicht mehr benötigt
+  if (not kctx)
+    throw openssl_exception(LOGSTR("mobs::hashHkdf"));
+
+  // 3. Parameter definieren (Digest, Key, Salt, Info)
+  *p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST, const_cast<char *>(digest.c_str()), 0);
+  *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY, const_cast<u_char *>(&secret[0]), secret.size());
+  if (not salt.empty())
+    *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT, const_cast<u_char *>(&salt[0]), salt.size());
+  else
+    *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT, const_cast<char *>(""), 0);
+
+  if (not info.empty())
+    *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO, const_cast<u_char *>(&info[0]), info.size());
+  else
+    *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO, const_cast<char *>(""), 0);
+  *p = OSSL_PARAM_construct_end();
+
+  // 4. Schlüssel ableiten
+  out.resize(length);
+  if (EVP_KDF_derive(kctx.get(), &out[0], out.size(), params) <= 0) {
+    out.clear();
+    throw openssl_exception(LOGSTR("mobs::hashHkdf"));
+  }
 }

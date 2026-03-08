@@ -543,7 +543,7 @@ void MrpcEc::clientRefreshKey(std::string &serverkey) {
   // Verschlüsselung mit altem Schlüssel starten
   encrypt();
   // aus shared secret den session-key erzeugen
-  hash_value(secret, session->sessionKey, "sha256");
+  hashHkdf(session->sessionKey, secret);
   MrpcNewEphemeralKey newKey;
   std::vector<u_char> v;
   from_string_base64(session->info, v);
@@ -573,7 +573,7 @@ void MrpcEc::startSession(const std::string &keyId, const std::string &software,
     std::vector<u_char> secret;
     ecdhGenerate(secret, session->info, serverkey);
     // aus shared secret den session-key erzeugen
-    hash_value(secret, session->sessionKey, "sha256");
+    hashHkdf(session->sessionKey, secret);
     session->generated = time(nullptr);
     if (state == fresh) {
       session->keyName = keyId;
@@ -636,7 +636,7 @@ void MrpcEc::setEcdhSessionKey(const std::vector<u_char> &cipher, const std::str
   // aus ephemeral key das shared secret ermitteln
   deriveSharedSecret(secret, ephemeralKey, privKey, passwd);
   // aus shared secret den session-key erzeugen
-  hash_value(secret, session->sessionKey, "sha256");
+  hashHkdf(session->sessionKey, secret);
   session->last = time(nullptr);
   if (not session->generated)
     session->generated = session->last;

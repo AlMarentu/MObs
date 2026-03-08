@@ -47,7 +47,12 @@ public:
   std::string idTo; ///< Bezeichnung des Empfängers
   std::vector<u_char> cipher; //< cipher
 };
-
+/*
+ * For BrainpoolP256r1, the OID is 1.3.36.3.3.2.8.1.1.7.
+ * For secp256r1 the attribute value is urn:oid:1.2.840.10045.3.1.7.
+ * For secp384r1 the attribute value is urn:oid:1.3.132.0.34.
+ * For secp521r1 the attribute value is urn:oid1.3.132.0.35.
+ */
 enum CryptKeyType {
   CryptRSA2048, //< RSA mit 2048 Bit
   CryptRSA3072, //< RSA mit 3072 Bit
@@ -70,7 +75,7 @@ enum CryptKeyType {
  * @param filePub Dateiname für die zu erzeugende public-key Datei im PEM-Format
  * @param passphrase Passphrase für den private-key
  * @param format Format für Ausgabe, default ist "PEM"
- * \throw runtime_error im Fehlerfall
+ * \throw std::runtime_error im Fehlerfall
  */
 void generateCryptoKey(enum CryptKeyType type, const std::string &filePriv, const std::string &filePub, const std::string &passphrase, const std::string &format = "PEM");
 
@@ -82,7 +87,7 @@ void generateCryptoKey(enum CryptKeyType type, const std::string &filePriv, cons
  * @param priv String des erzeugten private-key im PEM-Format
  * @param pub String des erzeugten public-key im PEM-Format
  * @param passphrase Passphrase für den private-key, wenn leer dann unverschlüsselt
- * \throw runtime_error im Fehlerfall
+ * \throw std::runtime_error im Fehlerfall
  */
 void generateCryptoKeyMem(enum CryptKeyType type, std::string &priv, std::string &pub, const std::string &passphrase = "");
 
@@ -90,7 +95,7 @@ void generateCryptoKeyMem(enum CryptKeyType type, std::string &priv, std::string
  *
  * @param data Schlüssel im DER-Format
  * @return String des erzeugten public-key im PEM-Format
- * \throw runtime_error im Fehlerfall
+ * \throw std::runtime_error im Fehlerfall
  */
 std::string getPublicKey(const std::vector<u_char> &data);
 
@@ -100,7 +105,7 @@ std::string getPublicKey(const std::vector<u_char> &data);
  * @param sessionKey zu verschlüsselnde Zeichenkette
  * @param cipher verschlüsseltes Ergebnis
  * @param filePub Dateipfad eines public Keys oder der Schlüssel selbst im PEM-Format
- * \throw runtime_error im Fehlerfall
+ * \throw std::runtime_error im Fehlerfall
  */
 void encryptPublic(const std::vector<u_char> &sessionKey, std::vector<u_char> &cipher, const std::string &filePub);
 
@@ -110,7 +115,7 @@ void encryptPublic(const std::vector<u_char> &sessionKey, std::vector<u_char> &c
  * @param sessionKey entschlüsselte Zeichenkette
  * @param filePriv Dateipfad eines private Keys oder der Schlüssel selbst im PEM-Format
  * @param passphrase Kennwort zum private Key
- * \throw runtime_error im Fehlerfall
+ * \throw std::runtime_error im Fehlerfall
 */
 void decryptPrivate(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePriv, const std::string &passphrase);
 
@@ -121,7 +126,7 @@ void decryptPrivate(const std::vector<u_char> &cipher, std::vector<u_char> &sess
  * @param cipher verschlüsseltes Ergebnis
  * @param filePriv Dateipfad eines private Keys oder der Schlüssel selbst im PEM-Format
  * @param passphrase Kennwort zum private Key
- * \throw runtime_error im Fehlerfall
+ * \throw std::runtime_error im Fehlerfall
  */
 void encryptPrivate(const std::vector<u_char> &sessionKey, std::vector<u_char> &cipher, const std::string &filePriv, const std::string &passphrase);
 
@@ -130,7 +135,7 @@ void encryptPrivate(const std::vector<u_char> &sessionKey, std::vector<u_char> &
  * @param cipher verschlüsselte Eingabe
  * @param sessionKey entschlüsselte Zeichenkette
  * @param filePup Dateipfad eines public Keys oder der Schlüssel selbst im PEM-Format
- * \throw runtime_error im Fehlerfall
+ * \throw std::runtime_error im Fehlerfall
  */
 void decryptPublic(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePup);
 
@@ -140,7 +145,7 @@ void decryptPublic(const std::vector<u_char> &cipher, std::vector<u_char> &sessi
  * @param cipher erzeugte Signatur
  * @param filePriv Dateipfad eines private Keys oder der Schlüssel selbst im PEM-Format
  * @param passphrase Kennwort zum private Key
- * \throw runtime_error im Fehlerfall
+ * \throw std::runtime_error im Fehlerfall
  */
 void digestSign(const std::vector<u_char> &buffer, std::vector<u_char> &cipher, const std::string &filePriv,
                 const std::string &passphrase);
@@ -189,7 +194,7 @@ std::string readPrivateKey(const std::string &filePriv, const std::string &passp
  *
  * @param filePub Dateipfad eines private Keys im PEM-Format
  * @return pub String des erzeugten public-key im PEM-Format
- * \throw runtime_error im Fehlerfall
+ * \throw std::runtime_error im Fehlerfall
 */
 std::string readPublicKey(const std::string &filePub);
 
@@ -198,7 +203,7 @@ std::string readPublicKey(const std::string &filePub);
  * @param filePriv Dateipfad eines private Keys oder der Schlüssel selbst im PEM-Format
  * @param passphrase Kennwort zum private Key
  * @return Info in Textform oder Leerstring im Fehlerfall
- * \throw runtime_error im Fehlerfall
+ * \throw std::runtime_error im Fehlerfall
  */
 std::string getKeyInfo(const std::string &filePriv, const std::string &passphrase);
 
@@ -206,7 +211,7 @@ std::string getKeyInfo(const std::string &filePriv, const std::string &passphras
  *
  * @param filePub Dateipfad eines öffentlichen Keys oder der Schlüssel selbst im PEM-Format
  * @return Info in Textform oder Leerstring im Fehlerfall
- * \throw runtime_error im Fehlerfall
+ * \throw std::runtime_error im Fehlerfall
  */
 std::string getKeyInfo(const std::string &filePub);
 
@@ -231,7 +236,7 @@ std::string getKeyFingerprint(const std::string &filePub);
  * @param filePup öffentlicher-Schlüssel des Servers
  * @param filePriv privater Schlüssel des Clients oder leer (ab openSSL 3.2)
  * @param passphrase Passwort zum privaten Schlüssel oder leer
- * \throw runtime_error im Fehlerfall
+ * \throw std::runtime_error im Fehlerfall
  */
 void encapsulatePublic(std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePup, const std::string &filePriv = "",
                        const std::string &passphrase = "");
@@ -243,7 +248,7 @@ void encapsulatePublic(std::vector<u_char> &cipher, std::vector<u_char> &session
  * @param filePriv privater Schlüssel des Server
  * @param passphrase Passwort zum privaten Schlüssel
  * @param filePup öffentlicher-Schlüssel des Clients zur Authentisierung oder leer (ab openSSL 3.2)
- * \throw runtime_error im Fehlerfall
+ * \throw std::runtime_error im Fehlerfall
  */
 void decapsulatePublic(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePriv,
                        const std::string &passphrase, const std::string &filePup = "");
@@ -255,7 +260,7 @@ void decapsulatePublic(const std::vector<u_char> &cipher, std::vector<u_char> &s
  * @param filePubPeer öffentlicher Schlüssel der Gegenstelle
  * @param filePriv privater eigener Schlüssel
  * @param passphrase Passwort zum privaten Schlüssel
- * \throw runtime_error im Fehlerfall
+ * \throw std::runtime_error im Fehlerfall
  */
 void deriveSharedSecret(std::vector<u_char> &secret, const std::string &filePubPeer, const std::string &filePriv,
                         const std::string &passphrase);
@@ -270,9 +275,22 @@ void deriveSharedSecret(std::vector<u_char> &secret, const std::string &filePubP
  * @param secret generiertes shared secret das dem Server mitgeteilt wird
  * @param ephemeralPubKey generierter publicKey des ephemeral keys im DER-Format base64
  * @param serverPub öffentlicher-Schlüssel des Servers
- * \throw runtime_error im Fehlerfall
+ * \throw std::runtime_error im Fehlerfall
  */
 void ecdhGenerate(std::vector<u_char> &secret, std::string &ephemeralPubKey, const std::string &serverPub);
+
+/** \brief hkdf Schlüsselerzeugung nach RFC 5869
+ *
+ * @param result erzeugter Schlüssel mit length Octets
+ * @param secret das Shared-Secret
+ * @param salt der optionale salt
+ * @param info die optionale Zusatzinfo
+ * @param length Anzahl der benötigten Octets
+ * @param digest Hash-Methode
+ * \throw std::runtime_error im Fehlerfall
+ */
+void hashHkdf(std::vector<u_char> &result, const std::vector<u_char> &secret, const std::vector<u_char> &salt = {},
+               const std::vector<u_char> &info = {}, size_t length = 32, const std::string &digest = "sha256");
 
 }
 
