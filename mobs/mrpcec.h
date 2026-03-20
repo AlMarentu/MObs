@@ -34,7 +34,7 @@ namespace mobs {
 
 
 
-/** \brief Klasse für Client-Server Modul über verschlüsselte XML-RPC-Calls
+/** \brief Klasse für Client-Server Modul über verschlüsselte XML-RPC-Calls.
  *
  * Die XML-Struktur der Nutzdaten ist anhand RFC 4051 implementiert.
  * Der Schlüsselaustausch erfolgt mittels ephemeren Diffie-Hellman auf Basis elliptischer Kurven. Die Authentisierung
@@ -51,7 +51,7 @@ namespace mobs {
     // wait for connected
     client.stopEncrypt();
     client.flush();
-    while (not client.isConnected()) {
+    while (not client.isConnected()){
       LOG(LM_INFO, "WAIT for connected");
       client.parseClient();
     }
@@ -137,7 +137,7 @@ public:
    *
    * Die Login-Anforderung cipher muss mit setSessionKey(cipher, keyId, serverPrivKey, passwd) quittiert werden.
    * Über die Callback-Methode getSenderPublicKey muss aus der keyId der public key des Senders ermittelt werden können.
-.  *
+   *
    * Bei einer exception wird die Login-Anforderung abgelehnt
    * @param cipher ephemeral key
    * @param keyId id zum public key des Senders oder leer
@@ -159,7 +159,7 @@ public:
   * Über die Callback-Methode getSenderPublicKey muss, aus der keyId, der public key des Senders ermittelt werden können
   *
   * zusätzlich müssen in der Session-Struktur die sessionId, sessionReuseTime sowie keyValidTime gesetzt werden.
-. *
+  *
   * Die Methode muss nur implementiert werden, wenn ein Schlüsselwechsel benötigt wird und wenn eine abweichende Behandlung
   * zum login vonnöten ist
   * @param cipher ephemeral key
@@ -175,7 +175,7 @@ public:
    */
   virtual std::string getSenderPublicKey(const std::string &keyId) { return {}; }
 
-  /** \brief callback für Server: Anfrage des public keys.
+  /** \brief callback für Server: Anfrage des Public Keys.
    *
    * Wird kein Schlüssel zurückgeliefert, so erhält der Client eine Fehlermeldung
    * \return Rückgabe des PupKeys im PEM-Format "-----BEGIN ..." oder leer bei Fehler
@@ -185,14 +185,14 @@ public:
   /** \brief Ermittle Session-Informationen aus dem ephemeren Schlüssel nach Diffie-Hellman auf Basis elliptischer Kurven (für Server).
    *
    * Der Schlüssel wird in der Session-Variable publicServerKey gespeichert.
-   * Der Server muss eine gültige Session haben, dann werden dort sessionKey, last und generated  gesetzt.
-   * Der sessionKey wird mittels sha256 aus dem shared secret berechnet.
+   * Der Server muss eine gültige Session haben, dann werden dort sessionKey, last und generated gesetzt.
+   * Aus dem shared secret wird der sessionKey wird mittels hash-KDF methode über sha256 berechnet.
    * @param ephemeralKey ephemerer Schlüssel der Client-Message
-   * @param privKey private key des Servers
+   * @param privateKey private key des Servers
    * @param passwd zugehöriges Passwort
    * \throw std::runtime_error im Fehlerfall
    */
-  void setEcdhSessionKey(const std::vector<u_char> &ephemeralKey, const std::string &privKey, const std::string &passwd);
+  void setEcdhSessionKey(const std::vector<u_char> &ephemeralKey, const std::string &privateKey, const std::string &passwd) const;
 
 
   /// senden eines Objektes ohne flush()
@@ -215,12 +215,12 @@ public:
    * Danach muss parseClient verwendet werden
    * @param keyId Id des Client-Schlüssels
    * @param software Info-String des aufrufenden Programmes
-   * @param privkey private Key des Clients
+   * @param privateKey private Key des Clients
    * @param passphrase zugehöriges Passwort
    * @param serverPubKey public Key des Servers
    */
-  void startSession(const std::string &keyId, const std::string &software, const std::string &privkey,
-                    const std::string &passphrase, std::string &serverPubKey);
+  void startSession(const std::string &keyId, const std::string &software, const std::string &privateKey,
+                    const std::string &passphrase, const std::string &serverPubKey);
 
   /** \brief Erzeuge einen neuen Schlüssel mit cipher und sende ihn an den Server (für Client).
    *
@@ -228,7 +228,7 @@ public:
    * Schlüsselwechsel, nach dem "wait for connected"
    * @param serverPubKey public Key des Servers
    */
-  void clientRefreshKey(std::string &serverPubKey);
+  void clientRefreshKey(const std::string &serverPubKey);
 
   /** \brief Sende eine Anfrage an den Server, um dessen public Key abzufragen (for Client).
    *
@@ -255,9 +255,9 @@ public:
 
 protected:
   /// \private
-  void StartTag(const std::string &element) override;
+  void StartTag(const std::string &ns, const std::string &element) override;
   /// \private
-  void EndTag(const std::string &element) override;
+  void EndTag(const std::string &ns, const std::string &element, bool emptyElement) override;
   /// \private
   void Encrypt(const std::string &algorithm, const ObjectBase *keyInfo, CryptBufBase *&cryptBufp) override;
   /// \private
@@ -265,7 +265,7 @@ protected:
   /// \private
   void filled(mobs::ObjectBase *obj, const std::string &error) override;
   /// \private
-  void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) override;
+  void Attribute(const std::string &ns, const std::string &element, const std::string &attribut, const std::wstring &value) override;
 
 private:
   bool encrypted = false;

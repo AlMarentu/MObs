@@ -24,7 +24,6 @@
 #include "crypt.h"
 #include "logging.h"
 #include "converter.h"
-#include "digest.h"
 
 #include <openssl/ssl.h>
 #include <openssl/rand.h>
@@ -40,10 +39,10 @@
 #include <openssl/core_names.h>
 
 #include <utility>
-#include <array>
 #include <vector>
-#include <cstring>
 #include <iomanip>
+
+#include "encdata.h"
 
 
 #define KEYBUFLEN 32
@@ -55,14 +54,23 @@ namespace mobs_internal {
 class SSL_Delete {
 public:
   SSL_Delete() = default;
+  // ReSharper disable once CppMemberFunctionMayBeConst
   void operator()(BIO *p) { BIO_free_all(p); }
+  // ReSharper disable once CppMemberFunctionMayBeConst
   void operator()(OSSL_ENCODER_CTX *p) { OSSL_ENCODER_CTX_free(p); }
+  // ReSharper disable once CppMemberFunctionMayBeConst
   void operator()(OSSL_DECODER_CTX *p) { OSSL_DECODER_CTX_free(p); }
+  // ReSharper disable once CppMemberFunctionMayBeConst
   void operator()(EVP_PKEY *p) { EVP_PKEY_free(p); }
+  // ReSharper disable once CppMemberFunctionMayBeConst
   void operator()(EVP_PKEY_CTX *p) { EVP_PKEY_CTX_free(p); }
+  // ReSharper disable once CppMemberFunctionMayBeConst
   void operator()(EVP_CIPHER_CTX *p) { EVP_CIPHER_CTX_free(p); }
+  // ReSharper disable once CppMemberFunctionMayBeConst
   void operator()(EVP_MD_CTX *p) { EVP_MD_CTX_free(p); }
+  // ReSharper disable once CppMemberFunctionMayBeConst
   void operator()(EVP_MD *p) { EVP_MD_free(p); }
+  // ReSharper disable once CppMemberFunctionMayBeConst
   void operator()(EVP_KDF_CTX *p) { EVP_KDF_CTX_free(p); }
 };
 
@@ -78,9 +86,9 @@ public:
     if (legacy_provider)
       return;
     OPENSSL_init_crypto(OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS, nullptr);
-    legacy_provider = OSSL_PROVIDER_load(NULL, "legacy");
+    legacy_provider = OSSL_PROVIDER_load(nullptr, "legacy");
     if (!legacy_provider)
-      LOG(LM_ERROR, "cann't load OpenSSL legacy provider");
+      LOG(LM_ERROR, "can't load OpenSSL legacy provider");
     LOG(LM_INFO, "OpenSSL legacy provider loaded");
   }
   static void close() {
@@ -129,7 +137,7 @@ std::unique_ptr<EVP_PKEY, SSL_Delete> mobs_internal::readPrivateKey(const std::s
     return {nullptr, SSL_Delete{}};
   std::unique_ptr<BIO, SSL_Delete> bp{nullptr, SSL_Delete{}};
   if (file.length() > 10 and file.compare(0, 10, "-----BEGIN") == 0) {
-    bp.reset(BIO_new_mem_buf(file.c_str(), int(file.length())));
+    bp.reset(BIO_new_mem_buf(file.c_str(), static_cast<int>(file.length())));
     if (not bp)
       THROW("alloc mem");
   }
@@ -157,7 +165,7 @@ std::unique_ptr<EVP_PKEY, SSL_Delete> mobs_internal::readPublicKey(const std::st
     return {nullptr, SSL_Delete{}};
   std::unique_ptr<BIO, SSL_Delete> bp{nullptr, SSL_Delete{}};
   if (file.length() > 10 and file.compare(0, 10, "-----BEGIN") == 0) {
-    bp.reset(BIO_new_mem_buf(file.c_str(), int(file.length())));
+    bp.reset(BIO_new_mem_buf(file.c_str(), static_cast<int>(file.length())));
     if (not bp)
       THROW("alloc mem");
   }
@@ -181,7 +189,7 @@ std::unique_ptr<EVP_PKEY, SSL_Delete> mobs_internal::readPublicKey(const std::st
 }
 
 
-static void exportPrivateKeyToFile(EVP_PKEY *pkey, const std::string &filePriv, const std::string &passphrase, const std::string &format = "PEM")
+static void exportPrivateKeyToFile(const EVP_PKEY *pkey, const std::string &filePriv, const std::string &passphrase, const std::string &format = "PEM")
 {
   // bei DER: *structure = "PrivateKeyInfo"; /* PKCS#8 structure */ oder EncryptedPrivateKeyInfo
   // OSSL_KEYMGMT_SELECT_KEYPAIR
@@ -202,7 +210,7 @@ static void exportPrivateKeyToFile(EVP_PKEY *pkey, const std::string &filePriv, 
     throw openssl_exception(LOGSTR("mobs::exportPrivateKeyToFile write failed"));
 }
 
-static void exportPublicKeyToFile(EVP_PKEY *pkey, const std::string &filePub, const std::string &format = "PEM")
+static void exportPublicKeyToFile(const EVP_PKEY *pkey, const std::string &filePub, const std::string &format = "PEM")
 {
   std::unique_ptr<BIO, SSL_Delete> bp_public(BIO_new_file(filePub.c_str(), "w+"), SSL_Delete{});
   std::unique_ptr<OSSL_ENCODER_CTX, SSL_Delete> ectx(OSSL_ENCODER_CTX_new_for_pkey(pkey,
@@ -216,7 +224,7 @@ static void exportPublicKeyToFile(EVP_PKEY *pkey, const std::string &filePub, co
     throw openssl_exception(LOGSTR("mobs::exportPublicKeyToFile write failed"));
 }
 
-static std::string exportPrivateKey(EVP_PKEY *pkey, const std::string &passphrase)
+static std::string exportPrivateKey(const EVP_PKEY *pkey, const std::string &passphrase)
 {
   const char *format = "PEM";
   std::unique_ptr<OSSL_ENCODER_CTX, SSL_Delete> ectx(OSSL_ENCODER_CTX_new_for_pkey(pkey,
@@ -227,7 +235,7 @@ static std::string exportPrivateKey(EVP_PKEY *pkey, const std::string &passphras
   if (not ectx)
     throw openssl_exception(LOGSTR("mobs::exportPrivateKey no suitable potential encoders found"));
   if (not passphrase.empty()) {
-    OSSL_ENCODER_CTX_set_passphrase(ectx.get(), (const unsigned char *)passphrase.c_str(), passphrase.length());
+    OSSL_ENCODER_CTX_set_passphrase(ectx.get(), reinterpret_cast<const unsigned char *>(passphrase.c_str()), passphrase.length());
     //OSSL_ENCODER_CTX_set_cipher(ectx.get(), "AES-256-CBC", nullptr);
     OSSL_ENCODER_CTX_set_cipher(ectx.get(), "DES-EDE3-CBC", nullptr);
   }
@@ -240,9 +248,8 @@ static std::string exportPrivateKey(EVP_PKEY *pkey, const std::string &passphras
   return mem;
 }
 
-static std::string exportPublicKey(EVP_PKEY *pkey)
+static std::string exportPublicKey(const EVP_PKEY *pkey, const char *format = "PEM") // oder TEXT nicht aber DER
 {
-  const char *format = "PEM";
   std::unique_ptr<OSSL_ENCODER_CTX, SSL_Delete> ectx(OSSL_ENCODER_CTX_new_for_pkey(pkey,
                                        OSSL_KEYMGMT_SELECT_PUBLIC_KEY
                                        | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS,
@@ -259,7 +266,7 @@ static std::string exportPublicKey(EVP_PKEY *pkey)
   return mem;
 }
 
-static void exportPublicKey(EVP_PKEY *pkey, std::vector<u_char> &key)
+static void exportPublicKey(const EVP_PKEY *pkey, std::vector<u_char> &key)
 {
   std::unique_ptr<OSSL_ENCODER_CTX, SSL_Delete> ectx(OSSL_ENCODER_CTX_new_for_pkey(pkey,
                                        OSSL_KEYMGMT_SELECT_PUBLIC_KEY
@@ -273,9 +280,36 @@ static void exportPublicKey(EVP_PKEY *pkey, std::vector<u_char> &key)
   if (not OSSL_ENCODER_to_data(ectx.get(), &data, &datalen))
     throw openssl_exception(LOGSTR("mobs::exportPublicKey write failed"));
   key.reserve(datalen);
-  std::copy((char *)data, (char *)data + datalen, std::back_inserter(key));
+  std::copy_n((char *)data, datalen, std::back_inserter(key));
   free(data);
 }
+
+// Liefert z.N.: NID_rsaEncryption, NID_X25519, NID_X9_62_prime256v1, usw.
+static int getNid(const EVP_PKEY *pkey) {
+  int nid = EVP_PKEY_get_id(pkey);
+  //LOG(LM_INFO, "NID = " << nid);
+  //LOG(LM_INFO, "PUB " << exportPublicKey(pkey, "TEXT"));
+  if (nid == NID_X9_62_id_ecPublicKey) {
+    char curve_name[64];
+    size_t len;
+    // Abrufen des Gruppennamens (Kurvennamens) direkt aus dem EVP_PKEY
+    if (EVP_PKEY_get_group_name(pkey, curve_name, sizeof(curve_name), &len)) {
+      //LOG(LM_DEBUG, "Kurven-Name: " << curve_name);
+      // Umwandlung des Namens in einen NID
+      int curve_nid = OBJ_sn2nid(curve_name);
+      //LOG(LM_INFO, "CNID = " << curve_nid);
+      if (curve_nid > 0)
+        nid = curve_nid;
+    }
+  }
+  return nid;
+}
+
+int mobs::getNidASN1(const std::string &oid) {
+  //LOG(LM_INFO, "ASN1 " << oid);
+  return OBJ_txt2nid(oid.c_str());
+}
+
 
 // erzeuge neuen Schlüssel mit denselben Parametern wie oldKey
 static std::unique_ptr<EVP_PKEY, SSL_Delete> genKey(EVP_PKEY *oldKey) {
@@ -338,6 +372,33 @@ static std::unique_ptr<EVP_PKEY, SSL_Delete> genKey(enum mobs::CryptKeyType type
 }
 
 
+void mobs::setEcKeyInfo(ObjectBase &keyValue, const std::string &filePub) {
+  auto ecKey = dynamic_cast<EcKey *>(&keyValue);
+  if (not ecKey)
+    THROW("mobs::setEcKeyInfo keyValue has wrong type");
+  auto pKey = mobs_internal::readPublicKey(filePub);
+  if (not pKey)
+    THROW(u8"can't load pub key");
+  std::vector<u_char> key;
+  exportPublicKey(pKey.get(), key);
+  ecKey->ECKeyValue.PublicKey(mobs::to_string_base64(key));
+
+  int nid = getNid(pKey.get());
+  //LOG(LM_INFO, "NID = " << nid);
+  ASN1_OBJECT *obj = OBJ_nid2obj(nid);
+  if (not obj)
+    THROW(u8"mobs::setEcKeyInfo invalid nid-object nid = " << nid);
+
+  // In Textform umwandeln (z.B. "1.2.840.113549.1.1.1")
+  char oid_buf[80];
+  OBJ_obj2txt(oid_buf, sizeof(oid_buf), obj, 1); // mit 0 kommt der Name
+  //LOG(LM_INFO, "OID " << oid_buf);
+  ecKey->ECKeyValue.NameCurve.URI(std::string("urn:oid:") + oid_buf);
+
+  // ASN1 wieder in NID
+  //LOG(LM_INFO, "OID_NID " << getNidASN1(oid_buf));
+}
+
 std::string mobs::getPublicKey(const std::vector<u_char> &data) {
   EVP_PKEY *pkey{};
   std::unique_ptr<OSSL_DECODER_CTX, SSL_Delete> ectx(OSSL_DECODER_CTX_new_for_pkey(&pkey,
@@ -371,8 +432,8 @@ void mobs::generateCryptoKeyMem(enum CryptKeyType type, std::string &priv, std::
 
 
 void
-mobs::decryptPublic(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePup) {
-  auto rsaPubKey = mobs_internal::readPublicKey(filePup);
+mobs::decryptPublic(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePub) {
+  auto rsaPubKey = mobs_internal::readPublicKey(filePub);
   if (not rsaPubKey)
     THROW(u8"can't load pub key");
   if (cipher.size() != EVP_PKEY_size(rsaPubKey.get()))
@@ -447,8 +508,8 @@ mobs::decryptPrivate(const std::vector<u_char> &cipher, std::vector<u_char> &ses
 
 
 void
-mobs::encryptPublic(const std::vector<u_char> &sessionKey, std::vector<u_char> &cipher, const std::string &filePup) {
-  auto rsaPubKey = mobs_internal::readPublicKey(filePup);
+mobs::encryptPublic(const std::vector<u_char> &sessionKey, std::vector<u_char> &cipher, const std::string &filePub) {
+  auto rsaPubKey = mobs_internal::readPublicKey(filePub);
   if (not rsaPubKey)
     THROW(u8"can't load pub key");
   if (sessionKey.size() >= EVP_PKEY_size(rsaPubKey.get()) - 41)
@@ -501,8 +562,8 @@ mobs::digestSign(const std::vector<u_char> &buffer, std::vector<u_char> &cipher,
 }
 
 bool
-mobs::digestVerify(const std::vector<u_char> &buffer, const std::vector<u_char> &cipher, const std::string &filePup) {
-  auto eckey = mobs_internal::readPublicKey(filePup);
+mobs::digestVerify(const std::vector<u_char> &buffer, const std::vector<u_char> &cipher, const std::string &filePub) {
+  auto eckey = mobs_internal::readPublicKey(filePub);
   if (not eckey)
     THROW(u8"can't load pub key");
   std::unique_ptr<EVP_MD_CTX, SSL_Delete>mdCtx(EVP_MD_CTX_new(), SSL_Delete{});
@@ -525,10 +586,10 @@ mobs::digestVerify(const std::vector<u_char> &buffer, const std::vector<u_char> 
 
 // cipher für Verschlüsselung, secret-key an empfänger Key Encapsulation Mechanism (KEM)
 void
-mobs::encapsulatePublic(std::vector<u_char> &cipher, std::vector<u_char> &key, const std::string &filePup, const std::string &filePriv,
+mobs::encapsulatePublic(std::vector<u_char> &cipher, std::vector<u_char> &key, const std::string &filePub, const std::string &filePriv,
                            const std::string &passphrase) {
   //mobs_internal::LegacyProvider::init();
-  auto rsaPubKey = mobs_internal::readPublicKey(filePup);
+  auto rsaPubKey = mobs_internal::readPublicKey(filePub);
   if (not rsaPubKey)
     THROW(u8"can't load pub key");
   auto rsaPrivKey = mobs_internal::readPrivateKey(filePriv, passphrase);
@@ -569,17 +630,17 @@ mobs::encapsulatePublic(std::vector<u_char> &cipher, std::vector<u_char> &key, c
 
 void
 mobs::decapsulatePublic(const std::vector<u_char> &cipher, std::vector<u_char> &key, const std::string &filePriv,
-                           const std::string &passphrase, const std::string &filePup) {
+                           const std::string &passphrase, const std::string &filePub) {
   auto rsaPrivKey = mobs_internal::readPrivateKey(filePriv, passphrase);
   if (not rsaPrivKey)
     THROW(u8"can't load priv key");
-  auto rsaPubKey = mobs_internal::readPublicKey(filePup);
+  auto rsaPubKey = mobs_internal::readPublicKey(filePub);
   std::unique_ptr<EVP_PKEY_CTX, SSL_Delete>ctx(EVP_PKEY_CTX_new_from_pkey(nullptr, rsaPrivKey.get(), nullptr), SSL_Delete{});
   if (!ctx)
     throw openssl_exception(LOGSTR("mobs::decapsulatePublic"));
   if (1 != EVP_PKEY_private_check(ctx.get()))
     THROW("IS NO PRIVATE KEY");
-  if (filePup.empty()) {
+  if (filePub.empty()) {
     if (EVP_PKEY_decapsulate_init(ctx.get(), nullptr) <= 0)
       throw openssl_exception(LOGSTR("mobs::decapsulatePublic"));
   } else {
@@ -596,11 +657,11 @@ mobs::decapsulatePublic(const std::vector<u_char> &cipher, std::vector<u_char> &
     throw std::runtime_error(LOGSTR("mobs::decapsulatePublic function not supported"));
 #endif
   }
-  size_t secretlen = 0;
-  if (EVP_PKEY_decapsulate(ctx.get(), nullptr, &secretlen, &cipher[0], cipher.size()) <= 0)
+  size_t secretLen = 0;
+  if (EVP_PKEY_decapsulate(ctx.get(), nullptr, &secretLen, &cipher[0], cipher.size()) <= 0)
     throw openssl_exception(LOGSTR("mobs::decapsulatePublic"));
-  key.resize(secretlen);
-  if (EVP_PKEY_decapsulate(ctx.get(), &key[0], &secretlen, &cipher[0], cipher.size()) <= 0)
+  key.resize(secretLen);
+  if (EVP_PKEY_decapsulate(ctx.get(), &key[0], &secretLen, &cipher[0], cipher.size()) <= 0)
     key.clear();
 }
 
@@ -613,7 +674,7 @@ bool mobs::checkPassword(const std::string &filePriv, const std::string &passphr
     if (!ctx)
       return false;
     return 1 == EVP_PKEY_private_check(ctx.get());
-  } catch (openssl_exception &e) {
+  } catch (openssl_exception &) {
     return false;
   }
 }
@@ -657,7 +718,7 @@ std::string mobs::getKeyInfo(const std::string &filePriv, const std::string &pas
     auto n = BIO_get_mem_data(biop.get(), &bptr);
     auto res = std::string(bptr, n);
     return res;
-  } catch (openssl_exception &e) {
+  } catch (openssl_exception &) {
     return {};
   }
 }
@@ -674,7 +735,7 @@ std::string mobs::getKeyInfo(const std::string &filePub) {
     auto n = BIO_get_mem_data(biop.get(), &bptr);
     auto res = std::string(bptr, n);
     return res;
-  } catch (openssl_exception &e) {
+  } catch (openssl_exception &) {
     return {};
   }
 }
@@ -710,17 +771,17 @@ void mobs::deriveSharedSecret(std::vector<u_char> &cipher, const std::string &fi
 }
 
 // public ephemeral key erzeugen
-void mobs::ecdhGenerate(std::vector<u_char> &secret, std::string &ephemeralPubKey, const std::string &serverPub) {
+void mobs::ecdhGenerate(std::vector<u_char> &secret, std::vector<u_char> &ephemeralPubKey, const std::string &serverPub) {
   //mobs_internal::LegacyProvider::init();
   auto rsaPubKey = mobs_internal::readPublicKey(serverPub);
   if (not rsaPubKey)
     THROW(u8"can't load pub key");
 
   // Schlüssel passend zum Server-Key erzeugen
-  auto peerkey = genKey(rsaPubKey.get());
+  auto peerKey = genKey(rsaPubKey.get());
 
   /* Create the context for the shared secret derivation */
-  std::unique_ptr<EVP_PKEY_CTX, SSL_Delete>ctx(EVP_PKEY_CTX_new_from_pkey(nullptr, peerkey.get(), nullptr), SSL_Delete{});
+  std::unique_ptr<EVP_PKEY_CTX, SSL_Delete>ctx(EVP_PKEY_CTX_new_from_pkey(nullptr, peerKey.get(), nullptr), SSL_Delete{});
   if (!ctx)
     throw openssl_exception(LOGSTR("mobs::ecdhGenerate"));
   /* Initialise */
@@ -741,13 +802,7 @@ void mobs::ecdhGenerate(std::vector<u_char> &secret, std::string &ephemeralPubKe
   if (EVP_PKEY_derive(ctx.get(), &secret[0], &outlen) <= 0)
     throw openssl_exception(LOGSTR("mobs::ecdhGenerate"));
 
-  std::vector<u_char> key;
-  exportPublicKey(peerkey.get(), key);
-  ephemeralPubKey = mobs::to_string_base64(key);
-
-
-
-
+  exportPublicKey(peerKey.get(), ephemeralPubKey);
 }
 
 void mobs::hashHkdf(std::vector<u_char> &out, const std::vector<u_char> &secret, const std::vector<u_char> &salt,

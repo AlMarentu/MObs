@@ -31,6 +31,7 @@
 #include <vector>
 
 namespace mobs {
+class ObjectBase;
 
 /// Klasse für public-Key Informationen
 class RecipientKey {
@@ -48,10 +49,12 @@ public:
   std::vector<u_char> cipher; //< cipher
 };
 /*
- * For BrainpoolP256r1, the OID is 1.3.36.3.3.2.8.1.1.7.
- * For secp256r1 the attribute value is urn:oid:1.2.840.10045.3.1.7.
- * For secp384r1 the attribute value is urn:oid:1.3.132.0.34.
- * For secp521r1 the attribute value is urn:oid1.3.132.0.35.
+ * For BrainpoolP256r1, the OID is 1.3.36.3.3.2.8.1.1.7
+ * For secp256r1 the attribute value is urn:oid:1.2.840.10045.3.1.7
+ * For secp384r1 the attribute value is urn:oid:1.3.132.0.34
+ * For secp521r1 the attribute value is urn:oid1.3.132.0.35
+ * For X25519 the attribute value is urn:oid:1.3.101.110
+ * rsa 1.2.840.113549.1.1.1
  */
 enum CryptKeyType {
   CryptRSA2048, //< RSA mit 2048 Bit
@@ -66,6 +69,14 @@ enum CryptKeyType {
   CryptECbrainpoolP384r1,
   CryptECbrainpoolP512r1,
 };
+
+/** \brief Key-Info struktur EcKey aur public Key füllen
+ *
+ * @param keyValue AgreementMethod.OriginatorKeyInfo.KeyValue
+ * @param filePub Dateiname für die zu erzeugende public-key Datei im PEM-Format
+ * \throws std::runtime_error wenn ein falscher Objekttyp übergeben wird
+ */
+void setEcKeyInfo(ObjectBase &keyValue, const std::string &filePub);
 
 /** \brief Erzeugung eines Schlüsselpaares (Datei)
  *
@@ -168,7 +179,7 @@ bool digestVerify(const std::vector<u_char> &buffer, const std::vector<u_char> &
  */
 bool checkPassword(const std::string &filePriv, const std::string &passphrase);
 
-/** \brief Schlüsselpaar erneut ausgeben
+/** \brief Schlüsselpaar erneut ausgeben.
  *
  * Aus dem privat key / File wird ein public/private Key-Paar erzeugt mit neuem Passwort.
  * So kann der öffentliche Schlüssel neu generiert werden oder das Passwort der privaten geändert
@@ -202,7 +213,7 @@ std::string readPublicKey(const std::string &filePub);
  *
  * @param filePriv Dateipfad eines private Keys oder der Schlüssel selbst im PEM-Format
  * @param passphrase Kennwort zum private Key
- * @return Info in Textform oder Leerstring im Fehlerfall
+ * @return Information in Textform oder Leerstring im Fehlerfall
  * \throw std::runtime_error im Fehlerfall
  */
 std::string getKeyInfo(const std::string &filePriv, const std::string &passphrase);
@@ -210,7 +221,7 @@ std::string getKeyInfo(const std::string &filePriv, const std::string &passphras
 /** \brief info zum Schlüssel ausgeben
  *
  * @param filePub Dateipfad eines öffentlichen Keys oder der Schlüssel selbst im PEM-Format
- * @return Info in Textform oder Leerstring im Fehlerfall
+ * @return Information in Textform oder Leerstring im Fehlerfall
  * \throw std::runtime_error im Fehlerfall
  */
 std::string getKeyInfo(const std::string &filePub);
@@ -230,7 +241,7 @@ std::string getKeyFingerprint(const std::string &filePub);
  * Ist der private Schlüssel angegeben, so wird eine zusätzliche authentifizierung des Client-Keys
  * hinzugefügt (ab openSSL 3.2)
  *
- * When ECDH is used in Ephemeral-Static (ES) mode, the recipient has a static key pair, but the sender generates a ephemeral key pair for each message.
+ * When ECDH is used in Ephemeral-Static (ES) mode, the recipient has a static key pair, but the sender generates an ephemeral key pair for each message.
  * @param cipher generierte Cipher die dem Server mitgeteilt wird
  * @param sessionKey generierter Session-Key der symmetrischen Verschlüsselung
  * @param filePup öffentlicher-Schlüssel des Servers
@@ -245,7 +256,7 @@ void encapsulatePublic(std::vector<u_char> &cipher, std::vector<u_char> &session
  *
  * @param cipher Cipher die vom Client erhalten wurde
  * @param sessionKey generierter Session-Key der symmetrischen Verschlüsselung
- * @param filePriv privater Schlüssel des Server
+ * @param filePriv privater Schlüssel des Servers
  * @param passphrase Passwort zum privaten Schlüssel
  * @param filePup öffentlicher-Schlüssel des Clients zur Authentisierung oder leer (ab openSSL 3.2)
  * \throw std::runtime_error im Fehlerfall
@@ -253,7 +264,7 @@ void encapsulatePublic(std::vector<u_char> &cipher, std::vector<u_char> &session
 void decapsulatePublic(const std::vector<u_char> &cipher, std::vector<u_char> &sessionKey, const std::string &filePriv,
                        const std::string &passphrase, const std::string &filePup = "");
 
-/** \brief Ermittel das gemeinsame shared secret zwischen zwei Schlusselpaaren
+/** \brief Ermittel das gemeinsame shared secret zwischen zwei Schlusselpaaren.
  *
  * Beide Seiten erhalten mit dem jeweiligen eigenen privaten und dem anderen öffentlichen Schlüssel dasselbe shared secret
  * @param secret generiertes shared secret
@@ -277,7 +288,7 @@ void deriveSharedSecret(std::vector<u_char> &secret, const std::string &filePubP
  * @param serverPub öffentlicher-Schlüssel des Servers
  * \throw std::runtime_error im Fehlerfall
  */
-void ecdhGenerate(std::vector<u_char> &secret, std::string &ephemeralPubKey, const std::string &serverPub);
+void ecdhGenerate(std::vector<u_char> &secret, std::vector<u_char> &ephemeralPubKey, const std::string &serverPub);
 
 /** \brief hkdf Schlüsselerzeugung nach RFC 5869
  *
@@ -291,6 +302,9 @@ void ecdhGenerate(std::vector<u_char> &secret, std::string &ephemeralPubKey, con
  */
 void hashHkdf(std::vector<u_char> &result, const std::vector<u_char> &secret, const std::vector<u_char> &salt = {},
                const std::vector<u_char> &info = {}, size_t length = 32, const std::string &digest = "sha256");
+
+/// Rückgabe NID oder NID_undef = 0; Bsp: oid = "1.3.101.110"
+int getNidASN1(const std::string &oid);
 
 }
 

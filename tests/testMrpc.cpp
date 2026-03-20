@@ -35,12 +35,14 @@
 #include "mrpc.h"
 #include "mrpcec.h"
 #include "tcpstream.h"
-//#include "encdata.h"
+#include "encdata.h"
 
 #include <stdio.h>
 #include <sstream>
 #include <gtest/gtest.h>
 #include <codecvt>
+
+#include "digest.h"
 
 using namespace std;
 
@@ -1532,17 +1534,34 @@ TEST(mrpcTest, MrpcRefreshKey) {
 
 }
 
-#if 0
+#if 1
 TEST(mrpcTest, MrpcDhEccKey) {
+  string priv, pub;
+  mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, priv, pub);
+
   mobs::KeyInfo keyInfo;
+  keyInfo.AgreementMethod.Algorithm("http://www.w3.org/2009/xmlenc11#ECDH-ES");
+  //keyInfo.AgreementMethod.KeyDerivationMethod.Algorithm("http://www.w3.org/2009/xmlenc11#ConcatKDF");
+  keyInfo.AgreementMethod.KeyDerivationMethod.Algorithm("http://www.w3.org/2021/04/xmldsig-more#hkdf");
+  //keyInfo.AgreementMethod.KeyDerivationMethod.ConcatKDFParams.AlgorithmID("00");
+  //keyInfo.AgreementMethod.KeyDerivationMethod.ConcatKDFParams.DigestMethod.Algorithm("http://www.w3.org/2001/04/xmlenc#sha256");
+  keyInfo.AgreementMethod.KeyDerivationMethod.HKDFParams.PRF.Algorithm("http://www.w3.org/2001/04/xmlenc#sha256");
+  keyInfo.AgreementMethod.KeyDerivationMethod.HKDFParams.KeyLength(32);
+  mobs::setEcKeyInfo(keyInfo.AgreementMethod.OriginatorKeyInfo.KeyValue, pub);
+#if 0
+  keyInfo.AgreementMethod.OriginatorKeyInfo.KeyValue.ECKeyValue.NameCurve.URI("urn:oid:1.3.36.3.3.2.8.1.1.7");
+  keyInfo.AgreementMethod.OriginatorKeyInfo.KeyValue.ECKeyValue.PublicKey(
+                    "BAHQXIjLoPO4LBehXFzOveAzouszXfs3aTmkFiwPrsXwTgaV7lBy5B7mPRLYCB7NgPlWD/Yhx1Oq"
+                    "JmSkrU+HjugU6AFPPrUmNARHk7x+JKK+V5v8ErNO1+GSnB25X6N9y08rIHeYaazT5Rc9YpdwEFBG"
+                    "mPOciWlDJCOfRVLJtcRF2X6L0Q==");
+#endif
 
-  keyInfo.EncryptedKey.EncryptionMethod.Algorithm("http://www.w3.org/2001/04/xmlenc#kw-aes128");
-  keyInfo.EncryptedKey.KeyInfo.AgreementMethod.Algorithm("http://www.w3.org/2009/xmlenc11#ECDH-ES");
-  keyInfo.EncryptedKey.KeyInfo.AgreementMethod.KeyDerivationMethod.Algorithm("http://www.w3.org/2009/xmlenc11#ConcatKDF");
-  keyInfo.EncryptedKey.KeyInfo.AgreementMethod.KeyDerivationMethod.ConcatKDFParams.AlgorithmID("00");
-  keyInfo.EncryptedKey.KeyInfo.AgreementMethod.KeyDerivationMethod.ConcatKDFParams.DigestMethod.Algorithm("http://www.w3.org/2001/04/xmlenc#sha256");
+  cout << keyInfo.to_string(mobs::ConvObjToString().exportXmlWithNS().doIndent().exportPrefix()) << endl;
 
-  cout << keyInfo.to_string(mobs::ConvObjToString().exportXml().doIndent().exportPrefix()) << endl;
+
+  cout << keyInfo.to_string(mobs::ConvObjToString().exportXmlWithNS().exportWoNull().doIndent().exportPrefix()) << endl;
+
+
 }
 #endif
 

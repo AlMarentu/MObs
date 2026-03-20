@@ -32,13 +32,13 @@
 
 #include <stdio.h>
 #include <sstream>
-#include <strstream>
 #include <gtest/gtest.h>
 
 #include "logging.h"
 #include "xmlwriter.h"
 #include "xmlout.h"
 #include "converter.h"
+#include "encdata.h"
 #include "xmlparser.h"
 #include "xmlread.h"
 
@@ -430,14 +430,12 @@ TEST(cryptTest, ecdh) {
   ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptECprime256v1, privS, pubS, "54321"));
   std::vector<u_char> cipherU;
   std::vector<u_char> cipherS;
-  string ephemeral;
+  std::vector<u_char> ephemeral;
 
   ASSERT_NO_THROW(mobs::ecdhGenerate(cipherU, ephemeral, pubS));
-  cerr << ephemeral << endl;
+  cerr << mobs::to_string_base64(ephemeral) << endl;
   // pub-key vom DER ins PEM-Format bringen
-  std::vector<u_char> buf;
-  mobs::from_string_base64(ephemeral, buf);
-  string ephemeralU = mobs::getPublicKey(buf);
+  string ephemeralU = mobs::getPublicKey(ephemeral);
   cerr << ephemeralU << endl;
   LOG(LM_INFO, " OLD " << mobs::getKeyInfo(privS, "54321"));
   LOG(LM_INFO, " NEW " << mobs::getKeyInfo(ephemeralU));
@@ -459,13 +457,11 @@ TEST(cryptTest, ecdh2) {
   string privS, pubS;
   ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptECsecp384r1, privS, pubS, "54321"));
   std::vector<u_char> cipherU;
-  string ephemeral;
+  std::vector<u_char> ephemeral;
   ASSERT_NO_THROW(mobs::ecdhGenerate(cipherU, ephemeral, pubS));
-  cerr << ephemeral << endl;
+  cerr << mobs::to_string_base64(ephemeral) << endl;
   // pub-key vom DER ins PEM-Format bringen
-  std::vector<u_char> buf;
-  mobs::from_string_base64(ephemeral, buf);
-  string ephemeralU = mobs::getPublicKey(buf);
+  string ephemeralU = mobs::getPublicKey(ephemeral);
   cerr << ephemeralU << endl;
   LOG(LM_INFO, " OLD " << mobs::getKeyInfo(privS, "54321"));
   LOG(LM_INFO, " NEW " << mobs::getKeyInfo(ephemeralU));
@@ -477,13 +473,11 @@ TEST(cryptTest, ecdh3) {
   string privS, pubS;
   ASSERT_NO_THROW(mobs::generateCryptoKeyMem(mobs::CryptECbrainpoolP384r1, privS, pubS, "54321"));
   std::vector<u_char> cipherU;
-  string ephemeral;
+  std::vector<u_char> ephemeral;
   ASSERT_NO_THROW(mobs::ecdhGenerate(cipherU, ephemeral, pubS));
-  cerr << ephemeral << endl;
+  cerr << mobs::to_string_base64(ephemeral) << endl;
   // pub-key vom DER ins PEM-Format bringen
-  std::vector<u_char> buf;
-  mobs::from_string_base64(ephemeral, buf);
-  string ephemeralU = mobs::getPublicKey(buf);
+  string ephemeralU = mobs::getPublicKey(ephemeral);
   cerr << ephemeralU << endl;
   LOG(LM_INFO, " OLD " << mobs::getKeyInfo(privS, "54321"));
   LOG(LM_INFO, " NEW " << mobs::getKeyInfo(ephemeralU));
@@ -728,9 +722,11 @@ TEST(cryptTest, xml) {
 class XParserReader : public mobs::XmlReader {
 public:
   explicit XParserReader(const wstring &i) : XmlReader(str), str(i) {}
-  void NullTag(const std::string &element) override { LOG(LM_INFO, "NULL " << element << " " << currentXmlns()); }
-  void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) override { LOG(LM_INFO, "ATTRIBUT " << attribut <<
-                                                                                                                                         " VALUE >" << mobs::to_string(value) << "<"); lastValue = mobs::to_string(value); }
+  void Attribute(const string &ns, const std::string &element, const std::string &attribut, const std::wstring &value) override {
+    LOG(LM_INFO, "ATTRIBUT " << attribut <<
+        " VALUE >" << mobs::to_string(value) << "<");
+    lastValue = mobs::to_string(value);
+  }
   void Value(const std::wstring &value) override { LOG(LM_INFO, "VALUE >" << mobs::to_string(value) << "<"); lastValue = mobs::to_string(value);}
   void Base64(const std::vector<u_char> &base64) override {
     std::string s;
@@ -738,9 +734,11 @@ public:
     lastCdata = s;
     LOG(LM_INFO, "BASE64 >" << s << "< " << base64.size());
   }
-  void StartTag(const std::string &element) override { LOG(LM_INFO, "START " << element << " " << currentXmlns()); }
-  void EndTag(const std::string &element) override { LOG(LM_INFO, "END " << element << " " << currentXmlns()); }
-  void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) override { LOG(LM_INFO, "PI" << element); }
+  void StartTag(const string &ns, const std::string &element) override { LOG(LM_INFO, "START " << element << " " << currentXmlns()); }
+  void EndTag(const string &ns, const std::string &element, bool emptyElement) override { LOG(LM_INFO, "END " << element << " " << currentXmlns()); }
+
+  void ProcessingInstruction(const std::string &element, const std::string &attribut,
+                             const std::wstring &value) override { LOG(LM_INFO, "PI" << element); }
 
   void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher,
               mobs::CryptBufBase *&cryptBufp) override {
@@ -832,26 +830,36 @@ TEST(cryptTest, hkdf) {
   info = {0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9 };
   EXPECT_NO_THROW(mobs::hashHkdf(result, key, salt, info, 42));
   {
-    std::strstream str;
+    std::stringstream str;
     for (unsigned char i : result) str << std::hex << std::setfill('0') << std::setw(2) << int(i);
-    EXPECT_STREQ(str.str(), "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865");
+    EXPECT_EQ(str.str(), "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865");
   }
 
   EXPECT_NO_THROW(mobs::hashHkdf(result, key, {}, {}, 42));
   {
-    std::strstream str;
+    std::stringstream str;
     for (unsigned char i : result) str << std::hex << std::setfill('0') << std::setw(2) << int(i);
-    EXPECT_STREQ(str.str(), "8da4e775a563c18f715f802a063c5a31b8a11f5c5ee1879ec3454e5f3c738d2d9d201395faa4b61a96c8");
+    EXPECT_EQ(str.str(), "8da4e775a563c18f715f802a063c5a31b8a11f5c5ee1879ec3454e5f3c738d2d9d201395faa4b61a96c8");
   }
 
   key = {0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, };
 
   EXPECT_NO_THROW(mobs::hashHkdf(result, key, salt, info, 42, "sha-1"));
   {
-    std::strstream str;
+    std::stringstream str;
     for (unsigned char i : result) str << std::hex << std::setfill('0') << std::setw(2) << int(i);
-    EXPECT_STREQ(str.str(), "085a01ea1b10f36933068b56efa5ad81a4f14b822f5b091568a9cdd4f155fda2c22e422478d305f3f896");
+    EXPECT_EQ(str.str(), "085a01ea1b10f36933068b56efa5ad81a4f14b822f5b091568a9cdd4f155fda2c22e422478d305f3f896");
   }
+
+}
+
+TEST(cryptTest, KeyInfo) {
+  mobs::KeyInfo ki;
+  std::string pub = "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEO5movW7IFqYYlNqurBJK8UZJWh3t\n"
+                    "aETcMAI5uegOOEKOzWri1EYs6fz0eF16cX+F9GWd4QRYxwXFyz0bvCYq4A==\n-----END PUBLIC KEY-----\n";
+  mobs::setEcKeyInfo(ki.AgreementMethod.OriginatorKeyInfo.KeyValue, pub);
+  EXPECT_EQ("{ECKeyValue:{NameCurve:{URI:\"urn:oid:1.2.840.10045.3.1.7\"},PublicKey:\"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEO5movW7IFqYYlNqurBJK8UZJWh3taETcMAI5uegOOEKOzWri1EYs6fz0eF16cX+F9GWd4QRYxwXFyz0bvCYq4A==\"}}",
+             ki.AgreementMethod.OriginatorKeyInfo.KeyValue.to_string(mobs::ConvObjToString().exportWoNull()));
 
 }
 
