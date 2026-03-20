@@ -1,5 +1,3 @@
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "bugprone-branch-clone"
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
@@ -28,29 +26,45 @@
 #include "objcache.h"
 #include <map>
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "bugprone-branch-clone"
 
 using namespace std;
+
+namespace {
+class NsConvToStrHint : public mobs::ConvToStrHint {
+public:
+  NsConvToStrHint(const mobs::ConvObjFromStr &cfh, bool alt) :
+                        ConvToStrHint(false, alt, false, cfh.hasFeatureCaseInsensitive()) {
+    nameSpc = cfh.hasFeatureXmlNamespaces();
+    //dfltNs = cfh.getFeatureDfltNs();
+    //TODO
+  }
+  ~NsConvToStrHint() = default;
+};
+}
+
 
 namespace mobs {
 
 /// \private
 enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confToken, const std::string &s) {
   confToken.push_back(s);
-  return MemVarCfg(confToken.size() + base -1);
+  return static_cast<MemVarCfg>(confToken.size() + base - 1);
 }
 
 static mobs::MemVarCfg hatFeatureAllg(mobs::MemVarCfg c, const std::vector<mobs::MemVarCfg> &config)
 {
-  for (auto i:config) {
+  for (const auto i:config) {
     if (i == c)
       return i;
-    else if (c == AltNameBase and i >= AltNameBase and i <= AltNameEnd)
+    if (c == AltNameBase and i >= AltNameBase and i <= AltNameEnd)
       return i;
-    else if (c == ColNameBase and i >= ColNameBase and i <= ColNameEnd)
+    if (c == ColNameBase and i >= ColNameBase and i <= ColNameEnd)
       return i;
-    else if (c == PrefixBase and i >= PrefixBase and i <= PrefixEnd)
+    if (c == PrefixBase and i >= PrefixBase and i <= PrefixEnd)
       return i;
-    else if (c == LengthBase and i >= LengthBase and i <= LengthEnd)
+    if (c == LengthBase and i >= LengthBase and i <= LengthEnd)
       return i;
   }
     return Unset;
@@ -71,6 +85,7 @@ void MemberBase::doConfig(MemVarCfg c)
     case Key1 ... Key5: m_key = c - Key1 + 1; break;
     case DbVersionField: m_key = INT_MAX; break;
     case AltNameBase ... AltNameEnd: m_altName = c; break;
+    case NameSpaceBase ... NameSpaceEnd: m_nsName = c; break;
     case Unset:
     case Embedded:
     case DbDetail:
@@ -110,9 +125,9 @@ void MemberBase::activate()
     m_parent->activate();
 }
 
-static std::string getNameAll(const mobs::ObjectBase *parent, const std::string &name,  MemVarCfg altName, const ConvToStrHint &cth)
+static std::string getNameAll(const mobs::ObjectBase *parent, const std::string &name,  MemVarCfg altName, MemVarCfg nsName, const ConvToStrHint &cth)
 {
-  MemVarCfg n = parent and cth.useAltNames() ? altName : Unset;
+  MemVarCfg n = parent and cth.hasFeatureUseAltNames() ? altName : Unset;
   std::string tmp;
   if (parent and parent->hasFeature(Embedded)) {
     auto p = parent;
@@ -123,13 +138,23 @@ static std::string getNameAll(const mobs::ObjectBase *parent, const std::string 
         tmp = p->getConf(pf) + tmp;
     }
   }
-  else if (parent and cth.usePrefix()) {
-    MemVarCfg pf = parent->hasFeature(PrefixBase);
-    if (pf and parent->getParentObject())
-      tmp += parent->getParentObject()->getConf(pf);
+  else {
+    if (parent and cth.hasFeatureUseNamespace() and nsName != Unset) {
+        tmp += parent->getConf(nsName);
+        tmp += ":";
+    } else if (cth.hasFeatureUseNamespace() and cth.getFeatureDfltNsPfx()) {
+      tmp += cth.getFeatureDfltNsPfx();
+      tmp += ":";
+    }
+    if (parent and cth.hasFeatureUsePrefix()) {
+      MemVarCfg pf = parent->hasFeature(PrefixBase);
+      if (pf and parent->getParentObject())
+        tmp += parent->getParentObject()->getConf(pf);
+    }
   }
   tmp += ((n == Unset) ? name : parent->getConf(n));
-  if (cth.toLowercase()) {
+    LOG(LM_INFO, "NAMEALL " << tmp);
+  if (cth.hasFeatureToLowercase()) {
     wstring tx = to_wstring(tmp);
     return to_string(mobs::toLower(tx));
   }
@@ -138,7 +163,7 @@ static std::string getNameAll(const mobs::ObjectBase *parent, const std::string 
 
 
 std::string MemberBase::getName(const ConvToStrHint &cth) const {
-  return getNameAll(m_parent, getElementName(), m_altName, cth);
+  return getNameAll(m_parent, getElementName(), m_altName, m_nsName, cth);
 }
 
 
@@ -162,6 +187,7 @@ void MemBaseVector::doConfig(MemVarCfg c)
     case InitialNull: m_c.push_back(c); break; // für Member-Elemente
     case VectorNull: nullAllowed(true); break;
     case AltNameBase ... AltNameEnd: m_altName = c; break;
+    case NameSpaceBase ... NameSpaceEnd: m_nsName = c; break;
     case Unset:
     case Key1 ... Key5:
     case DbAuditTrail:
@@ -180,7 +206,7 @@ MemVarCfg MemBaseVector::hasFeature(MemVarCfg c) const
 }
 
 std::string MemBaseVector::getName(const ConvToStrHint &cth) const {
-  return getNameAll(m_parent, getElementName(), m_altName, cth);
+  return getNameAll(m_parent, getElementName(), m_altName, m_nsName, cth);
 }
 
 /////////////////////////////////////////////////
@@ -188,7 +214,11 @@ std::string MemBaseVector::getName(const ConvToStrHint &cth) const {
 /////////////////////////////////////////////////
 
 std::string ObjectBase::getName(const ConvToStrHint &cth) const {
-  return getNameAll(m_parent, getElementName(), m_altName, cth);
+  if (m_parent)
+    return getNameAll(m_parent, getElementName(), m_altName, m_nsName, cth);
+  if (hasFeature(OTypeAsXRoot) != Unset or cth.hasFeatureUseNamespace())
+    return getNameAll(this, getObjectName(), m_altName, m_nsName, cth);
+  return {};
 }
 
 
@@ -241,6 +271,7 @@ void ObjectBase::doConfig(MemVarCfg c)
     case InitialNull: nullAllowed(true); break;
     case Key1 ... Key5: m_key = c - Key1 + 1; break;
     case AltNameBase ... AltNameEnd: m_altName = c; break;
+    case NameSpaceBase ... NameSpaceEnd: m_nsName = c; break;
     case Unset:
     case XmlAsAttr:
     case ColNameBase ... ColNameEnd:
@@ -252,19 +283,21 @@ void ObjectBase::doConfig(MemVarCfg c)
   }
 }
 
+// für direkt im "ObjInit" angegebene Args
 void ObjectBase::doConfigObj(MemVarCfg c)
 {
   switch(c) {
     case Unset: break;
-    case XmlAsAttr: break;
-    case Embedded: break;
     case InitialNull: nullAllowed(true); break;
-    case Key1 ... Key5: break;
-    case AltNameBase ... AltNameEnd: break;
-    case PrefixBase ... PrefixEnd: break;
     case DbAuditTrail:
     case OTypeAsXRoot:
     case ColNameBase ... ColNameEnd: m_config.push_back(c); break;
+    case NameSpaceBase ... NameSpaceEnd: m_nsName = c; break;
+    case XmlAsAttr:
+    case Embedded:
+    case Key1 ... Key5:
+    case AltNameBase ... AltNameEnd:
+    case PrefixBase ... PrefixEnd:
     case LengthBase ... LengthEnd:
     case DbCompact:
     case DbDetail:
@@ -284,6 +317,7 @@ const std::string &ObjectBase::getConf(MemVarCfg c) const
     case AltNameBase ... AltNameEnd: i = c - AltNameBase; break;
     case ColNameBase ... ColNameEnd: i = c - ColNameBase; break;
     case PrefixBase ... PrefixEnd: i = c - PrefixBase; break;
+    case NameSpaceBase ... NameSpaceEnd: i = c - NameSpaceBase; break;
     default: return x;
   }
   if (i < m_confToken.size())
@@ -299,6 +333,10 @@ MemVarCfg ObjectBase::hasFeature(MemVarCfg c) const
 void ObjectBase::regMem(MemberBase *mem)
 {
   mlist.emplace_back(mem, nullptr, nullptr);
+}
+
+void ObjectBase::addNamespace(const std::string &nsKurz, const std::string &nsLang) {
+  m_namespaces.emplace(nsLang, nsKurz);
 }
 
 void ObjectBase::regObj(ObjectBase *obj)
@@ -332,15 +370,16 @@ ObjectBase *ObjectBase::createObj(const string& n, ObjectBase *p)
   auto it = ObjectBase_Reg_createMap->find(n);
   if (it == ObjectBase_Reg_createMap->end())
     return nullptr;
-  return (*it).second(p);
+  return it->second(p);
 }
 
 ObjectBase *ObjectBase::getObjInfo(const std::string &name, const ConvObjFromStr &cfh)
 {
   for (auto i:mlist) {
     if (not i.obj) continue;
-    if ((cfh.acceptOriNames() and name == i.obj->getName(ConvToStrHint(false, false, false, cfh.caseInsensitive()))) or
-        (cfh.acceptAltNames() and name == i.obj->getName(ConvToStrHint(false, true, false, cfh.caseInsensitive()))))
+    LOG(LM_INFO, "ON " << name << " - " << i.obj->getName(NsConvToStrHint(cfh, false)));
+    if ((cfh.hasFeatureAcceptOriNames() and name == i.obj->getName(NsConvToStrHint(cfh, false))) or
+        (cfh.hasFeatureAcceptAltNames() and name == i.obj->getName(NsConvToStrHint(cfh, true))))
       return i.obj;
   }
   // Dito für Embedded
@@ -364,8 +403,8 @@ MemBaseVector *ObjectBase::getVecInfo(const std::string &name, const ConvObjFrom
 {
   for (auto i:mlist) {
     if (not i.vec) continue;
-    if ((cfh.acceptOriNames() and name == i.vec->getName(ConvToStrHint(false, false, false, cfh.caseInsensitive()))) or
-        (cfh.acceptAltNames() and name == i.vec->getName(ConvToStrHint(false, true, false, cfh.caseInsensitive()))))
+    if ((cfh.hasFeatureAcceptOriNames() and name == i.vec->getName(NsConvToStrHint(cfh, false))) or
+        (cfh.hasFeatureAcceptAltNames() and name == i.vec->getName(NsConvToStrHint(cfh, true))))
       return i.vec;
   }
   // Dito für Embedded
@@ -389,8 +428,8 @@ MemberBase *ObjectBase::getMemInfo(const std::string &name, const ConvObjFromStr
 {
   for (auto i:mlist) {
     if (not i.mem) continue;
-    if ((cfh.acceptOriNames() and name == i.mem->getName(ConvToStrHint(false, false, false, cfh.caseInsensitive()))) or
-        (cfh.acceptAltNames() and name == i.mem->getName(ConvToStrHint(false, true, false, cfh.caseInsensitive()))))
+    if ((cfh.hasFeatureAcceptOriNames() and name == i.mem->getName(NsConvToStrHint(cfh, false))) or
+        (cfh.hasFeatureAcceptAltNames() and name == i.mem->getName(NsConvToStrHint(cfh, true))))
       return i.mem;
   }
   // Dito für Embedded
@@ -487,15 +526,14 @@ std::string ObjectBase::objNameKeyStr(int64_t *ver) const
 class ConvFromStrHintDoCopy : virtual public ConvFromStrHint {
 public:
   ~ConvFromStrHintDoCopy() override = default;
-  bool acceptCompact() const override { return true; }
-  bool acceptExtended() const override { return false; }
+  bool hasFeatureAcceptCompact() const override { return true; }
+  bool hasFeatureAcceptExtended() const override { return false; }
 };
 
 void ObjectBase::doCopy(const ObjectBase &other)
 {
   if (this == &other)
     return;
-  ConvFromStrHintDoCopy cfh;
   if (getObjectName() != other.getObjectName())
     throw runtime_error(u8"ObjectBase::doCopy: invalid Type");
   if (other.isNull())
@@ -510,6 +548,7 @@ void ObjectBase::doCopy(const ObjectBase &other)
       throw runtime_error(u8"ObjectBase::doCopy: invalid Element (source missing)");
     if (m.mem)
     {
+      ConvFromStrHintDoCopy cfh;
       if (not src->mem)
         throw runtime_error(u8"ObjectBase::doCopy: invalid Element (Member)");
       if (src->mem->isNull())
@@ -529,7 +568,7 @@ void ObjectBase::doCopy(const ObjectBase &other)
         throw runtime_error(u8"ObjectBase::doCopy: invalid Element (Object)");
       m.obj->doCopy(*src->obj);
     }
-    src++;
+    ++src;
   }
   if (src != other.mlist.end())
     throw runtime_error(u8"ObjectBase::doCopy: invalid Element (target missing)");
@@ -538,7 +577,6 @@ void ObjectBase::doCopy(const ObjectBase &other)
 void ObjectBase::carelessCopy(const ObjectBase &other) {
   if (this == &other)
     return;
-  ConvFromStrHintDoCopy cfh;
   if (other.isNull()) {
     if (getObjectName() == other.getObjectName() and not isNull())
       forceNull();
@@ -551,6 +589,7 @@ void ObjectBase::carelessCopy(const ObjectBase &other) {
           if (isModified() or not m.mem->isNull())
             m.mem->forceNull();
         } else if (not m.mem->compareAndCopy(src.mem)) {
+          ConvFromStrHintDoCopy cfh;
           string tmp = src.mem->toStr(ConvToStrHint(true));
           if (isModified() or m.mem->toStr(ConvToStrHint(true)) != tmp)
             m.mem->fromStr(tmp, cfh); // Fallback auf String umkopieren
@@ -844,7 +883,7 @@ bool ObjectNavigator::find(const std::string &varName) {
     size_t pos2 = varName.find_first_of(".[", pos);
     if (pos2 == std::string::npos)
     {
-      enter(varName.substr(pos));
+      enter(varName.substr(pos), "");
       return true;
     }
     string element = varName.substr(pos, pos2 - pos);
@@ -864,7 +903,7 @@ bool ObjectNavigator::find(const std::string &varName) {
 //      std::cerr << "XX " << element << " " << index << " " << i << std::endl;
       pos2++;
     }
-    enter(element, index);
+    enter(element, "", index);
     if (pos2 == varName.length())
       return true;
     if (varName[pos2] != '.')
@@ -889,7 +928,7 @@ bool ObjectNavigator::setNull() {
   TRACE("");
   if (memVec)
   {
-    switch (cfs.nullHandling()) {
+    switch (cfs.getFeatureNullHandling()) {
       case ConvObjFromStr::omit: break;
       case ConvObjFromStr::force: memVec->forceNull(); break;
       case ConvObjFromStr::clear:
@@ -911,7 +950,7 @@ bool ObjectNavigator::setNull() {
   }
   if (member())
   {
-    switch (cfs.nullHandling()) {
+    switch (cfs.getFeatureNullHandling()) {
       case ConvObjFromStr::omit: break;
       case ConvObjFromStr::force: member()->forceNull(); break;
       case ConvObjFromStr::clear:
@@ -935,7 +974,7 @@ bool ObjectNavigator::setNull() {
     return false;
   if (objekte.top().obj)
   {
-    switch (cfs.nullHandling()) {
+    switch (cfs.getFeatureNullHandling()) {
       case ConvObjFromStr::omit: break;
       case ConvObjFromStr::force: objekte.top().obj->forceNull(); break;
       case ConvObjFromStr::clear:
@@ -959,8 +998,12 @@ bool ObjectNavigator::setNull() {
 }
 
 bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
+  return enter(element, "", index);
+}
+
+bool ObjectNavigator::enter(const std::string &element, const std::string &ns, std::size_t index) {
   TRACE(PARAM(element) << PARAM(index));
-  //LOG(LM_INFO, "enter " << element << " " << index);
+  LOG(LM_INFO, "enter " << element << " " << ns << " " << index);
   path.push(element);
 
   if (objekte.empty())
@@ -974,12 +1017,35 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
   memBase = nullptr;
   //LOG(LM_DEBUG, "Im Object " << memName);
   std::string elementFind = element;
-  if (cfs.caseInsensitive())
+  if (cfs.hasFeatureCaseInsensitive())
     elementFind = mobs::toLower(element);
+
   if (objekte.top().obj)
   {
+    if (cfs.getFeatureDfltNsPtr() and (ns.empty() or ns == string(cfs.getFeatureDfltNsPtr()))) {
+      if (ns.empty())
+        return false;
+    }
+    else
+    if (not ns.empty()) {
+      std::string nsKurz;
+      mobs::ObjectBase *o = objekte.top().obj->getObjInfo(elementFind, cfs.useXmlNoNs());
+      auto obj = o ? o : objekte.top().obj;
+      while (obj) {
+        auto it = obj->namespaces().find(ns);
+        if (it != obj->namespaces().end()) {
+          nsKurz = it->second;
+          break;
+        }
+        obj = obj->getParentObject();
+      }
+      if (nsKurz.empty())
+        LOG(LM_INFO, "NAMESPACE FEHLT " << nsKurz);
+      if (cfs.hasFeatureXmlNamespaces() and not nsKurz.empty())
+        elementFind = nsKurz + ":" + elementFind;
+    }
+    LOG(LM_INFO, "EFIND " << elementFind);
     mobs::MemBaseVector *v = objekte.top().obj->getVecInfo(elementFind, cfs);
-
     if (v)
     {
       size_t s = v->size();
@@ -988,7 +1054,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
       else if (index < MemBaseVector::nextpos and index < s)
       {
         s = index;
-        if (cfs.shrinkArray())
+        if (cfs.hasFeatureShrinkArray())
           v->resize(s+1);
       }
       else
@@ -1047,7 +1113,7 @@ bool ObjectNavigator::enter(const std::string &element, std::size_t index) {
   memName += ".";
   memName += element;
   objekte.push(ObjectNavigator::Objekt(nullptr, memName));
-  if (cfs.exceptionIfUnknown())
+  if (cfs.hasFeatureExceptionIfUnknown())
     throw runtime_error(u8"ObjectNavigator: Element " + memName + " not found");
   //LOG(LM_DEBUG, u8"Element " + memName + " ist nicht vorhanden");
   return false;
@@ -1082,9 +1148,9 @@ void ObjectNavigator::pushObject(ObjectBase &obj, const std::string &name) {
 namespace  {
 class ObjDump : virtual public ObjTravConst {
 public:
-  explicit ObjDump(const ConvObjToString &c) : quoteKeys(c.withQuotes() ? "\"":""), cth(c) { };
+  explicit ObjDump(const ConvObjToString &c) : quoteKeys(c.hasFeatureWithQuotes() ? "\"":""), cth(c) { };
   void newline() {
-    if (needBreak and cth.withIndentation())
+    if (needBreak and cth.hasFeatureWithIndentation())
     {
       string s;
       s.resize(level * 2, ' ');
@@ -1094,9 +1160,9 @@ public:
   };
   bool doObjBeg(const ObjectBase &obj) override
   {
-    if (obj.isNull() and cth.omitNull())
+    if (obj.isNull() and cth.hasFeatureOmitNull())
       return false;
-    if (not obj.isModified() and cth.modOnly())
+    if (not obj.isModified() and cth.hasFeatureModOnly())
       return false;
     if (not fst)
       res << ",";
@@ -1119,7 +1185,7 @@ public:
   };
   void doObjEnd(const ObjectBase &obj) override
   {
-    if (obj.isNull() and cth.omitNull())
+    if (obj.isNull() and cth.hasFeatureOmitNull())
       return;
     level--;
     newline();
@@ -1130,9 +1196,9 @@ public:
   };
   bool doArrayBeg(const MemBaseVector &vec) override
   {
-    if (vec.isNull() and cth.omitNull())
+    if (vec.isNull() and cth.hasFeatureOmitNull())
       return false;
-    if (not vec.isModified() and cth.modOnly())
+    if (not vec.isModified() and cth.hasFeatureModOnly())
       return false;
     if (not fst)
       res << ",";
@@ -1159,9 +1225,9 @@ public:
   };
   void doMem(const MemberBase &mem) override
   {
-    if (mem.isNull() and cth.omitNull())
+    if (mem.isNull() and cth.hasFeatureOmitNull())
       return;
-    if (not mem.isModified() and cth.modOnly())
+    if (not mem.isModified() and cth.hasFeatureModOnly())
       return;
     if (not fst)
       res << ",";
@@ -1191,50 +1257,40 @@ private:
 
 std::string ObjectBase::to_string(const ConvObjToString& cth) const
 {
-  if (cth.toJson())
+  if (cth.hasFeatureToJson())
   {
     ObjDump od(cth);
     traverse(od);
     return od.result();
   }
-  else if (cth.toXml())
-  {
-    stringstream ss;
-    mobs::CryptOstrBuf streambuf(ss);
-    std::wostream xStrOut(&streambuf);
-    XmlWriter wr(xStrOut, XmlWriter::CS_utf8, cth.withIndentation());
-    XmlOut xd(&wr, cth);
-    wr.writeHead();
-    traverse(xd);
-    streambuf.finalize();
-    return ss.str();
-  }
-  else
-    return "";
+  stringstream ss;
+  mobs::CryptOstrBuf streambuf(ss);
+  std::wostream xStrOut(&streambuf);
+  XmlWriter wr(xStrOut, XmlWriter::CS_utf8, cth.hasFeatureWithIndentation());
+  XmlOut xd(&wr, cth);
+  wr.writeHead();
+  traverse(xd);
+  streambuf.finalize();
+  return ss.str();
 }
 
 std::string MemBaseVector::to_string(const ConvObjToString& cth) const
 {
-  if (cth.toJson())
+  if (cth.hasFeatureToJson())
   {
     ObjDump od(cth);
     traverse(od);
     return od.result();
   }
-  else if (cth.toXml())
-  {
-    stringstream ss;
-    mobs::CryptOstrBuf streambuf(ss);
-    std::wostream xStrOut(&streambuf);
-    XmlWriter wr(xStrOut, XmlWriter::CS_utf8, cth.withIndentation());
-    XmlOut xd(&wr, cth);
-    wr.writeHead();
-    traverse(xd);
-    streambuf.finalize();
-    return ss.str();
-  }
-  else
-    return "";
+  stringstream ss;
+  mobs::CryptOstrBuf streambuf(ss);
+  std::wostream xStrOut(&streambuf);
+  XmlWriter wr(xStrOut, XmlWriter::CS_utf8, cth.hasFeatureWithIndentation());
+  XmlOut xd(&wr, cth);
+  wr.writeHead();
+  traverse(xd);
+  streambuf.finalize();
+  return ss.str();
 }
 
 

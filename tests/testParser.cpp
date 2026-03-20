@@ -35,7 +35,6 @@ using namespace std;
 
 
 namespace {
-
 class JParser : public mobs::JsonParser {
 public:
   explicit JParser(const string &i) : mobs::JsonParser(i) {};
@@ -82,14 +81,18 @@ public:
 
 class XParserW : public mobs::XmlParserW {
 public:
-  explicit XParserW(const wstring &i) : mobs::XmlParserW(str), str(i) {}
+  explicit XParserW(const wstring &i) : mobs::XmlParserW(str), str(i) { attributAfterStart(false); }
 
-  void NullTag(const string &ns, const std::string &element) override { LOG(LM_INFO, "NULL " << ns << element); }
-
-  void Attribute(const string &ns, const std::string &element, const std::string &attribut, const std::wstring &value) override {
+  void Attribute(const string &ns, const std::string &element, const std::string &attribut, const std::wstring &value, bool nsOk) override {
     LOG(LM_INFO, "ATTRIBUT " << attribut << " (" << ns << element <<
                              ") VALUE >" << mobs::to_string(value) << "<");
+    if (not nsOk) {
+      LOG(LM_INFO, "NS-ERROR");
+      nsError = true;
+    }
     lastValue = mobs::to_string(value);
+    lastKey += ns  + attribut + "|";
+    lastShort += attribut + "|";
   }
 
   void Value(const std::wstring &value) override {
@@ -106,11 +109,19 @@ public:
     LOG(LM_INFO, "BASE64 >" << s << "< " << base64.size());
   }
 
-  void StartTag(const string &ns, const std::string &element) override { LOG(LM_INFO, "START " << ns << element);
+  void StartTag(const string &ns, const std::string &element, bool nsOk) override {
+    LOG(LM_INFO, "START " << ns << element);
+    if (not nsOk) {
+      LOG(LM_INFO, "NS-ERROR");
+      nsError = true;
+    }
     lastKey += ns  + element + "|";
+    lastShort += element + "|";
   }
 
-  void EndTag(const string &ns, const std::string &element) override { LOG(LM_INFO, "END " << ns << element); }
+  void EndTag(const string &ns, const std::string &element, bool emptyElement, bool noAttributes) override {
+    LOG(LM_INFO, (emptyElement ? "NULL ": "END ") << ns << element);
+  }
 
   void ProcessingInstruction(const std::string &element, const std::string &attribut,
                              const std::wstring &value) override { LOG(LM_INFO, "PI " << element << "." << attribut << "="
@@ -121,16 +132,16 @@ public:
   std::string lastCdata;
   std::string lastValue;
   std::string lastKey;
+  std::string lastShort;
   bool wait = false;
+  bool nsError = false;
 };
 
 class XParserReader : public mobs::XmlReader {
 public:
   explicit XParserReader(const wstring &i) : XmlReader(str), str(i) {}
 
-  void NullTag(const std::string &element) override { LOG(LM_INFO, "NULL " << element); }
-
-  void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) override {
+  void Attribute(const string &ns, const std::string &element, const std::string &attribut, const std::wstring &value) override {
     LOG(LM_INFO, "ATTRIBUT " << attribut <<
                              " VALUE >" << mobs::to_string(value) << "<");
     lastValue = mobs::to_string(value);
@@ -150,11 +161,11 @@ public:
     LOG(LM_INFO, "BASE64 >" << s << "< " << base64.size());
   }
 
-  void StartTag(const std::string &element) override { LOG(LM_INFO, "START " << element);
+  void StartTag(const string &ns, const std::string &element) override { LOG(LM_INFO, "START " << element);
     lastKey += currentXmlns() + element + "|";
   }
 
-  void EndTag(const std::string &element) override { LOG(LM_INFO, "END " << element); }
+  void EndTag(const string &ns, const std::string &element, bool emptyElement) override { LOG(LM_INFO, "END " << element); }
 
   void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher,
                mobs::CryptBufBase *&cryptBufp) override {
@@ -163,7 +174,7 @@ public:
   }
 
   void filled(mobs::ObjectBase *obj, const std::string &error) override {
-     LOG(LM_INFO, "Filled: " << obj->to_string());
+    LOG(LM_INFO, "Filled: " << obj->to_string());
   }
 
   void EncryptionFinished() override { }
@@ -371,7 +382,7 @@ TEST(parserTest, xmlns1) {
   p.wait = true;
   ASSERT_NO_THROW(p.parse());
   EXPECT_EQ(p.lastValue, "Client");
-  EXPECT_EQ(p.lastKey, "Root|XXXData|http://www.w3.org/2000/09/xmldsig#EncryptionMethod|http://www.w3.org/2000/09/xmldsig#KeyInfo|https://www.w3.org/2000/09/xmldsig#KeyName|");
+  EXPECT_EQ(p.lastKey, "Root|Type|XXXData|http://www.w3.org/2000/09/xmldsig#Algorithm|http://www.w3.org/2000/09/xmldsig#EncryptionMethod|http://www.w3.org/2000/09/xmldsig#KeyInfo|https://www.w3.org/2000/09/xmldsig#KeyName|");
   p.lastKey.clear();
   ASSERT_NO_THROW(p.parse());
   EXPECT_EQ(p.lastValue, "ABC");
@@ -403,7 +414,7 @@ TEST(parserTest, xmlns2) {
   p.wait = true;
   ASSERT_NO_THROW(p.parse());
   EXPECT_EQ(p.lastValue, "Client");
-  EXPECT_EQ(p.lastKey, "Root|XXXData|http://www.w3.org/2000/09/xmldsig#EncryptionMethod|http://www.w3.org/2000/09/xmldsig#KeyInfo|KeyName|");
+  EXPECT_EQ(p.lastKey, "Root|Type|XXXData|http://www.w3.org/2000/09/xmldsig#Algorithm|http://www.w3.org/2000/09/xmldsig#EncryptionMethod|http://www.w3.org/2000/09/xmldsig#KeyInfo|KeyName|");
   p.lastKey.clear();
   ASSERT_NO_THROW(p.parse());
   EXPECT_EQ(p.lastValue, "ABC");
@@ -468,7 +479,7 @@ TEST(parserTest, xmlns6) {
   p.wait = true;
   ASSERT_NO_THROW(p.parse());
   EXPECT_EQ(p.lastValue, "Client");
-  EXPECT_EQ(p.lastKey, "http://www.mobs.org/test#Root|http://www.w3.org/2001/04/xmlenc#KeyInfo|http://www.mobs.org/test#KeyName|");
+  EXPECT_EQ(p.lastKey, "http://www.mobs.org/test#Root|http://www.w3.org/2001/04/xmlenc#name|http://www.w3.org/2001/04/xmlenc#KeyInfo|http://www.mobs.org/test#KeyName|");
   p.lastKey.clear();
   ASSERT_NO_THROW(p.parse());
   EXPECT_EQ(p.lastValue, "Bums");
@@ -479,10 +490,9 @@ TEST(parserTest, xmlns6) {
 
 
 TEST(parserTest, xmlEnc1) {
-
   std::wstring x = LR"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Root>
-  <EncryptedData Type="http://www.w3.org/2001/04/xmlenc#Element" xmlns:xenc="http://www.w3.org/2001/04/xmlenc#"
+  <xenc:EncryptedData Type="http://www.w3.org/2001/04/xmlenc#Element" xmlns:xenc="http://www.w3.org/2001/04/xmlenc#"
                    xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
         <xenc:EncryptionMethod Algorithm="http://www.w3.org/2001/04/xmlenc#aes-256-cbc"/>
         <ds:KeyInfo>
@@ -506,7 +516,7 @@ TEST(parserTest, xmlEnc1) {
                 <Feld>blah</Feld>
             </xenc:CipherValue>
         </xenc:CipherData>
-    </EncryptedData>
+    </xenc:EncryptedData>
   <Wert>55</Wert>
 </Root>
 )";
@@ -527,8 +537,46 @@ TEST(parserTest, xmlEnc1) {
   EXPECT_EQ(p.lastValue, "ABC");
   EXPECT_EQ(p.lastKey, "https://www.w3.org/2000/09/xmlxxx#CipherData|CipherValue|");
 #endif
-
 }
 
+TEST(parserTest, xmlns7) {
+  std::wstring x = LR"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+  <root>
+    <xenc11:KeyDerivationMethod Algorithm="http://www.w3.org/2021/04/xmldsig-more#hkdf"
+            xmlns:dsig-more="http://www.w3.org/2021/04/xmldsig-more#"
+            xmlns:xenc11="http://www.w3.org/2009/xmlenc11#">
+      <dsig-more:HKDFParams>
+        <dsig-more:PRF Algorithm="http://www.w3.org/2001/04/xmldsig-more#hmac-sha256"/>
+        <dsig-more:Salt>xWdTey4T6awUJkp0NPZNVTa2JQkWukC0Uk+qaeEpn4Y=</dsig-more:Salt>
+        <dsig-more:Info>dGVzdC1pbmZvLWRhdGE=</dsig-more:Info>
+        <dsig-more:KeyLength>16</dsig-more:KeyLength>
+      </dsig-more:HKDFParams>
+    </xenc11:KeyDerivationMethod>
+    <xenc:OriginatorKeyInfo xmlns:xenc="http://www.w3.org/2001/04/xmlenc#">
+      <ds:KeyValue xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+        <ds11:ECKeyValue xmlns:ds11="http://www.w3.org/2021/04/xmldsig-more#x25519">
+          <ds11:NamedCurve URI="urn:oid:1.3.101.110"/>
+          <ds11:PublicKey> ENCODED </ds11:PublicKey>
+        </ds11:ECKeyValue>
+      </ds:KeyValue>
+    </xenc:OriginatorKeyInfo>
+  </root>
+    )";
+
+  XParserW p(x);
+  //p.setGlobalNs("", "http://www.mobs.org/test#");
+  //p.wait = true;
+  ASSERT_NO_THROW(p.parse());
+  EXPECT_FALSE(p.nsError);
+  EXPECT_EQ(p.lastShort, "root|Algorithm|KeyDerivationMethod|HKDFParams|Algorithm|PRF|Salt|Info|KeyLength|OriginatorKeyInfo|KeyValue|ECKeyValue|URI|NamedCurve|PublicKey|");
+
+  XParserW q(x);
+  q.attributAfterStart(true);
+  ASSERT_NO_THROW(q.parse());
+  EXPECT_FALSE(q.nsError);
+  EXPECT_EQ(q.lastShort, "root|KeyDerivationMethod|Algorithm|HKDFParams|PRF|Algorithm|Salt|Info|KeyLength|OriginatorKeyInfo|KeyValue|ECKeyValue|NamedCurve|URI|PublicKey|");
+
+
+}
 
 }

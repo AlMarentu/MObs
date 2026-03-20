@@ -33,7 +33,6 @@
 #include <string>
 #include <stack>
 #include <map>
-#include <exception>
 #include <iostream>
 #include <codecvt>
 #include <utility>
@@ -91,7 +90,7 @@ public:
    @param element Name des Elementes
    */
   virtual void NullTag(const std::string &element) = 0;
-  /** \brief Callback-Function: Ein Atributwert einses Tags
+  /** \brief Callback-Function: Ein Atribut-Wert eines Tags
    @param element Name des Elementes
    @param attribut Name des Attributes
    @param value Wert des Attributes
@@ -110,7 +109,7 @@ public:
    @param element Name des Elementes
    */
   virtual void StartTag(const std::string &element) = 0;
-  /** \brief Callback-Function: Ein Ende-Tag , jedoch nicht bei NullTag(..)
+  /** \brief Callback-Function: Ein Ende-Tag, jedoch nicht bei NullTag(...)
    @param element Name des Elementes
    */
   virtual void EndTag(const std::string &element) = 0;
@@ -135,7 +134,7 @@ public:
       parse2GT();
       if (getValue() != "xml")
         throw std::runtime_error(u8"Syntax");
-      for (;peek() != '?';)
+      while (peek() != '?')
       {
         eat(' ');
         parse2GT();
@@ -156,7 +155,7 @@ public:
       parse2LT();
     }
     // eigentliches Parsing
-    for (;pos2 != std::string::npos;)
+    while (pos2 != std::string::npos)
     {
       saveValue();
       eat('<');
@@ -340,7 +339,7 @@ private:
     return decode(p, pos2);
   };
   void clearValue() { posS = posE; }; // der Zwischenraum fand Verwendung
-                                      /// Verwaltet den Zwischenraum zwischen den <..Tags..>
+                                      /// Verwaltet den Zwischenraum zwischen den <... Tags ...>
   void saveValue() {
     // wenn nicht verwendet, darf es nur white space sein
     if (posS != posE)
@@ -366,7 +365,7 @@ private:
     pos1++;
   };
   void eat() { pos1++; };
-  char peek() {
+  char peek() const {
     if (pos1 >= Xml.length())
       throw std::runtime_error(u8"unexpected EOF");
     //cerr << "Peek " << Xml[pos1] << " " << pos1 << endl;
@@ -375,8 +374,8 @@ private:
   /// Wandelt einen Teilstring aus Xml von der HTML-Notation in ASCII zurück
   /// @param pos_S StartPosition
   /// @param pos_E EndePosition
-  std::string decode(size_t pos_S, size_t pos_E) {
-    // Da in XML Die Zeicxhe & und < immer escaped (in HTML) werden müssen, kann ein Rückwandlung
+  std::string decode(size_t pos_S, size_t pos_E) const {
+    // Da in XML die Zeichen & und < immer escaped (in HTML) werden müssen, kann eine Rückwandlung
     // immer erfolgen, da ein '&' ansonsten nicht vorkommen sollte
     std::string result;
     for (;;)
@@ -456,11 +455,10 @@ XmlParserW(std::wistream &input);
 void parse();
 
 // Callback Funktionen
-void NullTag(const std::string &element);
-void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value);
+void Attribute(const std::string &ns, const std::string &element, const std::string &attribut, const std::wstring &value);
 void Value(const std::wstring &value);
-void StartTag(const std::string &element);
-void EndTag(const std::string &element);
+void StartTag(const std::string &ns, const std::string &element);
+void EndTag(const std::string &ns, const std::string &element, bool emptyElement, bool noAttributes);
 void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value);
 };
 \endcode
@@ -471,8 +469,8 @@ class XmlParserW  {
 public:
   /** Konstruktor der XML-Parser Basisklasse für std::wstring
    
-     es kann z.B. ein \c std::wifstream dienen oder ein \c std::wistringstream übergeben werden
-          Als Zeichensätze sind UTF-8, UTF-16, ISO8859-1, -9 und -15 erlaubt; Dateien dürfen mit einem BOM beginnen
+     es kann z.B. ein \c std::wifstream dienen oder ein \c std::wistringstream übergeben werden.
+          Als Zeichensätze sind UTF-8, UTF-16, ISO8859-1, -9 und -15 erlaubt; Dateien dürfen mit einem BOM beginnen.
      Das ENTITY-Konstrukt ist für externe ENTITYs erlaubt: \<!ENTITY greet \"Hallo !!\" \>
      Vordefinierte ENTITYs sind: \&lt; \&gt; \&amp; \&quot; \&apos;
    @param input XML-stream der geparst werden soll   */
@@ -510,20 +508,6 @@ public:
   /// liefert aktuellen Namespace
   std::string currentXmlns() const { return tags.empty() ? "" : tags.top().xmlns; };
 
-  /** \brief Callback-Function: Ein Tag ohne Inhalt, impliziert EndTag(..)
-   *
-   * es wird zuerst ein StartTag geliefert, dann ein NullTag
-   @param ns namespace
-   @param element Name des Elementes
-   */
-  virtual void NullTag(const std::string &ns, const std::string &element) = 0;
-  /** \brief Callback-Function: Ein Attributwert eines Tags
-   @param ns namespace
-   @param element Name des Elementes
-   @param attribut Name des Attributes
-   @param value Wert des Attributes
-   */
-  virtual void Attribute(const std::string &ns, const std::string &element, const std::string &attribut, const std::wstring &value) = 0;
   /** \brief Callback-Function: Ein Inhalt eines Tags inkl. CDATA
    @param value Inhalt des Tags
    */
@@ -537,14 +521,27 @@ public:
   /** \brief Callback-Function: Ein Start-Tag
    @param ns namespace
    @param element Name des Elementes
+   @param nsOk false, wenn der Namespace nicht aufgelöst werden konnte
    */
-  virtual void StartTag(const std::string &ns, const std::string &element) = 0;
-  /** \brief Callback-Function: Ein Ende-Tag , jedoch nicht bei NullTag(..)
+  virtual void StartTag(const std::string &ns, const std::string &element, bool nsOk) = 0;
+  /** \brief Callback-Function: Ein Attributwert eines Tags
+   *
+   * das Attribut wird nach dem StartTag gesendet, wenn nicht attributAfterStart(false) aktiviert ist.
    @param ns namespace
    @param element Name des Elementes
+   @param attribut Name des Attributes
+   @param value Wert des Attributes
+   @param nsOk false, wenn der Namespace nicht aufgelöst werden konnte
    */
-  virtual void EndTag(const std::string &ns, const std::string &element) = 0;
-  /** \brief Callback-Function: Eine Verarbeitungsanweisung z.B, "xml", "encoding", "UTF-8"
+  virtual void Attribute(const std::string &ns, const std::string &element, const std::string &attribut, const std::wstring &value, bool nsOk) = 0;
+  /** \brief Callback-Function: Ein Ende-Tag wurde bearbeitet
+   @param ns namespace
+   @param element Name des Elementes
+   @param emptyElement true, wenn Leer-Tag
+   @param noAttributes true, wenn in einem Leer-Tag keine Attribute vorhanden waren
+   */
+  virtual void EndTag(const std::string &ns, const std::string &element, bool emptyElement, bool noAttributes) = 0;
+  /** \brief Callback-Function: Eine Verarbeitungsanweisung z.B. "xml", "encoding", "UTF-8"
    *
    * Es wird immer zusätzlich eine leere Info (attribut="" und value="") erzeugt:
    @param element Name des Tags
@@ -557,6 +554,8 @@ public:
   void readTillEof(bool s) { reedEof = s; }
   /// non blocking parsen
   void readNonBlocking(bool s) { nonblocking = s; }
+  /// Schalter, ob Attribut() nach StartTag() aufgerufen wird (default = true)
+  void attributAfterStart(bool s) { delayedAttribut = s; }
   /// ist beim Parsen das Ende der Datei erreicht
   bool eof() const { return endOfFile; }
   /// ist der Stream verschlüsselt (läuft über CryptBuffer)
@@ -569,7 +568,7 @@ public:
   /// \see Base64
   void setBase64(bool b) { useBase64 = b; }
   /// Referenz auf input stream
-  std::wistream &getIstr() { return istr; };
+  std::wistream &getIstr() const { return istr; };
 
   /// Starte den Parser return true, wenn nonblocking ohne daten
   bool parse() {
@@ -602,7 +601,7 @@ public:
         std::locale lo;
         if ((curr = istr.get()) != 0xff)
           throw std::runtime_error(u8"Error in BOM");
-        lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::codecvt_mode(0)>);
+        lo = std::locale(istr.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, static_cast<std::codecvt_mode>(0)>);
         istr.putback(0xff);
         istr.putback(0xfe);
         istr.imbue(lo);
@@ -649,17 +648,16 @@ public:
           buffer.clear();
           inParse2LtWork = true;
           continue;
-        } else {
-          if (Traits::not_eof(curr) and Traits::to_char_type(curr) != '<') {
-            if (try64)
-              base64.put(Traits::to_char_type(curr));
-            else
-              buffer += Traits::to_char_type(curr);
-            curr = get();
-            continue;
-          }
-          inParse2Lt = false;
         }
+        if (Traits::not_eof(curr) and Traits::to_char_type(curr) != '<') {
+          if (try64)
+            base64.put(Traits::to_char_type(curr));
+          else
+            buffer += Traits::to_char_type(curr);
+          curr = get();
+          continue;
+        }
+        inParse2Lt = false;
       }
       inParse2LtWork = false;
       if (not Traits::eq_int_type(curr, '<'))  // Hauptschleife verlassen
@@ -691,9 +689,10 @@ public:
         if (element.empty())
           THROW("missing end tag");
         size_t pos = element.find(':'); // Prefix für namespace aus element extrahieren
-        std::string pfx, name;
+        //std::string pfx;
+        std::string name;
         if (pos != std::string::npos) {
-          pfx = element.substr(0, pos);
+          //pfx = element.substr(0, pos);
           name = element.substr(pos +1);
         }
         else
@@ -715,7 +714,7 @@ public:
           lastKey = "";
           in64 = false;
         }
-        EndTag(currentXmlns(), name);
+        EndTag(currentXmlns(), name, false, false);
         for (;;) { // alle Namespaces der vergangenen Level wieder löschen
           auto it = nameSpcs.begin();
           if (it == nameSpcs.end() or it->level < tags.size())
@@ -880,28 +879,41 @@ public:
       if (element.empty())
         THROW("missing begin tag");
       size_t pos = element.find(':'); // Prefix für namespace aus element extrahieren
+      bool found = true;
       std::string pfx, name;
       if (pos != std::string::npos) {
         pfx = element.substr(0, pos);
         name = element.substr(pos +1);
+        found = false;
       }
       else
         name = element;
       std::string ns;
-      bool found = false;
       for (auto &s:nameSpcs) // letzten zum pfx passenden namespace Eintrag suchen
         if (s.pfx == pfx) {
           ns = s.ns;
           found = true;
           break;
         }
-      //LOG(LM_INFO, "CURRENT NS " << element << " " << ns);
+      //LOG(LM_INFO, "CURRENT NS " << element << " " << ns << " found=" << found << " delayed=" << delayedAttribut);
       bool needStart = true;
       tags.emplace(element, ns);
       clearValue();
+      int attributCount = 0;
       for (;;)
       {
         bool hatWs = skipWs();
+        if (needStart and (found or peek() == '>' or peek() == '/')) {
+          if (delayedAttribut) {
+            if (not found) // wenn kein passender Namespace, dann pfx wieder zurück
+              name = element;
+            StartTag(currentXmlns(), name, found);
+            needStart = false;
+          }
+          for (auto &i:attWait)
+            Attribute(currentXmlns(), name, i.first, i.second, found);
+          attWait.clear();
+        }
         if (peek() == '>')  // Ende eines Starttags
         {
           inParse2Lt = true;
@@ -913,9 +925,9 @@ public:
           if (not found) // wenn kein passender Namespace, dann pfx wieder zurück
             name = element;
           if (needStart)
-            StartTag(currentXmlns(), name);
+            StartTag(currentXmlns(), name, found);
           needStart = false;
-          NullTag(currentXmlns(), name);
+          EndTag(currentXmlns(), name, true, attributCount == 0);
           tags.pop();
           inParse2Lt = true;
           break;
@@ -954,14 +966,20 @@ public:
           //LOG(LM_DEBUG, "New Namespace p='" << nsId << "' = " << ns << " Level " << tags.size());
           nameSpcs.emplace_front(tags.size(), nsId, nameSpc);
         }
-        else
-          Attribute(currentXmlns(), name, a, buffer);
+        else if (found) {
+          Attribute(currentXmlns(), name, a, buffer, found);
+          ++attributCount;
+        }
+        else {
+          attWait.emplace_back(a, std::move(buffer));
+          ++attributCount;
+        }
         eat(c);
       }
       if (not found) // wenn kein passender Namespace, dann pfx wieder zurück
         name = element;
       if (needStart)
-        StartTag(currentXmlns(), name);
+        StartTag(currentXmlns(), name, found);
       lastKey = element;
     }
     if (Traits::not_eof(curr))
@@ -998,8 +1016,8 @@ public:
     nameSpcs.emplace_front(0, id, ns);
   }
   void startEncryption(CryptBufBase *cbb) {
-    //LOG(LM_DEBUG, "setEncryptionMode  " << cbb->getRecipientId(0));
-    // erst mal den XML-Stack temporär wegrümen, damit die Levels passen
+    //LOG(LM_DEBUG, "setEncryptionMode " << cbb->getRecipientId(0));
+    // erst mal den XML-Stack temporär wegräumen, damit die Levels passen
     for (;;) { // alle Namespaces der vergangenen encryption vorab schon mal löschen
       auto it = nameSpcs.begin();
       if (it == nameSpcs.end() or it->level +3 < tags.size())
@@ -1113,7 +1131,7 @@ private:
     }
   };
   void clearValue() { saved.clear(); }; // der Zwischenraum fand Verwendung
-/// Verwaltet den Zwischenraum zwischen den <..Tags..>
+/// Verwaltet den Zwischenraum zwischen den <... Tags ...>
   void saveValueCheckWS() {
     // wenn nicht verwendet, darf es nur white space sein
     if (not saved.empty())
@@ -1164,6 +1182,7 @@ private:
       case L'\uFEFF': // ZERO WIDTH NO-BREAK SPACE
         eatWS();
         hatWs = true;
+      default: ;
     }
     return hatWs;
   };
@@ -1187,7 +1206,7 @@ private:
         if (p == tok.length() - (tok[1] == L'x' ? 2:1) and
             ((c >= 0 and c <= 0xD7FF) or
              (c >= 0xE000 and c <= 0xFFFD) or (c >= 0x10000 and c <= 0x10FFFF)))
-          return std::wstring(1, c); // Achtung { 1, c } ist nicht das selbe
+          return std::wstring(1, c); // Achtung { 1, c } ist nicht das selbe NOLINT(*-return-braced-init-list)
       }
     } catch (...) {}
     return {};
@@ -1221,7 +1240,7 @@ private:
       else if (conFun) // Wandlung bei ISO-Zeichensätzen
       {
         wchar_t (*cf)(wchar_t) = conFun;
-        std::transform(buf.cbegin()+int(posS), buf.cbegin()+int(posE), std::back_inserter(result),
+        std::transform(buf.cbegin()+static_cast<int>(posS), buf.cbegin()+static_cast<int>(posE), std::back_inserter(result),
                        [cf](const wchar_t c) -> wchar_t { return (c <= 127) ? c : cf(c); });
         break;
       }
@@ -1313,8 +1332,9 @@ private:
       delete cryptBufp;
       cryptBufp = nullptr;
     }
-    inline bool valid() { return cryptBufp; } // hat gültige encryption
-    inline std::wistream *streamPtr() const { return istr; } // stream pointer bei aktiver encryption
+
+    bool valid() const { return cryptBufp; } // hat gültige encryption
+    std::wistream *streamPtr() const { return istr; } // stream pointer bei aktiver encryption
     void setCryptBuf(mobs::CryptBufBase *cbbp) {
       cryptBufp = cbbp;
     }
@@ -1358,7 +1378,7 @@ private:
   };
   class NameSpc {
   public:
-    NameSpc(int l, const std::string &p, const std::string &n) : level(l), ns(n), pfx(p) {};
+    NameSpc(int l, std::string p, std::string n) : level(l), ns(std::move(n)), pfx(std::move(p)) {};
     int level;
     std::string ns;
     std::string pfx;
@@ -1392,7 +1412,9 @@ private:
   bool reedEof = true;
   bool endOfFile = false;
   bool nonblocking = false;
+  bool delayedAttribut = true;
   std::list<NameSpc> nameSpcs;
+  std::list<std::pair<std::string, std::wstring>> attWait; // Attribute, die auf Namspace-Namen warten oder delayedAttribut
   std::map<std::wstring, std::wstring> entities = {
       {L"lt", L"<"},
       {L"gt", L">"},

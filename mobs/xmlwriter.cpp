@@ -27,6 +27,9 @@
 #include <stack>
 #include <sstream>
 
+#include "objgen.h"
+#include "xmlout.h"
+
 
 using namespace std;
 
@@ -57,7 +60,7 @@ public:
   std::unique_ptr<std::ostream> binaryStream;
   std::ostream::pos_type binaryStart = 0;
 
-  void setConFun() {
+  void setConFun() const {
     std::locale lo;
     switch (cs) {
       case XmlWriter::CS_iso8859_1:
@@ -198,7 +201,7 @@ void XmlWriter::writeHead() {
   data->openEnd = true;
   data->inHeader = true;
   data->level = 0;
-  data->elements = stack<wstring>();
+  data->elements = {};
   writeAttribute(L"version", version);
   writeAttribute(L"encoding", encoding);
   if (standalone)
@@ -235,7 +238,7 @@ void XmlWriter::writeAttribute(const std::wstring &attribute, const std::wstring
       case 0xD800 ... 0xDFFF:
       case 0xFFFE ... 0xFFFF:
       case 0x110000 ... 0x7FFFFFFF:
-      case 0 ... 0x1f: *data->wostr << L"&#x" << hex << int(c) << L';'; break;
+      case 0 ... 0x1f: *data->wostr << L"&#x" << hex << static_cast<int>(c) << L';'; break;
       default: data->write(c);
     }
   *data->wostr << L'"';
@@ -265,7 +268,7 @@ void XmlWriter::writeValue(const std::wstring &value) {
       case 0xD800 ... 0xDFFF:
       case 0xFFFE ... 0xFFFF:
       case 0x110000 ... 0x7FFFFFFF:
-        *data->wostr << L"&#x" << hex << int(c) << L';';
+        *data->wostr << L"&#x" << hex << static_cast<int>(c) << L';';
         break;
       case ' ':
         if (cnt != 1 and cnt != value.length()) {
@@ -276,7 +279,7 @@ void XmlWriter::writeValue(const std::wstring &value) {
       case '\r':
       case '\n':
         if (escapeControl) {
-          *data->wostr << L"&#x" << hex << int(c) << L';';
+          *data->wostr << L"&#x" << hex << static_cast<int>(c) << L';';
           break;
         }
         __attribute__ ((fallthrough));
@@ -413,74 +416,113 @@ string XmlWriter::getString() const
   return "";
 }
 
+#define xenc L"http://www.w3.org/2001/04/xmlenc#"
+#define ds L"http://www.w3.org/2000/09/xmldsig#"
+//#define xenc11 L"http://www.w3.org/2009/xmlenc11#"
+//#define dsig11 L"http://www.w3.org/2009/xmldsig11#"
 
-void XmlWriter::startEncrypt(CryptBufBase *cbbp, bool oldStyle) {
+void XmlWriter::startEncrypt(CryptBufBase *cbbp) {
   if (data->cryptBufp or data->cryptSwap or not cbbp or data->level == 0)
     THROW("invalid state encryption");
   data->cryptLevel = data->level;
   std::wstring pfx;
   data->prefix.swap(pfx);
-  writeTagBegin(L"EncryptedData");
-  if (oldStyle) {
-    writeAttribute(L"Type", L"https://www.w3.org/2001/04/xmlenc#Element");
-    writeAttribute(L"xmlns", L"https://www.w3.org/2001/04/xmlenc#");
-    writeTagBegin(L"EncryptionMethod");
-    writeAttribute(L"Algorithm", L"https://www.w3.org/2001/04/xmlenc#" + to_wstring(cbbp->name()));
+  writeTagBegin(L"xenc:EncryptedData");
+  writeAttribute(L"Type", xenc "Element");
+  writeAttribute(L"xmlns:xenc", xenc);
+  writeAttribute(L"xmlns:ds", ds);
+  writeTagBegin(L"xenc:EncryptionMethod");
+  writeAttribute(L"Algorithm", xenc + to_wstring(cbbp->name()));
+  writeTagEnd();
+  size_t rcpt = cbbp->recipients();
+  for (size_t i = 0; i < rcpt; i++) {
+    string k = cbbp->getRecipientId(i);
+    string c = cbbp->getRecipientKeyBase64(i);
+    writeTagBegin(L"ds:KeyInfo");
+    writeTagBegin(L"ds:KeyName");
+    if (not k.empty())
+      writeValue(to_wstring(k));
     writeTagEnd();
-    size_t rcpt = cbbp->recipients();
-    for (size_t i = 0; i < rcpt; i++) {
-      writeTagBegin(L"KeyInfo");
-      writeAttribute(L"xmlns", L"https://www.w3.org/2000/09/xmldsig#");
-      writeTagBegin(L"KeyName");
-      string k = cbbp->getRecipientId(i);
-      if (not k.empty())
-        writeValue(to_wstring(k));
+    if (not c.empty()) {
+      writeTagBegin(L"xenc:CipherData");
+      writeTagBegin(L"xenc:CipherValue");
+      writeValue(to_wstring(c));
       writeTagEnd();
-      string c = cbbp->getRecipientKeyBase64(i);
-      if (not c.empty()) {
-        writeTagBegin(L"CipherData");
-        writeTagBegin(L"CipherValue");
-        writeValue(to_wstring(c));
-        writeTagEnd();
-        writeTagEnd();
-      }
       writeTagEnd();
     }
-    writeTagBegin(L"CipherData");
-    writeTagBegin(L"CipherValue");
-  } else {
-#define xenc L"http://www.w3.org/2001/04/xmlenc#"
-#define ds L"http://www.w3.org/2000/09/xmldsig#"
-//#define xenc11 L"http://www.w3.org/2009/xmlenc11#"
-//#define dsig11 L"http://www.w3.org/2009/xmldsig11#"
-    writeAttribute(L"Type", xenc "Element");
-    writeAttribute(L"xmlns:xenc", xenc);
-    writeAttribute(L"xmlns:ds", ds);
-    writeTagBegin(L"xenc:EncryptionMethod");
-    writeAttribute(L"Algorithm", xenc + to_wstring(cbbp->name()));
     writeTagEnd();
-    size_t rcpt = cbbp->recipients();
-    for (size_t i = 0; i < rcpt; i++) {
-      string k = cbbp->getRecipientId(i);
-      string c = cbbp->getRecipientKeyBase64(i);
-      writeTagBegin(L"ds:KeyInfo");
-      writeTagBegin(L"ds:KeyName");
-      if (not k.empty())
-        writeValue(to_wstring(k));
-      writeTagEnd();
-      if (not c.empty()) {
-        writeTagBegin(L"xenc:CipherData");
-        writeTagBegin(L"xenc:CipherValue");
-        writeValue(to_wstring(c));
-        writeTagEnd();
-        writeTagEnd();
-      }
-      writeTagEnd();
-    }
-    writeTagBegin(L"xenc:CipherData");
-    writeTagBegin(L"xenc:CipherValue");
   }
+  writeTagBegin(L"xenc:CipherData");
+  writeTagBegin(L"xenc:CipherValue");
   data->prefix.swap(pfx);
+  data->indentSave = data->indent;
+  data->indent = false;
+  data->closeTag();
+  data->cryptss.str("");
+  data->cryptss.clear();
+  // Wenn Ziel-Stream bereits ein mobs::CryptOstrBuf ist, dann statt in temporärem stream direkt in den Ziel-stream schreiben
+  // spart hier einen Zwischenpuffer und die Latenz dessen Ein-/Ausgabe
+  auto r = dynamic_cast<mobs::CryptOstrBuf *>(data->buffer.rdbuf());
+  if (r) {
+    data->buffer.flush();
+    data->cryptSwap = std::unique_ptr<CryptBufBase>(cbbp);
+    r->swapBuffer(data->cryptSwap);
+    //data->cryptBufp = std::unique_ptr<CryptOstrBuf>(new CryptOstrBuf(r->getOstream(), cbbp));
+    //data->wostr = new std::wostream(data->cryptBufp.get());
+  } else {
+    auto lo = data->buffer.getloc();
+    switch (data->cs)
+    {
+      case CS_utf8_bom:
+      case CS_utf8:
+        lo = std::locale(lo, new std::codecvt_utf8<wchar_t, 0x10ffff, std::little_endian>);
+        break;
+      case CS_iso8859_1:
+        lo = std::locale(lo, new codec_iso8859_1);
+        break;
+      case CS_iso8859_9:
+        lo = std::locale(lo, new codec_iso8859_9);
+        break;
+      case CS_iso8859_15:
+        lo = std::locale(lo, new codec_iso8859_15);
+        break;
+      case CS_utf16_be:
+        lo = std::locale(lo, new std::codecvt_utf16<wchar_t, 0x10ffff>);
+        break;
+      case CS_utf16_le:
+        lo = std::locale(lo, new std::codecvt_utf16<wchar_t, 0x10ffff, std::little_endian>);
+        break;
+    }
+    data->cryptBufp = std::unique_ptr<CryptOstrBuf>(new CryptOstrBuf(data->cryptss, cbbp));
+    data->wostr = new std::wostream(data->cryptBufp.get());
+    data->wostr->imbue(lo);
+  }
+  *data->wostr << mobs::CryptBufBase::base64(true);
+}
+
+void XmlWriter::startEncrypt(CryptBufBase *cbbp, mobs::ObjectBase *keyInfo) {
+  if (data->cryptBufp or data->cryptSwap or not cbbp or data->level == 0)
+    THROW("invalid state encryption");
+  data->cryptLevel = data->level;
+
+  //if (auto ki = dynamic_cast<mobs::KeyInfo *>(keyInfo)) {
+  //  ki->CipherData.CipherValue(cbbp->getRecipientKeyBase64(0));
+  //  ki->KeyName(cbbp->getRecipientId(0));
+  //}
+
+//#define xenc L"http://www.w3.org/2001/04/xmlenc#"
+  writeTagBegin(L"xenc:EncryptedData");
+  writeAttribute(L"Type", xenc "Element");
+  writeAttribute(L"xmlns:xenc", xenc);
+  //writeAttribute(L"xmlns:ds", ds);
+  writeTagBegin(L"xenc:EncryptionMethod");
+  writeAttribute(L"Algorithm", xenc + to_wstring(cbbp->name()));
+  writeTagEnd();
+  XmlOut xo(this, mobs::ConvObjToString().exportXmlWithNS().exportWoNull());
+  keyInfo->traverse(xo);
+  writeTagBegin(L"xenc:CipherData");
+  writeTagBegin(L"xenc:CipherValue");
+
   data->indentSave = data->indent;
   data->indent = false;
   data->closeTag();

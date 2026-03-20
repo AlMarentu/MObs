@@ -230,23 +230,23 @@ std::string to_string(MDate t) {
 }
 
 std::wstring StrConv<MDate>::c_to_wstring(const MDate &t, const ConvToStrHint &cth) {
-  if (cth.compact())
+  if (cth.hasFeatureCompact())
     return std::to_wstring(t.time_since_epoch().count());
   return to_wstring(t);
 }
 
 std::string StrConv<MDate>::c_to_string(const MDate &t, const ConvToStrHint &cth) {
-  if (cth.compact())
+  if (cth.hasFeatureCompact())
     return std::to_string(t.time_since_epoch().count());
   return to_string(t);
 }
 
 bool StrConv<MDate>::c_string2x(const std::string &str, MDate &t, const ConvFromStrHint &cfh) {
-  if (cfh.acceptExtended()) {
+  if (cfh.hasFeatureAcceptExtended()) {
     if (mobs::string2x(str, t))
       return true;
   }
-  if (not cfh.acceptCompact())
+  if (not cfh.hasFeatureAcceptCompact())
     return false;
   int i;
   if (not mobs::string2x(str, i))
@@ -432,23 +432,23 @@ MTime MTimeNow() {
 }
 
 std::wstring StrConv<MTime>::c_to_wstring(const MTime &t, const ConvToStrHint &cth) {
-  if (cth.compact())
+  if (cth.hasFeatureCompact())
     return std::to_wstring(t.time_since_epoch().count());
   return to_wstring(t);
 }
 
 std::string StrConv<MTime>::c_to_string(const MTime &t, const ConvToStrHint &cth) {
-  if (cth.compact())
+  if (cth.hasFeatureCompact())
     return std::to_string(t.time_since_epoch().count());
   return to_string(t);
 }
 
 bool StrConv<MTime>::c_string2x(const std::string &str, MTime &t, const ConvFromStrHint &cfh) {
-  if (cfh.acceptExtended()) {
+  if (cfh.hasFeatureAcceptExtended()) {
     if (mobs::string2x(str, t))
       return true;
   }
-  if (not cfh.acceptCompact())
+  if (not cfh.hasFeatureAcceptCompact())
     return false;
   int64_t i;
   if (not mobs::string2x(str, i))

@@ -768,7 +768,7 @@ public:
 
 class KeyDump : virtual public mobs::ObjTravConst {
 public:
-  explicit KeyDump(const mobs::ConvObjToString &c) : quoteKeys(c.withQuotes() ? "\"":""), cth(c) { };
+  explicit KeyDump(const mobs::ConvObjToString &c) : quoteKeys(c.hasFeatureWithQuotes() ? "\"":""), cth(c) { };
   bool doObjBeg(const mobs::ObjectBase &obj) override {
     if (not obj.getElementName().empty())
       objNames.push(obj.getName(cth) + ".");
@@ -1321,6 +1321,92 @@ TEST(objgenTest, jsonstr3) {
   cout << str.str() << endl;
 }
 
+
+namespace {
+class Method : virtual public mobs::ObjectBase
+{
+public:
+  ObjInit(Method);
+  MemVar(std::string, Algorithm, XMLATTR);
+};
+
+class ConcatHKDF : virtual public mobs::ObjectBase
+{
+public:
+  ObjInit(ConcatHKDF);
+  MemObj(Method, PRF, NAMESPACE(dsig-more));
+  MemVar(std::string, Salt, USENULL, NAMESPACE(dsig-more));
+  MemVar(std::string, Info, USENULL, NAMESPACE(dsig-more));
+  MemVar(int, KeyLength, NAMESPACE(dsig-more));
+  void init() override {
+    addNamespace("dsig-more", "http://www.w3.org/2021/04/xmldsig-more#");
+  }
+};
+
+class KeyDerivation : virtual public mobs::ObjectBase
+{
+public:
+  ObjInit(KeyDerivation);
+  MemVar(std::string, Algorithm, XMLATTR);
+  MemObj(ConcatHKDF, HKDFParams, NAMESPACE(xenc));
+  void init() override {
+    addNamespace("xenc", "http://www.w3.org/2001/04/xmlenc#");
+    addNamespace("xenc11", "http://www.w3.org/2009/xmlenc11#");
+  }
+};
+
+class Root : virtual public mobs::ObjectBase
+{
+public:
+  ObjInit(Root);
+  MemVar(std::string, Otto);
+  MemObj(KeyDerivation, KeyDerivationMethod, NAMESPACE(xenc11));
+};
+
+}
+
+TEST(objgenTest, xmlns1) {
+  std::string x1 = R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+  <root>
+    <Otto>Waalkes</Otto>
+    <xenc11:KeyDerivationMethod
+            xmlns:xenc="http://www.w3.org/2001/04/xmlenc#"
+            xmlns:xenc11="http://www.w3.org/2009/xmlenc11#"
+            Algorithm="http://www.w3.org/2021/04/xmldsig-more#hkdf">
+      <dsig-more:HKDFParams>
+        <dsig-more:PRF Algorithm="http://www.w3.org/2001/04/xmldsig-more#hmac-sha256"/>
+        <dsig-more:Salt>xWdTey4T6awUJkp0NPZNVTa2JQkWukC0Uk+qaeEpn4Y=</dsig-more:Salt>
+        <dsig-more:Info>dGVzdC1pbmZvLWRhdGE=</dsig-more:Info>
+        <dsig-more:KeyLength>16</dsig-more:KeyLength>
+      </dsig-more:HKDFParams>
+    </xenc11:KeyDerivationMethod>
+  </root>
+    )";
+
+
+  std::string x = R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+  <root>
+    <Otto>Waalkes</Otto>
+    <xenc11:KeyDerivationMethod Algorithm="http://www.w3.org/2021/04/xmldsig-more#hkdf"
+        xmlns:xenc="http://www.w3.org/2001/04/xmlenc#"
+        xmlns:xenc11="http://www.w3.org/2009/xmlenc11#">
+      <xenc:HKDFParams xmlns:dsig-more="http://www.w3.org/2021/04/xmldsig-more#">
+        <dsig-more:PRF Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+        <dsig-more:Salt>xWdTey4T6awUJkp0NPZNVTa2JQkWukC0Uk+qaeEpn4Y=</dsig-more:Salt>
+        <dsig-more:Info>III</dsig-more:Info>
+        <dsig-more:KeyLength>32</dsig-more:KeyLength>
+      </xenc:HKDFParams>
+    </xenc11:KeyDerivationMethod>
+  </root>
+    )";
+
+  Root o;
+  EXPECT_NO_THROW(mobs::string2Obj(x, o, mobs::ConvObjFromStr().useXml().useXmlNs().useForceNull()));
+  cout << o.to_string(mobs::ConvObjToString().exportXmlWithNS().doIndent());
+
+
+
+}
 #if 0
 TEST(objgenTest, compare) {
   Person p;

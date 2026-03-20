@@ -318,6 +318,25 @@ std::string to_string(const std::vector<u_char> &buf) {
 
 
 
+ConvObjFromStr ConvObjFromStr::setDfltNameSpace(const char *ns) const {
+  ConvObjFromStr c(*this);
+  c.dfltNs = ns;
+  if (ns and not *ns)
+    c.dfltNs = nullptr;
+  c.xmlNs = c.dfltNs != nullptr;
+  return c;
+}
+
+ConvObjToString ConvObjToString::setDfltNameSpacePfx(const char *ns) const {
+  ConvObjToString c(*this);
+  c.dfltNsPfx = ns;
+  if (ns and not *ns)
+    c.dfltNsPfx = nullptr;
+  c.nameSpc = c.dfltNsPfx != nullptr;
+  return c;
+}
+
+
 template<>
 /// \private
 bool to_int64(int t, int64_t &i)

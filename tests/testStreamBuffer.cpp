@@ -258,7 +258,7 @@ public:
                                                                             charsetUnknown) {}
 
 //  virtual void NullTag(const std::string &element) { EndTag(element); }
-  virtual void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) override {
+  virtual void Attribute(const string &ns, const std::string &element, const std::string &attribut, const std::wstring &value) override {
     LOG(LM_INFO, "attribute " << element << ":" << attribut << " = " << mobs::to_string(value));
   }
 
@@ -266,7 +266,7 @@ public:
     LOG(LM_INFO, "value " << mobs::to_string(value));
   }
 
-  virtual void StartTag(const std::string &element) override {
+  virtual void StartTag(const string &ns, const std::string &element) override {
     LOG(LM_INFO, "start " << element);
     if (element == "Person") {
         person.name("XXX");
@@ -274,7 +274,7 @@ public:
     }
   }
 
-  virtual void EndTag(const std::string &element) override {
+  virtual void EndTag(const string &ns, const std::string &element, bool emptyElement) override {
     LOG(LM_INFO, "end " << element);
   }
 

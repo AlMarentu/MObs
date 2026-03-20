@@ -110,13 +110,13 @@ public: \
   static std::string toStr(enum typ e) { return (toStr(mobsEnum_##typ##_define::numOf(e))); } \
   static size_t numOf(enum typ e) { return mobsEnum_##typ##_define::toEnum(e); } \
   static inline bool c_string2x(const std::string &str, typ &t, const mobs::ConvFromStrHint &cfh) { \
-    if (cfh.acceptExtended()) { try { t = fromStr(str); return true; } catch (...) { } } \
-    if (not cfh.acceptCompact()) return false; \
+    if (cfh.hasFeatureAcceptExtended()) { try { t = fromStr(str); return true; } catch (...) { } } \
+    if (not cfh.hasFeatureAcceptCompact()) return false; \
     int i; if (not mobs::string2x(str, i)) return false; t = typ(i); return true; } \
   static inline bool c_wstring2x(const std::wstring &wstr, typ &t, const mobs::ConvFromStrHint &cfh) { return c_string2x(mobs::to_string(wstr), t, cfh); } \
-  static inline std::string c_to_string(const typ &t, const mobs::ConvToStrHint &cth) { return cth.compact() ? mobs::to_string(int(t)) : toStr(t); } \
-  static inline std::wstring c_to_wstring(const typ &t, const mobs::ConvToStrHint &cth) { return cth.compact() ? mobs::to_wstring(int(t)) : mobs::to_wstring(toStr(t)); }; \
-  static inline bool c_is_chartype(const mobs::ConvToStrHint &cth) { return not cth.compact(); } \
+  static inline std::string c_to_string(const typ &t, const mobs::ConvToStrHint &cth) { return cth.hasFeatureCompact() ? mobs::to_string(int(t)) : toStr(t); } \
+  static inline std::wstring c_to_wstring(const typ &t, const mobs::ConvToStrHint &cth) { return cth.hasFeatureCompact() ? mobs::to_wstring(int(t)) : mobs::to_wstring(toStr(t)); }; \
+  static inline bool c_is_chartype(const mobs::ConvToStrHint &cth) { return not cth.hasFeatureCompact(); } \
   static inline bool c_is_mobsEnum() { return true; } \
   static inline typ c_empty() { return mobsEnum_##typ##_define::toEnum(0); } \
   static inline bool c_from_uint(uint64_t u, typ &t) { t = typ(u); return true; } \
@@ -157,7 +157,7 @@ std::string to_squote(const std::string &s);
 /** \brief String in Anführungszeichen (") setzen mit escaping für JSON (nach RFC 8259)
  *
  * es werden alle Zeichen escaped, die in JSON nach RFC 8259 escaped werden müssen
- * Dies beinhalet auch die Zeichen \b, \f, \n, \r, \t, \v  und \uXXXX für X < 0x20
+ * Dies beinhaltet auch die Zeichen \b, \f, \n, \r, \t, \v  und \uXXXX für X < 0x20
  * @param s in UTF8
  * @return
  */
@@ -294,7 +294,7 @@ inline std::wstring to_wstring(const std::wstring &t) { return t; }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
-inline std::wstring to_wstring(wchar_t t) { if (t < 0 or t > 0x10FFFF) return L"\uFFFD"; else if (t) return std::wstring() + t; return {}; }
+inline std::wstring to_wstring(wchar_t t) { if (t < 0 or t > 0x10FFFF) return L"\uFFFD"; if (t) return std::wstring() + t; return {}; }
 /// \brief Konvertierung nach std::wstring
 /// @param t Wert
 /// @return Wert als std::wstring
@@ -380,7 +380,7 @@ std::wstring to_wstring(double t);
 /// @return Wert als std::wstring
 std::wstring to_wstring(long double t);
 /// \brief Konvertierung nach std::string
-/// @param t Wert
+/// @param buf Wert
 /// @return Wert als hex-Bytes in std::string
 std::string to_string(const std::vector<u_char> &buf);
 
@@ -398,10 +398,11 @@ std::string to_string(const std::vector<u_char> &buf);
 
 
 template <typename T>
-/// \brief Konvertierung von std::string
-/// @param str Konvertierter Wert
-/// @param t Wert
-/// @return true, wenn fehlerfrei
+/** \brief Konvertierung von std::string
+    @param str Konvertierter Wert
+    @param t Wert
+   @return true, wenn fehlerfrei
+ */
 inline bool string2x(const std::string &str, T &t) {std::stringstream s; s.str(str); s >> t; return s.eof() and not s.bad() and not s.fail(); }
 /// \private
 template <> inline bool string2x(const std::string &str, std::string &t) { t = str; return true; }
@@ -443,7 +444,7 @@ template <> bool wstring2x(const std::wstring &wstr, std::u16string &t);
 
 // ist typename ein Character-Typ
 template <typename T>
-/// \brief prüft, ob der Typ T aus Text besteht - also zB. in JSON in Hochkommata steht
+/// \brief prüft, ob der Typ T aus Text besteht - also z.B. in JSON in Hochkommata steht
 inline bool mobschar(T) { return not std::numeric_limits<T>::is_specialized; }
 /// \private
 template <> inline bool mobschar(char) { return true; }
@@ -485,22 +486,26 @@ public:
   ConvToStrHint(ConvToStrHint &&) = default;
   /// Konstruktor
   /// @param print_compact führt bei einigen Typen zur vereinfachten Ausgabe als ganzzahliger Wert
-  /// @param altNames verwende alternative Namen wenn Vorhanden
+  /// @param altNames verwende alternative Namen, wenn vorhanden
   /// @param pfix verwende den Prefix vor dem Namen, falls vorhanden
   /// @param lowercase wandelt den Namen in Kleinbuchstaben
   explicit ConvToStrHint(bool print_compact, bool altNames = false, bool pfix = false, bool lowercase = false) : comp(print_compact),
-                                                                                                                 altnam(altNames), prefix(pfix), toLower(lowercase) {}
-  virtual ~ConvToStrHint() = default;
+                         altnam(altNames), prefix(pfix), toLower(lowercase) {}
+  ~ConvToStrHint() = default;
   /// \private
-  virtual bool compact() const { return comp; }
+  bool hasFeatureCompact() const { return comp; }
   /// \private
-  virtual bool useAltNames() const { return altnam; }
+  bool hasFeatureUseAltNames() const { return altnam; }
   /// \private
-  virtual bool usePrefix() const { return prefix; }
+  bool hasFeatureUsePrefix() const { return prefix; }
   /// \private
-  bool withIndentation() const { return indent; }
+  bool hasFeatureUseNamespace() const { return nameSpc; }
   /// \private
-  bool toLowercase() const { return toLower; }
+  bool hasFeatureWithIndentation() const { return indent; }
+  /// \private
+  bool hasFeatureToLowercase() const { return toLower; }
+  /// \private
+  const char *getFeatureDfltNsPfx() const { return dfltNsPfx; }
 
 protected:
   /// \private
@@ -513,6 +518,10 @@ protected:
   bool prefix = false;
   /// \private
   bool toLower = false;
+  /// \private
+  bool nameSpc = false;
+  /// \private
+  const char *dfltNsPfx{};
 };
 
 /// Hilfsklasse für Konvertierungsklasse - Basisklasse
@@ -523,9 +532,9 @@ public:
   ConvFromStrHint &operator=(const ConvFromStrHint &) = default;
   virtual ~ConvFromStrHint() = default;
   /// darf ein nicht-kompakter Wert als Eingabe fungieren
-  virtual bool acceptExtended() const = 0;
+  virtual bool hasFeatureAcceptExtended() const = 0;
   /// darf ein kompakter Wert (Zahlenwert bei MobsEnum oder Datum) als Eingabe fungieren
-  virtual bool acceptCompact() const = 0;
+  virtual bool hasFeatureAcceptCompact() const = 0;
 };
 
 /// Standard Konvertierungshinweis, kompakte und erweiterte Eingaben sind erlaubt
@@ -533,8 +542,8 @@ class ConvFromStrHintDefault : virtual public ConvFromStrHint {
 public:
   ConvFromStrHintDefault() = default;
   ~ConvFromStrHintDefault() override = default;
-  bool acceptCompact() const override { return true; }
-  bool acceptExtended() const override { return true; }
+  bool hasFeatureAcceptCompact() const override { return true; }
+  bool hasFeatureAcceptExtended() const override { return true; }
 };
 
 /// Konvertierungshinweis, der nur erweiterte Eingabe zulässt
@@ -542,35 +551,37 @@ class ConvFromStrHintExplizit : virtual public ConvFromStrHint {
 public:
   ConvFromStrHintExplizit() = default;
   ~ConvFromStrHintExplizit() override = default;
-  bool acceptCompact() const override { return false; }
-  bool acceptExtended() const override { return true; }
+  bool hasFeatureAcceptCompact() const override { return false; }
+  bool hasFeatureAcceptExtended() const override { return true; }
 };
 
 class CryptBufBase;
 /// Ausgabeformat für \c to_string() Methode von Objekten
-class ConvObjToString : virtual public ConvToStrHint {
+class ConvObjToString : public ConvToStrHint {
 public:
   /// Funktionssignatur für die Crypto-Funktion
   using EncrypFun = std::function<mobs::CryptBufBase*()>;
   ConvObjToString() : ConvToStrHint(false) {}
   /// \private
-  bool toXml() const { return xml; }
+  bool hasFeatureToXml() const { return xml; }
   /// \private
-  bool toJson() const { return not xml; }
+  bool hasFeatureToJson() const { return not xml; }
   /// \private
-  bool withQuotes() const { return quotes; }
+  bool hasFeatureWithQuotes() const { return quotes; }
   /// \private
-  bool omitNull() const { return onull; }
+  bool hasFeatureOmitNull() const { return onull; }
   /// \private
-  bool modOnly() const { return modified; }
+  bool hasFeatureModOnly() const { return modified; }
   /// \private
-  bool skipVersion() const { return skipVers; }
+  bool hasFeatureSkipVersion() const { return skipVers; }
   /// \private
-  EncrypFun getEncFun() const { return encryptor; }
+  EncrypFun getFeatureEncryptFun() const { return encryptor; }
   /// Ausgabe als XML-Datei
-  ConvObjToString exportXml() const { ConvObjToString c(*this); c.xml = true; return c; }
+  ConvObjToString exportXml() const { ConvObjToString c(*this); c.xml = true; c.nameSpc = false; return c; }
+  /// Ausgabe als XML-Datei mit Namespace
+  ConvObjToString exportXmlWithNS() const { ConvObjToString c(*this); c.xml = true; c.nameSpc = true; return c; }
   /// Ausgabe als JSON
-  ConvObjToString exportJson() const { ConvObjToString c(*this); c.xml = false; c.quotes = true; return c; }
+  ConvObjToString exportJson() const { ConvObjToString c(*this); c.xml = false; c.quotes = true; c.nameSpc = false; return c; }
   /// Verwende alternative Namen
   ConvObjToString exportAltNames() const { ConvObjToString c(*this); c.altnam = true; return c; }
   /// Export mit Einrückungen
@@ -587,12 +598,17 @@ public:
   ConvObjToString exportExtended() const { ConvObjToString c(*this); c.comp = false; return c; }
   /// Ausgabe von null-Werten überspringen
   ConvObjToString exportWoNull() const { ConvObjToString c(*this); c.onull = true; return c; }
+  /// Ausgabe von null-Werten zulassen (default)
+  ConvObjToString exportWithNull() const { ConvObjToString c(*this); c.onull = false; return c; }
   /// Ausgabe von Elementen mit Modified-Flag
   ConvObjToString exportModified() const { ConvObjToString c(*this); c.modified = true; return c; }
   /// Überspringe Versions-Elemente
   ConvObjToString exportSkipVersion() const { ConvObjToString c(*this); c.skipVers = true; return c; }
   /// setze Encrypt-Function
   ConvObjToString setEncryptor(EncrypFun e) const { ConvObjToString c(*this); c.encryptor = e; return c; }
+  /// setze default XML-Namespace Prefix für Export
+  ConvObjToString setDfltNameSpacePfx(const char *ns) const;
+
 private:
   bool xml = false;
   bool quotes = false;
@@ -610,30 +626,36 @@ public:
   /// Enums für Behandlung NULL-Werte
   enum Nulls { ignore, omit, clear, force, except };
   /// Eingabe ist im XML-Format
-  virtual bool acceptXml() const { return xml; }
+  bool hasFeatureAcceptXml() const { return xml; }
   /// darf ein kompakter Wert als Eingabe fungieren
-  bool acceptCompact() const override { return compact; }
+  bool hasFeatureAcceptCompact() const override { return compact; }
   /// darf ein nicht-kompakter Wert als Eingabe fungieren
-  bool acceptExtended() const override { return extended; };
+  bool hasFeatureAcceptExtended() const override { return extended; };
   /// Verwende alternative Namen
-  virtual bool acceptAltNames() const { return altNam; };
+  bool hasFeatureAcceptAltNames() const { return altNam; };
   /// Verwende original Namen
-  virtual bool acceptOriNames() const { return oriNam; };
+  bool hasFeatureAcceptOriNames() const { return oriNam; };
   /// setze Arraysize auf letztes Element
-  virtual bool shrinkArray() const { return shrink; };
+  bool hasFeatureShrinkArray() const { return shrink; };
   /// werfe eine Exception bei unbekannter Variable
-  virtual bool exceptionIfUnknown() const { return exceptUnk; };
+  bool hasFeatureExceptionIfUnknown() const { return exceptUnk; };
   /// Groß-/Kleinschreibung ignorieren
-  virtual bool caseInsensitive() const { return ignCase; };
+  bool hasFeatureCaseInsensitive() const { return ignCase; };
   /// Null-Werte behandeln
-  virtual enum Nulls nullHandling() const { return null; };
+  enum Nulls getFeatureNullHandling() const { return null; };
+  /// XML-Mamespaces
+  bool hasFeatureXmlNamespaces() const { return xmlNs; };
   /// \private
-  DecrypFun getDecFun() const { return decryptor; }
+  const char *getFeatureDfltNsPtr() const { return dfltNs; }
+  /// Rückgabe des Default-Namespaces
+  const char *getFeatureDfltNs() const { return dfltNs ? dfltNs : ""; }
+  /// \private
+  DecrypFun getFeatureDecryptFun() const { return decryptor; }
   /// Verwenden den XML-Parser
   ConvObjFromStr useXml() const { ConvObjFromStr c(*this); c.xml = true; return c; }
-  /// Werte in Kurzform akzeptieren (zB. Zahl anstatt enum-Text)
+  /// Werte in Kurzform akzeptieren (z.B. Zahl anstatt enum-Text)
   ConvObjFromStr useCompactValues() const { ConvObjFromStr c(*this); c.compact = true; c.extended = false; return c; }
-  /// Werte in Langform akzeptieren (zB. enum-Text, Datum)
+  /// Werte in Langform akzeptieren (z.B. enum-Text, Datum)
   ConvObjFromStr useExtendedValues() const { ConvObjFromStr c(*this); c.compact = false; c.extended = true; return c; }
   /// Werte in beliebiger Form akzeptieren
   ConvObjFromStr useAutoValues() const { ConvObjFromStr c(*this); c.compact = true; c.extended = true; return c; }
@@ -659,8 +681,15 @@ public:
   ConvObjFromStr useExceptUnknown() const {  ConvObjFromStr c(*this); c.exceptUnk = true; return c; }
   /// ignoriere beim Einlesen die Groß-/Kleinschreibung der Elementnamen
   ConvObjFromStr useIgnoreCase() const {  ConvObjFromStr c(*this); c.ignCase = true; return c; }
+  /// arbeite mit XML-Namespaces bei Elementnamen
+  ConvObjFromStr useXmlNs() const {  ConvObjFromStr c(*this); c.xmlNs = true; return c; }
+  /// arbeite nicht mit XML-Namespaces bei Elementnamen
+  ConvObjFromStr useXmlNoNs() const {  ConvObjFromStr c(*this); c.xmlNs = false; return c; }
   /// setze Decrypt-Function
   ConvObjFromStr setDecryptor(DecrypFun d) const { ConvObjFromStr c(*this); c.decryptor = d; return c; }
+  /// setze default XML-Namespace für Import
+  ConvObjFromStr setDfltNameSpace(const char *ns) const;
+
 protected:
   /// \private
   bool xml = false;
@@ -679,6 +708,10 @@ protected:
   /// \private
   bool ignCase = false;
   /// \private
+  bool xmlNs = false;
+  /// \private
+  const char *dfltNs{};
+  /// \private
   enum Nulls null = force;
   /// \private
   DecrypFun decryptor = nullptr;
@@ -694,13 +727,13 @@ template<typename T> inline bool to_uint64(T t, uint64_t &u) { return false; }
 /// @param i Ergebnisrückgabe als Zahl
 /// \return true wenn Konvertierung möglich
 template<typename T> inline bool to_int64(T t, int64_t &i) { return false; }
-///Template für Hilfsfunktion zum Konvertieren eines eines \c int in einen Typ t
+///Template für Hilfsfunktion zum Konvertieren eines \c int in einen Typ t
 /// \return true wenn Konvertierung möglich
 template<typename T> inline bool from_number(int64_t, T &t) { return false; }
-///Template für Hilfsfunktion zum Konvertieren eines eines \c uint in einen Typ t
+///Template für Hilfsfunktion zum Konvertieren eines \c uint in einen Typ t
 /// \return true wenn Konvertierung möglich
 template<typename T> inline bool from_number(uint64_t, T &t) { return false; }
-///Template für Hilfsfunktion zum Konvertieren eines eines \c double in einen Typ t
+///Template für Hilfsfunktion zum Konvertieren eines \c double in einen Typ t
 /// \return true wenn Konvertierung möglich
 template<typename T> inline bool from_number(double, T &t) { return false; }
 
@@ -723,12 +756,12 @@ template<> bool from_number(uint64_t, unsigned long int &t);
 template<> bool from_number(uint64_t, unsigned long long int &t);
 template<> bool from_number(uint64_t, bool &t);
 
-/** \brief Infos zum aktuellen Wert, wenn dieser als Zahl darstellbar ist.
+/** \brief Informationen zum aktuellen Wert, wenn dieser als Zahl darstellbar ist.
  *
  * Der Inhalt ist unabhängig vo Zustand \c isNull und hängt nur vom definierten Datentyp ab
  * bei \c bool ist \c isUnsigned gesetzt und max = 1
  *
- * Bei isTime-Typen sind bei Jahren von 1701 bis 1969 Sonderfunktionen unter Windows implementiert wenn entweder
+ * Bei isTime-Typen sind bei Jahren von 1701 bis 1969 Sonderfunktionen unter Windows implementiert, wenn entweder
  * GMT verwendet wird oder nur ein Datum. Der maximale Wert beträgt
  * 2262-04-11T23:47:16.854775Z oder 9223372036854775 µs = INT64MAX ns
  */
@@ -737,8 +770,8 @@ public:
   bool isUnsigned = false; ///< hat Wert von typ \c signed, i64, min und max sind gesetzt
   bool isSigned = false; ///< wht Wert vom Typ \c unsigned, u64 und max sind gesetzt
   bool isFloat = false; ///< wht Wert vom Typ \c Fließkommazahl, d ist gesetzt
-  bool isTime = false; ///< Wert ist Millisekunde seit Unix-Epoche i64 ist gesetzt
-  bool isEnum = false; ///<  Wert ist ein enum -> besser als Klartext darstellen \see acceptExtended
+  bool isTime = false; ///< Wert in Millisekunde seit Unix-Epoche i64 ist gesetzt
+  bool isEnum = false; ///<  Wert ist ein enum -> besser als Klartext darstellen \see hasFeatureAcceptExtended
   bool is_specialized = false; ///< is_specialized aus std::numeric_limits
   bool isBlob = false; ///< Binär-Daten-Objekt
   bool hasCompact = false; ///< hat member Compact-Modus
@@ -803,7 +836,7 @@ struct QueryInfo {
   /** Konstruktor
    *
    * @param mem Zeiger aud MobsMenberVariable
-   * @param oper Zeiger auf Oerator z.B. "<=" oder "IN"
+   * @param oper Zeiger auf Operator z.B. "<=" oder "IN"
    */
   QueryInfo(const MemberBase *mem, const char *oper) : mem(mem), op(oper) { }
   const MemberBase *mem;  ///< Zeiger aud MobsMenberVariable
@@ -816,19 +849,19 @@ struct QueryInfo {
 class StrConvBase {
 public:
   /// Angabe, ob die Ausgabe als Text erfolgt (quoting, escaping nötig)
-  static inline bool c_is_chartype(const ConvToStrHint &) { return true; }
+  static bool c_is_chartype(const ConvToStrHint &) { return true; }
   /// zeigt an, ob spezialisierter Typ vorliegt (\c \<limits>)
-  static inline bool c_is_specialized() { return false; }
-  /// zeigt an, ob des Element ein binäres Datenobjekt ist
-  static inline bool c_is_blob() { return false; }
-  /// zeigt an, ob des Element ein MOBSENUM ist
-  static inline bool c_is_mobsEnum() { return false; }
-  /// Körnung des Datentyps wenn es ein Date-Typ ist, \c 0 sonst
-  static inline uint64_t c_time_granularity() { return 0; }
+  static bool c_is_specialized() { return false; }
+  /// zeigt an, ob das Element ein binäres Datenobjekt ist
+  static bool c_is_blob() { return false; }
+  /// zeigt an, ob das Element ein MOBSENUM ist
+  static bool c_is_mobsEnum() { return false; }
+  /// Körnung des Datentyps, wenn es ein Date-Typ ist, \c 0 sonst
+  static uint64_t c_time_granularity() { return 0; }
   /// \private
-  static inline uint64_t c_max() { return 0; }
+  static uint64_t c_max() { return 0; }
   /// \private
-  static inline int64_t c_min() { return 0; }
+  static int64_t c_min() { return 0; }
 };
 
 /// Basis der Konvertierungs-Klasse Typabhängig für Serialisierung von und nach std::string
@@ -836,22 +869,22 @@ template <typename T>
 class StrConvBaseT : public StrConvBase {
 public:
   /// Angabe, ob die Ausgabe als Text erfolgt (quoting, escaping nötig)
-  static inline bool c_is_chartype(const ConvToStrHint &) { return true; }
+  static bool c_is_chartype(const ConvToStrHint &) { return true; }
   /// zeigt an, ob spezialisierter Typ vorliegt (\c \<limits>)
-  static inline bool c_is_specialized() { return false; }
-  /// zeigt an, ob des Element ein binäres Datenobjekt ist
-  static inline bool c_is_blob() { return false; }
-  /// zeigt an, ob des Element ein MOBSENUM ist
-  static inline bool c_is_mobsEnum() { return false; }
-  /// Körnung des Datentyps wenn es ein Date-Typ ist, \c 0 sonst
-  static inline uint64_t c_time_granularity() { return 0; }
+  static bool c_is_specialized() { return false; }
+  /// zeigt an, ob das Element ein binäres Datenobjekt ist
+  static bool c_is_blob() { return false; }
+  /// zeigt an, ob das Element ein MOBSENUM ist
+  static bool c_is_mobsEnum() { return false; }
+  /// Körnung des Datentyps, wenn es ein Date-Typ ist, \c 0 sonst
+  static uint64_t c_time_granularity() { return 0; }
   /// \private
-  static inline uint64_t c_max() { return 0; }
+  static uint64_t c_max() { return 0; }
   /// \private
-  static inline int64_t c_min() { return 0; }
-  /// liefert eine \e leere Variable die zum löschen oder Initialisieren einer Membervariablen verwendet wird
+  static int64_t c_min() { return 0; }
+  /// liefert eine \e leere Variable, die zum Löschen oder Initialisieren einer Membervariablen verwendet wird
   /// \see clear()
-  static inline T c_empty() { return mobsempty(T()); }
+  static T c_empty() { return mobsempty(T()); }
   /// Einlesen von int_64_t
   static bool c_from_int(int64_t i, T &t) { return false; }
   /// Einlesen von int_64_t
@@ -867,7 +900,7 @@ public:
   /// Zeiger auf Byte Array
   static bool c_to_blob(const T &t, const void *&, uint64_t &) { return false; }
   /// Blob einlesen
-  static inline bool c_from_blob(const void *p, uint64_t sz, T &) { return false; }
+  static bool c_from_blob(const void *p, uint64_t sz, T &) { return false; }
   /// Wandeln in MTime
   static bool c_from_mtime(int64_t i, T &t) { return false; }
   /// Einlesen von MTime
@@ -881,30 +914,30 @@ template <typename T>
 class StrConv : public StrConvBaseT<T> {
 public:
   /// liest eine Variable aus einem \c std::string
-  static inline bool c_string2x(const std::string &str, T &t, const ConvFromStrHint &) { return mobs::string2x(str, t); }
+  static bool c_string2x(const std::string &str, T &t, const ConvFromStrHint &) { return mobs::string2x(str, t); }
   /// liest eine Variable aus einem \c std::wstring
-  static inline bool c_wstring2x(const std::wstring &wstr, T &t, const ConvFromStrHint &cth) { return c_string2x(mobs::to_string(wstr), t, cth); }
+  static bool c_wstring2x(const std::wstring &wstr, T &t, const ConvFromStrHint &cth) { return c_string2x(mobs::to_string(wstr), t, cth); }
   /// Wandelt eine Variable in einen \c std::string um
-  static inline std::string c_to_string(const T &t, const ConvToStrHint &) { return to_string(t); };
+  static std::string c_to_string(const T &t, const ConvToStrHint &) { return to_string(t); };
   /// Wandelt eine Variable in einen \c std::wstring um
-  static inline std::wstring c_to_wstring(const T &t, const ConvToStrHint &) { return to_wstring(t); };
+  static std::wstring c_to_wstring(const T &t, const ConvToStrHint &) { return to_wstring(t); };
 //  static inline bool c_blob_ref(const T &t, const char *&ptr, size_t &sz) { return false; }
   /// Angabe, ob die Ausgabe als Text erfolgt (quoting, escaping nötig)
-  static inline bool c_is_chartype(const ConvToStrHint &) { return mobschar(T()); }
+  static bool c_is_chartype(const ConvToStrHint &) { return mobschar(T()); }
   /// Größter möglicher Wert
-  static inline uint64_t c_max() { uint64_t u; int64_t i; if (c_to_int64(std::numeric_limits<T>::max(), i)) return uint64_t(i);
+  static uint64_t c_max() { uint64_t u; int64_t i; if (c_to_int64(std::numeric_limits<T>::max(), i)) return uint64_t(i);
     return c_to_uint64(std::numeric_limits<T>::max(), u) ? u : 0; }
   /// Kleinster möglicher Wert
-  static inline int64_t c_min() { uint64_t u; int64_t i; if (c_to_int64(std::numeric_limits<T>::min(), i)) return i;
+  static int64_t c_min() { uint64_t u; int64_t i; if (c_to_int64(std::numeric_limits<T>::min(), i)) return i;
     return c_to_uint64(std::numeric_limits<T>::min(), u) ? int64_t(u) : 0; }
   /// Wandeln in uint64
-  static inline bool c_to_uint64(T t, uint64_t &u) { return to_uint64(t, u); }
+  static bool c_to_uint64(T t, uint64_t &u) { return to_uint64(t, u); }
   /// Wandeln in int64
-  static inline bool c_to_int64(T t, int64_t &i) { return to_int64(t, i); }
+  static bool c_to_int64(T t, int64_t &i) { return to_int64(t, i); }
   /// Einlesen von int_64_t
-  static inline bool c_from_int(int64_t i, T &t) { return from_number(i, t); }
+  static bool c_from_int(int64_t i, T &t) { return from_number(i, t); }
   /// Einlesen von int_64_t
-  static inline bool c_from_uint(uint64_t u, T &t) { return from_number(u, t); }
+  static bool c_from_uint(uint64_t u, T &t) { return from_number(u, t); }
 };
 
 template <>
@@ -912,21 +945,21 @@ template <>
 class StrConv<bool> : public StrConvBaseT<bool> {
 public:
   /// \private
-  static inline bool c_string2x(const std::string &str, bool &t, const ConvFromStrHint &) { return mobs::string2x(str, t); }
+  static bool c_string2x(const std::string &str, bool &t, const ConvFromStrHint &) { return mobs::string2x(str, t); }
   /// \private
-  static inline bool c_wstring2x(const std::wstring &wstr, bool &t, const ConvFromStrHint &cth) { return c_string2x(mobs::to_string(wstr), t, cth); }
+  static bool c_wstring2x(const std::wstring &wstr, bool &t, const ConvFromStrHint &cth) { return c_string2x(mobs::to_string(wstr), t, cth); }
   /// \private
-  static inline std::string c_to_string(const bool &t, const ConvToStrHint &) { return to_string(t); };
+  static std::string c_to_string(const bool &t, const ConvToStrHint &) { return to_string(t); };
   /// \private
-  static inline std::wstring c_to_wstring(const bool &t, const ConvToStrHint &) { return to_wstring(t); };
+  static std::wstring c_to_wstring(const bool &t, const ConvToStrHint &) { return to_wstring(t); };
   /// \private
-  static inline bool c_is_chartype(const ConvToStrHint &) { return false; }
+  static bool c_is_chartype(const ConvToStrHint &) { return false; }
   /// \private
-  static inline uint64_t c_max() { return 1; }
+  static uint64_t c_max() { return 1; }
   /// \private
-  static inline bool c_to_uint64(bool t, uint64_t &u) { u = t ? 1:0; return true; }
+  static bool c_to_uint64(bool t, uint64_t &u) { u = t ? 1:0; return true; }
   /// \private
-  static inline bool c_from_uint(uint64_t u, bool &t) { t = (u != 0); return true; }
+  static bool c_from_uint(uint64_t u, bool &t) { t = (u != 0); return true; }
 };
 
 template <>
@@ -938,15 +971,15 @@ public:
   /// \private
   static  bool c_wstring2x(const std::wstring &wstr, float &t, const ConvFromStrHint &cth);
   /// \private
-  static inline std::string c_to_string(const float &t, const ConvToStrHint &) { return to_string(t); };
+  static std::string c_to_string(const float &t, const ConvToStrHint &) { return to_string(t); };
   /// \private
-  static inline std::wstring c_to_wstring(const float &t, const ConvToStrHint &) { return to_wstring(t); };
+  static std::wstring c_to_wstring(const float &t, const ConvToStrHint &) { return to_wstring(t); };
   /// \private
-  static inline bool c_is_chartype(const ConvToStrHint &) { return false; }
+  static bool c_is_chartype(const ConvToStrHint &) { return false; }
   /// \private
-  static inline bool c_to_double(float t, double &d) { d = t; return true; }
+  static bool c_to_double(float t, double &d) { d = t; return true; }
   /// \private
-  static inline bool c_from_double(double d, float &t) { t = static_cast<float>(d); return true; }
+  static bool c_from_double(double d, float &t) { t = static_cast<float>(d); return true; }
 };
 
 
@@ -960,15 +993,15 @@ public:
   /// \private
   static bool c_wstring2x(const std::wstring &wstr, double &t, const ConvFromStrHint &cth);
   /// \private
-  static inline std::string c_to_string(const double &t, const ConvToStrHint &) { return to_string(t); };
+  static std::string c_to_string(const double &t, const ConvToStrHint &) { return to_string(t); };
   /// \private
-  static inline std::wstring c_to_wstring(const double &t, const ConvToStrHint &) { return to_wstring(t); };
+  static std::wstring c_to_wstring(const double &t, const ConvToStrHint &) { return to_wstring(t); };
   /// \private
-  static inline bool c_is_chartype(const ConvToStrHint &) { return false; }
+  static bool c_is_chartype(const ConvToStrHint &) { return false; }
   /// \private
-  static inline bool c_to_double(double t, double &d) { d = t; return true; }
+  static bool c_to_double(double t, double &d) { d = t; return true; }
   /// \private
-  static inline bool c_from_double(double d, double &t) { t = d; return true; }
+  static bool c_from_double(double d, double &t) { t = d; return true; }
 };
 
 
@@ -985,7 +1018,7 @@ public:
   /// \private
   static std::wstring c_to_wstring(const std::vector<u_char> &t, const ConvToStrHint &);
   /// \private
-  static inline bool c_is_blob() { return true; }
+  static bool c_is_blob() { return true; }
   /// \private
   static bool c_to_blob(const std::vector<u_char> &t, const void *&p, uint64_t &sz);
   /// \private
@@ -997,21 +1030,21 @@ template <typename T>
 class StrIntConv : public StrConvBaseT<T> {
 public:
   /// \private
-  static inline bool c_string2x(const std::string &str, T &t, const ConvFromStrHint &) { int i; if (not mobs::string2x(str, i)) return false; t = T(i); return true; }
+  static bool c_string2x(const std::string &str, T &t, const ConvFromStrHint &) { int i; if (not mobs::string2x(str, i)) return false; t = T(i); return true; }
   /// \private
-  static inline bool c_wstring2x(const std::wstring &wstr, T &t, const ConvFromStrHint &) { int i; if (not mobs::wstring2x(wstr, i)) return false; t = T(i); return true; }
+  static bool c_wstring2x(const std::wstring &wstr, T &t, const ConvFromStrHint &) { int i; if (not mobs::wstring2x(wstr, i)) return false; t = T(i); return true; }
   /// \private
-  static inline std::string c_to_string(const T &t, const ConvToStrHint &) { return std::to_string(int(t)); }
+  static std::string c_to_string(const T &t, const ConvToStrHint &) { return std::to_string(int(t)); }
   /// \private
-  static inline std::wstring c_to_wstring(const T &t, const ConvToStrHint &) { return std::to_wstring(int(t)); };
+  static std::wstring c_to_wstring(const T &t, const ConvToStrHint &) { return std::to_wstring(int(t)); };
   /// \private
-  static inline bool c_is_chartype(const ConvToStrHint &) { return false; }
+  static bool c_is_chartype(const ConvToStrHint &) { return false; }
   /// \private
-  static inline bool c_is_specialized() { return false; }
+  static bool c_is_specialized() { return false; }
   /// \private
-  static inline uint64_t c_max() { return std::numeric_limits<unsigned short int>::max(); }
+  static uint64_t c_max() { return std::numeric_limits<unsigned short int>::max(); }
   /// \private
-  static inline T c_empty() { return T(0); }
+  static T c_empty() { return T(0); }
 };
 
 

@@ -53,15 +53,15 @@ ObjRegister(Gespann);
 // Hilfsklasse zum Einlesen von XML-Dateien
 class XmlInput : public mobs::XmlReader {
 public:
-  explicit XmlInput(wistream &str) : XmlReader(str) { }
+  explicit XmlInput(wistream &str) : XmlReader(str, mobs::ConvObjFromStr().setDfltNameSpace("abc.xml").useXmlNs()) { }
 
-  void StartTag(const std::string &element) override {
+  void StartTag(const string &ns, const std::string &element) override {
     LOG(LM_INFO, "start " << element);
     // Wenn passendes Tag gefunden, dann Objekt einlesen
-    if (elementRemovePrefix(element) == "Gespann")
+    if (element == "Gespann" and ns == getCFS().getFeatureDfltNs())
       fill(new Gespann);
   }
-  void EndTag(const std::string &element) override {
+  void EndTag(const string &ns, const std::string &element, bool emptyElement) override {
     LOG(LM_INFO, "end " << element);
   }
   void filled(mobs::ObjectBase *obj, const string &error) override {
@@ -144,13 +144,12 @@ int main(int argc, char* argv[])
 
     // Writer-Klasse mit File, und Optionen initialisieren
     mobs::XmlWriter xf(x2out, mobs::XmlWriter::CS_utf8_bom, true);
-    xf.setPrefix(L"m:"); // optionaler XML Namespace
-    mobs::XmlOut xo(&xf, cth);
+    mobs::XmlOut xo(&xf, cth.setDfltNameSpacePfx("m"));  // optionaler XML Namespace-Prefix
     // XML-Header
     xf.writeHead();
-    xf.writeAttribute(L"xmlns", L"abc.xml");
     // Listen-Tag
     xf.writeTagBegin(L"list");
+    xf.writeAttribute(L"xmlns:m", L"abc.xml");
 
     // Objekt schreiben
     f1.traverse(xo);
@@ -221,7 +220,7 @@ int main(int argc, char* argv[])
 
   // Import-Klasee mit FIle initialisieren
     XmlInput xr(x2in);
-    xr.setPrefix("m:"); // optionaler XML Namespace
+    //xr.setPrefix("m:"); // optionaler XML Namespace
 
     while (not xr.eof()) {
       // File parsen

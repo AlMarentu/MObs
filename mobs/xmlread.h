@@ -32,27 +32,11 @@
 namespace mobs {
 
 
-class Cipher : virtual public mobs::ObjectBase
-{
-public:
-  ObjInit(Cipher);
-  MemVar(std::string, CipherValue);
-};
-
-class KeyInfo : virtual public mobs::ObjectBase
-{
-public:
-  ObjInit(KeyInfo);
-  MemVar(std::string, KeyName, USENULL);
-  MemObj(Cipher, CipherData, USENULL);
-};
-
-
-
 class CryptBufBase;
 class XmlReadData;
-/** \brief KLasse um Objekte aus XML einzulesen
+/** \brief KLasse um Objekte aus XML einzulesen.
  *
+ * Verwendet den xmlParser im Modus attributAfterStart.
  */
 class XmlReader {
 public:
@@ -80,10 +64,8 @@ public:
   explicit XmlReader(std::wistream &str, const ConvObjFromStr &c = ConvObjFromStr());
   virtual ~XmlReader();
 
-  /// Callback für Null-Tag
-  virtual void NullTag(const std::string &element) { EndTag(element); }
   /// Callback für Attribut
-  virtual void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) { }
+  virtual void Attribute(const std::string &ns, const std::string &element, const std::string &attribut, const std::wstring &value) { }
   /// Callback für Werte
   virtual void Value(const std::wstring &value) { }
   /** \brief Callback-Function: Ein CDATA-Element mit base64 codiertem Inhalt
@@ -93,9 +75,9 @@ public:
    */
   virtual void Base64(const std::vector<u_char> &base64) { }
   /// Callback für Start-Tag
-  virtual void StartTag(const std::string &element) { }
+  virtual void StartTag(const std::string &ns, const std::string &element) { }
   /// Callback für Ende-Tag
-  virtual void EndTag(const std::string &element) { }
+  virtual void EndTag(const std::string &ns, const std::string &element, bool emptyElement) { }
   /// Callback für ProcessingInstruction
   virtual void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) { }
   /// Callback für gelesenes Objekt
@@ -111,29 +93,28 @@ public:
    * @param cryptBufp ein mit new erzeugtes Encryption-Module; wird automatisch freigegeben
    */
   virtual void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, mobs::CryptBufBase *&cryptBufp) { }
-  /** \brief Callback-Funktion: Ein Element "EncryptedData" wurde gefunden und ein decrypt-Modul wird benötigt
+  /** \brief Callback-Funktion: Ein Element "EncryptedData" wurde gefunden und ein decrypt-Modul wird benötigt.
    *
-   * Es wird  "https://www.w3.org/2001/04/xmlenc#Element" unterstützt.
+   * Es wird  "http://www.w3.org/2001/04/xmlenc#Element" unterstützt.
    * Bei mehreren Recipients muss nur bei einer Id eine Entschlüsselungs-Klasse zurückgeliefert werden.
    * Bei unbekannten Recipients kann nullptr zurückgegeben werden.
-   * @param algorithm Algorithmus um xmlns bereinigt zB.: aes-256-cbc, oder "https://www.w3.org/2001/04/xmlenc#aes-256-cbc"/
-   * @param keyInfo KeyInfo-Element
-   * @returns cryptBufp ein mit new erzeugtes Encryption-Module; wird automatisch freigegeben oder nullptr, wenn unbekannt
+   * @param algorithm Algorithmus um xmlns bereinigt zB.: aes-256-cbc, oder "http://www.w3.org/2001/04/xmlenc#aes-256-cbc"/
+   * @param keyInfo KeyInfo-Element (siehe encdata.h)
+   * @param cryptBufp ein mit new erzeugtes Encryption-Module; wird automatisch freigegeben; oder nullptr, wenn unbekannt
    */
-  virtual void Encrypt(const std::string &algorithm, const ObjectBase *keyInfo, mobs::CryptBufBase *&cryptBufp) {
-    if (auto ki = dynamic_cast<const mobs::KeyInfo *>(keyInfo))
-      Encrypt(algorithm, ki->KeyName(), ki->CipherData.CipherValue(), cryptBufp);
-  }
+  virtual void Encrypt(const std::string &algorithm, const ObjectBase *keyInfo, mobs::CryptBufBase *&cryptBufp);
+  /** \brief Ein Objekt KeyInfo soll gelesen werden.
+   *
+   * Überladbare Methode um ein KeyInfo-Objekt zu erzeugen. Standard ist die KeyInfo aus encdata.h.
+   * \return Rückgabe eine neu erzeugten, leeren Objektes KeyInfo;
+   * \throws runtime_error, wenn ein nullptr zurückgeliefert wird
+   */
+  virtual ObjectBase *fillKeyInfo();
 
   /// Encryption-Element abgeschlossen
   virtual void EncryptionFinished() { }
 
-  /// setzte ein XML-Prefix
-  void setPrefix(const std::string &pf);
-  /// entferne das Prefix
-  /// \throw runtime_error falls das prefix nicht übereinstimmt
-  std::string elementRemovePrefix(const std::string &element) const;
-  /// Aktiviere automatische base64 erkennung
+ /// Aktiviere automatische base64 erkennung
   /// \see Base64
   void setBase64(bool b);
   /// Einstellung: Lese bis EOF, ansonsten stoppe beim letzten Ene-Tag
@@ -162,6 +143,8 @@ public:
   void setMaxElementSize(size_t s);
   /// ist der Stream verschlüsselt (läuft über CryptBuffer)
   bool encrypted() const;
+  /// aktuelle conversion-hints abfragen
+  const ConvObjFromStr &getCFS() const;
 
 private:
   std::unique_ptr<XmlReadData> data;
@@ -174,9 +157,9 @@ class XmlRead : public XmlReader {
 public:
   /// Alles initialisieren
   XmlRead(const std::string &str, ObjectBase &obj, const ConvObjFromStr &c) :
-          XmlReader(str, c), object(obj), decrypFun(c.getDecFun()) { }
+          XmlReader(str, c), object(obj), decrypFun(c.getFeatureDecryptFun()) { }
   /// \private
-  void StartTag(const std::string &element) override {
+  void StartTag(const std::string &ns, const std::string &element) override {
     if (element == "root" or (object.hasFeature(OTypeAsXRoot) != Unset and element == object.getObjectName())) {
       fill(&object);
       done = true;

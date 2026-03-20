@@ -22,6 +22,7 @@
 #include "xmlread.h"
 #include "xmlparser.h"
 #include "logging.h"
+#include "encdata.h"
 
 
 #include<stack>
@@ -41,28 +42,16 @@ static std::wstring stow(const string &s, bool dontConvert) {
                                                      
   class XmlReadData : public ObjectNavigator, public XmlParserW  {
   public:
-    XmlReadData(XmlReader *p, wistream &s, const ConvObjFromStr &c) : ObjectNavigator(c), XmlParserW(s), parent(p) {}
-    XmlReadData(XmlReader *p, const wstring &s, const ConvObjFromStr &c) : ObjectNavigator(c), XmlParserW(str), parent(p), str(s) {}
-    XmlReadData(XmlReader *p, const string &s, const ConvObjFromStr &c, bool charsetUnknown = false) : ObjectNavigator(c), XmlParserW(str), parent(p),
-                str(stow(s, charsetUnknown)), doConversion(charsetUnknown) { }
+    XmlReadData(XmlReader *p, wistream &s, const ConvObjFromStr &c) : ObjectNavigator(c), XmlParserW(s), parent(p) { }
+    XmlReadData(XmlReader *p, const wstring &s, const ConvObjFromStr &c) : ObjectNavigator(c), XmlParserW(str), parent(p), str(s) { }
+    XmlReadData(XmlReader *p, const string &s, const ConvObjFromStr &c, bool charsetUnknown = false) : ObjectNavigator(c),
+                                      XmlParserW(str), parent(p), str(stow(s, charsetUnknown)), doConversion(charsetUnknown) { }
 
-    std::string elementRemovePrefix(const std::string &element) const {
-      if (prefix.empty())
-        return element;
-      if (element.length() > prefix.length() and element.substr(0, prefix.length()) == prefix)
-        return element.substr(prefix.length());
-      throw runtime_error("Prefix mismatch");
-    }
-    void NullTag(const string &ns, const std::string &element) override {
-      TRACE(PARAM(element));
-      if (levelStart and (encLevel != 1 or levelStartTmp)) {
-        setNull();
-        EndTag(currentXmlns(), element);
-      }
-      else
-        parent->NullTag(elementRemovePrefix(element));
-    };
-    void Attribute(const string &ns, const std::string &element, const std::string &attribute, const std::wstring &value) override {
+    void Attribute(const string &ns, const std::string &element, const std::string &attribute, const std::wstring &value, bool nsOk) override {
+      //LOG(LM_INFO, "XMLREAD Attribut TAG " << ns << " : " << attribute << " (" <<element << ") el=" << encLevel);
+      ++attributCounter;
+      if (not nsOk and cfs.hasFeatureXmlNamespaces())
+        error += string(error.empty() ? "":"\n") + u8"can't resolve namespace in " + showName();
       if (element == "EncryptedData" and attribute == "Type" and value == L"http://www.w3.org/2001/04/xmlenc#Element") {
         //LOG(LM_INFO, "ENCRYPTION BEGIN");
         encLevel = 1;
@@ -75,15 +64,14 @@ static std::wstring stow(const string &s, bool dontConvert) {
       }
       else if (levelStart and not member()) {
         enter(attribute);
-        if (member() and member()->hasFeature(XmlAsAttr))
-        {
+        if (member() and member()->hasFeature(XmlAsAttr)) {
           if (not member()->fromStr(value, cfs))
             error += string(error.empty() ? "":"\n") + u8"invalid type in variable " + showName() + u8" can't assign";
         }
         leave();
       }
       else
-        parent->Attribute(elementRemovePrefix(element), attribute, value);
+        parent->Attribute(ns, element, attribute, value);
     };
     void Value(const std::wstring &val) override {
       //LOG(LM_INFO, "XMLREAD VALUE  " << mobs::to_string(val) << " " << levelStart);
@@ -106,8 +94,13 @@ static std::wstring stow(const string &s, bool dontConvert) {
       else
         parent->Base64(base64);
     }
-    void StartTag(const string &ns, const std::string &element) override {
-      //LOG(LM_INFO, "XMLREAD START TAG " << element);
+    void StartTag(const string &ns, const std::string &element, bool nsOk) override {
+      //LOG(LM_INFO, "XMLREAD START TAG " << ns << " : " << element << " el=" << encLevel);
+      attributCounter = 0;
+      if (not nsOk and cfs.hasFeatureXmlNamespaces())
+        error += string(error.empty() ? "":"\n") + u8"can't resolve namespace in " + showName();
+      if (encLevel == 0 and element == "EncryptedData" and ns == "http://www.w3.org/2001/04/xmlenc#")
+        return; // ignoriere Start Tag
       if (encLevel == 2 and levelStartTmp == 0 and element == "CipherValue" and ns == "http://www.w3.org/2001/04/xmlenc#") {
         encLevel = 3;
         startEncryption(encCbb);
@@ -121,21 +114,35 @@ static std::wstring stow(const string &s, bool dontConvert) {
       }
       else if (encLevel == 1 and element == "KeyInfo" and ns == "http://www.w3.org/2000/09/xmldsig#") {
         // KeyInfo-Objekt parsen
-        ki = new mobs::KeyInfo;
+        ki = parent->fillKeyInfo();
+        // Namespace aus darüberliegendem Objekt "EncryptedData" importieren
+        ki->addNamespace("xenc", "http://www.w3.org/2001/04/xmlenc#");
+        ki->forceNull();
         pushObject(*ki, "KeyInfo");
         levelStartTmp = currentLevel();
         if (not levelStart)
           levelStart = levelStartTmp;
       }
       else if (levelStart) {
-        if (not enter(elementRemovePrefix(element)) and cfs.exceptionIfUnknown())
-          error += string(error.empty() ? "":"\n") + elementRemovePrefix(element) + u8"not found";
+        if (not enter(element, ns) and cfs.hasFeatureExceptionIfUnknown())
+          error += string(error.empty() ? "":"\n") + element + u8"not found";
       }
       else
-        parent->StartTag(element);
+        parent->StartTag(ns, element);
     }
-    void EndTag(const string &ns, const std::string &element) override {
-      //LOG(LM_INFO, "XMLREAD END TAG " << element);
+
+    void EndTag(const string &ns, const std::string &element, bool emptyElement, bool noAttributes) override {
+      //LOG(LM_INFO, "XMLREAD END TAG " << element << " " << emptyElement << " attCnt=" << attributCounter);
+      if (emptyElement) {
+        if (levelStart and (encLevel != 1 or levelStartTmp)) {
+          if (attributCounter == 0) // Wenn Attribute vorhanden waren, ist es kein NullValue mehr
+            setNull();
+        }
+        else {
+          parent->EndTag(ns, element, emptyElement);
+          return;
+        }
+      }
       if (levelStartTmp > 0) {
         if (currentLevel() == levelStartTmp) {
           if (levelStartTmp == levelStart) // bei primären Objekt KeyInfo waren beide identisch
@@ -153,12 +160,12 @@ static std::wstring stow(const string &s, bool dontConvert) {
           }
         }
         else
-          leave(elementRemovePrefix(element));
+          leave(element);
       }
       else if (encLevel == 3 and levelStartTmp == 0 and element == "CipherValue") {
         encLevel = 2;
       }
-       else if (encLevel == 2 and levelStartTmp == 0 and element == "CipherData") {
+      else if (encLevel == 2 and levelStartTmp == 0 and element == "CipherData") {
         encLevel = 1;
       }
       else if (encLevel == 1 and levelStartTmp == 0 and element == "EncryptedData") {
@@ -175,14 +182,15 @@ static std::wstring stow(const string &s, bool dontConvert) {
           obj = nullptr;
           levelStart = 0;
           error = "";
-          parent->EndTag(element);
+          parent->EndTag(ns, element, false);
         }
         else
-          leave(elementRemovePrefix(element));
+          leave(element);
       }
       else
-        parent->EndTag(element);
+        parent->EndTag(ns, element, false);
     }
+
     void ProcessingInstruction(const std::string &element, const std::string &attribut, const std::wstring &value) override {
       TRACE(PARAM(element) << PARAM(attribut));
       if (element == "xml" and attribut == "encoding") {
@@ -190,13 +198,13 @@ static std::wstring stow(const string &s, bool dontConvert) {
         
         // da wstringstream das encoding der local ignoriert, hier explizit umsetzen, wenn Input ein string mit undefiniertem Zeichensatz war
         if (doConversion and encoding != "ISO-8859-1") {
-          size_t pos = str.tellg();
+          std::streamsize pos = str.tellg();
           std::wistringstream str2;
           str2.swap(str);
           const std::wstring &s = str2.str();
           if (encoding == "UTF-8") {
             std::string res;
-            transform(s.cbegin(), s.cend(), back_inserter(res), [](char c) { return char(c); });
+            transform(s.cbegin(), s.cend(), back_inserter(res), [](char c) { return c; });
             str.str(to_wstring(res));
           }
           else if (encoding == "ISO-8859-15") {
@@ -227,6 +235,7 @@ static std::wstring stow(const string &s, bool dontConvert) {
     void setMaxElementSize(size_t s) {
       XmlParserW::maxElementSize = s;
     }
+    const ConvObjFromStr &getCFS() const { return cfs; }
 
     XmlReader *parent;
     std::wistringstream str;
@@ -238,8 +247,8 @@ static std::wstring stow(const string &s, bool dontConvert) {
     std::string encoding;
     std::string encAlgo; // EncryptionMethod
     CryptBufBase *encCbb{};
-    std::string prefix;
     int encLevel = 0; // off/EncryptedData/CipherData/CipherValue
+    int attributCounter = 0;
     bool doConversion = false;
   };
 
@@ -262,16 +271,20 @@ void XmlReader::fill(ObjectBase *obj) {
   data->setObj(obj);
 }
 
-std::string XmlReader::elementRemovePrefix(const std::string &element) const {
-  return data->elementRemovePrefix(element);
-}
-
 std::istream &XmlReader::byteStream(size_t len, CryptBufBase *cbbp) {
   return data->byteStream(len, cbbp);
 }
 
 
-void XmlReader::setPrefix(const std::string &pf) { data->prefix = pf; }
+void XmlReader::Encrypt(const std::string &algorithm, const ObjectBase *keyInfo, mobs::CryptBufBase *&cryptBufp) {
+  if (auto ki = dynamic_cast<const mobs::KeyInfo *>(keyInfo))
+    Encrypt(algorithm, ki->KeyName(), ki->CipherData.CipherValue(), cryptBufp);
+}
+
+ObjectBase * XmlReader::fillKeyInfo() {
+  return new mobs::KeyInfo;
+}
+
 void XmlReader::setBase64(bool b) { data->setBase64(b); }
 bool XmlReader::parse() { return data->parse(); }
 bool XmlReader::eof() const { return data->eof(); }
@@ -284,6 +297,7 @@ std::string XmlReader::currentXmlns() const { return data->currentXmlns(); };
 void XmlReader::setMaxElementSize(size_t s) { data->setMaxElementSize(s); }
 std::wistream &XmlReader::getIstr() { return data->getIstr(); }
 bool XmlReader::encrypted() const { return data->encrypted(); }
+const ConvObjFromStr & XmlReader::getCFS() const { return data->getCFS(); }
 
 //  XmlReadData(const std::string &input, const ConvObjFromStr &c) : XmlParserW(str), str(to_wstring(input)) { cfs = c; };
 

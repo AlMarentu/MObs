@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -36,7 +36,7 @@ void string2Obj(const std::string &str, ObjectBase &obj, const ConvObjFromStr& c
     
     void Value(const string &val, bool charType) override {
       TRACE(PARAM(val));
-      if (enter(lastKey, currentIdx))
+      if (enter(lastKey, "", currentIdx))
       {
         if (not charType and val == "null")
           setNull();
@@ -52,7 +52,7 @@ void string2Obj(const std::string &str, ObjectBase &obj, const ConvObjFromStr& c
     void StartObject() override {
       TRACE(PARAM(lastKey));
       if (++level > 1)
-        enter(lastKey, currentIdx);
+        enter(lastKey, "", currentIdx);
       index.push(currentIdx);
       currentIdx = SIZE_T_MAX;
     }
@@ -89,7 +89,7 @@ void string2Obj(const std::string &str, ObjectBase &obj, const ConvObjFromStr& c
   
   
 
-  if (cfh.acceptXml()) {
+  if (cfh.hasFeatureAcceptXml()) {
     XmlRead xd(str, obj, cfh);
     xd.parse();
     if (not xd.found())

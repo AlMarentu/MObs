@@ -173,9 +173,9 @@ public:
 
   bool doObjBeg(const ObjectBase &obj) override
   {
-    if (obj.isNull() and cth.omitNull())
+    if (obj.isNull() and cth.hasFeatureOmitNull())
       return false;
-    if (not obj.isModified() and cth.modOnly())
+    if (not obj.isModified() and cth.hasFeatureModOnly())
       return false;
     if (inArray() and noArrays)
       return arrayIndex() == 0;
@@ -211,9 +211,9 @@ public:
   };
   bool doArrayBeg(const MemBaseVector &vec) override
   {
-    if (vec.isNull() and cth.omitNull())
+    if (vec.isNull() and cth.hasFeatureOmitNull())
       return false;
-    if (not vec.isModified() and cth.modOnly())
+    if (not vec.isModified() and cth.hasFeatureModOnly())
       return false;
     if (index) // für Projektion
     {
@@ -269,9 +269,9 @@ public:
   {
     if (noKeys and mem.keyElement() > 0 and level.top().isKey)
       return;
-    if (mem.isNull() and cth.omitNull())
+    if (mem.isNull() and cth.hasFeatureOmitNull())
       return;
-    if (not mem.isModified() and cth.modOnly())
+    if (not mem.isModified() and cth.hasFeatureModOnly())
       return;
     if (inArray() and noArrays and arrayIndex() != 0)
       return;
@@ -282,7 +282,7 @@ public:
       level.top().doc.append(kvp(name, 1));
       return;
     }
-    bool compact = cth.compact();
+    bool compact = cth.hasFeatureCompact();
     if (mem.is_chartype(cth) and mem.hasFeature(mobs::DbCompact))
       compact = true;
     MobsMemberInfo mi;
@@ -874,8 +874,8 @@ public:
           if (array.empty())
             enter(key);
           if (member()) {
-            ConvToStrHint cts(not cfs.acceptExtended());
-            bool compact = cts.compact();
+            ConvToStrHint cts(not cfs.hasFeatureAcceptExtended());
+            bool compact = cts.hasFeatureCompact();
             if (member()->is_chartype(cts) and member()->hasFeature(mobs::DbCompact))
               compact = true;
             MobsMemberInfo mi;
@@ -933,7 +933,7 @@ public:
                 cerr << "sonst " << int(e.type()) << endl;
                 throw runtime_error(u8"invalid type, can't assign");
             }
-          } else if (cfs.exceptionIfUnknown())
+          } else if (cfs.hasFeatureExceptionIfUnknown())
             throw runtime_error(u8"no variable, can't assign");
           else
             LOG(LM_DEBUG, u8"mongodb element " << showName() << " is not in object");

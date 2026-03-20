@@ -88,10 +88,10 @@ public:
         return false;
       if (obj.hasFeature(mobs::DbDetail))
         return false;
-      if (obj.isNull() and cth.omitNull())
+      if (obj.isNull() and cth.hasFeatureOmitNull())
         return false;
       if (obj.hasFeature(mobs::DbJson)) {
-        if (cth.modOnly()) // where nur in QBE erzeugen
+        if (cth.hasFeatureModOnly()) // where nur in QBE erzeugen
         {
           if (not obj.isNull())
             throw runtime_error(u8"Query on DBJSON element not allowed");
@@ -123,10 +123,10 @@ public:
 //    LOG(LM_INFO, "VECTOR ");
     if (vec.hasFeature(mobs::DbDetail))
       return false;
-    if (vec.isNull() and cth.omitNull())
+    if (vec.isNull() and cth.hasFeatureOmitNull())
       return false;
     if (vec.hasFeature(mobs::DbJson)) {
-      if (cth.modOnly()) // where nur in QBE erzeugen
+      if (cth.hasFeatureModOnly()) // where nur in QBE erzeugen
       {
         if (not vec.isNull())
           throw runtime_error(u8"Query on DBJSON element not allowed");
@@ -192,7 +192,7 @@ public:
     if (inArray() and arrayIndex() > 0)
       return;
 
-    bool compact = cth.compact();
+    bool compact = cth.hasFeatureCompact();
     if (mem.is_chartype(cth) and mem.hasFeature(mobs::DbCompact))
       compact = true;
     string name = mem.getName(cth);
@@ -226,17 +226,17 @@ public:
       selectField += "mt.";
       selectField += name;
     }
-    if (not mem.isModified() and cth.modOnly())
+    if (not mem.isModified() and cth.hasFeatureModOnly())
       return;
-    if (mem.isNull() and cth.omitNull())
+    if (mem.isNull() and cth.hasFeatureOmitNull())
       return;
 
     if (mem.isVersionField()) {
-      if (cth.skipVersion())
+      if (cth.hasFeatureSkipVersion())
         return;
     }
 
-    if (not cth.modOnly()) // where nur in QBE erzeugen
+    if (not cth.hasFeatureModOnly()) // where nur in QBE erzeugen
       return;
 
     if (not arrayLevelJoin.empty())
@@ -407,7 +407,7 @@ public:
 
   void doMem(MemberBase &mem) final
   {
-    bool compact = cth.compact();
+    bool compact = cth.hasFeatureCompact();
     if (mem.is_chartype(cth) and mem.hasFeature(mobs::DbCompact))
       compact = true;
 
@@ -450,7 +450,7 @@ public:
     }
     if (obj.hasFeature(mobs::DbDetail))
       return false;
-    if (obj.isNull() and cth.omitNull())
+    if (obj.isNull() and cth.hasFeatureOmitNull())
       return false;
     if (obj.hasFeature(mobs::DbJson)) {
       string tx = obj.to_string(ConvObjToString().exportExtended().exportWoNull());
@@ -499,7 +499,7 @@ public:
       }
       return false;
     }
-    if (not obj.isModified() and cth.modOnly())
+    if (not obj.isModified() and cth.hasFeatureModOnly())
       return false;
     if (mode != Values and mode != FldVal and inArray() and arrayIndex() > 0)
       return false;
@@ -683,17 +683,17 @@ public:
   /// \private
   void doMem(const MemberBase &mem) final
   {
-    if (mem.isNull() and cth.omitNull())
+    if (mem.isNull() and cth.hasFeatureOmitNull())
       return;
-    if (not mem.isModified() and cth.modOnly())
+    if (not mem.isModified() and cth.hasFeatureModOnly())
       return;
     if (mem.isVersionField()) {
-      if (cth.skipVersion())
+      if (cth.hasFeatureSkipVersion())
         return;
     }
     if (mode != Values and mode != FldVal and inArray() and arrayIndex() > 0)
       return;
-    bool compact = cth.compact();
+    bool compact = cth.hasFeatureCompact();
     if (mem.is_chartype(cth) and mem.hasFeature(mobs::DbCompact))
       compact = true;
     if (mode == Values) {
@@ -1392,9 +1392,9 @@ bool ElementNames::doObjBeg(const ObjectBase &obj) {
     return false;
   if (obj.hasFeature(mobs::DbDetail))
     return false;
-  if (obj.isNull() and data->cth.omitNull())
+  if (obj.isNull() and data->cth.hasFeatureOmitNull())
     return false;
-  if (not obj.isModified() and data->cth.modOnly())
+  if (not obj.isModified() and data->cth.hasFeatureModOnly())
     return false;
   if (inArray() and arrayIndex() > 0)
     return false;
@@ -1412,9 +1412,9 @@ void ElementNames::doObjEnd(const ObjectBase &obj) {
 bool ElementNames::doArrayBeg(const MemBaseVector &vec) {
   if (vec.hasFeature(mobs::DbDetail))
     return false;
-  if (vec.isNull() and data->cth.omitNull())
+  if (vec.isNull() and data->cth.hasFeatureOmitNull())
     return false;
-  if (not vec.isModified() and data->cth.modOnly())
+  if (not vec.isModified() and data->cth.hasFeatureModOnly())
     return false;
   data->names.push(data->names.top() + vec.getName(data->cth) + ".");
   return true;
@@ -1443,13 +1443,13 @@ void ElementNames::doMem(const MemberBase &mem) {
     }
     return;
   }
-  if (mem.isNull() and data->cth.omitNull())
+  if (mem.isNull() and data->cth.hasFeatureOmitNull())
     return;
-  if (not mem.isModified() and data->cth.modOnly())
+  if (not mem.isModified() and data->cth.hasFeatureModOnly())
     return;
   if (inArray() and arrayIndex() > 0)
     return;
-  bool compact = data->cth.compact();
+  bool compact = data->cth.hasFeatureCompact();
   if (mem.is_chartype(data->cth) and mem.hasFeature(mobs::DbCompact))
     compact = true;
 
@@ -1505,7 +1505,7 @@ bool AuditTrail::doObjBeg(const ObjectBase &obj) {
   }
   else if (obj.hasFeature(mobs::DbDetail))
     return false;
-  if (obj.isNull() and cth.omitNull())
+  if (obj.isNull() and cth.hasFeatureOmitNull())
     return false;
   if (not inDelAudit() and not initial and not obj.isModified())
     return false;
@@ -1533,7 +1533,7 @@ void AuditTrail::doObjEnd(const ObjectBase &obj) {
 bool AuditTrail::doArrayBeg(const MemBaseVector &vec) {
   if (vec.hasFeature(mobs::DbDetail))
     return false;
-  if (vec.isNull() and cth.omitNull())
+  if (vec.isNull() and cth.hasFeatureOmitNull())
     return false;
   if (not inDelAudit() and not initial and not vec.isModified())
     return false;
@@ -1565,7 +1565,7 @@ void AuditTrail::doArrayEnd(const MemBaseVector &vec) {
 }
 
 void AuditTrail::doMem(const MemberBase &mem) {
-  if (mem.isNull() and cth.omitNull())
+  if (mem.isNull() and cth.hasFeatureOmitNull())
     return;
   if (not inDelAudit() and not initial and not mem.isModified())
     return;
@@ -1761,7 +1761,7 @@ public:
   {
     bool useSimlpeType = false;
     size_t sLen = 0;
-    bool compact = cth.compact();
+    bool compact = cth.hasFeatureCompact();
     if (mem.is_chartype(cth) and mem.hasFeature(mobs::DbCompact))
       compact = true;
     MobsMemberInfo mi;
@@ -1850,7 +1850,7 @@ public:
       }
       xw.writeTagEnd();
     }
-    if (mem.isNull() and cth.omitNull())
+    if (mem.isNull() and cth.hasFeatureOmitNull())
       return;
 
   };

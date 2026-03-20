@@ -188,11 +188,11 @@ template <> bool string2x(const std::string &str, UxTime &t)
 
 
 bool StrConv<UxTime>::c_string2x(const std::string &str, UxTime &t, const ConvFromStrHint &cfh) {
-  if (cfh.acceptExtended()) {
+  if (cfh.hasFeatureAcceptExtended()) {
     if (mobs::string2x(str, t))
       return true;
   }
-  if (not cfh.acceptCompact())
+  if (not cfh.hasFeatureAcceptCompact())
     return false;
   int64_t i;
   if (not mobs::string2x(str, i))

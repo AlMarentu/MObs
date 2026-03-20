@@ -170,7 +170,7 @@ void Mrpc::filled(mobs::ObjectBase *obj, const std::string &error)
   stop();
 }
 
-void Mrpc::StartTag(const std::string &element)
+void Mrpc::StartTag(const std::string &ns, const std::string &element)
 {
   LOG(LM_DEBUG, "start " << element);
   // Wenn passendes Tag gefunden, dann Objekt einlesen
@@ -203,7 +203,7 @@ void Mrpc::StartTag(const std::string &element)
   }
 }
 
-void Mrpc::EndTag(const std::string &element)
+void Mrpc::EndTag(const std::string &ns, const std::string &element, bool emptyElement)
 {
   LOG(LM_DEBUG, "end " << element << " lev " << level());
   if (state == connected and not encrypted and level() == 2)

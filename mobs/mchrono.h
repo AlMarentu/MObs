@@ -74,7 +74,7 @@ public:
   static std::wstring c_to_wstring(const MDate &t, const ConvToStrHint &cth);
 
   /// \private
-  static inline bool c_is_chartype(const ConvToStrHint &cth) { return not cth.compact(); }
+  static inline bool c_is_chartype(const ConvToStrHint &cth) { return not cth.hasFeatureCompact(); }
 
   /// \private
   static inline uint64_t c_time_granularity() { return 86400000000; } // returning Seconds
@@ -185,7 +185,7 @@ public:
   static std::wstring c_to_wstring(const MTime &t, const ConvToStrHint &cth);
 
   /// \private
-  static inline bool c_is_chartype(const ConvToStrHint &cth) { return not cth.compact(); }
+  static inline bool c_is_chartype(const ConvToStrHint &cth) { return not cth.hasFeatureCompact(); }
 
   /// \private
   static inline uint64_t c_time_granularity() { return 1; }

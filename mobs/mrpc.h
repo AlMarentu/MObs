@@ -218,9 +218,9 @@ public:
 
 protected:
   /// \private
-  void StartTag(const std::string &element) override;
+  void StartTag(const std::string &ns, const std::string &element) override;
   /// \private
-  void EndTag(const std::string &element) override;
+  void EndTag(const std::string &ns, const std::string &element, bool emptyElement) override;
   /// \private
   void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, CryptBufBase *&cryptBufp) override;
   /// \private

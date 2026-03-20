@@ -113,11 +113,11 @@ public:
   /// \private
   static inline bool c_wstring2x(const std::wstring &wstr, UxTime &t, const ConvFromStrHint &cth) { return c_string2x(mobs::to_string(wstr), t, cth); }
   /// \private
-  static inline std::string c_to_string(const UxTime &t, const ConvToStrHint &cth) { if (cth.compact()) return std::to_string(t.toUxTime()); return to_string(t); };
+  static inline std::string c_to_string(const UxTime &t, const ConvToStrHint &cth) { if (cth.hasFeatureCompact()) return std::to_string(t.toUxTime()); return to_string(t); };
   /// \private
-  static inline std::wstring c_to_wstring(const UxTime &t, const ConvToStrHint &cth) { if (cth.compact()) return std::to_wstring(t.toUxTime()); return to_wstring(t); };
+  static inline std::wstring c_to_wstring(const UxTime &t, const ConvToStrHint &cth) { if (cth.hasFeatureCompact()) return std::to_wstring(t.toUxTime()); return to_wstring(t); };
   /// \private
-  static inline bool c_is_chartype(const ConvToStrHint &cth) { return not cth.compact(); }
+  static inline bool c_is_chartype(const ConvToStrHint &cth) { return not cth.hasFeatureCompact(); }
   /// \private
   static inline uint64_t c_time_granularity() { return 1000000; } // returning Seconds
   /// \private

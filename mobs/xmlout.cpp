@@ -37,7 +37,7 @@ namespace mobs {
 
 bool XmlOut::doObjBeg(const ObjectBase &obj)
 {
-  if (obj.isNull() and cth.omitNull())
+  if (obj.isNull() and cth.hasFeatureOmitNull())
     return false;
   
   wstring name;
@@ -46,11 +46,11 @@ bool XmlOut::doObjBeg(const ObjectBase &obj)
   if (name.empty())
     name = to_wstring(obj.getName(cth));
   if (name.empty())
-    name = data->level() == 0 and obj.hasFeature(OTypeAsXRoot) == Unset ? L"root": to_wstring(obj.getObjectName());
+    name = data->level() == 0 ? L"root": to_wstring(obj.getObjectName());
 
   ConvObjToString::EncrypFun ef = nullptr;
   if (data->cryptingLevel() == 0 and obj.hasFeature(XmlEncrypt))
-    ef = cth.getEncFun();
+    ef = cth.getFeatureEncryptFun();
   if (ef) {
     CryptBufBase *cbp = ef();
     data->startEncrypt(cbp);
@@ -58,6 +58,10 @@ bool XmlOut::doObjBeg(const ObjectBase &obj)
 
 
   data->writeTagBegin(name);
+
+  if (cth.hasFeatureUseNamespace())
+    for (auto &i:obj.namespaces())
+      data->writeAttribute(L"xmlns:" + to_wstring(i.second), to_wstring(i.first));
 
   if (obj.isNull())
   {
@@ -97,7 +101,7 @@ void XmlOut::doArrayEnd(const MemBaseVector &vec)
 
 void XmlOut::doMem(const MemberBase &mem)
 {
-  if (mem.isNull() and cth.omitNull())
+  if (mem.isNull() and cth.hasFeatureOmitNull())
     return;
   wstring name;
   if (not elements.empty())
@@ -106,7 +110,7 @@ void XmlOut::doMem(const MemberBase &mem)
     name = to_wstring(mem.getName(cth));
   ConvObjToString::EncrypFun ef = nullptr;
   if (data->cryptingLevel() == 0 and mem.hasFeature(XmlEncrypt))
-    ef = cth.getEncFun();
+    ef = cth.getFeatureEncryptFun();
 
   if (mem.hasFeature(XmlAsAttr) and data->attributeAllowed() and not ef)
   {

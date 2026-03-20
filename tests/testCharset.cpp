@@ -50,19 +50,19 @@ public:
   XmlInput(const std::string &str, bool charsetUnknown = false) : XmlReader(str, ConvObjFromStr(), charsetUnknown) { }
 
 //  virtual void NullTag(const std::string &element) { EndTag(element); }
-  virtual void Attribute(const std::string &element, const std::string &attribut, const std::wstring &value) {
+  virtual void Attribute(const string &ns, const std::string &element, const std::string &attribut, const std::wstring &value) {
     LOG(LM_INFO, "attribute " << element << ":" << attribut << " = " << to_string(value));
   }
   virtual void Value(const std::wstring &value) {
     LOG(LM_INFO, "value " << to_string(value));
   }
 
-  virtual void StartTag(const std::string &element) {
+  virtual void StartTag(const string &ns, const std::string &element) {
     LOG(LM_INFO, "start " << element);
     person.name("XXX");
     fill(&person);
   }
-  virtual void EndTag(const std::string &element) {
+  virtual void EndTag(const string &ns, const std::string &element, bool emptyElement) {
     LOG(LM_INFO, "end " << element);
   }
   virtual void filled(ObjectBase *obj, const string &error) {

@@ -54,13 +54,13 @@ class XmlInput : public mobs::XmlReader {
 public:
   explicit XmlInput(wistream &str) : XmlReader(str) { }
 
-  void StartTag(const std::string &element) override {
+  void StartTag(const string &ns, const std::string &element) override {
     LOG(LM_INFO, "start " << element);
     // Wenn passendes Tag gefunden, dann Objekt einlesen
-    if (elementRemovePrefix(element) == "Gespann")
+    if (element == "Gespann")
       fill(new Gespann);
   }
-  void EndTag(const std::string &element) override {
+  void EndTag(const string &ns, const std::string &element, bool emptyElement) override {
     LOG(LM_INFO, "end " << element);
   }
   void filled(mobs::ObjectBase *obj, const string &error) override {

@@ -89,8 +89,8 @@
  \endcode
 
  Zum Verarbeiten solcher Objekte gibt es verschiedene Methoden:
- \arg Rekursiver Durchlauf mit Hilfe einer Traverse-Klasse
- \arg Füllen über eine sequentiellen Pfad
+ \arg Rekursiver Durchlauf mithilfe einer Traverse-Klasse
+ \arg Füllen über eine sequenziellen Pfad
  \see mobs::ObjTravConst
  \see mobs::ObjTrav
  \see mobs::ObjectNavigator
@@ -151,11 +151,12 @@
 
 
 
+#ifndef MOBS_OBJGEN_H
+#define MOBS_OBJGEN_H
+
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "UnusedGlobalDeclarationInspection"
 #pragma ide diagnostic ignored "UnusedMacroInspection"
-#ifndef MOBS_OBJGEN_H
-#define MOBS_OBJGEN_H
 
 #include <string>
 #include <list>
@@ -171,14 +172,14 @@
 namespace mobs {
 
 /// Makro für Typ-Deklaration zu \c MemVar
-#define MemVarType(typ) mobs::Member<typ, mobs::StrConv<typ>>
+#define MemVarType(typ) mobs::Member<typ, mobs::StrConv<typ>> // NOLINT(*-macro-parentheses)
 /*! \brief Deklarations-Makro für eine Membervariable
 @param typ Basistyp
 @param name Name
 */
 #define MemVar(typ, name, ...) MemVarType(typ) name = MemVarType(typ) (#name, this, { __VA_ARGS__ })
 /// Makro für Typ-Deklaration zu \c MemEnumVar
-#define MemEnumVarTyp(typ) mobs::Member<typ, StrIntConv<typ>>
+#define MemEnumVarTyp(typ) mobs::Member<typ, StrIntConv<typ>> // NOLINT(*-macro-parentheses)
 /*! \brief Deklarations-Makro für eine Membervariable des Typs \c enum
 @param typ Basistyp
 @param name Name
@@ -203,11 +204,12 @@ namespace mobs {
 #define MemMobsVar(typ, name, converter, ...) MemMobsVarType(typ, converter) name = MemMobsVarType(typ, converter) (#name, this, { __VA_ARGS__ })
 
 /// \private
-enum MemVarCfg { Unset = 0, InitialNull, VectorNull, XmlAsAttr, Embedded, DbCompact, DbDetail, DbVersionField, DbAuditTrail,
-                 Key1, Key2, Key3, Key4, Key5, DbJson, XmlEncrypt, OTypeAsXRoot,
+enum MemVarCfg { Unset = 0, InitialNull = 1, VectorNull = 2, XmlAsAttr = 3, Embedded = 4, DbCompact = 5, DbDetail = 6, DbVersionField = 7, DbAuditTrail = 8,
+                 Key1 = 9, Key2 = 10, Key3 = 11, Key4 = 12, Key5 = 13, DbJson = 14, XmlEncrypt = 15, OTypeAsXRoot = 16,
                  AltNameBase = 1000, AltNameEnd = 1999,
                  ColNameBase = 2000, ColNameEnd = 3999,
                  PrefixBase = 4000, PrefixEnd = 4999,
+                 NameSpaceBase = 5000, NameSpaceEnd = 6999,
                  LengthBase = 10000, LengthEnd = 19999 };
 /// \private
 enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confToken, const std::string &s);
@@ -216,7 +218,7 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 #define USEVECNULL mobs::VectorNull ///< Bei Vektoren wird der Vector selbst mit \c null vorinitialisiert
 #define XMLATTR mobs::XmlAsAttr ///< Bei XML-Ausgabe als Attribute ausgeben (nur MemberVariable, nur von erstem Element fortlaufend)
 #define XMLENCRYPT mobs::XmlEncrypt ///< Bei XML-Ausgabe verschlüsselt ausgeben
-#define EMBEDDED mobs::Embedded ///< Bei Ausgabe als Attribute/Traversierung werden die Member des Objektes direkt, auf der selben Ebene, serialisiert
+#define EMBEDDED mobs::Embedded ///< Bei Ausgabe als Attribute/Traversierung werden die Member des Objektes direkt, auf derselben Ebene, serialisiert
 #define DBCOMPACT mobs::DbCompact ///< In der Datenbank wird der MOBSENUM oder der Zeit-Wert numerisch gespeichert
 #define DBDETAIL mobs::DbDetail ///< In der Datenbank wird dieses Subelement in einer Detail Table abgelegt, muss also separat gespeichert werden
 #define DBJSON mobs::DbJson ///< In nicht dokumentbasierten Datenbanken wird das Unterobjekt als Text im JSON-Format abgelegt
@@ -231,6 +233,7 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 #define ALTNAME(name) ::mobs::mobsToken(::mobs::AltNameBase,m_confToken,#name) ///< Definition eines Alternativen Namens für die Ein-/Ausgabe
 #define COLNAME(name) ::mobs::mobsToken(::mobs::ColNameBase,m_confToken,#name) ///< Definition eines Alternativen Namens für den Collection-Namen (oder Tabellennamen) der Datenbank
 #define PREFIX(name) ::mobs::mobsToken(::mobs::PrefixBase,m_confToken,#name) ///< Definition eines Prefix für den Export-Namen, wenn in eine flache Struktur exportiert wird \see EMBEDDED
+#define NAMESPACE(name) ::mobs::mobsToken(::mobs::NameSpaceBase,m_confToken,#name) ///< Definition eines Namespaces für den XML-Export-Namen
 /// Angabe der max. Länge des Strings; [1..9999] möglich
 #define LENGTH(len)  mobs::MemVarCfg(((len) > 0 and mobs::LengthBase +(len) <= mobs::LengthEnd)?mobs::LengthBase +(len): mobs::LengthEnd)
 
@@ -256,7 +259,7 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
  @param name Name
  */#define MemEnumVector(typ, name, ...) MemVector( MemMobsEnumVarType(typ), name, __VA_ARGS__)
 
-/*! \brief Deklarations-Makro für eine Objekt als Membervariable
+/*! \brief Deklarations-Makro für ein Objekt als Membervariable
  @param typ Objekttyp
  @param name Name
  */
@@ -328,11 +331,11 @@ class MemBaseVector;
 class NullValue {
 public:
   friend class MemberBase;
-  /// Abfrage, ob eine Variable den Wet \c NULL hat (nur möglich, wenn \c nullAllowed gesetzt ist.
+  /// Abfrage, ob eine Variable den Wet \c NULL hat; nur möglich, wenn \c nullAllowed gesetzt ist.
   bool isNull() const { return m_null; }
   /// Setzmethode  ob \c NULL -Werte erlaubt sind
   void nullAllowed(bool on) { m_nullAllowed = on; }
-  /// Abfrage ob für diese Variable Null-Werte erlaubt sind
+  /// Abfrage, ob für diese Variable Null-Werte erlaubt sind
   bool nullAllowed() const { return m_nullAllowed; }
   /// Interne Setzmethode für Modified-Flag. Immer in Baumstruktur Richtung Wurzel verodern
   void setModified(bool m) { m_modified = m; }
@@ -381,7 +384,7 @@ public:
   virtual std::string toStr(const ConvToStrHint &) const  = 0;
   /// Ausgabe des Inhalts als \c std::wstring
   virtual std::wstring toWstr(const ConvToStrHint &) const  = 0;
-  /// Abfrage, ob der Inhalt textbasiert ist (zb. in JSON in Hochkommata gesetzt wird)
+  /// Abfrage, ob der Inhalt textbasiert ist (z.B. in JSON in Hochkommata gesetzt wird)
   virtual bool is_chartype(const ConvToStrHint &) const = 0;
   /// Versuch, die  Variable aus einem \c std::string im Format UTF-8 einzulesen
   virtual bool fromStr(const std::string &s, const ConvFromStrHint &) = 0;
@@ -394,7 +397,7 @@ public:
   /// natives Kopieren einer Member-Variable
   /// \return true, wenn kopieren erfolgreich (Typ-Gleichheit beider Elemente)
   virtual bool doCopy(const MemberBase *other) = 0;
-  /** \brief natives Kopieren einer Member-Variable wenn unterschiedlich
+  /** \brief natives Kopieren einer Member-Variablen, wenn unterschiedlich
    *
    *  das modified-Flag wir nur bei ungleichheit gesetzt
    *  \return true, wenn kopieren erfolgreich (Typ-Gleichheit beider Elemente)
@@ -441,6 +444,7 @@ private:
 
   int m_key = 0;
   MemVarCfg m_altName = Unset;
+  MemVarCfg m_nsName = Unset;
   std::string m_name{};
   std::vector<MemVarCfg> m_config;
   ObjectBase *m_parent = nullptr;
@@ -452,7 +456,7 @@ private:
 // ------------------ VectorBase ------------------
 
 
-/** \brief Basisklasse für Vektoren auf Membervariablen oder Objekten innerhalb von von \c ObjectBase angeleiteten Klasse
+/** \brief Basisklasse für Vektoren auf Membervariablen oder Objekten innerhalb von \c ObjectBase angeleiteten Klasse
  *
  * Bitte als Makro MemVarVector oder MemVector verwenden
  *
@@ -467,10 +471,10 @@ public:
   template <class T>
   friend class MemberVector;
   /// Konstante, die auf das nächste Element eines MenBaseVectors verweist, das dann automatisch erzeugt wird
-  static const size_t nextpos = INT_MAX;
-  static const size_t npos = SIZE_T_MAX; ///< Konstante für ungültige Position
+  static constexpr size_t nextpos = INT_MAX;
+  static constexpr size_t npos = SIZE_T_MAX; ///< Konstante für ungültige Position
   /// \private
-  MemBaseVector(const std::string& n, ObjectBase *obj, const std::vector<MemVarCfg>& cv) : m_name(n), m_parent(obj)
+  MemBaseVector(std::string  n, ObjectBase *obj, const std::vector<MemVarCfg>& cv) : m_name(std::move(n)), m_parent(obj)
   { for (auto c:cv) doConfig(c); if (nullAllowed()) setNull(true); }
   virtual ~MemBaseVector() = default;
   /// Starte Traversierung nicht const
@@ -487,10 +491,10 @@ public:
   size_t size() const { return m_size; }
   /// Vergrößert/verkleinert die Elementzahl des Vektors
   virtual void resize(size_t s) = 0;
-  /// liefert den Namen des Elementes des Vektor Variablen falls diese ein Mobs-Objekt ist
+  /// liefert den Namen des Elementes der Vektor Variablen, falls diese ein Mobs-Objekt ist
   virtual std::string contentObjName() const = 0;
   /// liefert den Namen der Vektor variablen
-  inline std::string getElementName() const { return m_name; }
+  std::string getElementName() const { return m_name; }
   /// Config-Token alternativer Name oder \c SIZE_T_MAX
   MemVarCfg cAltName() const { return m_altName; }
   /// Abfrage des originalen oder des alternativen Namens des Vektors
@@ -512,10 +516,10 @@ public:
   /// Objekt wurde beschrieben
   void activate();
   /// Zeiger auf Vater-Objekt
-  inline const ObjectBase *getParentObject() const { return m_parent; }
+  const ObjectBase *getParentObject() const { return m_parent; }
   /// Abfrage gesetzter  Attribute
   MemVarCfg hasFeature(MemVarCfg c) const;
-  /// Abfrage der ursprünglichen Vectorsize (Audit Trail)
+  /// Abfrage der ursprünglichen Vector-Size (Audit Trail)
   size_t getInitialSize() const { return m_oldSize; }
   /// Ausgabe der Vector-Elemente als String
   std::string to_string(const ConvObjToString& cth) const;
@@ -529,6 +533,7 @@ private:
   std::string m_name;
   std::vector<MemVarCfg> m_c; // config für Member
   MemVarCfg m_altName = Unset;
+  MemVarCfg m_nsName = Unset;
   size_t m_oldSize = SIZE_MAX;
   size_t m_size = 0;
 
@@ -586,7 +591,7 @@ protected:
   virtual void init() { };
   /// Callback-Funktion die nach einem \c clear aufgerufen wird
   virtual void cleared() { };
-  /** \brief Callback-Funktion die nach einem \c load() über das DatenbankInterface aufgerufen wird
+  /** \brief Callback-Funktion die nach einem \c load() über das DatenbankInterface aufgerufen wird.
    *
    * Der Aufruf erfolgt bevor die Modified-Flags gelöscht und der Audit-Trail begonnen wird.
    */
@@ -602,7 +607,7 @@ public:
   void activate();
 //  /// private
 //  void key(int k) { m_key = k; }
-  /// \brief Abfrage ob Unterobjekt ein Key-Element enthält
+  /// \brief Abfrage, ob Unterobjekt ein Key-Element enthält
   /// @return Position im Schlüssel oder \c 0 wenn kein Schlüsselelement
   int keyElement() const { return m_key; }
   /// Suche eine Membervariable
@@ -610,7 +615,7 @@ public:
   /// @param cfh Konvertierung Hinweise
   /// @return Zeiger auf Objekt \c Memberbase oder \c nullptr
   MemberBase *getMemInfo(const std::string &name, const ConvObjFromStr &cfh);
-  /// Suche eine Member-Objekt
+  /// Suche ein Member-Objekt
   /// @param name Name des zu suchenden Objektes
   /// @param cfh Konvertierung Hinweise
   /// @return Zeiger auf Objekt \c ObjectBase oder \c nullptr
@@ -625,7 +630,7 @@ public:
   /// \brief Erzeuge ein neues Objekt
   /// @param name Typname des Objektes
   /// @param parent  Zeiger auf Parent des Objektes, immer \c nullptr, wird nur intern verwendet
-  /// @return Zeiger auf das erzeugte Objekt oder \c nullptr falls ein solches Objekt nicht registriert wurde \see ObjRegister(name)
+  /// @return Zeiger auf das erzeugte Objekt oder \c nullptr, falls ein solches Objekt nicht registriert wurde \see ObjRegister(name)
   static ObjectBase *createObj(const std::string& name, ObjectBase *parent = nullptr);
   /** \brief Setze Inhalt auf leer.
    *
@@ -697,6 +702,16 @@ public:
    */
   bool operator==(const std::string &s) const { return objNameKeyStr() == s; }
 
+  /** \brief Für den XML-Export können hier verschiedenen Namespaces hinzugefügt werden.
+   *
+   * @param nsKurz Kürzel des Namespace (z.B.: xenc11)
+   * @param nsLang Namespace ausgeschrieben (z.B.: http://www.w3.org/2009/xmlenc11)
+   */
+  void addNamespace(const std::string &nsKurz, const std::string &nsLang);
+
+  /// Abruf der Liste der Namespaces
+  const std::map<std::string, std::string> &namespaces() const { return m_namespaces; }
+
   /// \private
   void regObj(ObjectBase *obj);
   /// \private
@@ -723,7 +738,9 @@ private:
   MemBaseVector *m_parVec = nullptr;
   int m_key = 0;
   MemVarCfg m_altName = Unset;
+  MemVarCfg m_nsName = Unset;
   std::vector<MemVarCfg> m_config;
+  std::map<std::string, std::string> m_namespaces; // Langname, Kürzel
 
   void regMem(MemberBase *mem);
   void doConfig(MemVarCfg c);
@@ -742,9 +759,9 @@ private:
 // ------------------ Member ------------------
 
 template<typename T, class C>
-/** \brief Klasse für Member-Variable zum angegeben Basistyp
+/** \brief Klasse für Member-Variable zum angegeben Basistyp.
  
- Diese Klasse wird normalerweise innerhalb einen Objektes  das von der Basisklasse  \c ObjectType abgeleitet verwendet.
+ Diese Klasse wird normalerweise innerhalb eines Objektes, das von der Basisklasse  \c ObjectType abgeleitet wurde, verwendet.
  
  Zur Deklaration bitte das Makro \c MemVar verwenden
  \see MemVar
@@ -809,13 +826,13 @@ public:
   Member &operator=(Member<T, C> &&other) = delete;
   ~Member() override { TRACE(PARAM(getElementName())); }
   /// Zugriff auf Inhalt; bei null wird immer ein leerer Wert zurückgegeben (Default-Konstruktor)
-  inline T operator() () const { if (isNull()) return T(); return wert; }
+  T operator() () const { if (isNull()) return T(); return wert; }
   /// Zuweisung eines Wertes
-  inline void operator() (const T &t) { doAudit(); wert = t; activate(); }
+  void operator() (const T &t) { doAudit(); wert = t; activate(); }
   /// Vergleichsoperator mit Wert, \c NULL wird als ungleich behandelt
   bool operator== (const T &t) const { return not isNull() and wert == t; }
   /// \brief Zuweisung eines Wertes mit move
-  /// sinnvoll für für zB. Byte-Arrays, um nicht doppelten Speicherplatz zu verbrauchen
+  /// sinnvoll für z.B. Byte-Arrays, um nicht doppelten Speicherplatz zu verbrauchen
   /// \code
   /// x.emplace(vector<u_char>(cp, cp + size));
   /// \endcode
@@ -827,7 +844,7 @@ public:
   std::string toStr(const ConvToStrHint &cth) const override { return this->c_to_string(wert, cth); }
   /// Abfragemethode mit Ausgabe als \c std::wstring
   std::wstring toWstr(const ConvToStrHint &cth) const override { return this->c_to_wstring(wert, cth); }
-  /// Abfrage, ob der Inhalt textbasiert ist (zb. in JSON in Hochkommata gesetzt wird)
+  /// Abfrage, ob der Inhalt textbasiert ist (z.B. in JSON in Hochkommata gesetzt wird)
   bool is_chartype(const ConvToStrHint &cth) const override { return this->c_is_chartype(cth); }
   /// Einlesen der Variable aus einem \c std::string im Format UTF-8
   bool fromStr(const std::string &sin, const ConvFromStrHint &cfh) override { doAudit(); if (this->c_string2x(sin, wert, cfh)) { activate(); return true; } return false; }
@@ -836,11 +853,11 @@ public:
   void fromStrExplizit(const std::string &sin)  { if (not fromStr(sin, ConvFromStrHintExplizit())) throw std::runtime_error("fromStrExplizit input error"); }
   /// Einlesen der Variable aus einem \c std::wstring
   bool fromStr(const std::wstring &sin, const ConvFromStrHint &cfh) override { doAudit(); if (this->c_wstring2x(sin, wert, cfh)) { activate(); return true; } return false; }
-  /// Info zum aktuellen Datentyp mit Inhalt
+  /// Information zum aktuellen Datentyp mit Inhalt
   void memInfo(MobsMemberInfo &i) const override { memInfo(i, wert); }
   /// Versuch Variable aus Meminfo auszulesen (isFloat/isSigned/isUnsigned/isTime)
   bool fromMemInfo(const MobsMemberInfo &i) override;
-  /// Info zum aktuellen Datentyp mit variablen Wert
+  /// Information zum aktuellen Datentyp mit variablem Wert
   void memInfo(MobsMemberInfo &i, const T &value) const;
   /// Versuche ein Member nativ zu kopieren
   bool doCopy(const MemberBase *other) override { auto t = dynamic_cast<const Member<T, C> *>(other); if (t) doCopy(*t); return t != nullptr; }
@@ -849,7 +866,7 @@ public:
   /// \private
   std::string auditEmpty() const override { return C::c_to_string(C::c_empty(), ConvToStrHint(hasFeature(mobs::DbCompact))); }
   /// \private
-  void inline doCopy(const Member<T, C> &other) { if (other.isNull()) forceNull(); else operator()(other()); }
+  void doCopy(const Member<T, C> &other) { if (other.isNull()) forceNull(); else operator()(other()); }
  /// \private
   void inline carelessCopy(const Member<T, C> &other);
 
@@ -980,7 +997,7 @@ protected:
 // ------------------ MemberVector ------------------
 
 template<class T>
-/// \brief Klasse für Vektoren auf Membervariablen oder Objekten innerhalb von von \c ObjectBase angeleiteten Klasse; Bitte als Makro MemVarVector oder MemVector verwenden
+/// \brief Klasse für Vektoren auf Membervariablen oder Objekten innerhalb von \c ObjectBase abgeleiteten Klassen; bitte als Makro MemVarVector oder MemVector verwenden
 /// \see MemVarVector
 /// \see MemVector
 /// \tparam T entweder eine von \c MemberBase oder eine von \c ObjectBase abgeleitete Klasse
@@ -1060,7 +1077,7 @@ public:
    * \throws runtime_error, wenn nach einem Objekt gesucht wird, das kein KEYELEMENT definiert hat
    */
   size_t find(const typename T::findType &t, size_t start = 0) const;
-  /** \brief Suche nach einem Element
+  /** \brief Suche nach einem Element.
    *
    * Ist der Vektor ein MemVarVektor, so kann nach dem Inhalt des Elements gesucht werden;
    * bei einem Objektvektor wird nach dem Namen des Objektes (objNameKeyStr()) gesucht
@@ -1089,7 +1106,7 @@ template<class T>
 bool MemberVector<T>::contains(const typename T::findType &t) const
 {
   for (auto i = begin(); i != end(); i++)
-    if (*i == t)return true;
+    if (*i == t) return true;
   return false;
 }
 
@@ -1276,7 +1293,7 @@ public:
   virtual ~ObjVisitor() = default;
   /**\brief Aufruf für Visitor
    *
-   * @param obj zu Besuchendes Objekt
+   * @param obj zu besuchendes Objekt
    */
   virtual void visit(ObjectBase &obj) = 0;
 };
@@ -1287,29 +1304,29 @@ public:
   virtual ~ObjVisitorConst() = default;
   /**\brief Aufruf für Visitor
    *
-   * @param obj zu Besuchendes Objekt
+   * @param obj zu besuchendes Objekt
    */
   virtual void visit(const ObjectBase &obj) = 0;
 };
 
-/// Basisklasse zum sequentiellen Einfügen von Daten in ein Objekt
+/// Basisklasse zum sequenziellen Einfügen von Daten in ein Objekt
 class ObjectNavigator  {
 public:
   /// Konstruktor
   explicit ObjectNavigator(ConvObjFromStr c = ConvObjFromStr()) : cfs(std::move(c)) { }
   /// Zeiger auf die aktuelle MemberVariable oder nullptr, falls es keine Variable ist
-  inline MemberBase *member() const { return memBase; };
+  MemberBase *member() const { return memBase; };
   /// Name der aktuellen MemberVariablen, oder leer, falls es keine Variable ist
-  inline const std::string &showName() const { return memName; };
+  const std::string &showName() const { return memName; };
   /// Name des aktuell referenzierten Objektes/Variable, leer, falls der das Objekt abgearbeitet ist
-  inline std::string current() const { return path.empty() ? "" : path.top(); }
+  std::string current() const { return path.empty() ? "" : path.top(); }
   /// lege ein Objekt auf den Stapel, um die aktuellen Member zu füllen
-  /// @param obj Objekt, muss von ObjecBase abgeleitet sein
-  /// @param name Name des Objektes, muss nicht angegeben werden
+  /// @param obj Objekt, muss von ObjectBase abgeleitet sein
+  /// @param name Name des Objektes; muss nicht angegeben werden
   void pushObject(ObjectBase &obj, const std::string &name = "<obj>");
   /** \brief Suche ein Element in der aktuellen Objektstruktur
    @param element Name des Elementes
-   @param index optional: Index bei Vectoren; ansonsten wir der Vector um ein Element erweitert
+   @param index optional: Index bei Vektoren; ansonsten wir der Vector um ein Element erweitert
    @return liefert false, wenn das Element nicht existiert
 
    Ist das Element  eine Variable, so Kann über \c member darauf zugegriffen werden. Bei Objekten wird in die neue
@@ -1320,6 +1337,7 @@ public:
    Wird \c MemBaseVector::next übergeben wird automatisch erweitert; bei \c SIZE_T_MAX  wird  der Vector selbst betrachtet -> memVec
    */
   bool enter(const std::string &element, std::size_t index = MemBaseVector::nextpos);
+  bool enter(const std::string &element, const std::string &ns, std::size_t index = MemBaseVector::nextpos);
   /// Verlassen einer Ebene in der Objektstruktur
   /// @param element Name des Elementes oder leer, wenn der Name der Struktur nicht geprüft werden soll
   /// \throw std::runtime_error bei Strukturfehler

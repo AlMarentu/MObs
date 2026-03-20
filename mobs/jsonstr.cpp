@@ -31,9 +31,9 @@ public:
   explicit ObjDump(JS &js) : jstr(js) { };
   bool doObjBeg(const mobs::ObjectBase &obj) override
   {
-    if (obj.isNull() and jstr.cts().omitNull())
+    if (obj.isNull() and jstr.cts().hasFeatureOmitNull())
       return false;
-    if (not obj.isModified() and jstr.cts().modOnly())
+    if (not obj.isModified() and jstr.cts().hasFeatureModOnly())
       return false;
     if (not obj.getElementName().empty() and not jstr.isRoot() and not jstr.inArray())
       jstr << JS::Tag(obj.getName(jstr.cts()));
@@ -47,15 +47,15 @@ public:
   };
   void doObjEnd(const mobs::ObjectBase &obj) override
   {
-    if (obj.isNull() and jstr.cts().omitNull())
+    if (obj.isNull() and jstr.cts().hasFeatureOmitNull())
       return;
     jstr.objectEnd();
   };
   bool doArrayBeg(const mobs::MemBaseVector &vec) override
   {
-    if (vec.isNull() and jstr.cts().omitNull())
+    if (vec.isNull() and jstr.cts().hasFeatureOmitNull())
       return false;
-    if (not vec.isModified() and jstr.cts().modOnly())
+    if (not vec.isModified() and jstr.cts().hasFeatureModOnly())
       return false;
     if (not jstr.isRoot())
       jstr << JS::Tag(vec.getName(jstr.cts()));
@@ -73,9 +73,9 @@ public:
   };
   void doMem(const mobs::MemberBase &mem) override
   {
-    if (mem.isNull() and jstr.cts().omitNull())
+    if (mem.isNull() and jstr.cts().hasFeatureOmitNull())
       return;
-    if (not mem.isModified() and jstr.cts().modOnly())
+    if (not mem.isModified() and jstr.cts().hasFeatureModOnly())
       return;
     if (not inArray())
       jstr << JS::Tag(mem.getName(jstr.cts()));
@@ -116,7 +116,7 @@ public:
       ostr << ',';
     else
       info.top().comma = true;
-    if (cth.withIndentation()) {
+    if (cth.hasFeatureWithIndentation()) {
       // Damit simpl arrays schön in einer Zeile dargestellt werden hier etwas verkünsteln
       auto s = ostr.tellp();
       if (inSimpleList) {
