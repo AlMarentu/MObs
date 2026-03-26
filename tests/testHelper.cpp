@@ -450,8 +450,7 @@ TEST(helperTest, dbjson) {
             gsql.replaceStatement(true));
   EXPECT_EQ(R"(create table D.ObjJ1(xx INT NOT NULL,yy VARCHAR(99),zz INT NOT NULL,ll VARCHAR(88), primary key (xx));)",
             gsql.createStatement(true));
-
-  gsql.readObject(j2);
+  ASSERT_NO_THROW(gsql.readObject(j2));
   EXPECT_EQ(R"({xx:2,yy:{aa:2,bb:3,cc:4,col:"green"},zz:2,ll:[1,2,4]})", j2.to_string());
 
 }

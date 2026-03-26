@@ -453,7 +453,7 @@ public:
       mobs::MemVarCfg c = mem.hasFeature(mobs::LengthBase);
       if (c and s.length() > (c - mobs::LengthBase))
         throw runtime_error(u8"SQL: content to big für column " +
-        mem.getName(mobs::ConvObjToString().exportPrefix().exportAltNames()) + " need " + std::to_string(s.length()));
+        mem.getName(mobs::ConvObjToString().exportDbPrefix().exportAltNames()) + " need " + std::to_string(s.length()));
       setBuffer(sql_var, s.length() + 1);
       if (mem.isNull())
         e = rsetnull(sql_var.sqltype, sql_var.sqldata);

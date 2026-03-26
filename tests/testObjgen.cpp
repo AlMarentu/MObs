@@ -124,7 +124,7 @@ class Buchstabe : virtual public mobs::ObjectBase {
 public:
   ObjInit(Buchstabe);
 
-  MemVar(char32_t, buchstabe, USENULL);
+  MemVar(char32_t, buchstabe, USENULL, ALTNAME(Letter));
   MemVar(std::string, htmlTag);
 };
 
@@ -588,14 +588,60 @@ TEST(objgenTest, Pointer) {
   EXPECT_EQ(R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", ip->to_string(mobs::ConvObjToString().exportCompact()));
 
   // Test ob Objekte nativ zurückgegeben werden und keine Kopien
-  EXPECT_EQ(&ip->kontakte, ip->getVecInfo("kontakte", mobs::ConvObjFromStr()));
+  EXPECT_EQ(&ip->kontakte, ip->getMemVec("kontakte", mobs::ConvObjFromStr()));
   EXPECT_EQ(&ip->kontakte[3], dynamic_cast<Kontakt *>(ip->kontakte.getObjInfo(3)));
   EXPECT_EQ(static_cast<mobs::ObjectBase *>(&ip->kontakte[3]), ip->kontakte.getObjInfo(3));
   EXPECT_EQ(ip, dynamic_cast<mobs::ObjectBase *>(ip));
-  EXPECT_EQ(&ip->kontakte[0].number, (dynamic_cast<MemVarType(string) *>(ip->kontakte[0].getMemInfo("number", mobs::ConvObjFromStr()))));
-  EXPECT_EQ(&ip->kontakte[1].art, (dynamic_cast<MemMobsEnumVarType(device) *>(ip->kontakte[1].getMemInfo("art", mobs::ConvObjFromStr()))));
+  EXPECT_EQ(&ip->kontakte[0].number, (dynamic_cast<MemVarType(string) *>(ip->kontakte[0].getMemVar("number", mobs::ConvObjFromStr()))));
+  EXPECT_EQ(&ip->kontakte[1].art, (dynamic_cast<MemMobsEnumVarType(device) *>(ip->kontakte[1].getMemVar("art", mobs::ConvObjFromStr()))));
 //  cerr << typeid(&ip->kontakte[0].number).name() << endl;
 //  cerr << typeid(ip->kontakte[0].getMemInfo("number")).name() << endl;
+}
+
+class Y : virtual public mobs::ObjectBase {
+public:
+  ObjInit(Y, PREFIX(y_));
+  MemVar(std::string, elefant);
+  MemVar(std::string, banane, ALTNAME(platanos));
+
+};
+
+class X : virtual public mobs::ObjectBase {
+  public:
+  ObjInit(X);
+  MemObj(Buchstabe, b, EMBEDDED, PREFIX(p_));
+  MemObj(Buchstabe, c, EMBEDDED, PREFIX(q_));
+  MemObj(Y, yyy, PREFIX(yps_));
+  MemVar(int, XXX, USENULL, ALTNAME(aa), PREFIX(X_));
+  MemVar(std::string, Wert, PREFIX(y_));
+};
+
+
+TEST(objgenTest, findVar) {
+  Person p;
+  ASSERT_NO_THROW(mobs::string2Obj( R"({kundennr:44,firma:false,name:"Peter",vorname:"",adresse:{strasse:"",plz:"",ort:""},kontakte:[{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:0,number:""},{art:2,number:"+40 0000 1111 222"}],hobbies:["","Piano"]})", p));
+
+  EXPECT_EQ(&p.kontakte[1].art, p.findVariable("kontakte[1].art"));
+  EXPECT_EQ(&p.kontakte[2].art, p.findVariable("kontakte[2].art"));
+
+  Buchstabe b;
+  EXPECT_EQ(nullptr, b.findVariable("buabe"));
+  EXPECT_EQ(&b.buchstabe, b.findVariable("buchstabe"));
+  EXPECT_EQ(&b.buchstabe, b.findVariable("Letter", mobs::ConvObjFromStr().useAlternativeNames()));
+  EXPECT_EQ(&b.buchstabe, b.findVariable("leTTer", mobs::ConvObjFromStr().useAlternativeNames().useIgnoreCase()));
+  EXPECT_EQ(&b.buchstabe, b.findVariable("BUCHSTAbe", mobs::ConvObjFromStr().useOriginalNames().useIgnoreCase()));
+  EXPECT_EQ(nullptr, b.findVariable("BUCHSTAbe", mobs::ConvObjFromStr().useOriginalNames()));
+  EXPECT_EQ(nullptr, b.findVariable("buchstabe", mobs::ConvObjFromStr().useAlternativeNames()));
+  EXPECT_EQ(nullptr, b.findVariable("Letter", mobs::ConvObjFromStr().useOriginalNames()));
+
+  X x;
+  EXPECT_EQ(&x.b.buchstabe, x.findVariable("p_buchstabe"));
+  LOG(LM_INFO, x.to_string(mobs::ConvObjToString().exportAltNames().exportDbPrefix()));
+  LOG(LM_INFO, x.to_string(mobs::ConvObjToString().exportDbPrefix()));
+
+  Y y;
+  LOG(LM_INFO, y.to_string(mobs::ConvObjToString().exportDbPrefix()));
+
 }
 
 TEST(objgenTest, getSetVar) {
@@ -611,6 +657,7 @@ TEST(objgenTest, getSetVar) {
   EXPECT_TRUE(r);
   EXPECT_EQ("", op->getVariable("kontakte[1].bee", &r));
   EXPECT_FALSE(r);
+
 //  std::cerr << to_string(p) << std::endl;
 
 }
@@ -1041,7 +1088,7 @@ TEST(objgenTest, embedded) {
   EXPECT_EQ("{aa:2,bb:3,cc:4,xx:1,zz:5}", e4.to_string(mobs::ConvObjToString()));
 
   e2.yy.bb(3);
-  EXPECT_EQ("{xx:0,a_aa:0,a_bb:3,a_cc:0,aa:0,ww:{b_aa:0,b_bb:0,b_cc:0}}", e2.to_string(mobs::ConvObjToString().exportPrefix()));
+  EXPECT_EQ("{xx:0,a_aa:0,a_bb:3,a_cc:0,aa:0,ww:{b_aa:0,b_bb:0,b_cc:0}}", e2.to_string(mobs::ConvObjToString().exportDbPrefix()));
   EXPECT_EQ("{xx:0,a_aa:0,a_bb:3,a_cc:0,aa:0,ww:{aa:0,bb:0,cc:0}}", e2.to_string(mobs::ConvObjToString()));
   EXPECT_NO_THROW(mobs::string2Obj("{xx:1,a_aa:2,a_bu:3,a_cc:4,aa:5,ww:{aa:0,bb:0,cc:0}}", e2, mobs::ConvObjFromStr().useAutoNames().useExceptUnknown()));
 
@@ -1181,6 +1228,26 @@ TEST(objgenTest, findVectorObject) {
 
 
 }
+
+class ObjE6 : virtual public ObjE1, virtual public mobs::ObjectBase {
+public:
+  ObjInitDerived(ObjE6, ObjE1);
+
+  MemVar(int, xx);
+  MemVar(int, yy);
+  MemVar(int, zz);
+};
+
+
+TEST(objgenTest, derived) {
+  ObjE6 o;
+  std::string x="{aa:1,bb:2,cc:3,xx:24,yy:25,zz:26}";
+
+  EXPECT_STREQ("{aa:0,bb:0,cc:0,xx:0,yy:0,zz:0}", o.to_string().c_str());
+  ASSERT_NO_THROW(mobs::string2Obj(x, o, mobs::ConvObjFromStr()));
+  EXPECT_EQ(x, o.to_string());
+}
+
 
 
 
@@ -1422,5 +1489,3 @@ TEST(objgenTest, compare) {
 
 
 }
-
-

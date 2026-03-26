@@ -219,7 +219,7 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 #define XMLATTR mobs::XmlAsAttr ///< Bei XML-Ausgabe als Attribute ausgeben (nur MemberVariable, nur von erstem Element fortlaufend)
 #define XMLENCRYPT mobs::XmlEncrypt ///< Bei XML-Ausgabe verschlüsselt ausgeben
 #define EMBEDDED mobs::Embedded ///< Bei Ausgabe als Attribute/Traversierung werden die Member des Objektes direkt, auf derselben Ebene, serialisiert
-#define DBCOMPACT mobs::DbCompact ///< In der Datenbank wird der MOBSENUM oder der Zeit-Wert numerisch gespeichert
+#define DBCOMPACT mobs::DbCompact ///< In der Datenbank wird der MOBSENUM oder der Zeit-Wert als Zahl gespeichert
 #define DBDETAIL mobs::DbDetail ///< In der Datenbank wird dieses Subelement in einer Detail Table abgelegt, muss also separat gespeichert werden
 #define DBJSON mobs::DbJson ///< In nicht dokumentbasierten Datenbanken wird das Unterobjekt als Text im JSON-Format abgelegt
 #define VERSIONFIELD mobs::DbVersionField ///< In diesem Feld wird die Objektversion gespeichert, 0 entspricht noch nicht gespeichert
@@ -233,7 +233,7 @@ enum mobs::MemVarCfg mobsToken(MemVarCfg base, std::vector<std::string> &confTok
 #define ALTNAME(name) ::mobs::mobsToken(::mobs::AltNameBase,m_confToken,#name) ///< Definition eines Alternativen Namens für die Ein-/Ausgabe
 #define COLNAME(name) ::mobs::mobsToken(::mobs::ColNameBase,m_confToken,#name) ///< Definition eines Alternativen Namens für den Collection-Namen (oder Tabellennamen) der Datenbank
 #define PREFIX(name) ::mobs::mobsToken(::mobs::PrefixBase,m_confToken,#name) ///< Definition eines Prefix für den Export-Namen, wenn in eine flache Struktur exportiert wird \see EMBEDDED
-#define NAMESPACE(name) ::mobs::mobsToken(::mobs::NameSpaceBase,m_confToken,#name) ///< Definition eines Namespaces für den XML-Export-Namen
+#define NAMESPACE(name) ::mobs::mobsToken(::mobs::NameSpaceBase,m_confToken,#name) ///< Definition eines Namespaces für den XML-Export-Namen; schließt XMLATTR aus
 /// Angabe der max. Länge des Strings; [1..9999] möglich
 #define LENGTH(len)  mobs::MemVarCfg(((len) > 0 and mobs::LengthBase +(len) <= mobs::LengthEnd)?mobs::LengthBase +(len): mobs::LengthEnd)
 
@@ -274,11 +274,11 @@ ObjInit1(objname, __VA_ARGS__ )
 #define ObjInit(objname, ...) ObjInitDerived2(objname, , __VA_ARGS__)
 #define ObjInit2(objname, initializer, ...) \
 using baseType = objname;      \
-objname() : ObjectBase() initializer { doConfClear(); doConfigObj({ __VA_ARGS__ }); doInit(); objname::init(); setModified(false); } \
+objname() : ObjectBase() initializer { doConfClear(); doConfigObj({ __VA_ARGS__ }); doInit(); objname::init(); initStatic(); setModified(false); } \
 objname(mobs::MemBaseVector *m, mobs::ObjectBase *o, const std::vector<mobs::MemVarCfg> &cv = {}) : ObjectBase(m, o, cv) \
-  { doInit(); objname::init(); setModified(false); } \
+  { doInit(); objname::init(); initStatic(); setModified(false); } \
 objname(const std::string &name, ObjectBase *t, const std::vector<mobs::MemVarCfg> &cv) : ObjectBase(name, t, cv) \
-  { if (t) t->regObj(this); doInit(); objname::init(); setModified(false); } \
+  { if (t) t->regObj(this); doInit(); objname::init(); initStatic(); setModified(false); } \
 objname &operator=(const objname &rhs) { doCopy(rhs); return *this; }  \
 objname &operator=(objname &&rhs) noexcept = delete; \
 void operator()(const objname &other) { doCopy(other); } \
@@ -286,10 +286,18 @@ static ObjectBase *createMe(ObjectBase *parent = nullptr) { if (parent) return n
 ObjectBase *createNew() const override { return new objname(); } \
 std::string getObjectName() const override { return #objname; } \
 static std::string objName() { return #objname; }
+
 /*! \brief Makro für Definitionen im Objekt das von ObjectBase abgeleitet ist ohne copy constructor
  @param objname Name der Klasse (muss von ObjectBase abgeleitet sein)
  */
-#define ObjInit1(objname, ...) ObjInit2(objname, , __VA_ARGS__)
+#define ObjInit1(objname, ...) ObjInit2(objname, , __VA_ARGS__) \
+std::multimap<std::string, mobs::ObjectBase::MobsObjMemberInfo> &findMyMemberMap() override { return sFindMyMemberMap(); } \
+static std::multimap<std::string, mobs::ObjectBase::MobsObjMemberInfo> &sFindMyMemberMap() { \
+  static std::multimap<std::string, mobs::ObjectBase::MobsObjMemberInfo> memberMap; \
+  return memberMap; } \
+void initStatic() { static std::mutex m; static bool done = false; if (done) return; const std::lock_guard<std::mutex> lock(m); if (done) return; firstInit(); done = true; }
+// die static multimap muss innerhalb einer Methode deklariert werden, da das Makro die Variable sonst nict instantiieren kann
+
 /*! \brief Makro für Definitionen im Objekt das von ObjectBase sowie einer weiteren Klasse abgeleitet ist.
  @param objname Name der Klasse (muss von ObjectBase abgeleitet sein)
  @param initializer Name einer weiteren Klasse, deren default-Konstruktor aufgerufen wird.
@@ -317,8 +325,7 @@ static RegMe##name regme; \
 RegMe##name RegMe##name::regme; \
 }
 
-template <class T>
-class MemberVector;
+template <class T> class MemberVector;
 class ObjTrav;
 class ObjTravConst;
 class ObjVisitor;
@@ -326,6 +333,7 @@ class ObjVisitorConst;
 class MemberBase;
 class ObjectBase;
 class MemBaseVector;
+template<typename U, class V> class Member;
 
 /// Interne Klasse zur Behandlung von \c NULL \c -Werten
 class NullValue {
@@ -378,6 +386,9 @@ public:
   MemVarCfg cAltName() const { return m_altName; };
   /// Abfrage des originalen oder des alternativen Namens der Membervariablen
   std::string getName(const ConvToStrHint &) const;
+  /// Abfrage nach XML-Namespace
+  std::string getNameSpace(const ConvToStrHint &cth) const;
+
   /// Setze Inhalt auf leer, mit initialen null-Einstellungen
   virtual void clear() = 0;
   /// Ausgabe des Inhalts als \c std::string in UTF-8
@@ -499,6 +510,9 @@ public:
   MemVarCfg cAltName() const { return m_altName; }
   /// Abfrage des originalen oder des alternativen Namens des Vektors
   std::string getName(const ConvToStrHint &) const;
+  /// Abfrage nach XML-Namespace
+  std::string getNameSpace(const ConvToStrHint &cth) const;
+
   /// liefert einen Zeiger auf das entsprechende Element, falls es eine \c MemVar ist
   virtual MemberBase *getMemInfo(size_t i) = 0;
   /// liefert einen Zeiger auf das entsprechende Element, falls es eine \c MemVar ist
@@ -555,6 +569,7 @@ class ObjectBase : public NullValue {
   template<typename W>
   friend class MemberVector;
   friend class DatabaseInterface;
+  friend class ObjectNavigator;
 protected:
   /// \private
   ObjectBase(std::string n, ObjectBase *obj, const std::vector<MemVarCfg>& cv ) : m_varNam(std::move(n)), m_parent(obj) { for (auto c:cv) doConfig(c); } // Konstruktor for MemObj
@@ -603,6 +618,9 @@ public:
   MemVarCfg cAltName() const { return m_altName; };
   /// Abfrage des originalen oder des alternativen Namens des Objektes
   std::string getName(const ConvToStrHint &) const;
+  /// Abfrage nach XML-Namespace
+  std::string getNameSpace(const ConvToStrHint &cth) const;
+
   /// Objekt wurde beschrieben
   void activate();
 //  /// private
@@ -614,19 +632,19 @@ public:
   /// @param name Name der zu suchenden Variable
   /// @param cfh Konvertierung Hinweise
   /// @return Zeiger auf Objekt \c Memberbase oder \c nullptr
-  MemberBase *getMemInfo(const std::string &name, const ConvObjFromStr &cfh);
+  MemberBase *getMemVar(const std::string &name, const ConvObjFromStr &cfh);
   /// Suche ein Member-Objekt
   /// @param name Name des zu suchenden Objektes
   /// @param cfh Konvertierung Hinweise
   /// @return Zeiger auf Objekt \c ObjectBase oder \c nullptr
-  virtual ObjectBase *getObjInfo(const std::string &name, const ConvObjFromStr &cfh);
+  ObjectBase *getObject(const std::string &name, const ConvObjFromStr &cfh);
   /// Suche einen Vector von Membervariablen oder Objekten
   /// @param name Name der zu suchenden Variable
   /// @param cfh Konvertierung Hinweise
   /// @return Zeiger auf Objekt \c MemBaseVector oder \c nullptr
-  MemBaseVector *getVecInfo(const std::string &name, const ConvObjFromStr &cfh);
+  MemBaseVector *getMemVec(const std::string &name, const ConvObjFromStr &cfh);
   /// \private
-  static void regObject(std::string n, ObjectBase *fun(ObjectBase *)) noexcept;
+  static void regObject(const std::string& n, ObjectBase *fun(ObjectBase *)) noexcept;
   /// \brief Erzeuge ein neues Objekt
   /// @param name Typname des Objektes
   /// @param parent  Zeiger auf Parent des Objektes, immer \c nullptr, wird nur intern verwendet
@@ -646,9 +664,14 @@ public:
   void clearModified();
   /// lösche alle Modified-Flags und aktiviert den Audit Trail Modus
   void startAudit();
+  /// sucht eine Variable
+  /// @param path Pfad der Variable z.B.: kontakt[3].number
+  /// @param cfh Konvertierung Hinweise
+  /// \return Zeiger auf Variable oder nullptr wenn nicht gefunden
+  MemberBase *findVariable(const std::string &path, const ConvObjFromStr &cfh = ConvObjFromStr());
   /// Setzt eine Variable mit dem angegebene Inhalt
   /// @param path Pfad der Variable z.B.: kontakt[3].number
-  /// @param value Inhalt, der geschrieben werden soll
+  /// @param value Inhalt, der geschrieben werden soll, wahlweise compact oder extendet
   /// \return true, wenn der Vorgang erfolgreich war
   bool setVariable(const std::string &path, const std::string &value);
   /// liest eine Variable relativ zum angegebenen Pfad
@@ -716,6 +739,8 @@ public:
   void regObj(ObjectBase *obj);
   /// \private
   void regArray(MemBaseVector *vec);
+  /// \private
+  void rebuildFindMap();
 
 
 protected:
@@ -731,6 +756,25 @@ protected:
   void doConfClear() { m_altName = Unset; } // Bei Vererbung keinen Namen erben
   /// \private
   void clear(bool null);
+  /// \private
+  void firstInit();
+  /// Callback-Methode für dynamische Klassen wie z.B. MobsUnion<>
+  virtual void setType(const std::string& t) {};
+
+  class MobsObjMemberInfo {
+  public:
+    MobsObjMemberInfo(std::string ns, std::string nam, const std::vector<size_t> &pos, bool ia, bool io) :
+       name(std::move(nam)), xmlNs(std::move(ns)), minfoPos(pos), isAltName(ia), isOriName(io) {}
+    MobsObjMemberInfo(MobsObjMemberInfo &&) = default;
+    ~MobsObjMemberInfo() = default;
+    std::string name; // Name case sensitiv
+    std::string xmlNs;
+    std::vector<size_t> minfoPos;
+    bool isAltName;
+    bool isOriName;
+  };
+  /// \private
+  virtual std::multimap<std::string, MobsObjMemberInfo> &findMyMemberMap();
 
 private:
   std::string m_varNam;
@@ -752,7 +796,13 @@ private:
     ObjectBase *obj = nullptr;
     MemBaseVector *vec = nullptr;
   };
-  std::list<MlistInfo> mlist;
+
+
+  static void insertFindMap(std::multimap<std::string, MobsObjMemberInfo> & findMap, ObjectBase *obj,
+                            const std::vector<size_t> &pos = std::vector<size_t>(), const std::string &prefix = "");
+
+  const MlistInfo *findMyMember(const std::string &ns, const std::string &name, const ConvObjFromStr &cfh);
+  std::vector<MlistInfo> mlist;
 };
 
 
@@ -1370,6 +1420,7 @@ private:
   std::stack<Objekt> objekte;
   std::stack<std::string> path;
 
+  std::string next2Enter;
   std::string memName;
   MemberBase *memBase = nullptr;
   MemBaseVector *memVec = nullptr;

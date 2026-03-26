@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -27,7 +27,6 @@
 
 #include <string>
 
-#include "objtypes.h"
 #include "objgen.h"
 
 namespace mobs {
@@ -109,7 +108,7 @@ class Master : virtual public mobs::ObjectBase {
 class MobsUnion : virtual public mobs::ObjectBase {
 public:
   /// \private
-  ObjInit1(MobsUnion);
+  ObjInit2(MobsUnion,);
   /// \private
   MobsUnion(const MobsUnion &that) : ObjectBase() { TRACE(""); MobsUnion::doCopy(that); }
   ~MobsUnion() override { if (m_obj) delete m_obj; }
@@ -118,7 +117,7 @@ public:
   /// setzt den Objekttyp des Unions, keine Aktion benn der Typ bereits passt
   /// @param t Objekttyp (muss mit \c ObjRegister) registriert sein; ist t leer, so wird das Objekt gelöscht
   /// \throw runtime_error wenn der Objekttyp nicht von der Basisklasse \c T abgeleitet ist
-  void setType(const std::string& t);
+  void setType(const std::string& t) override;
   /// Übernehme eine Kopie des angegebenen Objektes
   void operator() (const T &t) { setType(t.getObjectName()); m_obj->doCopy(t); activate(); }
   /// const Zugriffsmethode auf die Basisklasse
@@ -131,15 +130,19 @@ public:
   T &operator() () { if (not m_obj) throw std::runtime_error("MobsUnion is empty"); return *m_obj; }
   /// const Zugriffsmethode auf die Basisklasse mit exception
   const T &operator() () const  { if (not m_obj) throw std::runtime_error("MobsUnion is empty"); return *m_obj; }
-  /// \brief Überladenen Methode, die das gewünschte MobsUnion-Objekt \c name zuerst zu erzeugen versucht
-  ObjectBase *getObjInfo(const std::string &name, const ConvObjFromStr &cfh) override { setType(name); return m_obj; }
   /// \private
   void doCopy(const ObjectBase &other) override;
   /// \private
-  void cleared() final { if (m_obj) {delete m_obj; regObj(nullptr); } }
-  
+  void cleared() final { if (m_obj) {delete m_obj; regObj(nullptr); rebuildFindMap(); } }
+
+protected:
+  // keine statische MemberMap verwenden
+  std::multimap<std::string, MobsObjMemberInfo> &findMyMemberMap() override { return memberMap; };
+  // ReSharper disable once CppMemberFunctionMayBeStatic
+  void initStatic() {};
 private:
   T *m_obj = nullptr;
+  std::multimap<std::string, MobsObjMemberInfo> memberMap;
 };
 
 
@@ -147,6 +150,7 @@ private:
 
 template <class T>
 void MobsUnion<T>::setType(const std::string& t) {
+  LOG(LM_INFO, "UNION_TYPE " << t);
   // hier wird als einziges ein neues Objekt erzeugt oder entfernt
   // es muss immer m_obj mit ObjectBase.mlist synchron gehalten werden
   if (t.empty()) {
@@ -159,7 +163,7 @@ void MobsUnion<T>::setType(const std::string& t) {
     return;
   }
   if (m_obj == nullptr or m_obj->getObjectName() != t) {
-    if (m_obj) delete m_obj;
+    delete m_obj;
     regObj(nullptr); // ObjectBase.mlist clear
     // wird über Constructor in Obj-Liste von ObjectBase eingefügt
     ObjectBase *o = ObjectBase::createObj(t, this);
@@ -172,6 +176,7 @@ void MobsUnion<T>::setType(const std::string& t) {
     }
     else
       activate();
+    rebuildFindMap();
   }
 }
 

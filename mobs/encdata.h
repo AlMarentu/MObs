@@ -81,7 +81,7 @@ class KeyNC : virtual public mobs::ObjectBase
 {
 public:
   ObjInit(KeyNC);
-  MemVar(std::string, URI, XMLATTR, NAMESPACE(dsig11));
+  MemVar(std::string, URI, XMLATTR);
 };
 
 class KeyEC : virtual public mobs::ObjectBase

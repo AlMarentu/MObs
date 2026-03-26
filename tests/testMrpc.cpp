@@ -1556,10 +1556,10 @@ TEST(mrpcTest, MrpcDhEccKey) {
                     "mPOciWlDJCOfRVLJtcRF2X6L0Q==");
 #endif
 
-  cout << keyInfo.to_string(mobs::ConvObjToString().exportXmlWithNS().doIndent().exportPrefix()) << endl;
+  cout << keyInfo.to_string(mobs::ConvObjToString().exportXmlWithNS().doIndent().exportDbPrefix()) << endl;
 
 
-  cout << keyInfo.to_string(mobs::ConvObjToString().exportXmlWithNS().exportWoNull().doIndent().exportPrefix()) << endl;
+  cout << keyInfo.to_string(mobs::ConvObjToString().exportXmlWithNS().exportWoNull().doIndent().exportDbPrefix()) << endl;
 
 
 }

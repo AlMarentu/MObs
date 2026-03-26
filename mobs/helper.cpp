@@ -46,7 +46,7 @@ class GenerateSqlJoin : virtual public ObjTravConst {
 public:
 
   explicit GenerateSqlJoin(const ConvObjToString& c, SQLDBdescription &sqlDbDescription) :
-          cth(c.exportPrefix().exportAltNames()), sqldb(sqlDbDescription)  {}
+          cth(c.exportDbPrefix().exportAltNames()), sqldb(sqlDbDescription)  {}
 
 
 
@@ -332,7 +332,7 @@ private:
 class ExtractSql : virtual public ObjTrav {
 public:
   explicit ExtractSql(SQLDBdescription &s, const ConvObjToString& c) : current(nullptr, "", {}),
-                                                                       cth(std::move(c.exportPrefix().exportAltNames())),
+                                                                       cth(std::move(c.exportDbPrefix().exportAltNames())),
                                                                        sqldb(s) { }
 
   bool doObjBeg(ObjectBase &obj) final
@@ -385,6 +385,7 @@ public:
         t += "}";
         ObjectBase dummy{};
         dummy.regArray(&vec);
+        dummy.rebuildFindMap();
         string2Obj(t, dummy, ConvObjFromStr().useExceptUnknown());
       }
       return false;
@@ -433,7 +434,7 @@ class GenerateSql : virtual public ObjTravConst {
 public:
   enum Mode { Where, Fields, Values, Update, Create, FldVal, FldVal2 };
   explicit GenerateSql(Mode m, SQLDBdescription &s, const ConvObjToString& c) : current(nullptr, "", {}), mode(m),
-  cth(c.exportPrefix().exportAltNames()), sqldb(s) { sqldb.startWriting(); }
+  cth(c.exportDbPrefix().exportAltNames()), sqldb(s) { sqldb.startWriting(); }
 
   ~GenerateSql() { sqldb.finishWriting(); }
 
@@ -1234,7 +1235,7 @@ void SqlGenerator::readObject(const DetailInfo &di) {
     throw runtime_error("invalid DetailInfo in readObject");
 
   sqldb.startReading();
-  size_t index = sqldb.readIndexValue(vec->getName(mobs::ConvObjToString().exportPrefix().exportAltNames()));
+  size_t index = sqldb.readIndexValue(vec->getName(mobs::ConvObjToString().exportDbPrefix().exportAltNames()));
   if (index >= INT_MAX)
     throw runtime_error("no index position in readObject");
   vec->resize(index+1);

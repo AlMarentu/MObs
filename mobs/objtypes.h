@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2024 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -69,22 +69,20 @@ im Mobs-Objekt verwendet werden, mit Klartext-Namen arbeiten kann
 #define MOBS_ENUM_DEF(typ, ... ) \
 enum typ { __VA_ARGS__ }; \
 class mobsEnum_##typ##_define { \
+private: \
+  static constexpr enum typ v[] = { __VA_ARGS__ }; \
+  static constexpr size_t len_v = sizeof v / sizeof(enum typ); \
 public: \
-static size_t numOf(enum typ e) { \
-  static const std::vector<enum typ> v = { __VA_ARGS__ }; \
-  size_t pos = 0; \
-  for (auto i:v) \
-    if (i == e) \
-      return pos; \
-    else \
-      pos++; \
-  throw std::runtime_error("enum does not exist"); \
-} \
-static enum typ toEnum(size_t pos) { \
-  static const std::vector<enum typ> v = { __VA_ARGS__ }; \
-  if (pos >= v.size()) \
-    throw std::runtime_error("enum out of range"); \
-  return v[pos]; } \
+  static size_t numOf(enum typ e) { \
+    for (size_t pos = 0; pos < len_v; pos++) \
+      if (v[pos] == e) \
+        return pos; \
+    throw std::runtime_error("enum does not exist"); \
+  } \
+  static enum typ toEnum(size_t pos) { \
+    if (pos >= len_v) \
+      throw std::runtime_error("enum out of range"); \
+    return v[pos]; } \
 }
 
 /// Deklaration der Ausgabewerte zu einem \c MOBS_ENUM_DEF
@@ -387,7 +385,7 @@ std::string to_string(const std::vector<u_char> &buf);
 
 //template <typename T>
 /// String-Konvertierung
-/// @param val Wert in utf8
+/// @param t Wert in utf8
 /// @return Wert als wstring
 //inline std::wstring to_wstring(T t) { return to_wstring(to_string(t)); }
 
@@ -489,15 +487,14 @@ public:
   /// @param altNames verwende alternative Namen, wenn vorhanden
   /// @param pfix verwende den Prefix vor dem Namen, falls vorhanden
   /// @param lowercase wandelt den Namen in Kleinbuchstaben
-  explicit ConvToStrHint(bool print_compact, bool altNames = false, bool pfix = false, bool lowercase = false) : comp(print_compact),
-                         altnam(altNames), prefix(pfix), toLower(lowercase) {}
+  explicit ConvToStrHint(bool print_compact, bool altNames = false) : comp(print_compact), altnam(altNames) {}
   ~ConvToStrHint() = default;
   /// \private
   bool hasFeatureCompact() const { return comp; }
   /// \private
   bool hasFeatureUseAltNames() const { return altnam; }
   /// \private
-  bool hasFeatureUsePrefix() const { return prefix; }
+  bool hasFeatureUseDbPrefix() const { return prefix; }
   /// \private
   bool hasFeatureUseNamespace() const { return nameSpc; }
   /// \private
@@ -590,8 +587,8 @@ public:
   ConvObjToString noIndent() const { ConvObjToString c(*this); c.indent = false; return c; }
   /// Elementbezeichner in Kleinbuchstaben
   ConvObjToString exportLowercase() const { ConvObjToString c(*this); c.toLower = true; return c; }
-  /// Verwende den Prefix zum Namen
-  ConvObjToString exportPrefix() const { ConvObjToString c(*this); c.prefix = true; return c; }
+  /// Verwende den Prefix für Datenbank-Column-Names der flach eingebundenen Objekte; wird automatisch gesetzt
+  ConvObjToString exportDbPrefix() const { ConvObjToString c(*this); c.prefix = true; return c; }
   /// Verwende native Bezeichner von enums und Zeiten
   ConvObjToString exportCompact() const { ConvObjToString c(*this); c.comp = true; return c; }
   /// Ausgabe im Klartext von enums und Uhrzeit
@@ -605,7 +602,7 @@ public:
   /// Überspringe Versions-Elemente
   ConvObjToString exportSkipVersion() const { ConvObjToString c(*this); c.skipVers = true; return c; }
   /// setze Encrypt-Function
-  ConvObjToString setEncryptor(EncrypFun e) const { ConvObjToString c(*this); c.encryptor = e; return c; }
+  ConvObjToString setEncryptor(const EncrypFun &e) const { ConvObjToString c(*this); c.encryptor = e; return c; }
   /// setze default XML-Namespace Prefix für Export
   ConvObjToString setDfltNameSpacePfx(const char *ns) const;
 
@@ -686,7 +683,7 @@ public:
   /// arbeite nicht mit XML-Namespaces bei Elementnamen
   ConvObjFromStr useXmlNoNs() const {  ConvObjFromStr c(*this); c.xmlNs = false; return c; }
   /// setze Decrypt-Function
-  ConvObjFromStr setDecryptor(DecrypFun d) const { ConvObjFromStr c(*this); c.decryptor = d; return c; }
+  ConvObjFromStr setDecryptor(const DecrypFun &d) const { ConvObjFromStr c(*this); c.decryptor = d; return c; }
   /// setze default XML-Namespace für Import
   ConvObjFromStr setDfltNameSpace(const char *ns) const;
 
