@@ -222,7 +222,7 @@ protected:
   /// \private
   void EndTag(const std::string &ns, const std::string &element, bool emptyElement) override;
   /// \private
-  void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, CryptBufBase *&cryptBufp) override;
+  void Encrypt(const std::string &algorithm, const ObjectBase *keyInfo, mobs::CryptBufBase *&cryptBufp) override;
   /// \private
   void EncryptionFinished() override;
   /// \private

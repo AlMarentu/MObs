@@ -276,11 +276,6 @@ std::istream &XmlReader::byteStream(size_t len, CryptBufBase *cbbp) {
 }
 
 
-void XmlReader::Encrypt(const std::string &algorithm, const ObjectBase *keyInfo, mobs::CryptBufBase *&cryptBufp) {
-  if (auto ki = dynamic_cast<const mobs::KeyInfo *>(keyInfo))
-    Encrypt(algorithm, ki->KeyName(), ki->CipherData.CipherValue(), cryptBufp);
-}
-
 ObjectBase * XmlReader::fillKeyInfo() {
   return new mobs::KeyInfo;
 }
@@ -298,6 +293,12 @@ void XmlReader::setMaxElementSize(size_t s) { data->setMaxElementSize(s); }
 std::wistream &XmlReader::getIstr() { return data->getIstr(); }
 bool XmlReader::encrypted() const { return data->encrypted(); }
 const ConvObjFromStr & XmlReader::getCFS() const { return data->getCFS(); }
+
+void XmlRead::Encrypt(const std::string &algorithm, const ObjectBase *keyInfo, mobs::CryptBufBase *&cryptBufp) {
+  if (decrypFun)
+    if (auto ki = dynamic_cast<const mobs::KeyInfo *>(keyInfo))
+      cryptBufp = decrypFun(algorithm, ki->KeyName());
+}
 
 //  XmlReadData(const std::string &input, const ConvObjFromStr &c) : XmlParserW(str), str(to_wstring(input)) { cfs = c; };
 

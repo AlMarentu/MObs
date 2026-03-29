@@ -167,9 +167,8 @@ public:
 
   void EndTag(const string &ns, const std::string &element, bool emptyElement) override { LOG(LM_INFO, "END " << element); }
 
-  void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher,
-               mobs::CryptBufBase *&cryptBufp) override {
-    LOG(LM_INFO, "Encrypt algorithm=" << algorithm << " keyName=" << keyName << " cipher=" << cipher);
+  void Encrypt(const std::string &algorithm, const mobs::ObjectBase *keyInfo, mobs::CryptBufBase *&cryptBufp) override {
+    LOG(LM_INFO, "Encrypt algorithm=" << algorithm);
     cryptBufp = new mobs::CryptBufNone();
   }
 

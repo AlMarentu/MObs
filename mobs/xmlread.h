@@ -84,15 +84,6 @@ public:
   /// @param obj Zeiger auf das mit \c fill übergebene Objekt
   /// @param error ist bei Fehler gefüllt, ansonsten leer
   virtual void filled(ObjectBase *obj, const std::string &error) = 0;
-  /** \brief Callback-Funktion: Ein Element "EncryptedData" wurde gefunden und ein decrypt-Modul wird benötigt
-   *
-   * Es wird  "https://www.w3.org/2001/04/xmlenc#Element" unterstützt
-   * @param algorithm Algorithmus um xmlns bereinigt zB.: aes-256-cbc, oder "https://www.w3.org/2001/04/xmlenc#aes-256-cbc"/
-   * @param keyName KeyInfo-Element
-   * @param cipher Schlüssel-Element
-   * @param cryptBufp ein mit new erzeugtes Encryption-Module; wird automatisch freigegeben
-   */
-  virtual void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, mobs::CryptBufBase *&cryptBufp) { }
   /** \brief Callback-Funktion: Ein Element "EncryptedData" wurde gefunden und ein decrypt-Modul wird benötigt.
    *
    * Es wird  "http://www.w3.org/2001/04/xmlenc#Element" unterstützt.
@@ -102,7 +93,7 @@ public:
    * @param keyInfo KeyInfo-Element (siehe encdata.h)
    * @param cryptBufp ein mit new erzeugtes Encryption-Module; wird automatisch freigegeben; oder nullptr, wenn unbekannt
    */
-  virtual void Encrypt(const std::string &algorithm, const ObjectBase *keyInfo, mobs::CryptBufBase *&cryptBufp);
+  virtual void Encrypt(const std::string &algorithm, const mobs::ObjectBase *keyInfo, mobs::CryptBufBase *&cryptBufp) {};
   /** \brief Ein Objekt KeyInfo soll gelesen werden.
    *
    * Überladbare Methode um ein KeyInfo-Objekt zu erzeugen. Standard ist die KeyInfo aus encdata.h.
@@ -171,10 +162,7 @@ public:
       throw std::runtime_error(error);
   }
   /// \private
-  void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, mobs::CryptBufBase *&cryptBufp) override {
-    if (decrypFun)
-      cryptBufp = decrypFun(algorithm, keyName);
-  }
+  void Encrypt(const std::string &algorithm, const ObjectBase *keyInfo, mobs::CryptBufBase *&cryptBufp) override;
 
   /// wurde überhaupt eine Wurzel gefunden
   bool found() const { return done; }

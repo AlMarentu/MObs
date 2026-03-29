@@ -282,7 +282,7 @@ public:
     LOG(LM_INFO, "filled " << obj->to_string() << (error.empty() ? " OK" : " ERROR = ") << error);
   }
 
-  void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher, mobs::CryptBufBase *&cryptBufp) override {
+  void Encrypt(const std::string &algorithm, const mobs::ObjectBase *keyInfo, mobs::CryptBufBase *&cryptBufp) override {
       cryptBufp = new mobs::CryptBufNone();
   }
 

@@ -165,6 +165,7 @@
 #include <vector>
 #include <stack>
 #include <stdexcept>
+#include <mutex>
 
 #include "logging.h"
 #include "objtypes.h"

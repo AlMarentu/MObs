@@ -23,6 +23,7 @@
 #include "xmlwriter.h"
 #include "xmlout.h"
 #include "aes.h"
+#include "encdata.h"
 #include "rsa.h"
 
 namespace mobs {
@@ -145,10 +146,12 @@ void Mrpc::EncryptionFinished()
   stop();
 }
 
-void Mrpc::Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher,
-                   CryptBufBase *&cryptBufp)
+void Mrpc::Encrypt(const std::string &algorithm, const ObjectBase *keyInfo, mobs::CryptBufBase *&cryptBufp)
 {
-  LOG(LM_DEBUG, "Encryption " << algorithm << " keyName " << keyName << " cipher " << cipher);
+  if (auto ki = dynamic_cast<const mobs::KeyInfo *>(keyInfo))
+    LOG(LM_DEBUG, "Encryption " << algorithm << " keyName " << ki->KeyName() << " cipher " << ki->CipherData.CipherValue());
+  else
+    LOG(LM_DEBUG, "Encryption " << algorithm);
   if (not session)
     throw std::runtime_error("session missing");
   encrypted = true;

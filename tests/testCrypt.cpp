@@ -740,16 +740,17 @@ public:
   void ProcessingInstruction(const std::string &element, const std::string &attribut,
                              const std::wstring &value) override { LOG(LM_INFO, "PI" << element); }
 
-  void Encrypt(const std::string &algorithm, const std::string &keyName, const std::string &cipher,
-              mobs::CryptBufBase *&cryptBufp) override {
-    LOG(LM_INFO, "Encrypt algorithm=" << algorithm << " keyName=" << keyName << " cipher=" << cipher);
-    //LOG(LM_INFO, "Encrypt algorithm=" << algorithm << " keyInfo=" << (keyInfo ? keyInfo->to_string():"null"));
+  void Encrypt(const std::string &algorithm, const mobs::ObjectBase *keyInfo, mobs::CryptBufBase *&cryptBufp) override {
+    if (auto ki = dynamic_cast<const mobs::KeyInfo *>(keyInfo)) {
+      LOG(LM_DEBUG, "Encryption " << algorithm << " keyName " << ki->KeyName() << " cipher " << ki->CipherData.CipherValue());
       std::vector<u_char> cip;
-      mobs::from_string_base64(cipher, cip);
+      mobs::from_string_base64(ki->CipherData.CipherValue(), cip);
       buffOut(cip);
       mobs::decapsulatePublic(cip, key, privS, "54321", pubC);
       buffOut(key);
-      cryptBufp = new mobs::CryptBufAes(key,keyName);
+      cryptBufp = new mobs::CryptBufAes(key, ki->KeyName());
+    } else
+      LOG(LM_ERROR, "Keine KeyInfo");
   };
 
   void filled(mobs::ObjectBase *obj, const std::string &error) override {

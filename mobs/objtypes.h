@@ -157,7 +157,7 @@ std::string to_squote(const std::string &s);
  * es werden alle Zeichen escaped, die in JSON nach RFC 8259 escaped werden müssen
  * Dies beinhaltet auch die Zeichen \b, \f, \n, \r, \t, \v  und \uXXXX für X < 0x20
  * @param s in UTF8
- * @return
+ * @return quoted string in Anführungszeichen
  */
 std::string to_quoteJson(const std::string &s);
 
@@ -485,8 +485,6 @@ public:
   /// Konstruktor
   /// @param print_compact führt bei einigen Typen zur vereinfachten Ausgabe als ganzzahliger Wert
   /// @param altNames verwende alternative Namen, wenn vorhanden
-  /// @param pfix verwende den Prefix vor dem Namen, falls vorhanden
-  /// @param lowercase wandelt den Namen in Kleinbuchstaben
   explicit ConvToStrHint(bool print_compact, bool altNames = false) : comp(print_compact), altnam(altNames) {}
   ~ConvToStrHint() = default;
   /// \private
@@ -718,21 +716,21 @@ protected:
 /// @param t zu wandelnder Typ
 /// @param u Ergebnisrückgabe als Zahl
 /// \return true wenn Konvertierung möglich
-template<typename T> inline bool to_uint64(T t, uint64_t &u) { return false; }
+template<typename T> inline bool to_uint64(T, uint64_t &) { return false; }
 ///Template für Hilfsfunktion zum Konvertieren eines Datentyps in einen signed int
 /// @param t zu wandelnder Typ
 /// @param i Ergebnisrückgabe als Zahl
 /// \return true wenn Konvertierung möglich
-template<typename T> inline bool to_int64(T t, int64_t &i) { return false; }
+template<typename T> inline bool to_int64(T, int64_t &) { return false; }
 ///Template für Hilfsfunktion zum Konvertieren eines \c int in einen Typ t
 /// \return true wenn Konvertierung möglich
-template<typename T> inline bool from_number(int64_t, T &t) { return false; }
+template<typename T> inline bool from_number(int64_t, T &) { return false; }
 ///Template für Hilfsfunktion zum Konvertieren eines \c uint in einen Typ t
 /// \return true wenn Konvertierung möglich
-template<typename T> inline bool from_number(uint64_t, T &t) { return false; }
+template<typename T> inline bool from_number(uint64_t, T &) { return false; }
 ///Template für Hilfsfunktion zum Konvertieren eines \c double in einen Typ t
 /// \return true wenn Konvertierung möglich
-template<typename T> inline bool from_number(double, T &t) { return false; }
+template<typename T> inline bool from_number(double, T &) { return false; }
 
 
 template<> bool to_int64(int t, int64_t &i);
