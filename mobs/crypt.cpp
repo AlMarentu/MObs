@@ -740,8 +740,38 @@ std::string mobs::getKeyInfo(const std::string &filePub) {
   }
 }
 
+std::string mobs::getKeyFingerprint(const std::string &filePub) {
+  try {
+    auto key = mobs_internal::readPublicKey(filePub);
+    if (not key)
+      throw openssl_exception(LOGSTR("mobs::getKeyInfo"));
+
+    unsigned char *der{};
+    // 1. In DER-Format konvertieren (Public Key)
+    int der_len = i2d_PUBKEY(key.get(), &der);
+    if (der_len < 0) return {};
+
+    // 2. SHA-256 Hash berechnen
+    std::vector<u_char> md(EVP_MAX_MD_SIZE);
+    unsigned int md_len;
+
+    std::stringstream str;
+    if (EVP_Digest(der, der_len, &md[0], &md_len, EVP_sha256(), nullptr)) {
+      for (unsigned int i = 0; i < md_len; i++) {
+        str << std::hex << std::setw(2) << std::setfill('0') << (int)md[i];
+        if (i + 1 != md_len)
+          str << ':';
+      }
+    }
+    OPENSSL_free(der);
+    return str.str();
+  } catch (openssl_exception &) {
+    return {};
+  }
+}
+
 void mobs::deriveSharedSecret(std::vector<u_char> &cipher, const std::string &filePubPeer, const std::string &filePriv,
-  const std::string &passphrase) {
+                              const std::string &passphrase) {
   auto rsaPubKey = mobs_internal::readPublicKey(filePubPeer);
   if (not rsaPubKey)
     THROW(u8"can't load pub key");
