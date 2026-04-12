@@ -54,27 +54,24 @@ class MrpcClient : public QObject {
   Q_OBJECT
   friend class MrpcEventLoop;
 public:
-  MrpcClient(mobs::MrpcSession &clientsession);
-  ~MrpcClient();
+  explicit MrpcClient(mobs::MrpcSession &clientsession);
+  ~MrpcClient() override;
 
-  std::streamsize in_avail();
+  std::streamsize in_avail() const;
   void kill();
   void close();
   void query(const mobs::ObjectBase *queryObj);
 
-  std::string server();
+  std::string server() const;
 
   mobs::ObjectBase *lastResult() const;
   std::unique_ptr<mobs::ObjectBase> getLastResult();
   void releaseResult();
   std::ostream &outByteStream();
   std::streamsize closeOutByteStream();
+  QByteArray &getBuffer();
 
   QElapsedTimer elapsed;
-  static std::string privateKey;
-  static std::string software;
-  static std::string tmpPass;
-  static std::string keyId;
   static void setPrivateKey(const std::string &softwareName, const std::string &id, const std::string &priv, const std::string &passwd);
 
 
@@ -96,10 +93,16 @@ public Q_SLOTS:
 
 private:
   std::unique_ptr<MrpcClientData> data;
+  static std::string privateKey;
+  static std::string software;
+  static std::string tmpPass;
+  static std::string keyId;
+
   void error();
 };
 
 class MrpcEventLoopData;
+
 /** \brief Qt modaler Event-Loop der eine MRPC-Kommunikation kapselt und eine Progress-Bar anzeigt
  *
  */
@@ -136,6 +139,7 @@ public:
   std::unique_ptr<T> getResult();
 
   void waitForAnswer(int maxPercent = 0);
+
   int sequence = -1;
   bool abbruch = false;
   std::string error;

@@ -27,11 +27,9 @@
 #include "mobs/xmlread.h"
 #include "mobs/mrpcsession.h"
 #include "mobs/mrpcec.h"
+#include "mobs/crypt.h"
+#include "mobs/converter.h"
 #include "mrpcEventLoop.h"
-
-#include "crypt.h"
-
-#define ECC
 
 #if 0
 inline std::basic_ios<char> &operator<<(std::basic_ios<char> &s, QString q) {
@@ -46,9 +44,9 @@ namespace {
 class BlockIstBuf : public std::basic_streambuf<char> {
 public:
   using Base = std::basic_streambuf<char>;
-  using char_type = typename Base::char_type;
+  using char_type = Base::char_type;
   using Traits = std::char_traits<char_type>;
-  using int_type = typename Base::int_type;
+  using int_type = Base::int_type;
 
   BlockIstBuf() : Base() {}
   void addBuff(QByteArray &&move) {
@@ -61,7 +59,7 @@ public:
 
   int_type underflow() override;
 
-  inline std::streamsize avail() {
+  std::streamsize avail() {
     return showmanyc();
   }
 
@@ -106,9 +104,9 @@ BlockIstBuf::int_type BlockIstBuf::underflow() {
 class BlockOstBuf : public std::basic_streambuf<char> {
 public:
   using Base = std::basic_streambuf<char>; ///< Basis-Typ
-  using char_type = typename Base::char_type; ///< Element-Typ
+  using char_type = Base::char_type; ///< Element-Typ
   using Traits = std::char_traits<char_type>; ///< Traits-Typ
-  using int_type = typename Base::int_type; ///< zugehöriger int-Typ
+  using int_type = Base::int_type; ///< zugehöriger int-Typ
 
   /// default Konstruktor
   BlockOstBuf(QTcpSocket *sock) : Base(), socket(sock) {
@@ -154,10 +152,10 @@ std::basic_streambuf<char>::pos_type
 BlockOstBuf::seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which) {
   if (which & std::ios_base::out) {
     if ((which & std::ios_base::in) or dir != std::ios_base::cur or off != 0)
-      return pos_type(off_type(-1));
-    return pos_type(wrPos + off_type(std::distance(Base::pbase(), Base::pptr())));
+      return pos_type(static_cast<off_type>(-1));
+    return pos_type(wrPos + static_cast<off_type>(std::distance(Base::pbase(), Base::pptr())));
   }
-  return {off_type(-1)};
+  return {static_cast<pos_type>(-1)};
 }
 
 }
@@ -172,6 +170,7 @@ class MrpcEventLoopData {
       size_t current = SIZE_T_MAX;
       size_t last{};
       bool active = true;
+      QByteArray resultBuff;
     };
     std::map<const QObject*, MrpcInfo> connections;
     //std::map<std::string, std::pair<int, int>> istMaxCnt;
@@ -277,7 +276,7 @@ public:
   ssize_t attachmentSz = 0;
   std::istream *attachmentIstr = nullptr;
   int reParseCnt = 0;
-
+  QByteArray resultBuffer;
 };
 
 
@@ -305,15 +304,8 @@ MrpcClient::MrpcClient(mobs::MrpcSession &clientsession)
 MrpcClient::~MrpcClient() {
   if (data->socket->isOpen())
     data->socket->abort();
-  //disconnect(&data->readTimer, &QTimer::timeout, this, &MrpcClient::readyRead);
-  disconnect(data->socket, &QTcpSocket::connected, this, &MrpcClient::connected);
-  disconnect(data->socket, &QTcpSocket::disconnected, this, &MrpcClient::disconnected);
-  disconnect(data->socket, &QTcpSocket::readyRead, this, &MrpcClient::readyRead);
-  disconnect(this, &MrpcClient::dataAvail, this, &MrpcClient::doParse);
-  disconnect(data->socket, &QTcpSocket::bytesWritten, this, &MrpcClient::bytesWritten);
-  disconnect(data->socket, &QAbstractSocket::errorOccurred, this, &MrpcClient::errorOccurred);
-  //disconnect(data->loop, &MrpcEventLoop::mrpcKill, this, &MrpcClient::cancel);
-  //disconnect(this, &MrpcClient::requestDone, data->loop, &MrpcEventLoop::requestDone);
+  disconnect(data->socket, nullptr, nullptr, nullptr);
+  disconnect(this, nullptr, nullptr, nullptr);
 };
 
 
@@ -322,7 +314,7 @@ std::string MrpcClient::keyId;      // keyId ui privat key
 std::string MrpcClient::software;
 std::string MrpcClient::tmpPass;    // temporäre UUID zum Verschlüsseln in memory
 
-std::streamsize MrpcClient::in_avail() {
+std::streamsize MrpcClient::in_avail() const {
   return data->iBlkStr.avail();
 }
 
@@ -436,7 +428,6 @@ void MrpcClient::setPrivateKey(const std::string &softwareName, const std::strin
 void MrpcClient::connected()
 {
   LOG(LM_INFO, "connected " << data->befserverSession.server);
-#ifdef ECC
   try {
     data->xr.startSession(data->befserverSession.keyName, MrpcClient::software, MrpcClient::privateKey, MrpcClient::tmpPass, data->befserverSession.publicServerKey);
     // wait4connect aktivieren
@@ -446,14 +437,6 @@ void MrpcClient::connected()
   } catch (std::exception &e) {
     LOG(LM_ERROR, "Exception: " << e.what());
   }
-#else
-  /*bool readyRead =*/ data->parse();
-  if (data->state == MrpcClientData::WaitingCon)
-  {
-    data->state = MrpcClientData::Waiting;
-    emit requestDone(&data->xr.session->server);
-  }
-#endif
 }
 
 void MrpcClient::disconnected()
@@ -516,12 +499,13 @@ void MrpcClient::readyRead()
 
 void MrpcClient::doParse()
 {
+  bool ready = true;
   LOG(LM_DEBUG, "doParse " << int(data->state));
   try {
     if (data->state >= MrpcClientData::Ready)
        return;
     if (not data->attachmentIstr) {
-      bool ready = data->xr.parseClient();
+      ready = data->xr.parseClient();
       if (data->state == MrpcClientData::WaitingCon and data->xr.isConnected())
       {
         LOG(LM_INFO, "Connection confirmed " << data->befserverSession.keyValidTime);
@@ -576,6 +560,7 @@ void MrpcClient::doParse()
       char buf[8192+1];
       auto s = data->attachmentIstr->readsome(buf, sizeof(buf)-1);
       if (s > 0) {
+        data->resultBuffer.append(buf, static_cast<int>(s));
         buf[s] = '\0';
         auto rd = data->attachmentIstr->tellg();
         //data->reParseCnt = 0;
@@ -608,6 +593,8 @@ void MrpcClient::doParse()
     emit result(nullptr);
     data->xr.resultObj = nullptr;
   }
+  if (not ready and in_avail() + data->socket->bytesAvailable())
+    QTimer::singleShot(1, this, &MrpcClient::doParse);
 }
 
 void MrpcClient::query(const mobs::ObjectBase *queryObj)
@@ -627,8 +614,7 @@ void MrpcClient::query(const mobs::ObjectBase *queryObj)
     data->queryObj = queryObj;
 }
 
-std::string MrpcClient::server()
-{
+std::string MrpcClient::server() const {
   return data->befserverSession.server;
 }
 
@@ -645,6 +631,10 @@ std::streamsize MrpcClient::closeOutByteStream()
   return sz;
 }
 
+QByteArray& MrpcClient::getBuffer()
+{
+  return data->resultBuffer;
+}
 
 
 void MrpcClient::error() {
@@ -696,7 +686,7 @@ void MrpcEventLoop::result(const mobs::ObjectBase *obj)
     it->second.current = it->second.last;
   }
   for (auto &i:data->connections)
-    if (it->second.active)
+    if (i.second.active)
       return;
   //endProgress();
   LOG(LM_INFO, "QUIT");
@@ -795,10 +785,9 @@ std::map<std::string, std::unique_ptr<mobs::ObjectBase>> MrpcEventLoop::getResul
 {
   std::map<std::string, std::unique_ptr<mobs::ObjectBase>> result;
   for (auto &i:data->connections) {
-    auto &mrpc = *i.second.mrpc.get();
+    auto &mrpc = *i.second.mrpc;
     if (mrpc.lastResult()) {
       result.emplace(mrpc.server(), std::move(mrpc.getLastResult()));
-
     }
   }
   return result;
@@ -811,7 +800,7 @@ void MrpcEventLoop::waitForAnswer(int mp)
   if (mp > currentMaxPercent and mp < 100)
     maxPercent = mp;
   for (auto &i:data->connections) {
-    auto &mrpc = *i.second.mrpc.get();
+    auto &mrpc = *i.second.mrpc;
     mrpc.releaseResult();
     connect(&mrpc, &MrpcClient::result, this, &MrpcEventLoop::result);
     connect(this, &MrpcEventLoop::mrpcKill, &mrpc, &MrpcClient::cancel);
@@ -822,7 +811,7 @@ void MrpcEventLoop::waitForAnswer(int mp)
   exec();
   LOG(LM_DEBUG, "MRPC-LOOP ende");
   for (auto &i:data->connections) {
-    auto &mrpc = *i.second.mrpc.get();
+    auto &mrpc = *i.second.mrpc;
     disconnect(&mrpc, &MrpcClient::result, this, &MrpcEventLoop::result);
     disconnect(this, &MrpcEventLoop::mrpcKill, &mrpc, &MrpcClient::cancel);
     disconnect(&mrpc, &MrpcClient::requestDone, this, &MrpcEventLoop::requestDone);
@@ -922,6 +911,7 @@ MrpcEventLoop::~MrpcEventLoop()
 {
   loopCounter--;
   LOG(LM_INFO, "MrpcEventLoop::~MrpcEventLoop " << loopCounter);
+  disconnect(this, nullptr, nullptr, nullptr);
   endProgress();
   for (auto &i:data->connections) {
     auto &mrpc = *i.second.mrpc.get();
@@ -930,7 +920,4 @@ MrpcEventLoop::~MrpcEventLoop()
   }
   delete data;
 }
-
-
-
 

@@ -55,9 +55,13 @@ public:
   SSL_Delete() = default;
   void operator()(BIO *p);
   void operator()(OSSL_ENCODER_CTX *p);
+  void operator()(OSSL_DECODER_CTX *p);
   void operator()(EVP_PKEY *p);
   void operator()(EVP_PKEY_CTX *p);
   void operator()(EVP_CIPHER_CTX *p);
+  void operator()(EVP_MD_CTX *p);
+  void operator()(EVP_MD *p);
+  void operator()(EVP_KDF_CTX *p);
 };
 std::string openSslGetError();
 std::unique_ptr<EVP_PKEY, SSL_Delete> readPrivateKey(const std::string &file, const std::string &passphrase);

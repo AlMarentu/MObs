@@ -496,6 +496,7 @@ TEST(cryptTest, rsaCheck) {
   auto hash = mobs::getRsaFingerprint(pub);
   //std::cerr << hash << std::endl;
   EXPECT_EQ(32, hash.length());
+  cout << mobs::getKeyFingerprint(pub) << endl;
 }
 
 TEST(cryptTest, keyChange) {
@@ -510,6 +511,7 @@ TEST(cryptTest, keyChange) {
   //EXPECT_TRUE(mobs::getKeyFingerprint(pub)== mobs::getRsaFingerprint(pub2));
   EXPECT_EQ(pub, pub2);
   EXPECT_TRUE(mobs::getKeyInfo(priv, "12345") == mobs::getKeyInfo(priv2, "55555"));
+  cout << mobs::getKeyFingerprint(pub) << endl;
 }
 
 TEST(cryptTest, rsaChange) {
@@ -522,6 +524,7 @@ TEST(cryptTest, rsaChange) {
   EXPECT_TRUE(mobs::checkPasswordRsa(priv2, "55555"));
   EXPECT_TRUE(mobs::getRsaFingerprint(pub)== mobs::getRsaFingerprint(pub2));
   EXPECT_TRUE(mobs::getRsaInfo(priv, "12345") == mobs::getRsaInfo(priv2, "55555"));
+  cout << mobs::getKeyFingerprint(pub) << endl;
 }
 
 

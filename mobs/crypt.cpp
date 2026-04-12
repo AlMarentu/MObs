@@ -54,24 +54,15 @@ namespace mobs_internal {
 class SSL_Delete {
 public:
   SSL_Delete() = default;
-  // ReSharper disable once CppMemberFunctionMayBeConst
-  void operator()(BIO *p) { BIO_free_all(p); }
-  // ReSharper disable once CppMemberFunctionMayBeConst
-  void operator()(OSSL_ENCODER_CTX *p) { OSSL_ENCODER_CTX_free(p); }
-  // ReSharper disable once CppMemberFunctionMayBeConst
-  void operator()(OSSL_DECODER_CTX *p) { OSSL_DECODER_CTX_free(p); }
-  // ReSharper disable once CppMemberFunctionMayBeConst
-  void operator()(EVP_PKEY *p) { EVP_PKEY_free(p); }
-  // ReSharper disable once CppMemberFunctionMayBeConst
-  void operator()(EVP_PKEY_CTX *p) { EVP_PKEY_CTX_free(p); }
-  // ReSharper disable once CppMemberFunctionMayBeConst
-  void operator()(EVP_CIPHER_CTX *p) { EVP_CIPHER_CTX_free(p); }
-  // ReSharper disable once CppMemberFunctionMayBeConst
-  void operator()(EVP_MD_CTX *p) { EVP_MD_CTX_free(p); }
-  // ReSharper disable once CppMemberFunctionMayBeConst
-  void operator()(EVP_MD *p) { EVP_MD_free(p); }
-  // ReSharper disable once CppMemberFunctionMayBeConst
-  void operator()(EVP_KDF_CTX *p) { EVP_KDF_CTX_free(p); }
+  void operator()(BIO *p);
+  void operator()(OSSL_ENCODER_CTX *p);
+  void operator()(OSSL_DECODER_CTX *p);
+  void operator()(EVP_PKEY *p);
+  void operator()(EVP_PKEY_CTX *p);
+  void operator()(EVP_CIPHER_CTX *p);
+  void operator()(EVP_MD_CTX *p);
+  void operator()(EVP_MD *p);
+  void operator()(EVP_KDF_CTX *p);
 };
 
 std::string openSslGetError();
@@ -113,6 +104,42 @@ public:
 
 
 }
+
+// ReSharper disable once CppMemberFunctionMayBeConst
+void SSL_Delete::operator()(BIO* p)
+{ BIO_free_all(p); }
+
+// ReSharper disable once CppMemberFunctionMayBeConst
+void SSL_Delete::operator()(OSSL_ENCODER_CTX* p)
+{ OSSL_ENCODER_CTX_free(p); }
+
+// ReSharper disable once CppMemberFunctionMayBeConst
+void SSL_Delete::operator()(OSSL_DECODER_CTX* p)
+{ OSSL_DECODER_CTX_free(p); }
+
+// ReSharper disable once CppMemberFunctionMayBeConst
+void SSL_Delete::operator()(EVP_PKEY* p)
+{ EVP_PKEY_free(p); }
+
+// ReSharper disable once CppMemberFunctionMayBeConst
+void SSL_Delete::operator()(EVP_PKEY_CTX* p)
+{ EVP_PKEY_CTX_free(p); }
+
+// ReSharper disable once CppMemberFunctionMayBeConst
+void SSL_Delete::operator()(EVP_CIPHER_CTX* p)
+{ EVP_CIPHER_CTX_free(p); }
+
+// ReSharper disable once CppMemberFunctionMayBeConst
+void SSL_Delete::operator()(EVP_MD_CTX* p)
+{ EVP_MD_CTX_free(p); }
+
+// ReSharper disable once CppMemberFunctionMayBeConst
+void SSL_Delete::operator()(EVP_MD* p)
+{ EVP_MD_free(p); }
+
+// ReSharper disable once CppMemberFunctionMayBeConst
+void SSL_Delete::operator()(EVP_KDF_CTX* p)
+{ EVP_KDF_CTX_free(p); }
 
 std::string mobs_internal::openSslGetError() {
   u_long e;

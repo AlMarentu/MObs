@@ -69,20 +69,22 @@ im Mobs-Objekt verwendet werden, mit Klartext-Namen arbeiten kann
 #define MOBS_ENUM_DEF(typ, ... ) \
 enum typ { __VA_ARGS__ }; \
 class mobsEnum_##typ##_define { \
-private: \
-  static constexpr enum typ v[] = { __VA_ARGS__ }; \
-  static constexpr size_t len_v = sizeof v / sizeof(enum typ); \
 public: \
-  static size_t numOf(enum typ e) { \
-    for (size_t pos = 0; pos < len_v; pos++) \
-      if (v[pos] == e) \
-        return pos; \
-    throw std::runtime_error("enum does not exist"); \
-  } \
-  static enum typ toEnum(size_t pos) { \
-    if (pos >= len_v) \
-      throw std::runtime_error("enum out of range"); \
-    return v[pos]; } \
+static size_t numOf(enum typ e) { \
+  static const std::vector<enum typ> v = { __VA_ARGS__ }; \
+  size_t pos = 0; \
+  for (auto i:v) \
+    if (i == e) \
+      return pos; \
+    else \
+      pos++; \
+  throw std::runtime_error("enum does not exist"); \
+} \
+static enum typ toEnum(size_t pos) { \
+  static const std::vector<enum typ> v = { __VA_ARGS__ }; \
+  if (pos >= v.size()) \
+    throw std::runtime_error("enum out of range"); \
+  return v[pos]; } \
 }
 
 /// Deklaration der Ausgabewerte zu einem \c MOBS_ENUM_DEF
@@ -239,7 +241,7 @@ inline std::string to_string(unsigned long long int t) { return std::to_string(t
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
-inline std::string to_string(bool t) { return t ? u8"true":u8"false"; }
+inline std::string to_string(bool t) { return t ? "true":"false"; }
 /// \brief Konvertierung nach std::string
 /// @param t Wert
 /// @return Wert als std::string
@@ -881,25 +883,25 @@ public:
   /// \see clear()
   static T c_empty() { return mobsempty(T()); }
   /// Einlesen von int_64_t
-  static bool c_from_int(int64_t i, T &t) { return false; }
+  static bool c_from_int(int64_t , T &) { return false; }
   /// Einlesen von int_64_t
-  static bool c_from_uint(uint64_t u, T &t) { return false; }
+  static bool c_from_uint(uint64_t , T &) { return false; }
   /// Einlesen von double
-  static bool c_from_double(double d, T &t) { return false; }
+  static bool c_from_double(double , T &) { return false; }
   /// Wandeln in double
-  static bool c_to_double(T t, double &) { return false; }
+  static bool c_to_double(T , double &) { return false; }
   /// Wandeln in uint64
-  static bool c_to_uint64(T t, uint64_t &) { return false; }
+  static bool c_to_uint64(T , uint64_t &) { return false; }
   /// Wandeln in int64
-  static bool c_to_int64(T t, int64_t &) { return false; }
+  static bool c_to_int64(T , int64_t &) { return false; }
   /// Zeiger auf Byte Array
-  static bool c_to_blob(const T &t, const void *&, uint64_t &) { return false; }
+  static bool c_to_blob(const T &, const void *&, uint64_t &) { return false; }
   /// Blob einlesen
-  static bool c_from_blob(const void *p, uint64_t sz, T &) { return false; }
+  static bool c_from_blob(const void *, uint64_t , T &) { return false; }
   /// Wandeln in MTime
-  static bool c_from_mtime(int64_t i, T &t) { return false; }
+  static bool c_from_mtime(int64_t , T &) { return false; }
   /// Einlesen von MTime
-  static bool c_to_mtime(T t, int64_t &) { return false; }
+  static bool c_to_mtime(T , int64_t &) { return false; }
   /// Ausgabe enum als string
   static std::string c_to_str(int) { return {}; }
 };

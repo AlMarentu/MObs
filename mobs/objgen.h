@@ -22,13 +22,13 @@
  \brief Deklaration um die Zielklassen zu generieren */
 
 /** \mainpage MObs C++ Bibliothek
- 
+
  Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
- 
+
  Lizenztyp: LGPL
- 
+
  Die Grundbausteine:
- 
+
  Das Grundelement ist ein Objekt bestehend aus einer Klasse die von \c ObjectBase abgeleitet ist.
  Dieses Objekt kann wiederum verschiedene Objekte oder Variablen von Basistypen enthalten.
  Zusätzlich können auch Vektoren dieser beiden Typen existieren.
@@ -51,7 +51,7 @@
  class Adresse : virtual public mobs::ObjectBase {
  public:
    ObjInit(Adresse); // Makro, das alle nötigen Konstruktoren liefert
-   
+
    MemVar(std::string, strasse);
    MemVar(std::string, plz);
    MemVar(std::string, ort);
@@ -60,7 +60,7 @@
  class Person : virtual public mobs::ObjectBase {
    public:
    ObjInit(Person); // Makro, das alle nötigen Konstruktoren liefert
-   
+
    MemVar(int,            kundennr);  // int Membervariable kundennr
    MemVar(bool,           firma);     // bool Membervariable firma
    MemVar(std::string,    name);      // std::string Membervariable name
@@ -71,7 +71,7 @@
    MemEnumVector(device, kontakteWerbung); // Vektor von ENums
  };
  \endcode
- 
+
  Der Zugriff auf die Elemente dieser Klassen erfolgt über get- und set-Methoden:
  \code
  Person p;
@@ -94,7 +94,7 @@
  \see mobs::ObjTravConst
  \see mobs::ObjTrav
  \see mobs::ObjectNavigator
- 
+
  Es existieren Klassen, um solche Objekt von und nach XML oder JSON zu wandeln
 
  \code
@@ -645,7 +645,7 @@ public:
   /// @return Zeiger auf Objekt \c MemBaseVector oder \c nullptr
   MemBaseVector *getMemVec(const std::string &name, const ConvObjFromStr &cfh);
   /// \private
-  static void regObject(const std::string& n, ObjectBase *fun(ObjectBase *)) noexcept;
+  static void regObject(const char *n, ObjectBase *fun(ObjectBase *)) noexcept;
   /// \brief Erzeuge ein neues Objekt
   /// @param name Typname des Objektes
   /// @param parent  Zeiger auf Parent des Objektes, immer \c nullptr, wird nur intern verwendet
@@ -760,7 +760,7 @@ protected:
   /// \private
   void firstInit();
   /// Callback-Methode für dynamische Klassen wie z.B. MobsUnion<>
-  virtual void setType(const std::string& t) {};
+  virtual void setType(const std::string &) {};
 
   class MobsObjMemberInfo {
   public:
@@ -811,9 +811,9 @@ private:
 
 template<typename T, class C>
 /** \brief Klasse für Member-Variable zum angegeben Basistyp.
- 
+
  Diese Klasse wird normalerweise innerhalb eines Objektes, das von der Basisklasse  \c ObjectType abgeleitet wurde, verwendet.
- 
+
  Zur Deklaration bitte das Makro \c MemVar verwenden
  \see MemVar
  \code
@@ -826,7 +826,7 @@ template<typename T, class C>
      MemVar(int,         anzahlRaeder);
 }
 \endcode
-  
+
    Zulässige Typen sind:
  \arg bool
  \arg char

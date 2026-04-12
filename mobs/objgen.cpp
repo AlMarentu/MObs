@@ -235,9 +235,10 @@ std::string MemBaseVector::getNameSpace(const ConvToStrHint &cth) const {
 /////////////////////////////////////////////////
 
 std::string ObjectBase::getName(const ConvToStrHint &cth) const {
-  if (m_parent)
+  bool xroot = hasFeature(OTypeAsXRoot) != Unset;
+  if (m_parent or (not xroot and not getElementName().empty()))
     return getNameAll(m_parent, getElementName(), m_altName, m_nsName, cth);
-  if (hasFeature(OTypeAsXRoot) != Unset or cth.hasFeatureUseNamespace())
+  if (xroot or cth.hasFeatureUseNamespace())
     return getNameAll(this, getObjectName(), m_altName, m_nsName, cth);
   return {};
 }
@@ -405,12 +406,12 @@ MemBaseVector * ObjectBase::getMemVec(const std::string &name, const ConvObjFrom
   return nullptr;
 }
 
-void ObjectBase::regObject(const string& n, ObjectBase *fun(ObjectBase *)) noexcept
+void ObjectBase::regObject(const char *n, ObjectBase *fun(ObjectBase *)) noexcept
 {
   if (ObjectBase_Reg_createMap == nullptr)
-    ObjectBase_Reg_createMap = new map<string, ObjectBase *(*)(ObjectBase *)>;
+    ObjectBase_Reg_createMap = new std::map<std::string, ObjectBase *(*)(ObjectBase *)>;
 
-  ObjectBase_Reg_createMap->insert(make_pair(n, fun));
+  ObjectBase_Reg_createMap->insert(make_pair(std::string(n), fun));
 }
 
 ObjectBase *ObjectBase::createObj(const string& n, ObjectBase *p)

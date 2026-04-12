@@ -24,7 +24,6 @@
 #ifndef MOBS_MRPCEC_H
 #define MOBS_MRPCEC_H
 
-#include "xmlparser.h"
 #include "xmlread.h"
 #include "xmlwriter.h"
 #include "mrpcsession.h"
@@ -58,7 +57,7 @@ namespace mobs {
  * \endverbatim
  */
 class MrpcEc : public XmlReader {
-  enum State { fresh, getPubKey, connectingServer, connectingServerConfirmed, connectingClient, connected, readyRead, attachment, closing };
+  enum State { fresh, getPubKey, connectingServer, connectingServerConfirmed, connectingClient, clientConfirmed, connected, readyRead, attachment, closing };
 public:
   /** \brief Konstruktor für Client-Server Klasse mit Schlüsselaustausch nach Diffie-Hellman auf Basis elliptischer Kurven
    *

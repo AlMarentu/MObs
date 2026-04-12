@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include "mrpcec.h"
 #include "xmlwriter.h"
+#include "xmlparser.h"
 #include "xmlout.h"
 #include "aes.h"
 #include "crypt.h"
@@ -100,10 +101,10 @@ void MrpcSession::clear() {
 }
 
 unsigned int MrpcSession::keyValid() const {
-  if (keyValidTime <= 0)
-    return INT_MAX;
   if (not sessionId or sessionKey.empty())
     return 0;
+  if (keyValidTime <= 0)
+    return INT_MAX;
   auto now = time(nullptr);
   if (generated + keyValidTime <= now)
     return 0;
@@ -155,13 +156,15 @@ void MrpcEc::EncryptionFinished()
     LOG(LM_INFO, "connection established with wait");
     stopEncrypt();
     flush();
-    //state = readyRead;
     state = connected;
   }
   //LOG(LM_INFO, "EF " << int(state) << " " << level());
-  if (state == connected and level() == 2)
+  if (state == clientConfirmed)
+    state = connected;
+  else if (state == connected and level() == 2) {
     state = attachmentLength > 0 ? attachment : readyRead;
-  //LOG(LM_INFO, "EFS " << int(state));
+    LOG(LM_INFO, "EFS " << int(state));
+  }
   // weiteres parsen anhalten
   stop();
 }
@@ -177,9 +180,6 @@ void MrpcEc::Encrypt(const std::string &algorithm, const ObjectBase *keyInfo,
     //state = readyRead;
     state = connected;
   }
-  //else if (state == connected)
-  //state = readyRead;
-
   if (keyInfo and keyInfo->isNull() and not session->sessionKey.empty()) {
     // TODO state, da nur für Server ??
     cryptBufp = new mobs::CryptBufAes(session->sessionKey);
@@ -199,9 +199,9 @@ void MrpcEc::Encrypt(const std::string &algorithm, const ObjectBase *keyInfo,
   LOG(LM_INFO, "AGREE " << ki->AgreementMethod.Algorithm() << " " << ki->AgreementMethod.KeyDerivationMethod.Algorithm());
   if (ki->AgreementMethod.Algorithm() == "http://www.w3.org/2009/xmlenc11#ECDH-ES" and
       ki->AgreementMethod.KeyDerivationMethod.Algorithm() == "http://www.w3.org/2021/04/xmldsig-more#hkdf") {
-    std::vector<u_char> salt;
-    std::vector<u_char> info;
-    size_t size = 32;
+    //std::vector<u_char> salt;
+    //std::vector<u_char> info;
+    //size_t size = 32;
     mobs::from_string_base64(ki->AgreementMethod.OriginatorKeyInfo.KeyValue.ECKeyValue.PublicKey(), cip);
     LOG(LM_INFO, "KEY " << to_string_base64(cip));
     LOG(LM_INFO, "ALG " << ki->AgreementMethod.KeyDerivationMethod.HKDFParams.PRF.Algorithm());
@@ -240,6 +240,9 @@ void MrpcEc::filled(mobs::ObjectBase *obj, const std::string &error)
   LOG(LM_DEBUG, "filled " << obj->getObjectName() << ": " << obj->to_string(ConvObjToString().exportWoNull()) << (isEncrypted()? " OK":" UNENCRYPTED"));
   if (not error.empty())
     THROW("error in XML stream: " << error);
+  session->last = time(nullptr);
+  if (state == clientConfirmed)
+    state = connected;
   if (auto err = dynamic_cast<MrpcSessionReturnError *>(obj)) {
     LOG(LM_ERROR, "Received MrpcSessionReturnError " << err->error());
     if (resultObj) {
@@ -280,7 +283,13 @@ void MrpcEc::StartTag(const std::string &ns, const std::string &element)
 {
   LOG(LM_DEBUG, "start " << element << " s " << static_cast<int>(state));
   // Wenn passendes Tag gefunden, dann Objekt einlesen
-  if (state == connectingServer or state == connectingClient or state == getPubKey) { // ohne Login nur fixe Auswahl
+  if (element == "MrpcReset") { // Authentifizeirung zurücksetzen
+    stop(); // parser anhalten wegen Statuswechsel
+    state = fresh;
+    if (session)
+      session->clear();
+    LOG(LM_INFO, "Server Reset");
+  } else if (state == connectingServer or state == connectingClient or state == getPubKey) { // ohne Login nur fixe Auswahl
     if (element == "MrpcSessionLoginResult")
       fill(new MrpcSessionLoginResult);
     else if (element == "MrpcSessionAuth")
@@ -398,6 +407,8 @@ void MrpcEc::closeServer()
 {
   writer.writeTagEnd();
   flush();
+  if (session)
+    session->sessionId = 0; // nach dem Schließen des Servers ist die Session ungültig
 }
 
 void MrpcEc::flush()
@@ -426,7 +437,7 @@ bool MrpcEc::parseServer()
     case connectingServer:
       setMaxElementSize(4096);
       parse();
-      LOG(LM_DEBUG, "pars done " << std::boolalpha << static_cast<bool>(resultObj));
+      LOG(LM_DEBUG, "pars done c " << std::boolalpha << static_cast<bool>(resultObj));
       if (auto *sess = dynamic_cast<MrpcSessionAuth *>(resultObj.get())) {
         session->info = STRSTR(sess->login() << '@' << sess->hostname() << '/' << sess->software());
         session->keyName = sess->keyId();
@@ -502,6 +513,7 @@ bool MrpcEc::parseServer()
       //LOG(LM_INFO, "BLAH " << inByteStreamAvail());
       return inByteStreamAvail();
     case connectingClient:
+    case clientConfirmed:
     case getPubKey:
       throw std::runtime_error("error while connecting");
   }
@@ -528,7 +540,7 @@ bool MrpcEc::parseClient()
       session->sessionId = sess->sessId();
       session->sessionReuseTime = sess->sessionReuseTime();
       session->keyValidTime = sess->sessionKeyValidTime();
-      state = connected;
+      state = clientConfirmed;
       resultObj = nullptr;
     }
   }
@@ -545,6 +557,7 @@ bool MrpcEc::parseClient()
   bool ret = state == readyRead;
   if (ret)
     state = connected;
+  LOG(LM_DEBUG, "parseClient " << static_cast<int>(state) << " ret = " << std::boolalpha << ret);
   return ret;
 }
 
@@ -681,7 +694,7 @@ void MrpcEc::setEcdhSessionKey(const std::vector<u_char> &cipher, const std::str
 
 bool MrpcEc::isConnected() const
 {
-  return state == connected or state == readyRead or state == connectingServerConfirmed or state == attachment;
+  return state == connected or state == readyRead or state == connectingServerConfirmed or state == clientConfirmed or state == attachment;
 }
 
 
