@@ -65,9 +65,9 @@ public:
      *
      * @param tag Name des Elements/des Objektes
      */
-    Tag(const std::string &tag) noexcept : t(tag) {}; // NOLINT(*-explicit-constructor)
+    Tag(std::string tag) noexcept : t(std::move(tag)) {}; // NOLINT(*-explicit-constructor)
   private:
-    const std::string &t;
+    const std::string t;
   };
   /** \brief Operatoren für die JSON-Ausgabe, die Objekte sowie Array beginnen oder beenden
    *
