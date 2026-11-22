@@ -1,18 +1,17 @@
 cmake_minimum_required(VERSION 3.13)
-project(MObs LANGUAGES CXX)
-project(MObs VERSION 0.3.0)
+project(MObs VERSION 0.3.0 LANGUAGES CXX)
 
 # alternative OpenSSL
 if(APPLE)
     # homebrew Version
-    set (CMAKE_PREFIX_PATH /usr/local/opt/openssl)
+    #set (CMAKE_PREFIX_PATH /usr/local/opt/openssl)
 elseif(WIN32)
     # https://curl.se/windows/dl-7.76.1/openssl-1.1.1k-win32-mingw.zip
     # set (CMAKE_PREFIX_PATH "C:/openssl-1.1.1k-win32-mingw")
 endif()
 message(STATUS "CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}")
 
-option(BUILD_SHARED_LIBS "Build shared lib" OFF)
+option(BUILD_SHARED_LIBS "Build shared lib" ON)
 option(PACKAGE_TESTS "Build the tests" ON)
 option(BUILD_DOC "Build Documentation" OFF)
 option(BUILD_MONGO_INTERFACE "Build the Mongo database modules" ON)

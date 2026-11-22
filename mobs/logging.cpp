@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2025 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -23,13 +23,14 @@
 #include <iomanip>
 #include <cstring>
 #include "logging.h"
+#include "mchrono.h"
 
-#ifdef __MINGW32__
-typedef unsigned char u_char;
-#else
+#ifndef __MINGW32__
 #include <fcntl.h>
 #include <unistd.h>
 #endif
+
+using u_char = unsigned char;
 
 /*! \def PARAM(x)
  \brief Hilfs-Makro für TRACE, stellt Parameternamen vor Inhalt.
@@ -46,6 +47,12 @@ typedef unsigned char u_char;
 namespace logging {
 
 loglevel currentLevel = lm_trace;
+
+std::function<void(char logType, const std::string &)> logFileCallback = nullptr;
+
+void logWithTime(char logType, const std::string &text) {
+  std::cerr << mobs::to_string_ansi(mobs::MTimeNow(), mobs::MTimeFract::MF3) << ' ' << logType << ' ' << text << std::endl;
+}
 
 
 /// \brief Logmeldung ausgeben, interne Funktion, bitte Makro LOG() verwenden
@@ -65,9 +72,9 @@ void logMessage(loglevel l, const std::function<std::string()>& message)
     case lm_info: c = 'I'; break;
     case lm_error: c = 'E'; break;
     case lm_warn: c = 'W'; break;
+    case lm_none: return;
   }
   std::stringstream out;
-  out << c << ' ';
   for (auto i:message()) {
     switch(i) {
       case '\n': out << "<NL>"; break;
@@ -78,7 +85,10 @@ void logMessage(loglevel l, const std::function<std::string()>& message)
       default: out << i;
     }
   }
-  std::cerr << out.str() << std::endl;
+  if (logFileCallback)
+    logFileCallback(c, out.str());
+  else
+    std::cerr << c << ' ' << out.str() << std::endl;
 }
 
 

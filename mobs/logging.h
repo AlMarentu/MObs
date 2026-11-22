@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2024 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -47,16 +47,28 @@
 
 namespace logging {
 
-/// Log-Lebel, bitte Makros verwenden
+/// Log-Level, bitte im LOG-Makro die defines LM_DEBUG, LM_INFO, LM_WARNING und LM_ERROR verwenden
 typedef enum {
   lm_trace = 1,
   lm_debug = 2,
   lm_info  = 3,
   lm_warn  = 4,
-  lm_error = 5
+  lm_error = 5,
+  lm_none = 6 ///< ausschließlich zum Abschalten des Logs
 } loglevel;
 
-extern loglevel currentLevel;
+extern loglevel currentLevel; ///< Level ab dem geloggt werden soll; bei lm_none erfolgt kein logging
+
+extern std::function<void(char logType, const std::string &)> logFileCallback; ///< Callback für alternative LOG-Ausgabe; default = nullptr
+
+
+/** \brief Alternitive Log-Funktion mit Ausgabe der Zeit auf stderr
+ *
+ * @param logType Typ der Meldunf 'T'race, 'D'ebug, 'I'nfo, 'W'arning, 'E'rror
+ * @param text Log-Text aus dem LOG-Makro
+ */
+void logWithTime(char logType, const std::string &text);
+
 
 /// Interne Klasse für Tracing, bitte Makro TRACE verwenden
 class Trace {
@@ -109,16 +121,16 @@ public:
   LogMultiBuf(const LogMultiBuf &) = delete;
   LogMultiBuf &operator=(const LogMultiBuf &) = delete;
   ~LogMultiBuf() override;
+  protected:
   /// \private
   int_type overflow(int_type ch) override;
 
-protected:
   /// \private
   int sync() override;
 
 private:
   FileMultiLog log;
-  std::array<char_type, 1024> buffer;
+  std::array<char_type, 1024> buffer {};
 };
 
 /// stream für FileMultiLog
