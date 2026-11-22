@@ -229,7 +229,7 @@ static void exportPrivateKeyToFile(const EVP_PKEY *pkey, const std::string &file
   if (not ectx or not bp_private)
     throw openssl_exception(LOGSTR("mobs::exportPrivateKeyToFile no suitable potential encoders found"));
   if (not passphrase.empty()) {
-    OSSL_ENCODER_CTX_set_passphrase(ectx.get(), (const unsigned char *)passphrase.c_str(), passphrase.length());
+    OSSL_ENCODER_CTX_set_passphrase(ectx.get(), reinterpret_cast<const unsigned char *>(passphrase.c_str()), passphrase.length());
     //OSSL_ENCODER_CTX_set_cipher(ectx.get(), "AES-256-CBC", nullptr);
     OSSL_ENCODER_CTX_set_cipher(ectx.get(), "DES-EDE3-CBC", nullptr);
   }
@@ -270,7 +270,7 @@ static std::string exportPrivateKey(const EVP_PKEY *pkey, const std::string &pas
   size_t datalen;
   if (not OSSL_ENCODER_to_data(ectx.get(), &data, &datalen))
     throw openssl_exception(LOGSTR("mobs::exportPrivateKey write failed"));
-  auto mem = std::string((char *)data, datalen);
+  auto mem = std::string(reinterpret_cast<char *>(data), datalen);
   free(data);
   return mem;
 }
@@ -288,7 +288,7 @@ static std::string exportPublicKey(const EVP_PKEY *pkey, const char *format = "P
   size_t datalen;
   if (not OSSL_ENCODER_to_data(ectx.get(), &data, &datalen))
     throw openssl_exception(LOGSTR("mobs::exportPublicKey write failed"));
-  auto mem = std::string((char *)data, datalen);
+  auto mem = std::string(reinterpret_cast<char *>(data), datalen);
   free(data);
   return mem;
 }
@@ -307,7 +307,7 @@ static void exportPublicKey(const EVP_PKEY *pkey, std::vector<u_char> &key)
   if (not OSSL_ENCODER_to_data(ectx.get(), &data, &datalen))
     throw openssl_exception(LOGSTR("mobs::exportPublicKey write failed"));
   key.reserve(datalen);
-  std::copy_n((char *)data, datalen, std::back_inserter(key));
+  std::copy_n(reinterpret_cast<char *>(data), datalen, std::back_inserter(key));
   free(data);
 }
 
@@ -436,7 +436,7 @@ std::string mobs::getPublicKey(const std::vector<u_char> &data) {
   if (not ectx)
     throw openssl_exception(LOGSTR(R"(mobs::getPublicKey no suitable potential encoders found)"));
   size_t len = data.size();
-  const unsigned char *p = &data[0];
+  const unsigned char *p = data.data();
   if (not OSSL_DECODER_from_data(ectx.get(), &p, &len))
     throw openssl_exception(LOGSTR("mobs::getPublicKey read failed"));
 
@@ -478,7 +478,7 @@ mobs::decryptPublic(const std::vector<u_char> &cipher, std::vector<u_char> &sess
   //if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0)
   //  throw openssl_exception(LOGSTR("mobs::decryptPublicRsa"));
   size_t sz = sessionKey.size();
-  if (EVP_PKEY_verify_recover(ctx.get(), &sessionKey[0], &sz, &cipher[0], cipher.size()) <= 0)
+  if (EVP_PKEY_verify_recover(ctx.get(), sessionKey.data(), &sz, cipher.data(), cipher.size()) <= 0)
     throw openssl_exception(LOGSTR("mobs::decryptPublicRsa"));
   sessionKey.resize(sz);
 }
@@ -504,7 +504,7 @@ mobs::encryptPrivate(const std::vector<u_char> &sessionKey, std::vector<u_char> 
   //if (EVP_PKEY_CTX_set_signature_md(ctx.get(), EVP_sha256()) <= 0)
   //  throw openssl_exception(LOGSTR("mobs::encryptPrivateRsa"));
   size_t sz = cipher.size();
-  if (EVP_PKEY_sign(ctx.get(), &cipher[0], &sz, &sessionKey[0], sessionKey.size()) <= 0)
+  if (EVP_PKEY_sign(ctx.get(), cipher.data(), &sz, sessionKey.data(), sessionKey.size()) <= 0)
     throw openssl_exception(LOGSTR("mobs::encryptPrivateRsa"));
 }
 
@@ -528,7 +528,7 @@ mobs::decryptPrivate(const std::vector<u_char> &cipher, std::vector<u_char> &ses
   if (EVP_PKEY_CTX_set_rsa_padding(ctx.get(), RSA_PKCS1_OAEP_PADDING) <= 0)
     throw openssl_exception(LOGSTR("mobs::decryptPrivateRsa"));
   size_t sz = sessionKey.size();
-  if (EVP_PKEY_decrypt(ctx.get(), &sessionKey[0], &sz, &cipher[0], cipher.size()) <= 0)
+  if (EVP_PKEY_decrypt(ctx.get(), sessionKey.data(), &sz, cipher.data(), cipher.size()) <= 0)
     throw openssl_exception(LOGSTR("mobs::decryptPrivateRsa"));
   sessionKey.resize(sz);
 }
@@ -553,7 +553,7 @@ mobs::encryptPublic(const std::vector<u_char> &sessionKey, std::vector<u_char> &
   if (EVP_PKEY_CTX_set_rsa_padding(ctx.get(), RSA_PKCS1_OAEP_PADDING) <= 0)
     throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
   size_t sz = cipher.size();
-  if (EVP_PKEY_encrypt(ctx.get(), &cipher[0], &sz, &sessionKey[0], sessionKey.size()) <= 0)
+  if (EVP_PKEY_encrypt(ctx.get(), cipher.data(), &sz, sessionKey.data(), sessionKey.size()) <= 0)
     throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
 }
 
@@ -583,7 +583,7 @@ mobs::digestSign(const std::vector<u_char> &buffer, std::vector<u_char> &cipher,
     throw openssl_exception(LOGSTR("mobs::digestSign"));
   cipher.resize(1024);
   size_t sz = cipher.size();
-  if (1 != EVP_DigestSign(mdCtx.get(), &cipher[0], &sz, &buffer[0], buffer.size()))
+  if (1 != EVP_DigestSign(mdCtx.get(), cipher.data(), &sz, buffer.data(), buffer.size()))
     throw openssl_exception(LOGSTR("mobs::digestSign"));
   cipher.resize(sz);
 }
@@ -599,7 +599,7 @@ mobs::digestVerify(const std::vector<u_char> &buffer, const std::vector<u_char> 
     throw openssl_exception(LOGSTR("mobs::digestVerify"));
   if (1 != EVP_DigestVerifyInit(mdCtx.get(), nullptr, md, nullptr,  eckey.get()))
     throw openssl_exception(LOGSTR("mobs::digestVerify"));
-  int ret = EVP_DigestVerify(mdCtx.get(), &cipher[0], cipher.size(), &buffer[0], buffer.size());
+  int ret = EVP_DigestVerify(mdCtx.get(), cipher.data(), cipher.size(), buffer.data(), buffer.size());
   if (ret == 1)
     return true;
   if (ret == 0)
@@ -629,7 +629,7 @@ mobs::encapsulatePublic(std::vector<u_char> &cipher, std::vector<u_char> &key, c
      if (EVP_PKEY_encapsulate_init(ctx.get(), nullptr) <= 0)
       throw openssl_exception(LOGSTR("mobs::encapsulatePublic"));
   } else {
-#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR >= 2
+#if OPENSSL_VERSION_MAJOR >= 3 || (OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR >= 2)
     if (not rsaPrivKey)
       THROW(u8"can't load priv key");
     // EVP_PKEY_ML_KEM "ML-KEM"
@@ -649,7 +649,7 @@ mobs::encapsulatePublic(std::vector<u_char> &cipher, std::vector<u_char> &key, c
     throw openssl_exception(LOGSTR("mobs::encapsulatePublic"));
   cipher.resize(outlen);
   key.resize(keylen);
-  if (EVP_PKEY_encapsulate(ctx.get(), &cipher[0], &outlen, &key[0], &keylen) <= 0)
+  if (EVP_PKEY_encapsulate(ctx.get(), cipher.data(), &outlen, key.data(), &keylen) <= 0)
     throw openssl_exception(LOGSTR("mobs::encapsulatePublic"));
 
 
@@ -671,7 +671,7 @@ mobs::decapsulatePublic(const std::vector<u_char> &cipher, std::vector<u_char> &
     if (EVP_PKEY_decapsulate_init(ctx.get(), nullptr) <= 0)
       throw openssl_exception(LOGSTR("mobs::decapsulatePublic"));
   } else {
-#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR >= 2
+#if OPENSSL_VERSION_MAJOR >= 3 || (OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR >= 2)
     if (not rsaPubKey)
       THROW(u8"can't load pub key");
     if (EVP_PKEY_is_a(rsaPrivKey.get(), "RSA")) {
@@ -685,10 +685,10 @@ mobs::decapsulatePublic(const std::vector<u_char> &cipher, std::vector<u_char> &
 #endif
   }
   size_t secretLen = 0;
-  if (EVP_PKEY_decapsulate(ctx.get(), nullptr, &secretLen, &cipher[0], cipher.size()) <= 0)
+  if (EVP_PKEY_decapsulate(ctx.get(), nullptr, &secretLen, cipher.data(), cipher.size()) <= 0)
     throw openssl_exception(LOGSTR("mobs::decapsulatePublic"));
   key.resize(secretLen);
-  if (EVP_PKEY_decapsulate(ctx.get(), &key[0], &secretLen, &cipher[0], cipher.size()) <= 0)
+  if (EVP_PKEY_decapsulate(ctx.get(), &key[0], &secretLen, cipher.data(), cipher.size()) <= 0)
     key.clear();
 }
 
@@ -783,9 +783,9 @@ std::string mobs::getKeyFingerprint(const std::string &filePub) {
     unsigned int md_len;
 
     std::stringstream str;
-    if (EVP_Digest(der, der_len, &md[0], &md_len, EVP_sha256(), nullptr)) {
+    if (EVP_Digest(der, der_len, md.data(), &md_len, EVP_sha256(), nullptr)) {
       for (unsigned int i = 0; i < md_len; i++) {
-        str << std::hex << std::setw(2) << std::setfill('0') << (int)md[i];
+        str << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(md[i]);
         if (i + 1 != md_len)
           str << ':';
       }
@@ -823,7 +823,7 @@ void mobs::deriveSharedSecret(std::vector<u_char> &cipher, const std::string &fi
   if (EVP_PKEY_derive(ctx.get(), nullptr, &outlen) <= 0)
     throw openssl_exception(LOGSTR("mobs::deriveSharedSecret"));
   cipher.resize(outlen);
-  if (EVP_PKEY_derive(ctx.get(), &cipher[0], &outlen) <= 0)
+  if (EVP_PKEY_derive(ctx.get(), cipher.data(), &outlen) <= 0)
     throw openssl_exception(LOGSTR("mobs::deriveSharedSecret"));
 }
 
@@ -856,7 +856,7 @@ void mobs::ecdhGenerate(std::vector<u_char> &secret, std::vector<u_char> &epheme
   if (EVP_PKEY_derive(ctx.get(), nullptr, &outlen) <= 0)
     throw openssl_exception(LOGSTR("mobs::ecdhGenerate"));
   secret.resize(outlen);
-  if (EVP_PKEY_derive(ctx.get(), &secret[0], &outlen) <= 0)
+  if (EVP_PKEY_derive(ctx.get(), secret.data(), &outlen) <= 0)
     throw openssl_exception(LOGSTR("mobs::ecdhGenerate"));
 
   exportPublicKey(peerKey.get(), ephemeralPubKey);
@@ -879,21 +879,21 @@ void mobs::hashHkdf(std::vector<u_char> &out, const std::vector<u_char> &secret,
 
   // 3. Parameter definieren (Digest, Key, Salt, Info)
   *p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST, const_cast<char *>(digest.c_str()), 0);
-  *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY, const_cast<u_char *>(&secret[0]), secret.size());
+  *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY, const_cast<u_char *>(secret.data()), secret.size());
   if (not salt.empty())
-    *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT, const_cast<u_char *>(&salt[0]), salt.size());
+    *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT, const_cast<u_char *>(salt.data()), salt.size());
   else
     *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT, const_cast<char *>(""), 0);
 
   if (not info.empty())
-    *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO, const_cast<u_char *>(&info[0]), info.size());
+    *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO, const_cast<u_char *>(info.data()), info.size());
   else
     *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO, const_cast<char *>(""), 0);
   *p = OSSL_PARAM_construct_end();
 
   // 4. Schlüssel ableiten
   out.resize(length);
-  if (EVP_KDF_derive(kctx.get(), &out[0], out.size(), params) <= 0) {
+  if (EVP_KDF_derive(kctx.get(), out.data(), out.size(), params) <= 0) {
     out.clear();
     throw openssl_exception(LOGSTR("mobs::hashHkdf"));
   }

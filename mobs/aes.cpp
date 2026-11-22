@@ -75,13 +75,13 @@ public:
     // plaintext. We use a single iteration (the 6th parameter).
 //    key.fill(0);
 //    iv.fill(0);
-    if (not EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha1(), &salt[0], (u_char*)passwd.c_str(), int(passwd.length()), 1, &key[0], &iv[0]))
+    if (not EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha1(), salt.data(), (u_char*)passwd.c_str(), int(passwd.length()), 1, key.data(), iv.data()))
       throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
   }
 
   void newSalt()
   {
-    int r = RAND_bytes(&salt[0], int(salt.size()));
+    int r = RAND_bytes(salt.data(), int(salt.size()));
     if (r < 0)
       throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
   }
@@ -98,7 +98,7 @@ public:
 
   std::array<mobs::CryptBufAes::char_type, INPUT_BUFFER_LEN + EVP_MAX_BLOCK_LENGTH> buffer;
   std::array<u_char, INPUT_BUFFER_LEN + EVP_MAX_BLOCK_LENGTH> inputBuf; // NOLINT(cppcoreguidelines-pro-type-member-init)
-  u_char *inputStart = &inputBuf[0];
+  u_char *inputStart = inputBuf.data();
   std::array<u_char, 8> salt{};
   std::array<u_char, KEYBUFLEN> iv{};
   std::array<u_char, KEYBUFLEN> key{};
@@ -133,7 +133,7 @@ void mobs::CryptBufAes::hashAlgorithm(const std::string &algo) {
 }
 
 void mobs::CryptBufAes::getRand(std::vector<u_char> &rand) {
-  int r = RAND_bytes(&rand[0], int(rand.size()));
+  int r = RAND_bytes(rand.data(), int(rand.size()));
   if (r < 0)
     throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
 }
@@ -152,8 +152,8 @@ mobs::CryptBufAes::CryptBufAes(const std::vector<u_char> &key, const std::vector
   data = std::unique_ptr<CryptBufAesData>(new mobs::CryptBufAesData);
   data->id = id;
   data->initIV = writeIV;
-  memcpy(&data->key[0], &key[0], std::min(key.size(), sizeof(data->key)));
-  memcpy(&data->iv[0], &iv[0], std::min(iv.size(), sizeof(data->iv)));
+  std::copy_n(key.data(), std::min(key.size(), sizeof(data->key)), data->key.data());
+  std::copy_n(iv.data(),  std::min(iv.size(), sizeof(data->iv)), data->iv.data());
 }
 
 mobs::CryptBufAes::CryptBufAes(const std::vector<u_char> &key, const std::string &id) {
@@ -161,7 +161,7 @@ mobs::CryptBufAes::CryptBufAes(const std::vector<u_char> &key, const std::string
   data = std::unique_ptr<CryptBufAesData>(new mobs::CryptBufAesData);
   data->id = id;
   data->initIV = true;
-  memcpy(&data->key[0], &key[0], std::min(key.size(), sizeof(data->key)));
+  std::copy_n(key.data(), std::min(key.size(), sizeof(data->key)), data->key.data());
 }
 
 mobs::CryptBufAes::~CryptBufAes() {
@@ -218,7 +218,7 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::underflow() {
 
 int mobs::CryptBufAes::underflowWorker(bool nowait) {
   int len;
-  std::streamsize sz = std::distance(&data->inputBuf[0], data->inputStart);
+  std::streamsize sz = std::distance(data->inputBuf.data(), data->inputStart);
   do
   {
     auto maxFree = std::streamsize(data->inputBuf.size()) - EVP_MAX_BLOCK_LENGTH - sz;
@@ -236,7 +236,7 @@ int mobs::CryptBufAes::underflowWorker(bool nowait) {
     sz += n;
   } while (sz < std::streamsize(data->inputBuf.size()) / 2); // Buffer wenigstens halb voll kriegen
   {
-    u_char *start = &data->inputBuf[0];
+    u_char *start = data->inputBuf.data();
     if (not data->ctx) {
 //        LOG(LM_INFO, "AES init");
       if (data->initIV) {
@@ -246,11 +246,11 @@ int mobs::CryptBufAes::underflowWorker(bool nowait) {
             return 0;
           THROW("data missing");
         }
-        memcpy(&data->iv[0], start, is);
+        std::copy_n(start, is, data->iv.data());
         start += is;
         sz -= is;
-      } else if (data->salted and sz >= 16 and std::string((char *) &data->inputBuf[0], 8) == "Salted__") {
-        memcpy(&data->salt[0], start + 8, 8);
+      } else if (data->salted and sz >= 16 and std::string((char *) data->inputBuf.data(), 8) == "Salted__") {
+        std::copy_n(start + 8, 8, data->salt.data());
         start += 16;
         sz -= 16;
         data->initAES();
@@ -260,13 +260,13 @@ int mobs::CryptBufAes::underflowWorker(bool nowait) {
 
       if (not(data->ctx = EVP_CIPHER_CTX_new()))
         throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
-      if (1 != EVP_DecryptInit_ex(data->ctx, EVP_aes_256_cbc(), nullptr, &data->key[0], &data->iv[0]))
+      if (1 != EVP_DecryptInit_ex(data->ctx, EVP_aes_256_cbc(), nullptr, data->key.data(), data->iv.data()))
         throw openssl_exception(LOGSTR(""));
       data->md_init();
       data->initIV = false;
     }
-    data->inputStart = &data->inputBuf[0];
-    if (1 != EVP_DecryptUpdate(data->ctx, (u_char *) &data->buffer[0], &len, start, int(sz)))
+    data->inputStart = data->inputBuf.data();
+    if (1 != EVP_DecryptUpdate(data->ctx, (u_char *) data->buffer.data(), &len, start, int(sz)))
       throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
   }
   if (data->finished) {
@@ -280,15 +280,15 @@ int mobs::CryptBufAes::underflowWorker(bool nowait) {
     data->ctx = nullptr;
   }
   if (data->mdctx) {
-    EVP_DigestUpdate(data->mdctx, &data->buffer[0], len);
+    EVP_DigestUpdate(data->mdctx, data->buffer.data(), len);
     if (data->finished) {
       data->md_value.resize(EVP_MAX_MD_SIZE);
       u_int md_len;
-      EVP_DigestFinal_ex(data->mdctx, &data->md_value[0], &md_len);
+      EVP_DigestFinal_ex(data->mdctx, data->md_value.data(), &md_len);
       data->md_value.resize(md_len);
     }
   }
-  Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[len]);
+  Base::setg(data->buffer.data(), data->buffer.data(), data->buffer.data() + len);
   data->inPos += len;
   return len;
 }
@@ -302,7 +302,7 @@ void mobs::CryptBufAes::ctxInit() {
     }
     if (not (data->ctx = EVP_CIPHER_CTX_new()))
       throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
-    if (1 != EVP_EncryptInit_ex(data->ctx, EVP_aes_256_cbc(), nullptr, &data->key[0], &data->iv[0]))
+    if (1 != EVP_EncryptInit_ex(data->ctx, EVP_aes_256_cbc(), nullptr, data->key.data(), data->iv.data()))
       throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
     data->md_init();
   }
@@ -321,7 +321,7 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::overflow(mobs::CryptBufAes::int_t
       if (data->initIV) {
         data->initIV = false;
         ofs = int(iv_size());
-        memcpy(&buf[0], &data->iv[0], ofs);
+        std::copy_n(data->iv.data(), ofs, buf.data());
       }
       if (data->mdctx)
         EVP_DigestUpdate(data->mdctx, (u_char *) Base::pbase(), std::distance(Base::pbase(), Base::pptr()));
@@ -336,7 +336,7 @@ mobs::CryptBufAes::int_type mobs::CryptBufAes::overflow(mobs::CryptBufAes::int_t
         throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
 //    CSBLOG(LM_DEBUG, "Writing " << len << "  was " << std::distance(Base::pbase(), Base::pptr()));
       len += ofs;
-      doWrite((char *) (&buf[0]), len);
+      doWrite((char *) (buf.data()), len);
 //      std::cout << "overflow2 schreibe " << std::distance(Base::pbase(), Base::pptr()) << "\n";
 
       CryptBufBase::setp(data->buffer.begin(), data->buffer.end()); // buffer zurücksetzen
@@ -359,23 +359,23 @@ void mobs::CryptBufAes::finalize() {
   ctxInit();
   if (data->initIV) {
     data->initIV = false;
-    doWrite((char *)(&data->iv[0]), iv_size());
+    doWrite((char *)(data->iv.data()), iv_size());
   }
   pubsync();
   if (data->ctx) {
     std::array<u_char, EVP_MAX_BLOCK_LENGTH> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
     int len;
-    if (1 != EVP_EncryptFinal_ex(data->ctx, &buf[0], &len))
+    if (1 != EVP_EncryptFinal_ex(data->ctx, buf.data(), &len))
       throw openssl_exception(LOGSTR("mobs::CryptBufAes"));
 //    EVP_CIPHER_CTX_reset(data->ctx);
     EVP_CIPHER_CTX_free(data->ctx);
     data->ctx = nullptr;
     //CSBLOG(LM_DEBUG, "Writing. " << len);
-    doWrite(reinterpret_cast<char *>(&buf[0]), len);
+    doWrite(reinterpret_cast<char *>(buf.data()), len);
     if (data->mdctx) {
       data->md_value.resize(EVP_MAX_MD_SIZE);
       u_int md_len;
-      EVP_DigestFinal_ex(data->mdctx, &data->md_value[0], &md_len);
+      EVP_DigestFinal_ex(data->mdctx, data->md_value.data(), &md_len);
       data->md_value.resize(md_len);
     }
   }
@@ -386,7 +386,7 @@ void mobs::CryptBufAes::openSalt() {
   TRACE("");
   data->newSalt();
   doWrite("Salted__", 8);
-  doWrite(reinterpret_cast<char *>(&data->salt[0]), data->salt.size());
+  doWrite(reinterpret_cast<char *>(data->salt.data()), data->salt.size());
   //CSBLOG(LM_DEBUG, "Writing salt " << 8 + data->salt.size());
 }
 

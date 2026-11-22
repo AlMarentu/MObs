@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2025 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -87,7 +87,7 @@ mobs::CryptBufNone::int_type mobs::CryptBufNone::underflow() {
 }
 
 std::streamsize mobs::CryptBufNone::underflowWorker(bool nowait) {
-  std::streamsize sz = std::distance(&data->inputBuf[0], data->inputStart);
+  std::streamsize sz = std::distance(data->inputBuf.data(), data->inputStart);
   do {
     auto maxFree = std::streamsize(data->inputBuf.size()) - sz;
     std::streamsize s = nowait ? canRead() : maxFree;
@@ -103,8 +103,8 @@ std::streamsize mobs::CryptBufNone::underflowWorker(bool nowait) {
     data->inputStart += n;
     sz += n;
   } while (sz < static_cast<std::streamsize>(data->inputBuf.size() / 2)); // Buffer wenigstens halb voll kriegen
-  data->inputStart = &data->inputBuf[0];
-  Base::setg(&data->inputBuf[0], &data->inputBuf[0], &data->inputBuf[sz]);
+  data->inputStart = data->inputBuf.data();
+  Base::setg(data->inputBuf.data(), data->inputBuf.data(), data->inputBuf.data() + sz);
   return sz;
 }
 

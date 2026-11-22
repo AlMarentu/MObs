@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -74,7 +74,7 @@ public:
   std::streamsize readBuf(bool nowait) {
     if (fd == invalidSocket or bad)
       return 0;
-    auto res = recv(fd, &rdBuf[0], int(rdBuf.size()), MSG_NOSIGNAL | (nowait? MSG_DONTWAIT: 0)); // immer < INT_MAX
+    auto res = recv(fd, rdBuf.data(), int(rdBuf.size()), MSG_NOSIGNAL | (nowait? MSG_DONTWAIT: 0)); // immer < INT_MAX
     if (res < 0) {
       if (not nowait or errno != EAGAIN) {
         LOG(LM_ERROR, "read error " << errno << " " << strerror(errno));
@@ -83,9 +83,9 @@ public:
       return 0;
     }
 //    if (res < 200)
-//      LOG(LM_DEBUG, "READ TCP " << res << " " << std::string(&rdBuf[0], res));
+//      LOG(LM_DEBUG, "READ TCP " << res << " " << std::string(rdBuf.data(), res));
 //    else
-//      LOG(LM_INFO, "READ TCP " << res << " " << std::string(&rdBuf[0], 100) << " ... " << std::string(&rdBuf[res-100], 100));
+//      LOG(LM_INFO, "READ TCP " << res << " " << std::string(rdBuf.data(), 100) << " ... " << std::string(rdBuf.data() + (res-100), 100));
 //    LOG(LM_DEBUG, "READ TCP " << res);
     rdPos += SocketStBuf::off_type(res);
     return res;
@@ -96,7 +96,7 @@ public:
       bad = true;
     if (bad)
       return;
-    SocketStBuf::char_type *cp = &wrBuf[0];
+    SocketStBuf::char_type *cp = wrBuf.data();
     while (sz > 0) {
       auto res = send(fd, cp, int(sz), MSG_NOSIGNAL); // buffersize immer < INT_MAX
       LOG(LM_DEBUG, "WRITE TCP " << res );
@@ -184,7 +184,7 @@ std::streamsize SocketStBuf::showmanyc() {
   auto sz = data->readBuf(true);
   if (bad())
     return -1;
-  Base::setg(&data->rdBuf[0], &data->rdBuf[0], &data->rdBuf[sz]);
+  Base::setg(data->rdBuf.data(), data->rdBuf.data(), data->rdBuf.data() + sz);
   return sz;
 }
 
@@ -197,7 +197,7 @@ SocketStBuf::int_type SocketStBuf::underflow() {
     sz = data->readBuf(false);
     LOG(LM_DEBUG, "SocketStBuf::underflow DONE " << sz);
   }
-  Base::setg(&data->rdBuf[0], &data->rdBuf[0], &data->rdBuf[sz]);
+  Base::setg(data->rdBuf.data(), data->rdBuf.data(), data->rdBuf.data() + sz);
   if (sz == 0)
     return Traits::eof();
   return Traits::to_int_type(*Base::gptr());

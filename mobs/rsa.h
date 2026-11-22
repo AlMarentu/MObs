@@ -38,6 +38,8 @@ namespace mobs {
 
 class CryptBufRsaData;
 
+using u_char = unsigned char;
+
 /** \brief Stream-Buffer zur Basisklasse CryptBufBase mit RSA-Verschlüsselung
  *
  * Dient als Plugin für mobs::CryptIstrBuf oder mobs::CryptOstrBuf

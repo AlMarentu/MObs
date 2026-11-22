@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2024 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -30,10 +30,6 @@
 #include <vector>
 #include <memory>
 
-#ifdef __MINGW32__
-typedef unsigned char u_char;
-#endif
-
 namespace mobs {
 
 class CryptBufAesData;
@@ -54,6 +50,8 @@ public:
   using char_type = typename Base::char_type;  ///< Element-Typ
   using Traits = std::char_traits<char_type>; ///< Traits-Typ
   using int_type = typename Base::int_type; ///< zugehöriger int-Typ
+  using u_char = unsigned char;
+
 
   /** \brief Konstruktor für Verschlüsselung mit AES-256
    *

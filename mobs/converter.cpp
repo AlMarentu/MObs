@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2025 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -38,7 +38,8 @@
 #include <random>
 #include <iomanip>
 #include <regex>
-#include <cwchar>
+//#include <cwchar>
+#include <cassert>
 
 
 using namespace std;
@@ -55,12 +56,12 @@ wchar_t to_iso_8859_1(wchar_t c) {
 
 wchar_t to_iso_8859_9(wchar_t c) {
   switch (c) {
-    case 0x011E: return wchar_t(0xD0); //     LATIN CAPITAL LETTER G WITH BREVE
-    case 0x0130: return wchar_t(0xDD); //     LATIN CAPITAL LETTER I WITH DOT ABOVE
-    case 0x015E: return wchar_t(0xDE); //     LATIN CAPITAL LETTER S WITH CEDILLA
-    case 0x011F: return wchar_t(0xF0); //     LATIN SMALL LETTER G WITH BREVE
-    case 0x0131: return wchar_t(0xFD); //     LATIN SMALL LETTER DOTLESS I
-    case 0x015F: return wchar_t(0xFE); //     LATIN SMALL LETTER S WITH CEDILLA
+    case 0x011E: return static_cast<wchar_t>(0xD0); //     LATIN CAPITAL LETTER G WITH BREVE
+    case 0x0130: return static_cast<wchar_t>(0xDD); //     LATIN CAPITAL LETTER I WITH DOT ABOVE
+    case 0x015E: return static_cast<wchar_t>(0xDE); //     LATIN CAPITAL LETTER S WITH CEDILLA
+    case 0x011F: return static_cast<wchar_t>(0xF0); //     LATIN SMALL LETTER G WITH BREVE
+    case 0x0131: return static_cast<wchar_t>(0xFD); //     LATIN SMALL LETTER DOTLESS I
+    case 0x015F: return static_cast<wchar_t>(0xFE); //     LATIN SMALL LETTER S WITH CEDILLA
     case 0xD0:
     case 0xDD:
     case 0xDE:
@@ -74,14 +75,14 @@ wchar_t to_iso_8859_9(wchar_t c) {
 
 wchar_t to_iso_8859_15(wchar_t c) {
   switch (c) {
-    case 0x20AC: return wchar_t(0xA4); //       EURO SIGN
-    case 0x0160: return wchar_t(0xA6); //       LATIN CAPITAL LETTER S WITH CARON
-    case 0x0161: return wchar_t(0xA8); //       LATIN SMALL LETTER S WITH CARON
-    case 0x017D: return wchar_t(0xB4); //       LATIN CAPITAL LETTER Z WITH CARON
-    case 0x017E: return wchar_t(0xB8); //       LATIN SMALL LETTER Z WITH CARON
-    case 0x0152: return wchar_t(0xBC); //       LATIN CAPITAL LIGATURE OE
-    case 0x0153: return wchar_t(0xBD); //       LATIN SMALL LIGATURE OE
-    case 0x0178: return wchar_t(0xBE); //       LATIN CAPITAL LETTER Y WITH DIAERESIS
+    case 0x20AC: return static_cast<wchar_t>(0xA4); //       EURO SIGN
+    case 0x0160: return static_cast<wchar_t>(0xA6); //       LATIN CAPITAL LETTER S WITH CARON
+    case 0x0161: return static_cast<wchar_t>(0xA8); //       LATIN SMALL LETTER S WITH CARON
+    case 0x017D: return static_cast<wchar_t>(0xB4); //       LATIN CAPITAL LETTER Z WITH CARON
+    case 0x017E: return static_cast<wchar_t>(0xB8); //       LATIN SMALL LETTER Z WITH CARON
+    case 0x0152: return static_cast<wchar_t>(0xBC); //       LATIN CAPITAL LIGATURE OE
+    case 0x0153: return static_cast<wchar_t>(0xBD); //       LATIN SMALL LIGATURE OE
+    case 0x0178: return static_cast<wchar_t>(0xBE); //       LATIN CAPITAL LETTER Y WITH DIAERESIS
     case 0xA4:
     case 0xA6:
     case 0xA8:
@@ -97,33 +98,33 @@ wchar_t to_iso_8859_15(wchar_t c) {
 
 wchar_t to_windows_1252(wchar_t c) {
   switch (c) {
-    case 0x20AC: return wchar_t(0x80); //       EURO SIGN
-    case 0x0201: return wchar_t(0x82); // Komma
-    case 0x0192: return wchar_t(0x83); // f
-    case 0x201E: return wchar_t(0x84); // Anführungszeichen unten
-    case 0x2026: return wchar_t(0x85); // 3 Punkte
-    case 0x2020: return wchar_t(0x86); // Kreuz
-    case 0x2021: return wchar_t(0x87); // Doppelkreuz
-    case 0x02C6: return wchar_t(0x88); // Dach
-    case 0x2030: return wchar_t(0x89); // Promille
-    case 0x0160: return wchar_t(0x8A); //       LATIN CAPITAL LETTER S WITH CARON
-    case 0x2039: return wchar_t(0x8B); // <
-    case 0x0152: return wchar_t(0x8C); //       LATIN CAPITAL LIGATURE OE
-    case 0x017D: return wchar_t(0x8E); //       LATIN CAPITAL LETTER Z WITH CARON
-    case 0x2018: return wchar_t(0x91); // ' Anfang
-    case 0x2019: return wchar_t(0x92); // ' Ende
-    case 0x201C: return wchar_t(0x93); // " Anfang
-    case 0x201D: return wchar_t(0x94); // " Ende
-    case 0x2022: return wchar_t(0x95); // Punkt
-    case 0x2013: return wchar_t(0x96); // --
-    case 0x2014: return wchar_t(0x97); // ---
-    case 0x02DC: return wchar_t(0x98); // Welle
-    case 0x2122: return wchar_t(0x99); // TM
-    case 0x0161: return wchar_t(0x9A); //       LATIN SMALL LETTER S WITH CARON
-    case 0x203A: return wchar_t(0x9B); // >
-    case 0x0153: return wchar_t(0x9C); //       LATIN SMALL LIGATURE OE
-    case 0x017E: return wchar_t(0x9E); //       LATIN SMALL LETTER Z WITH CARON
-    case 0x0178: return wchar_t(0x9F); //       LATIN CAPITAL LETTER Y WITH DIAERESIS
+    case 0x20AC: return static_cast<wchar_t>(0x80); //       EURO SIGN
+    case 0x0201: return static_cast<wchar_t>(0x82); // Komma
+    case 0x0192: return static_cast<wchar_t>(0x83); // f
+    case 0x201E: return static_cast<wchar_t>(0x84); // Anführungszeichen unten
+    case 0x2026: return static_cast<wchar_t>(0x85); // 3 Punkte
+    case 0x2020: return static_cast<wchar_t>(0x86); // Kreuz
+    case 0x2021: return static_cast<wchar_t>(0x87); // Doppelkreuz
+    case 0x02C6: return static_cast<wchar_t>(0x88); // Dach
+    case 0x2030: return static_cast<wchar_t>(0x89); // Promille
+    case 0x0160: return static_cast<wchar_t>(0x8A); //       LATIN CAPITAL LETTER S WITH CARON
+    case 0x2039: return static_cast<wchar_t>(0x8B); // <
+    case 0x0152: return static_cast<wchar_t>(0x8C); //       LATIN CAPITAL LIGATURE OE
+    case 0x017D: return static_cast<wchar_t>(0x8E); //       LATIN CAPITAL LETTER Z WITH CARON
+    case 0x2018: return static_cast<wchar_t>(0x91); // ' Anfang
+    case 0x2019: return static_cast<wchar_t>(0x92); // ' Ende
+    case 0x201C: return static_cast<wchar_t>(0x93); // " Anfang
+    case 0x201D: return static_cast<wchar_t>(0x94); // " Ende
+    case 0x2022: return static_cast<wchar_t>(0x95); // Punkt
+    case 0x2013: return static_cast<wchar_t>(0x96); // --
+    case 0x2014: return static_cast<wchar_t>(0x97); // ---
+    case 0x02DC: return static_cast<wchar_t>(0x98); // Welle
+    case 0x2122: return static_cast<wchar_t>(0x99); // TM
+    case 0x0161: return static_cast<wchar_t>(0x9A); //       LATIN SMALL LETTER S WITH CARON
+    case 0x203A: return static_cast<wchar_t>(0x9B); // >
+    case 0x0153: return static_cast<wchar_t>(0x9C); //       LATIN SMALL LIGATURE OE
+    case 0x017E: return static_cast<wchar_t>(0x9E); //       LATIN SMALL LETTER Z WITH CARON
+    case 0x0178: return static_cast<wchar_t>(0x9F); //       LATIN CAPITAL LETTER Y WITH DIAERESIS
     case 0x80 ... 0x9F:
      return inval;
     default: return (c < L'\u0000' or c > L'\u00ff') ? inval : c;
@@ -134,59 +135,59 @@ inline wchar_t from_iso_8859_1(wchar_t c) { return c; }
 
 wchar_t from_iso_8859_9(wchar_t c) {
   switch (c) {
-    case 0xD0: return wchar_t(0x011E); //     LATIN CAPITAL LETTER G WITH BREVE
-    case 0xDD: return wchar_t(0x0130); //     LATIN CAPITAL LETTER I WITH DOT ABOVE
-    case 0xDE: return wchar_t(0x015E); //     LATIN CAPITAL LETTER S WITH CEDILLA
-    case 0xF0: return wchar_t(0x011F); //     LATIN SMALL LETTER G WITH BREVE
-    case 0xFD: return wchar_t(0x0131); //     LATIN SMALL LETTER DOTLESS I
-    case 0xFE: return wchar_t(0x015F); //     LATIN SMALL LETTER S WITH CEDILLA
+    case 0xD0: return static_cast<wchar_t>(0x011E); //     LATIN CAPITAL LETTER G WITH BREVE
+    case 0xDD: return static_cast<wchar_t>(0x0130); //     LATIN CAPITAL LETTER I WITH DOT ABOVE
+    case 0xDE: return static_cast<wchar_t>(0x015E); //     LATIN CAPITAL LETTER S WITH CEDILLA
+    case 0xF0: return static_cast<wchar_t>(0x011F); //     LATIN SMALL LETTER G WITH BREVE
+    case 0xFD: return static_cast<wchar_t>(0x0131); //     LATIN SMALL LETTER DOTLESS I
+    case 0xFE: return static_cast<wchar_t>(0x015F); //     LATIN SMALL LETTER S WITH CEDILLA
     default: return c;
   }
 }
 
 wchar_t from_iso_8859_15(wchar_t c) {
   switch (c) {
-    case 0xA4: return wchar_t(0x20AC); //       EURO SIGN
-    case 0xA6: return wchar_t(0x0160); //       LATIN CAPITAL LETTER S WITH CARON
-    case 0xA8: return wchar_t(0x0161); //       LATIN SMALL LETTER S WITH CARON
-    case 0xB4: return wchar_t(0x017D); //       LATIN CAPITAL LETTER Z WITH CARON
-    case 0xB8: return wchar_t(0x017E); //       LATIN SMALL LETTER Z WITH CARON
-    case 0xBC: return wchar_t(0x0152); //       LATIN CAPITAL LIGATURE OE
-    case 0xBD: return wchar_t(0x0153); //       LATIN SMALL LIGATURE OE
-    case 0xBE: return wchar_t(0x0178); //       LATIN CAPITAL LETTER Y WITH DIAERESIS
+    case 0xA4: return static_cast<wchar_t>(0x20AC); //       EURO SIGN
+    case 0xA6: return static_cast<wchar_t>(0x0160); //       LATIN CAPITAL LETTER S WITH CARON
+    case 0xA8: return static_cast<wchar_t>(0x0161); //       LATIN SMALL LETTER S WITH CARON
+    case 0xB4: return static_cast<wchar_t>(0x017D); //       LATIN CAPITAL LETTER Z WITH CARON
+    case 0xB8: return static_cast<wchar_t>(0x017E); //       LATIN SMALL LETTER Z WITH CARON
+    case 0xBC: return static_cast<wchar_t>(0x0152); //       LATIN CAPITAL LIGATURE OE
+    case 0xBD: return static_cast<wchar_t>(0x0153); //       LATIN SMALL LIGATURE OE
+    case 0xBE: return static_cast<wchar_t>(0x0178); //       LATIN CAPITAL LETTER Y WITH DIAERESIS
     default: return c;
   }
 }
 
 wchar_t from_windows_1252(wchar_t c) {
   switch (c) {
-    case 0x80: return wchar_t(0x20AC); //       EURO SIGN
-    case 0x82: return wchar_t(0x0201); // Komma
-    case 0x83: return wchar_t(0x0192); // f
-    case 0x84: return wchar_t(0x201E); // Anführungszeichen unten
-    case 0x85: return wchar_t(0x2026); // 3 Punkte
-    case 0x86: return wchar_t(0x2020); // Kreuz
-    case 0x87: return wchar_t(0x2021); // Doppelkreuz
-    case 0x88: return wchar_t(0x02C6); // Dach
-    case 0x89: return wchar_t(0x2030); // Promille
-    case 0x8A: return wchar_t(0x0160); //       LATIN CAPITAL LETTER S WITH CARON
-    case 0x8B: return wchar_t(0x2039); // <
-    case 0x8C: return wchar_t(0x0152); //       LATIN CAPITAL LIGATURE OE
-    case 0x8E: return wchar_t(0x017D); //       LATIN CAPITAL LETTER Z WITH CARON
-    case 0x91: return wchar_t(0x2018); // ' Anfang
-    case 0x92: return wchar_t(0x2019); // ' Ende
-    case 0x93: return wchar_t(0x201C); // " Anfang
-    case 0x94: return wchar_t(0x201D); // " Ende
-    case 0x95: return wchar_t(0x2022); // Punkt
-    case 0x96: return wchar_t(0x2013); // --
-    case 0x97: return wchar_t(0x2014); // ---
-    case 0x98: return wchar_t(0x02DC); // Welle
-    case 0x99: return wchar_t(0x2122); // TM
-    case 0x9A: return wchar_t(0x0161); //       LATIN SMALL LETTER S WITH CARON
-    case 0x9B: return wchar_t(0x203A); // >
-    case 0x9C: return wchar_t(0x0153); //       LATIN SMALL LIGATURE OE
-    case 0x9E: return wchar_t(0x017E); //       LATIN SMALL LETTER Z WITH CARON
-    case 0x9F: return wchar_t(0x0178); //       LATIN CAPITAL LETTER Y WITH DIAERESIS
+    case 0x80: return static_cast<wchar_t>(0x20AC); //       EURO SIGN
+    case 0x82: return static_cast<wchar_t>(0x0201); // Komma
+    case 0x83: return static_cast<wchar_t>(0x0192); // f
+    case 0x84: return static_cast<wchar_t>(0x201E); // Anführungszeichen unten
+    case 0x85: return static_cast<wchar_t>(0x2026); // 3 Punkte
+    case 0x86: return static_cast<wchar_t>(0x2020); // Kreuz
+    case 0x87: return static_cast<wchar_t>(0x2021); // Doppelkreuz
+    case 0x88: return static_cast<wchar_t>(0x02C6); // Dach
+    case 0x89: return static_cast<wchar_t>(0x2030); // Promille
+    case 0x8A: return static_cast<wchar_t>(0x0160); //       LATIN CAPITAL LETTER S WITH CARON
+    case 0x8B: return static_cast<wchar_t>(0x2039); // <
+    case 0x8C: return static_cast<wchar_t>(0x0152); //       LATIN CAPITAL LIGATURE OE
+    case 0x8E: return static_cast<wchar_t>(0x017D); //       LATIN CAPITAL LETTER Z WITH CARON
+    case 0x91: return static_cast<wchar_t>(0x2018); // ' Anfang
+    case 0x92: return static_cast<wchar_t>(0x2019); // ' Ende
+    case 0x93: return static_cast<wchar_t>(0x201C); // " Anfang
+    case 0x94: return static_cast<wchar_t>(0x201D); // " Ende
+    case 0x95: return static_cast<wchar_t>(0x2022); // Punkt
+    case 0x96: return static_cast<wchar_t>(0x2013); // --
+    case 0x97: return static_cast<wchar_t>(0x2014); // ---
+    case 0x98: return static_cast<wchar_t>(0x02DC); // Welle
+    case 0x99: return static_cast<wchar_t>(0x2122); // TM
+    case 0x9A: return static_cast<wchar_t>(0x0161); //       LATIN SMALL LETTER S WITH CARON
+    case 0x9B: return static_cast<wchar_t>(0x203A); // >
+    case 0x9C: return static_cast<wchar_t>(0x0153); //       LATIN SMALL LIGATURE OE
+    case 0x9E: return static_cast<wchar_t>(0x017E); //       LATIN SMALL LETTER Z WITH CARON
+    case 0x9F: return static_cast<wchar_t>(0x0178); //       LATIN CAPITAL LETTER Y WITH DIAERESIS
     default: return c;
   }
 }
@@ -224,11 +225,10 @@ static const char tab_7up[] =
 
 
 wchar_t to_7up(wchar_t c) {
-  if (sizeof(tab_7up) != 581)
-    abort();
-  if (c < 0 or c > static_cast<size_t>(sizeof(tab_7up)))
+  assert(sizeof(tab_7up) == 581); // überwacht versehentliches editieren
+  if (c < 0 or c >= static_cast<size_t>(sizeof(tab_7up)))
     return L' ';
-  return static_cast<size_t>(tab_7up[size_t(c)]);
+  return tab_7up[static_cast<size_t>(c)]; // NOLINT(*-str34-c)
 }
 
 codec_iso8859_1::result codec_iso8859_1::do_out(mbstate_t& state,
@@ -241,7 +241,7 @@ codec_iso8859_1::result codec_iso8859_1::do_out(mbstate_t& state,
 {
   for (; from != from_end and to != to_end; from++, to++)
   {
-    *to = u_char(to_iso_8859_1(*from));
+    *to = static_cast<unsigned char>(to_iso_8859_1(*from)); // NOLINT(*-narrowing-conversions)
 //    cerr << to_string(*from);
   }
   to_next = to;
@@ -259,7 +259,7 @@ codec_iso8859_1::result codec_iso8859_1::do_in (state_type& state,
 {
   for (; from != from_end and to != to_end; from++, to++)
   {
-    *to = from_iso_8859_1(*(unsigned char*)from);
+    *to = from_iso_8859_1(static_cast<unsigned char>(*from));
 //    cerr << to_string(*to);
   }
   to_next = to;
@@ -281,7 +281,7 @@ codec_iso8859_9::result codec_iso8859_9::do_out(mbstate_t& state,
 {
   for (; from != from_end and to != to_end; from++, to++)
   {
-    *to = u_char(to_iso_8859_9(*from));
+    *to = static_cast<unsigned char>(to_iso_8859_9(*from)); // NOLINT(*-narrowing-conversions)
   }
   to_next = to;
   from_next = from;
@@ -298,7 +298,7 @@ codec_iso8859_9::result codec_iso8859_9::do_in (state_type& state,
 {
   for (; from != from_end and to != to_end; from++, to++)
   {
-    *to = from_iso_8859_9(*(unsigned char*)from);
+    *to = from_iso_8859_9(static_cast<unsigned char>(*from));
   }
   to_next = to;
   from_next = from;
@@ -319,7 +319,7 @@ codec_iso8859_15::result codec_iso8859_15::do_out(mbstate_t& state,
 {
   for (; from != from_end and to != to_end; from++, to++)
   {
-    *to = u_char(to_iso_8859_15(*from));
+    *to = static_cast<unsigned char>(to_iso_8859_15(*from)); // NOLINT(*-narrowing-conversions)
   }
   to_next = to;
   from_next = from;
@@ -336,7 +336,7 @@ codec_iso8859_15::result codec_iso8859_15::do_in (state_type& state,
 {
   for (; from != from_end and to != to_end; from++, to++)
   {
-    *to = from_iso_8859_15(*(unsigned char*)from);
+    *to = from_iso_8859_15(static_cast<unsigned char>(*from));
   }
   to_next = to;
   from_next = from;
@@ -358,7 +358,7 @@ codec_windows_1252::result codec_windows_1252::do_out(mbstate_t& state,
 {
   for (; from != from_end and to != to_end; from++, to++)
   {
-    *to = u_char(to_windows_1252(*from));
+    *to = static_cast<unsigned char>(to_windows_1252(*from)); // NOLINT(*-narrowing-conversions)
   }
   to_next = to;
   from_next = from;
@@ -375,7 +375,7 @@ codec_windows_1252::result codec_windows_1252::do_in (state_type& state,
 {
   for (; from != from_end and to != to_end; from++, to++)
   {
-    *to = from_windows_1252(*(unsigned char*)from);
+    *to = from_windows_1252(static_cast<unsigned char>(*from));
   }
   to_next = to;
   from_next = from;
@@ -443,8 +443,8 @@ std::wstring::const_iterator to7Up(std::wstring::const_iterator begin, std::wstr
   for (; begin != end; begin++) {
     char n = ' ';
 //    wchar_t x = *begin;
-    if (*begin >= 0 and size_t(*begin) < sizeof(tab_7up) -1)
-      n = tab_7up[size_t(*begin)];
+    if (*begin >= 0 and static_cast<size_t>(*begin) < sizeof(tab_7up) -1)
+      n = tab_7up[static_cast<size_t>(*begin)];
     switch (n) {
       case '\0' ... 0x1f:
         LOG(LM_ERROR, " EEEE " << to_string(*begin));
@@ -624,7 +624,7 @@ bool StrConv<std::vector<u_char>>::c_from_blob(const void *p, uint64_t sz, vecto
 }
 
 bool StrConv<std::vector<u_char>>::c_to_blob(const vector<u_char> &t, const void *&p, uint64_t &sz) {
-  p = (void *)&t[0]; sz = t.size();
+  p = (void *)t.data(); sz = t.size();
   return true;
 }
 
@@ -695,7 +695,7 @@ StringFormatter::~StringFormatter() = default;
 
 int StringFormatter::insertPattern(const wstring &regex, const wstring &format) {
   data->rules.emplace_back(regex, format);
-  return data->rules.size();
+  return data->rules.size(); // NOLINT(*-narrowing-conversions)
 }
 
 bool StringFormatter::empty() const {
@@ -735,7 +735,7 @@ int StringFormatter::format(const wstring &input, wstring &result, int ruleBegin
               if (idx != cmd.length() -1)
                 throw runtime_error("XX");
             }
-            catch (exception &e) {
+            catch (exception &) {
               THROW("invalid position id in format");
             }
             cmd.clear();
@@ -760,7 +760,7 @@ int StringFormatter::format(const wstring &input, wstring &result, int ruleBegin
               if (idx != match[pos].str().length())
                 throw runtime_error("XX");
             }
-            catch (exception &e) {
+            catch (exception &) {
               THROW("invalid number " << mobs::to_string(match[pos].str()));
             }
             cmd += c;
@@ -794,7 +794,7 @@ int StringFormatter::format(const wstring &input, wstring &result, int ruleBegin
                 if (idx != cmd.length() - 1)
                   throw runtime_error("XX");
               }
-              catch (exception &e) {
+              catch (exception &) {
                 THROW("invalid length id in format");
               }
             if (len and match[pos].str().length() > abs(len))
@@ -815,7 +815,7 @@ int StringFormatter::format(const wstring &input, wstring &result, int ruleBegin
             cmd += c;
         }
       }
-      return i+1;
+      return i+1; // NOLINT(*-narrowing-conversions)
     }
   }
   return 0;
@@ -857,7 +857,7 @@ const string &getNodeName()
     if (nodename.empty())
       throw std::runtime_error("GetComputerName failed");
 #else
-    struct utsname uts;
+    struct utsname uts{};
     if (::uname(&uts) == -1)
       throw std::runtime_error("uname failed");
     nodename = uts.nodename;

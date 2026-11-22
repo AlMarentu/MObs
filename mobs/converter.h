@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2024 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -18,21 +18,17 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#ifndef MOBS_CONVERTER_H
+#define MOBS_CONVERTER_H
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "UnusedGlobalDeclarationInspection"
-#ifndef MOBS_CONVERTER_H
-#define MOBS_CONVERTER_H
 
 #include <string>
 #include <vector>
 #include <locale>
 #include <algorithm>
 #include <memory>
-
-#ifdef __MINGW32__
-typedef unsigned char u_char;
-#endif
 
 /** \file converter.h
  \brief Hilfsklassen für codecs und base64 */
@@ -104,7 +100,7 @@ wchar_t from_windows_1252(wchar_t c);
 
 /// codec für wfstream
 class codec_iso8859_1 : virtual public std::codecvt<wchar_t, char, std::mbstate_t> {
-public:
+protected:
   /// \private
   result do_out(mbstate_t& state, const wchar_t* from, const wchar_t* from_end, const wchar_t*& from_next,
                 char* to, char* to_end, char*& to_next) const override;
@@ -112,46 +108,42 @@ public:
   result do_in (state_type& state, const char* from, const char* from_end, const char*& from_next,
                 wchar_t* to, wchar_t* to_limit, wchar_t*& to_next) const override;
 
-protected:
   /// \private
   bool do_always_noconv() const noexcept override;
 };
 /// codec für wfstream
 class codec_iso8859_9 : virtual public std::codecvt<wchar_t, char, std::mbstate_t> {
-public:
+protected:
   /// \private
   result do_out(mbstate_t& state, const wchar_t* from, const wchar_t* from_end, const wchar_t*& from_next,
                         char* to, char* to_end, char*& to_next) const override;
   /// \private
   result do_in (state_type& state, const char* from, const char* from_end, const char*& from_next,
                         wchar_t* to, wchar_t* to_limit, wchar_t*& to_next) const override;
-protected:
   /// \private
   bool do_always_noconv() const noexcept override;
 };
 /// codec für wfstream
 class codec_iso8859_15 : virtual public std::codecvt<wchar_t, char, std::mbstate_t> {
-public:
+protected:
   /// \private
   result do_out(mbstate_t& state, const wchar_t* from, const wchar_t* from_end, const wchar_t*& from_next,
                         char* to, char* to_end, char*& to_next) const override;
   /// \private
   result do_in (state_type& state, const char* from, const char* from_end, const char*& from_next,
                         wchar_t* to, wchar_t* to_limit, wchar_t*& to_next) const override;
-protected:
   /// \private
   bool do_always_noconv() const noexcept override;
 };
 /// codec für wfstream
 class codec_windows_1252 : virtual public std::codecvt<wchar_t, char, std::mbstate_t> {
-public:
+protected:
   /// \private
   result do_out(mbstate_t& state, const wchar_t* from, const wchar_t* from_end, const wchar_t*& from_next,
                         char* to, char* to_end, char*& to_next) const override;
   /// \private
   result do_in (state_type& state, const char* from, const char* from_end, const char*& from_next,
                         wchar_t* to, wchar_t* to_limit, wchar_t*& to_next) const override;
-protected:
   /// \private
   bool do_always_noconv() const noexcept override;
 };
@@ -179,10 +171,10 @@ OutputIt copy_base64(InputIt first, InputIt last, OutputIt d_first, const std::s
   while (first != last) {
     a = (a << 8) + (*first & 0xff);
     if (++i == 3) {
-      *d_first++ = char(to_base64(a >> 18));
-      *d_first++ = char(to_base64((a >> 12) & 0x3f));
-      *d_first++ = char(to_base64((a >> 6) & 0x3f));
-      *d_first++ = char(to_base64(a & 0x3f));
+      *d_first++ = static_cast<char>(to_base64(a >> 18));
+      *d_first++ = static_cast<char>(to_base64((a >> 12) & 0x3f));
+      *d_first++ = static_cast<char>(to_base64((a >> 6) & 0x3f));
+      *d_first++ = static_cast<char>(to_base64(a & 0x3f));
       i = 0;
       a = 0;
       if (l++ > 15) {
@@ -191,17 +183,17 @@ OutputIt copy_base64(InputIt first, InputIt last, OutputIt d_first, const std::s
         l = 0;
       }
     }
-    first++;
+    ++first;
   }
   if (i == 2) {
-    *d_first++ = char(to_base64(a >> 10));
-    *d_first++ = char(to_base64(a >> 4 & 0x3f));
-    *d_first++ = char(to_base64((a & 0x0f) << 2));
+    *d_first++ = static_cast<char>(to_base64(a >> 10));
+    *d_first++ = static_cast<char>(to_base64(a >> 4 & 0x3f));
+    *d_first++ = static_cast<char>(to_base64((a & 0x0f) << 2));
     *d_first++ = ('=');
   }
   if (i == 1) {
-    *d_first++ = char(to_base64(a >> 2));
-    *d_first++ = char(to_base64((a & 0x03) << 4));
+    *d_first++ = static_cast<char>(to_base64(a >> 2));
+    *d_first++ = static_cast<char>(to_base64((a & 0x03) << 4));
     *d_first++ = ('=');
     *d_first++ = ('=');
   }
@@ -246,6 +238,8 @@ public:
   void done();
   /// Neustart
   void clear() { start(); };
+  /// Anzahl erhaltener bytes
+  size_t size() const { return base64.size(); };
 
 private:
   void start();
@@ -316,6 +310,6 @@ private:
 
 }
 
+#pragma clang diagnostic pop
 #endif
 
-#pragma clang diagnostic pop
