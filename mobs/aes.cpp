@@ -30,7 +30,7 @@
 #include <vector>
 #include <array>
 #include <iomanip>
-#include <cstring>
+#include <algorithm>
 
 #ifdef STREAMLOG
 #define CSBLOG(x, y) LOG(x, y)

@@ -242,7 +242,7 @@ JsonStream &JsonStream::operator<<(const std::wstring &t) {
   return *this;
 }
 
-JsonStream &JsonStream::operator<<(nullptr_t) {
+JsonStream &JsonStream::operator<<(std::nullptr_t) {
   data->elementCheck();
   data->delimElement(data->lastTag);
   data->ostr << "null";

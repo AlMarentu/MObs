@@ -30,6 +30,8 @@
 #include <algorithm>
 #include <memory>
 
+using u_char = unsigned char;
+
 /** \file converter.h
  \brief Hilfsklassen für codecs und base64 */
 
