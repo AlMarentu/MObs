@@ -55,6 +55,7 @@ class MemberBase;
  */
 class JsonStream {
 public:
+  using u_int64_t = uint64_t;
   /** \brief Klasse die einen Names-Tag für JSON fasst
    *
    */
@@ -110,7 +111,7 @@ public:
   /// Streamoperator
   JsonStream &operator<<(bool t);
   /// Streamoperator
-  JsonStream &operator<<(nullptr_t t);
+  JsonStream &operator<<(std::nullptr_t t);
   /// Streamoperator
   JsonStream &operator<<(const mobs::ObjectBase &t);
   /// Streamoperator

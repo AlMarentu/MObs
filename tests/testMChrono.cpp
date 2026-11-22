@@ -20,11 +20,7 @@
 
 
 #include "mchrono.h"
-#include "mchrono.h"
-
 #include "objgen.h"
-#include "objgen.h"
-
 
 #include <stdio.h>
 #include <sstream>
@@ -74,6 +70,20 @@ TEST(mchronoTest, mtime) {
   EXPECT_TRUE(string2x("1999-12-31T15:30", t));
   EXPECT_EQ("1999-12-31T14:30:00.000000Z", to_string_gmt(t));
 
+  EXPECT_TRUE(string2x("1971-12-31T15:30:00.654321Z", t));
+  EXPECT_EQ("1971-12-31T15:30:00.654321Z", to_string_gmt(t));
+  EXPECT_EQ("1971-12-31T15:30:00.654321Z", to_string_gmt(t, mobs::MF6));
+  EXPECT_EQ("1971-12-31T15:30:00.654Z", to_string_gmt(t, mobs::MF3));
+  EXPECT_EQ("1971-12-31T15:30:00.6Z", to_string_gmt(t, mobs::MF1));
+  EXPECT_EQ("1971-12-31T15:30:00Z", to_string_gmt(t, mobs::MSecond));
+  EXPECT_EQ("1971-12-31T15:30Z", to_string_gmt(t, mobs::MMinute));
+  EXPECT_EQ("1971-12-31T15Z", to_string_gmt(t, mobs::MHour));
+  EXPECT_EQ("1971-12-31", to_string_gmt(t, mobs::MDay));
+  EXPECT_EQ("1971-12", to_string_gmt(t, mobs::MMonth));
+  EXPECT_EQ("1971", to_string_gmt(t, mobs::MYear));
+
+#ifndef __MINGW32__
+  // windoof kann nur ab 1970
   EXPECT_TRUE(string2x("1900-12-31T15:30:00.654321Z", t));
   EXPECT_EQ("1900-12-31T15:30:00.654321Z", to_string_gmt(t));
   EXPECT_EQ("1900-12-31T15:30:00.654321Z", to_string_gmt(t, mobs::MF6));
@@ -85,9 +95,9 @@ TEST(mchronoTest, mtime) {
   EXPECT_EQ("1900-12-31", to_string_gmt(t, mobs::MDay));
   EXPECT_EQ("1900-12", to_string_gmt(t, mobs::MMonth));
   EXPECT_EQ("1900", to_string_gmt(t, mobs::MYear));
-
 //  EXPECT_TRUE(string2x("1583-01-01T15:30:00Z", t));
 //  EXPECT_EQ("1583-01-01T15:30:00Z", to_string_gmt(t));
+#endif
 
 
 }
@@ -97,11 +107,12 @@ TEST(mchronoTest, mtime_int) {
 
   EXPECT_TRUE(mobs::from_number(int64_t (9223372036854775), t));
   EXPECT_EQ("2262-04-11T23:47:16.854775Z", to_string_gmt(t));
+#ifndef __MINGW32__
   EXPECT_TRUE(mobs::from_number(int64_t (-12521191039804), t));
   EXPECT_EQ("1969-08-09T01:53:28.960196Z", to_string_gmt(t));
   EXPECT_TRUE(mobs::from_number(int64_t (-2521191039804000), t));
   EXPECT_EQ("1890-02-08T13:09:20.196000Z", to_string_gmt(t));
-
+#endif
   EXPECT_NO_THROW(t = mobs::MTimeNow());
   LOG(LM_INFO, "NOW " << mobs::to_string(t));
 
@@ -119,9 +130,10 @@ TEST(mchronoTest, mdate) {
   EXPECT_EQ("1970-02-01T00Z", to_string_gmt(d, MTimeFract::MHour));
   EXPECT_EQ("1970-02-01", mobs::to_string(d));
 
+#ifndef __MINGW32__
   EXPECT_TRUE(mobs::from_number(int64_t (-25000), d));
   EXPECT_EQ("1901-07-22", to_string(d));
-
+#endif
 
   EXPECT_NO_THROW(d = mobs::MDateNow());
   LOG(LM_INFO, "NOW " << mobs::to_string(d));

@@ -261,7 +261,7 @@ public:
 
   bool setTOS(int tos) const {
 #ifdef __MINGW32__
-#define TOS_CAST (const char *)
+#define SOCK_CAST (const char *)
 #else
 #define SOCK_CAST
 #endif
