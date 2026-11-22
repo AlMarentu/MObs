@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2025 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -109,14 +109,14 @@ public:
     std::vector<u_char *> encrypted_key(recipients.size());
 
     for (size_t i = 0; i < recipients.size(); i++) {
-      encrypted_key[i] = &recipients[i].cipher[0];
+      encrypted_key[i] = recipients[i].cipher.data();
       pub_keys[i] = recipients[i].key.get();
     }
 
     size_t ivlen = EVP_CIPHER_get_iv_length(EVP_aes_256_cbc());
     //iv.resize(ivlen);
-    if (not EVP_SealInit(ctx, EVP_aes_256_cbc(), &encrypted_key[0], &encrypted_key_len[0], &iv[0],
-                         &pub_keys[0], recipients.size()))
+    if (not EVP_SealInit(ctx, EVP_aes_256_cbc(), encrypted_key.data(), encrypted_key_len.data(), iv.data(),
+                         pub_keys.data(), recipients.size()))
       throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
     for (size_t i = 0; i < recipients.size(); i++) {
       auto &rec = recipients[i];
@@ -177,7 +177,6 @@ mobs::CryptBufRsa::CryptBufRsa(const std::string &filename, const std::vector<u_
     throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
   if (not (data->ctx = EVP_CIPHER_CTX_new()))
     throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
-//  memcpy(&data->iv[0], &g_iv[0], KEYBUFLEN);
 }
 
 
@@ -219,11 +218,11 @@ mobs::CryptBufRsa::int_type mobs::CryptBufRsa::underflow() {
       return Traits::eof();
     std::array<u_char, INPUT_BUFFER_LEN + EVP_MAX_BLOCK_LENGTH> buf{}; // NOLINT(cppcoreguidelines-pro-type-member-init)
 
-    size_t sz = doRead((char *) &buf[0], buf.size() - EVP_MAX_BLOCK_LENGTH);
+    size_t sz = doRead((char *) buf.data(), buf.size() - EVP_MAX_BLOCK_LENGTH);
     // Input Buffer wenigstens halb voll kriegen
     if (sz) {
       while (sz < buf.size() / 2) {
-        auto szt = doRead((char *) &buf[sz], buf.size() - sz);
+        auto szt = doRead((char *) (buf.data() + sz), buf.size() - sz);
         if (not szt) {
           data->finished = true;
           break;
@@ -233,13 +232,13 @@ mobs::CryptBufRsa::int_type mobs::CryptBufRsa::underflow() {
     }
     else
       data->finished = true;
-    u_char *start = &buf[0];
+    u_char *start = buf.data();
     if (data->init) {
       int is = EVP_CIPHER_iv_length(EVP_aes_256_cbc());
       if (sz < is)
         THROW("data missing");
-      memcpy(&data->iv[0], start, is);
-      if (1 != EVP_OpenInit(data->ctx, EVP_aes_256_cbc(), &data->cipher[0], data->cipher.size(), &data->iv[0], data->priv_key.get()))
+      std::copy_n(start, is, data->iv.data());
+      if (1 != EVP_OpenInit(data->ctx, EVP_aes_256_cbc(), data->cipher.data(), data->cipher.size(), data->iv.data(), data->priv_key.get()))
         throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
       start += is;
       sz -= is;
@@ -249,13 +248,13 @@ mobs::CryptBufRsa::int_type mobs::CryptBufRsa::underflow() {
       THROW("context is invalid");
     int len = 0;
 //      if (1 != EVP_DecryptUpdate(data->ctx, (u_char *) &data->buffer[0], &len, start, sz))
-    if (1 != EVP_OpenUpdate(data->ctx, (u_char *) &data->buffer[0], &len, start, sz))
+    if (1 != EVP_OpenUpdate(data->ctx, (u_char *) data->buffer.data(), &len, start, sz))
       throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
 //    LOG(LM_DEBUG, "GC2 = " << sz << " " << len << " " << std::string(&data->buffer[0], len));
 
     if (data->finished) {
       int lenf = 0;
-      if (1 != EVP_OpenFinal(data->ctx, (u_char *) &data->buffer[len], &lenf))
+      if (1 != EVP_OpenFinal(data->ctx, (u_char *) (data->buffer.data() + len), &lenf))
         throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
       len += lenf;
       //    EVP_CIPHER_CTX_reset(data->ctx);
@@ -263,7 +262,7 @@ mobs::CryptBufRsa::int_type mobs::CryptBufRsa::underflow() {
 //      LOG(LM_DEBUG, "AES done");
       data->ctx = nullptr;
     }
-    Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[len]);
+    Base::setg(data->buffer.data(), data->buffer.data(), data->buffer.data() + len);
     if (len == 0) {
       if (data->ctx)
         throw std::runtime_error("Keine Daten obwohl Quelle nicht leer");
@@ -291,19 +290,19 @@ mobs::CryptBufRsa::int_type mobs::CryptBufRsa::overflow(mobs::CryptBufRsa::int_t
       THROW("context is invalid");
     int len = 0;
     std::array<u_char, INPUT_BUFFER_LEN + EVP_MAX_BLOCK_LENGTH + KEYBUFLEN> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
-    u_char *start = &buf[0];
+    u_char *start = buf.data();
     if (data->init) {
       data->init = false;
       int is = EVP_CIPHER_iv_length(EVP_aes_256_cbc());
-      memcpy(start, &data->iv[0], is);
+      std::copy_n(data->iv.data(), is, start);
       start += is;
     }
     if (1 != EVP_SealUpdate(data->ctx, start, &len, (u_char *)(Base::pbase()),
                             std::distance(Base::pbase(), Base::pptr())))
       throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
-    len +=  int(start - &buf[0]);
+    len +=  int(start - buf.data());
 //      LOG(LM_INFO, "Writing " << len << "  was " << std::distance(Base::pbase(), Base::pptr()) << std::string(Base::pbase(), std::distance(Base::pbase(), Base::pptr())));
-    doWrite((char *)(&buf[0]), len);
+    doWrite((char *)(buf.data()), len);
     CryptBufBase::setp(data->buffer.begin(), data->buffer.end()); // buffer zurücksetzen
   }
 
@@ -319,13 +318,13 @@ void mobs::CryptBufRsa::finalize() {
   if (data->ctx) {
     std::array<u_char, EVP_MAX_BLOCK_LENGTH> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
     int len;
-    if (1 != EVP_SealFinal(data->ctx, &buf[0], &len))
+    if (1 != EVP_SealFinal(data->ctx, buf.data(), &len))
       throw openssl_exception(LOGSTR("mobs::CryptBufRsa"));
 //    EVP_CIPHER_CTX_reset(data->ctx);
     EVP_CIPHER_CTX_free(data->ctx);
     data->ctx = nullptr;
 //    LOG(LM_DEBUG, "Writing. " << len);
-    doWrite(reinterpret_cast<char *>(&buf[0]), len);
+    doWrite(reinterpret_cast<char *>(buf.data()), len);
   }
   CryptBufBase::finalize();
 }
@@ -361,7 +360,7 @@ mobs::decryptPublicRsa(const std::vector<u_char> &cipher, std::vector<u_char> &s
   //if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0)
   //  throw openssl_exception(LOGSTR("mobs::decryptPublicRsa"));
   size_t sz = sessionKey.size();
-  if (EVP_PKEY_verify_recover(ctx.get(), &sessionKey[0], &sz, &cipher[0], cipher.size()) <= 0)
+  if (EVP_PKEY_verify_recover(ctx.get(), sessionKey.data(), &sz, cipher.data(), cipher.size()) <= 0)
     throw openssl_exception(LOGSTR("mobs::decryptPublicRsa"));
   sessionKey.resize(sz);
 }
@@ -387,7 +386,7 @@ mobs::encryptPrivateRsa(const std::vector<u_char> &sessionKey, std::vector<u_cha
   //if (EVP_PKEY_CTX_set_signature_md(ctx.get(), EVP_sha256()) <= 0)
   //  throw openssl_exception(LOGSTR("mobs::encryptPrivateRsa"));
   size_t sz = cipher.size();
-  if (EVP_PKEY_sign(ctx.get(), &cipher[0], &sz, &sessionKey[0], sessionKey.size()) <= 0)
+  if (EVP_PKEY_sign(ctx.get(), cipher.data(), &sz, sessionKey.data(), sessionKey.size()) <= 0)
     throw openssl_exception(LOGSTR("mobs::encryptPrivateRsa"));
 }
 
@@ -411,7 +410,7 @@ mobs::decryptPrivateRsa(const std::vector<u_char> &cipher, std::vector<u_char> &
   if (EVP_PKEY_CTX_set_rsa_padding(ctx.get(), RSA_PKCS1_OAEP_PADDING) <= 0)
     throw openssl_exception(LOGSTR("mobs::decryptPrivateRsa"));
   size_t sz = sessionKey.size();
-  if (EVP_PKEY_decrypt(ctx.get(), &sessionKey[0], &sz, &cipher[0], cipher.size()) <= 0)
+  if (EVP_PKEY_decrypt(ctx.get(), sessionKey.data(), &sz, cipher.data(), cipher.size()) <= 0)
     throw openssl_exception(LOGSTR("mobs::decryptPrivateRsa"));
   sessionKey.resize(sz);
 }
@@ -436,7 +435,7 @@ mobs::encryptPublicRsa(const std::vector<u_char> &sessionKey, std::vector<u_char
   if (EVP_PKEY_CTX_set_rsa_padding(ctx.get(), RSA_PKCS1_OAEP_PADDING) <= 0)
     throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
   size_t sz = cipher.size();
-  if (EVP_PKEY_encrypt(ctx.get(), &cipher[0], &sz, &sessionKey[0], sessionKey.size()) <= 0)
+  if (EVP_PKEY_encrypt(ctx.get(), cipher.data(), &sz, sessionKey.data(), sessionKey.size()) <= 0)
     throw openssl_exception(LOGSTR("mobs::encryptPublicRsa"));
 }
 
@@ -487,7 +486,7 @@ std::string mobs::getRsaFingerprint(const std::string &filePub) {
   unsigned int sz = BN_num_bytes(modulus);
   //std::cerr << sz << " " << BN_bn2hex(modulus) << std::endl;
   buf.resize(sz);
-  BN_bn2bin(modulus, &buf[0]);
+  BN_bn2bin(modulus, buf.data());
   std::string res = mobs::hash_value(buf, "md5");
   BN_free(modulus);
   return res;

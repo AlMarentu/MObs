@@ -1,7 +1,7 @@
 // Bibliothek zur einfachen Verwendung serialisierbarer C++-Objekte
 // für Datenspeicherung und Transport
 //
-// Copyright 2020 Matthias Lautner
+// Copyright 2026 Matthias Lautner
 //
 // This is part of MObs https://github.com/AlMarentu/MObs.git
 //
@@ -31,6 +31,7 @@
 #include "objgen.h"
 
 #include <stdio.h>
+#include <iomanip>
 #include <sstream>
 #include <gtest/gtest.h>
 
@@ -65,7 +66,7 @@ TEST(cryptTest, aes1) {
 //)", w.getString());
 }
 
-static std::string to_aes(const std::string &s) {
+std::string to_aes(const std::string &s) {
   std::vector<u_char> key;
   std::vector<u_char> iv;
   key.resize(mobs::CryptBufAes::key_size(), '1');
@@ -81,7 +82,7 @@ static std::string to_aes(const std::string &s) {
   return ss.str();
 }
 
-static std::string from_aes(const std::string &s) {
+std::string from_aes(const std::string &s) {
   std::vector<u_char> key;
   std::vector<u_char> iv;
   key.resize(mobs::CryptBufAes::key_size(), '1');
@@ -91,13 +92,13 @@ static std::string from_aes(const std::string &s) {
   mobs::CryptIstrBuf streambuf(ss, new mobs::CryptBufAes(key, iv));
   std::wistream xStrIn(&streambuf);
   streambuf.getCbb()->setBase64(true);
-  std::string res;
+  std::wstring res;
   wchar_t c;
   while (not xStrIn.get(c).eof())
-    res += u_char(c);
+    res += c;
   if (streambuf.bad())
     throw std::runtime_error("encryption failed");
-  return res;
+  return mobs::to_string(res);
 }
 
 TEST(cryptTest, aes2) {
@@ -576,30 +577,30 @@ TEST(cryptTest, digest2) {
   mobs::CryptIstrBuf streambuf(ss, md);
   std::wistream xStrIn(&streambuf);
   EXPECT_TRUE(xStrIn.good());
-  std::string res;
+  std::wstring res;
   wchar_t c;
   while (xStrIn and not xStrIn.get(c).eof()) {
-    res += u_char(c);
+    res += c;
   }
 
   EXPECT_TRUE(xStrIn.eof());
   EXPECT_FALSE(xStrIn.bad());
   EXPECT_FALSE(streambuf.bad());
-  EXPECT_EQ(res, "Fischers Fritz fischt frische Fische");
+  EXPECT_EQ(res, L"Fischers Fritz fischt frische Fische");
   EXPECT_EQ(md->hashStr(), "fa24fbd0c280509e2171aa5958b06b313a57e70e");
 }
 
 TEST(cryptTest, faileof) {
   std::wstringstream ss(L"Fischers Fritz fischt frische Fische");
-  std::string res;
+  std::wstring res;
   wchar_t c;
   while (ss and not ss.get(c).eof()) {
-    res += u_char(c);
+    res += c;
   }
   EXPECT_TRUE(ss.eof());
   EXPECT_FALSE(ss.bad());
   EXPECT_TRUE(ss.fail());
-  EXPECT_EQ(res, "Fischers Fritz fischt frische Fische");
+  EXPECT_EQ(res, L"Fischers Fritz fischt frische Fische");
 }
 
 TEST(cryptTest, digest2e) {
@@ -608,11 +609,11 @@ TEST(cryptTest, digest2e) {
   mobs::CryptIstrBuf streambuf(ss, md);
   std::wistream xStrIn(&streambuf);
   EXPECT_TRUE(xStrIn.good());
-  std::string res;
+  std::wstring res;
   wchar_t c;
   while (xStrIn and not xStrIn.get(c).eof()) {
     LOG(LM_INFO, "FAIL " << xStrIn.fail());
-    res += u_char(c);
+    res += c;
   }
   EXPECT_TRUE(streambuf.bad());
   EXPECT_TRUE(xStrIn.bad());
@@ -649,7 +650,7 @@ TEST(cryptTest, digest4) {
 TEST(cryptTest, uuid) {
   mobs::digestStream ds("md5");
   std::vector<u_char> domain({0x6b, 0xa7, 0xb8, 0x10, 0x9d, 0xad, 0x11, 0xd1, 0x80, 0xb4, 0x00, 0xc0, 0x4f, 0xd4, 0x30, 0xc8});
-  ds << string((char *)&domain[0], domain.size());
+  ds << string(reinterpret_cast<char *>(domain.data()), domain.size());
   ds << "www.example.org";
   std::string uuid = ds.uuid();
   EXPECT_EQ(36, uuid.length());
@@ -660,7 +661,7 @@ TEST(cryptTest, uuid) {
   EXPECT_EQ('-', uuid[23]);
 
   mobs::digestStream ds2;
-  ds2 << string((char *)&domain[0], domain.size());
+  ds2 << string(reinterpret_cast<char *>(domain.data()), domain.size());
   ds2 << "www.example.org";
   EXPECT_EQ("74738ff5-5367-5958-9aee-98fffdcd1876", ds2.uuid());
 

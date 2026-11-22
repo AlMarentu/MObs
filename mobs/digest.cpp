@@ -115,7 +115,7 @@ mobs::CryptBufDigest::int_type mobs::CryptBufDigest::underflow() {
   try {
     if (data->finished or not isGood())
       return Traits::eof();
-    size_t sz = doRead((char *) &data->buffer[0], data->buffer.size());
+    size_t sz = doRead((char *) data->buffer.data(), data->buffer.size());
     // Input Buffer wenigstens halb voll kriegen
     if (sz) {
       while (sz < data->buffer.size() / 2) {
@@ -132,12 +132,12 @@ mobs::CryptBufDigest::int_type mobs::CryptBufDigest::underflow() {
     if (not data->mdctx)
       data->md_init();
     if (sz)
-      EVP_DigestUpdate(data->mdctx, &data->buffer[0], sz);
-    Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[sz]);
+      EVP_DigestUpdate(data->mdctx, data->buffer.data(), sz);
+    Base::setg(data->buffer.data(), data->buffer.data(), data->buffer.data() + sz);
     if (data->finished) {
       data->md_value.resize(EVP_MAX_MD_SIZE);
       u_int md_len;
-      EVP_DigestFinal_ex(data->mdctx, &data->md_value[0], &md_len);
+      EVP_DigestFinal_ex(data->mdctx, data->md_value.data(), &md_len);
       data->md_value.resize(md_len);
     }
 //    std::cout << "GC2 = " << len << " ";
@@ -145,7 +145,7 @@ mobs::CryptBufDigest::int_type mobs::CryptBufDigest::underflow() {
       return Traits::to_int_type(*Base::gptr());
   } catch (std::exception &e) {
     LOG(LM_ERROR, "Exception " << e.what());
-    Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[0]);
+    Base::setg(data->buffer.data(), data->buffer.data(), data->buffer.data());
     setBad();
     throw std::ios_base::failure(e.what(), std::io_errc::stream);
   }
@@ -187,7 +187,7 @@ void mobs::CryptBufDigest::finalize() {
   if (data->mdctx) {
     data->md_value.resize(EVP_MAX_MD_SIZE);
     u_int md_len;
-    EVP_DigestFinal_ex(data->mdctx, &data->md_value[0], &md_len);
+    EVP_DigestFinal_ex(data->mdctx, data->md_value.data(), &md_len);
     data->md_value.resize(md_len);
   }
   CryptBufBase::finalize();
@@ -239,7 +239,7 @@ public:
       pubsync();
       md_value.resize(EVP_MAX_MD_SIZE);
       u_int md_len;
-      EVP_DigestFinal_ex(mdctx, &md_value[0], &md_len);
+      EVP_DigestFinal_ex(mdctx, md_value.data(), &md_len);
       md_value.resize(md_len);
       EVP_MD_CTX_free(mdctx);
       mdctx = nullptr;
@@ -366,12 +366,12 @@ std::string mobs::hash_value(const std::vector<u_char> &s, const std::string &al
   auto mdctx = EVP_MD_CTX_new();
   if (not EVP_DigestInit_ex(mdctx, md, nullptr))
     throw openssl_exception(LOGSTR("mobs::CryptBufDigest"));
-  EVP_DigestUpdate(mdctx, &s[0], s.size());
+  EVP_DigestUpdate(mdctx, s.data(), s.size());
 
   std::vector<u_char> md_value;
   md_value.resize(EVP_MAX_MD_SIZE);
   u_int md_len;
-  EVP_DigestFinal_ex(mdctx, &md_value[0], &md_len);
+  EVP_DigestFinal_ex(mdctx, md_value.data(), &md_len);
   md_value.resize(md_len);
   std::stringstream x;
   for (auto c:md_value)
@@ -386,11 +386,11 @@ void mobs::hash_value(const std::vector<u_char> &s, std::vector<u_char> &hash, c
   auto mdctx = EVP_MD_CTX_new();
   if (not EVP_DigestInit_ex(mdctx, md, nullptr))
     throw openssl_exception(LOGSTR("mobs::CryptBufDigest"));
-  EVP_DigestUpdate(mdctx, &s[0], s.size());
+  EVP_DigestUpdate(mdctx, s.data(), s.size());
 
   hash.resize(EVP_MAX_MD_SIZE);
   u_int md_len;
-  EVP_DigestFinal_ex(mdctx, &hash[0], &md_len);
+  EVP_DigestFinal_ex(mdctx, hash.data(), &md_len);
   hash.resize(md_len);
 }
 

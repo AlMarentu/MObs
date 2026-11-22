@@ -33,6 +33,9 @@
 namespace mobs {
 class ObjectBase;
 
+using u_char = unsigned char;
+
+
 /// Klasse für public-Key Informationen
 class RecipientKey {
 public:

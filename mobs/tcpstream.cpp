@@ -214,7 +214,7 @@ public:
     if (fd == invalidSocket or bad)
       return 0;
     //LOG(LM_DEBUG, "TcpBuffer::underflow " << (nowait ? "NOWAIT":"WAIT"));
-    auto res = recv(fd, &rdBuf[0], int(rdBuf.size()), MSG_NOSIGNAL | (nowait? MSG_DONTWAIT: 0)); // immer < INT_MAX
+    auto res = recv(fd, rdBuf.data(), int(rdBuf.size()), MSG_NOSIGNAL | (nowait? MSG_DONTWAIT: 0)); // immer < INT_MAX
     //LOG(LM_DEBUG, "TcpBuffer::underflow Done " << res << "/" << rdBuf.size());
     if (res < 0) {
       if (not nowait or errno != EAGAIN) {
@@ -224,7 +224,7 @@ public:
       return 0;
     }
     //LOG(LM_DEBUG, "TcpStream read " << res << " soll " << rdBuf.size());
-    //LOG(LM_DEBUG, "RCV: " << std::string(&rdBuf[0], res));
+    //LOG(LM_DEBUG, "RCV: " << std::string(rdBuf.data(), res));
     rdPos += TcpStBuf::off_type(res);
     return res;
   }
@@ -234,7 +234,7 @@ public:
       bad = true;
     if (bad)
       return;
-    TcpStBuf::char_type *cp = &wrBuf[0];
+    TcpStBuf::char_type *cp = wrBuf.data();
     while (sz > 0) {
       auto res = send(fd, cp, int(sz), MSG_NOSIGNAL); // buffersize immer < INT_MAX
       //LOG(LM_DEBUG, "WRITE TCP " << res );
@@ -385,7 +385,7 @@ std::streamsize TcpStBuf::showmanyc() {
   auto sz = data->readBuf(true);
   if (bad())
     return -1;
-  Base::setg(&data->rdBuf[0], &data->rdBuf[0], &data->rdBuf[sz]);
+  Base::setg(data->rdBuf.data(), data->rdBuf.data(), data->rdBuf.data() + sz);
 //  if (not Traits::eq(delimiter, Traits::eof())) {
 //    auto pos = std::find(gptr(), egptr(),  delimiter);
 //    if (pos != egptr() and pos != gptr()) { // als erstes Zeichen erlaubt
@@ -399,7 +399,7 @@ std::streamsize TcpStBuf::showmanyc() {
 TcpStBuf::int_type TcpStBuf::underflow() {
   TRACE("");
   auto sz = data->readBuf(false);
-  Base::setg(&data->rdBuf[0], &data->rdBuf[0], &data->rdBuf[sz]);
+  Base::setg(data->rdBuf.data(), data->rdBuf.data(), data->rdBuf.data() + sz);
   if (sz == 0)
     return Traits::eof();
   return Traits::to_int_type(*Base::gptr());

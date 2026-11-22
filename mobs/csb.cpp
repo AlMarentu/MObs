@@ -91,7 +91,7 @@ public:
   std::istream &inStb; // Stream der Quelle ist Byte-orientiert und konvertiert beim Einlesen in wchar
   std::unique_ptr<CryptBufBase> cbb = nullptr; // Crypto-Buffer für
   std::mbstate_t state{};
-  std::array<CryptIstrBuf::char_type, INPUT_BUFFER_SIZE> buffer;
+  std::array<CryptIstrBuf::char_type, INPUT_BUFFER_SIZE> buffer{};
   CryptIstrBuf::pos_type pos = 0; // Anzahl Zeichen für seekoff
   // kann beim Lesen eines Blockes die Zeichensatzkonvertierung nicht bis zum Ende laufen,
   // dann denn Rest hier parken, bis ein weiterer Block vom input-Stream kommt.
@@ -142,7 +142,7 @@ CryptIstrBuf::int_type CryptIstrBuf::underflow() {
     std::streamsize sz = 0;
     std::streamsize restSize = 0;
     if (data->rest) {
-      restSize = data->rest->size();
+      restSize = data->rest->size(); // NOLINT(*-narrowing-conversions)
       if (restSize > 6) { // bei mehr als 6 extra-Bytes wird kein gültiges Zeichen mehr entstehen
         CSBLOG(LM_DEBUG, "CryptIstrBuf::underflow Rest SZ=" << data->rest->size());
         //TODO Schalter ob invalid char eof oder bad liefert
@@ -152,10 +152,10 @@ CryptIstrBuf::int_type CryptIstrBuf::underflow() {
       std::copy_n(data->rest->begin(), restSize, buf.begin());
       data->rest = nullptr;
       data->state = std::mbstate_t{};
-      CSBLOG(LM_DEBUG, "CryptIstrBuf::underflow restoring " << restSize << " chars: " << std::string(&buf[0], restSize));
+      CSBLOG(LM_DEBUG, "CryptIstrBuf::underflow restoring " << restSize << " chars: " << std::string(buf.data(), restSize));
     }
     if (data->cbb) {
-      std::streamsize rd = buf.size() - restSize;
+      std::streamsize rd = buf.size() - restSize; // NOLINT(*-narrowing-conversions)
       auto av = data->cbb->in_avail();
       if (av == 0) {
         // evt. auf neue Zeichen warten
@@ -178,7 +178,7 @@ CryptIstrBuf::int_type CryptIstrBuf::underflow() {
         return Traits::eof();
       std::istream::sentry sen(data->inStb, true);
       if (sen) {
-        data->inStb.read(&buf[restSize], buf.size() - restSize);
+        data->inStb.read(&buf[restSize], buf.size() - restSize); // NOLINT(*-narrowing-conversions)
         sz = data->inStb.gcount();
         if (not sz) {
           if (restSize) // bereits unkodierbare Zeichen vorhanden
@@ -188,32 +188,32 @@ CryptIstrBuf::int_type CryptIstrBuf::underflow() {
         }
       }
     }
-//    std::cout << "GC = " << sz << "  " << std::string(&buf[0], sz) << std::endl;
+//    std::cout << "GC = " << sz << "  " << std::string(buf.data(), sz) << std::endl;
     char_type *bit;
     const char *bp;
 
     std::use_facet<std::codecvt<char_type, char, std::mbstate_t>>(lo).in(
-        data->state, &buf[0], &buf[sz], bp,
-        &data->buffer[0],
-        &data->buffer[INPUT_BUFFER_SIZE], bit);
-    if (bp != &buf[sz]) { // Rest merken
+        data->state, buf.data(), buf.data() + sz, bp,
+        data->buffer.data(),
+        data->buffer.data() + INPUT_BUFFER_SIZE, bit);
+    if (bp != buf.data() + sz) { // Rest merken
       data->rest = std::unique_ptr<std::vector<char>>(
-          new std::vector<char>(const_cast<char *>(bp), &buf[sz])); //std::distance(bp, &buf[sz]))
+          new std::vector<char>(const_cast<char *>(bp), buf.data() + sz)); //std::distance(bp, buf.data() + sz))
       CSBLOG(LM_DEBUG, "CryptIstrBuf saving " << data->rest->size() << " chars: "
-                                              << std::string(&(*data->rest)[0], data->rest->size()));
-      if (bp == &buf[0])
+                                              << std::string(data->rest->data(), data->rest->size()));
+      if (bp == buf.data())
       {
         LOG(LM_ERROR,
-            "CryptIstrBuf::underflow facet failed chars = " << int(bp[0]) << ", " << int(bp[1]) << ", " << int(bp[2])
-                                                            << " Size " << std::distance(&buf[0], (char *) bp) << " != "
+            "CryptIstrBuf::underflow facet failed chars = " << static_cast<int>(bp[0]) << ", " << static_cast<int>(bp[1]) << ", " << static_cast<int>(bp[2])
+              << " Size " << std::distance(buf.data(), const_cast<char *>(bp)) << " != "
                                                             << sz);
         throw std::ios_base::failure("invalid charset", std::io_errc::stream);
       }
     }
-    Base::setg(&data->buffer[0], &data->buffer[0], bit);
+    Base::setg(data->buffer.data(), data->buffer.data(), bit);
     if (Base::gptr() == Base::egptr())
       return Traits::eof();
-    data->pos += off_type(std::distance(Base::gptr(), Base::egptr()));
+    data->pos += static_cast<off_type>(std::distance(Base::gptr(), Base::egptr()));
 
 //    data->print_buffer(Base::gptr(), Base::egptr());
 
@@ -237,8 +237,8 @@ CryptIstrBuf::int_type CryptIstrBuf::underflow() {
 CryptIstrBuf::pos_type CryptIstrBuf::seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which) {
   TRACE(PARAM(off) << PARAM(dir) << PARAM(which));
   if (not(which & std::ios_base::in) or dir != std::ios_base::cur or off != 0)
-    return pos_type(off_type(-1));
-  return pos_type(data->pos - off_type(std::distance(Base::gptr(), Base::egptr())));
+    return {static_cast<off_type>(-1)};
+  return pos_type(data->pos - static_cast<off_type>(std::distance(Base::gptr(), Base::egptr())));
 }
 
 void CryptIstrBuf::imbue(const std::locale &loc) {
@@ -248,40 +248,40 @@ void CryptIstrBuf::imbue(const std::locale &loc) {
   std::locale lo = getloc();
   if (lo != loc and Base::gptr() != Base::egptr()) {
 //    std::cout << "imbue" << std::endl;
-    data->pos -= off_type(std::distance(Base::gptr(), Base::egptr()));
+    data->pos -= static_cast<off_type>(std::distance(Base::gptr(), Base::egptr()));
     std::array<char, INPUT_BUFFER_SIZE * 4> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
     char *bp;
     const char_type *bit;
     std::mbstate_t state{};
 //    bool ncv = std::use_facet<std::codecvt<char_type, char, std::mbstate_t>>(lo).always_noconv();
     std::use_facet<std::codecvt<char_type, char, std::mbstate_t>>(lo).out(state, Base::gptr(), Base::egptr(), bit,
-                                                                          &buf[0], &buf[sizeof(buf)], bp);
+                                                                          buf.data(), buf.data() + buf.size(), bp);
     if (bit != Base::egptr())
       LOG(LM_ERROR, u8"read buffer to small");
     data->state = std::mbstate_t{};
     const char *bp2;
     char_type *bit2;
 //    ncv = std::use_facet<std::codecvt<char_type, char, std::mbstate_t>>(lo).always_noconv();
-    std::use_facet<std::codecvt<char_type, char, std::mbstate_t>>(loc).in(data->state, &buf[0], bp, bp2,
-                                                                          &data->buffer[0],
-                                                                          &data->buffer[INPUT_BUFFER_SIZE], bit2);
+    std::use_facet<std::codecvt<char_type, char, std::mbstate_t>>(loc).in(data->state, buf.data(), bp, bp2,
+                                                                          data->buffer.data(),
+                                                                          data->buffer.data() + INPUT_BUFFER_SIZE, bit2);
     if (bp != bp2) {
-      auto sz = std::distance(bp2, (const char *) bp);
+      auto sz = std::distance(bp2, static_cast<const char *>(bp));
       LOG(LM_ERROR,
           "CryptIstrBuf::imbue facet failed 2 chars = " << int(bp[0]) << ", " << int(bp[1]) << ", " << int(bp[2])
-                                                        << " Size " << std::distance(&buf[0], (char *) bp) << " != "
+                                                        << " Size " << std::distance(buf.data(), (char *) bp) << " != "
                                                         << sz);
-      if (bp2 != &buf[0]) { // Rest merken
+      if (bp2 != buf.data()) { // Rest merken
         data->rest = std::unique_ptr<std::vector<char>>(new std::vector<char>((char *) bp2, bp));
         CSBLOG(LM_DEBUG, "CryptIstrBuf saving " << data->rest->size() << " chars: "
-                                                << std::string(&(*data->rest)[0], data->rest->size()));
+                                                << std::string(data->rest->data(), data->rest->size()));
       } else
         throw std::ios_base::failure("invalid charset", std::io_errc::stream);
     }
     CSBLOG(LM_DEBUG,
-           "locale change " << std::distance(Base::gptr(), Base::egptr()) << " -> " << std::distance(&buf[0], bp) << " -> "
-                            << std::distance(&data->buffer[0], bit2));
-    Base::setg(&data->buffer[0], &data->buffer[0], bit2);
+           "locale change " << std::distance(Base::gptr(), Base::egptr()) << " -> " << std::distance(buf.data(), bp) << " -> "
+                            << std::distance(data->buffer.data(), bit2));
+    Base::setg(data->buffer.data(), data->buffer.data(), bit2);
     data->pos += off_type(std::distance(Base::gptr(), Base::egptr()));
     if (data->rest)
       return;
@@ -292,26 +292,26 @@ void CryptIstrBuf::imbue(const std::locale &loc) {
     auto sz = data->rest->size();
     std::copy_n(data->rest->begin(), sz, buf.begin());
     data->rest = nullptr;
-    CSBLOG(LM_DEBUG, "CryptIstrBuf restoring " << sz << " chars: " << std::string(&buf[0], sz));
+    CSBLOG(LM_DEBUG, "CryptIstrBuf restoring " << sz << " chars: " << std::string(buf.data(), sz));
     char_type *bit;
     const char *bp;
-    std::use_facet<std::codecvt<char_type, char, std::mbstate_t>>(loc).in(data->state, &buf[0], &buf[sz], bp,
+    std::use_facet<std::codecvt<char_type, char, std::mbstate_t>>(loc).in(data->state, buf.data(), buf.data() + sz, bp,
                                                                           Base::egptr(),
-                                                                          &data->buffer[INPUT_BUFFER_SIZE], bit);
-    if (bp != &buf[sz]) {
+                                                                          data->buffer.data() + INPUT_BUFFER_SIZE, bit);
+    if (bp != buf.data() + sz) {
       LOG(LM_ERROR,
           "CryptIstrBuf::imbue facet failed chars = " << int(bp[0]) << ", " << int(bp[1]) << ", " << int(bp[2])
-                                                      << " Size " << std::distance(&buf[0], (char *) bp) << " != "
+                                                      << " Size " << std::distance(buf.data(), (char *) bp) << " != "
                                                       << sz);
-      if (bp != &buf[0]) { // Rest merken
+      if (bp != buf.data()) { // Rest merken
         data->rest = std::unique_ptr<std::vector<char>>(
-            new std::vector<char>(const_cast<char *>(bp), &buf[sz])); //std::distance(bp, &buf[sz]))
+            new std::vector<char>(const_cast<char *>(bp), buf.data() + sz)); //std::distance(bp, buf.data() + sz))
         CSBLOG(LM_DEBUG, "CryptIstrBuf saving " << data->rest->size() << " chars: "
-                                                << std::string(&(*data->rest)[0], data->rest->size()));
+                                                << std::string(data->rest->data(), data->rest->size()));
       } else
         throw std::ios_base::failure("invalid charset", std::io_errc::stream);
     }
-    Base::setg(&data->buffer[0], Base::egptr(), bit);
+    Base::setg(data->buffer.data(), Base::egptr(), bit);
     data->pos += off_type(std::distance(Base::gptr(), Base::egptr()));
 //    data->print_buffer(Base::gptr(), Base::egptr());
     return;
@@ -336,7 +336,7 @@ std::streamsize CryptIstrBuf::showmanyc() {
     return 0;
 
   if (data->rest)
-    return data->rest->size() + data->cbb->in_avail();
+    return data->rest->size() + data->cbb->in_avail(); // NOLINT(*-narrowing-conversions)
   return data->cbb->in_avail();
 }
 
@@ -390,18 +390,18 @@ CryptOstrBuf::int_type CryptOstrBuf::overflow(CryptOstrBuf::int_type ch) {
       std::vector<char> buf(OUTPUT_BUFFER_SIZE * 2);
       char *bp;
       std::use_facet<std::codecvt<char_type, char, std::mbstate_t>>(lo).out(data->state, Base::pbase(), Base::pptr(),
-                                                                            bit, &buf[0], &buf[buf.size()], bp);
-      if (Base::pptr() != bit and std::distance(&buf[0], bp) < ssize_t(buf.size())) {
+                                                                            bit, buf.data(), buf.data() + buf.size(), bp);
+      if (Base::pptr() != bit and std::distance(buf.data(), bp) < ssize_t(buf.size())) {
         LOG(LM_ERROR, "CryptOstrBuf::overflow facet failed char = " << int(*bit));
         throw std::ios_base::failure("invalid charset", std::io_errc::stream);
       }
       auto ep = Base::pptr();
-      data->pos += off_type(std::distance((const char_type *) &data->buffer[0], bit));
+      data->pos += off_type(std::distance((const char_type *) data->buffer.data(), bit));
       Base::setp(data->buffer.begin(), data->buffer.end()); // buffer zurücksetzen
       while (bit < ep)  // übrig gebliebene Zeichen zurückschreiben
         Base::sputc(*bit++);
       if (data->cbb) {
-        std::streamsize sz = std::distance(&buf[0], bp);
+        std::streamsize sz = std::distance(buf.data(), bp);
         std::streamsize wr = 0;
         while (wr < sz) {
           CSBLOG(LM_DEBUG, "OUTSTB write " << sz - wr);
@@ -411,10 +411,10 @@ CryptOstrBuf::int_type CryptOstrBuf::overflow(CryptOstrBuf::int_type ch) {
           wr += n;
         }
       } else
-        data->outStb.write(&buf[0], std::distance(&buf[0], bp));
+        data->outStb.write(buf.data(), std::distance(buf.data(), bp));
 #if 0
       // Debug:
-      for (auto ip = &buf[0]; ip != bp; ip++) {
+      for (auto ip = buf.data(); ip != bp; ip++) {
         auto const i = *ip;
         if (i == 0) {
           std::cout << "NULL";
@@ -465,7 +465,7 @@ void CryptOstrBuf::finalize() {
 CryptOstrBuf::pos_type CryptOstrBuf::seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which) {
   TRACE(PARAM(off) << PARAM(dir) << PARAM(which));
   if (not(which & std::ios_base::out) or dir != std::ios_base::cur or off != 0)
-    return pos_type(off_type(-1));
+    return {static_cast<off_type>(-1)};
   return pos_type(data->pos + off_type(std::distance(Base::pbase(), Base::pptr())));
 }
 
@@ -476,16 +476,16 @@ void CryptOstrBuf::imbue(const std::locale &loc) {
 #if 0
   std::vector<char> buf(128);
   char *bp;
-  std::use_facet<std::codecvt<char_type, char, std::mbstate_t>>(getloc()).unshift(data->state, &buf[0], &buf[buf.size()], bp);
-  if (bp > &buf[0]) {
+  std::use_facet<std::codecvt<char_type, char, std::mbstate_t>>(getloc()).unshift(data->state, buf.data(), &buf[buf.size()], bp);
+  if (bp > buf.data()) {
     if (data->cbb) {
-      std::streamsize sz = std::distance(&buf[0], bp);
+      std::streamsize sz = std::distance(buf.data(), bp);
       std::streamsize wr = 0;
       while (wr < sz) {
         wr += data->cbb->sputn(&buf[wr], sz - wr);
       }
     } else
-      data->outStb.write(&buf[0], std::distance(&buf[0], bp));
+      data->outStb.write(buf.data(), std::distance(buf.data(), bp));
   }
 #endif
   basic_streambuf::imbue(loc);
@@ -552,14 +552,14 @@ public:
       if (c == '=') { // padding
         switch (b64Cnt) {
           case 3:
-            *it++ = u_char(b64Value >> 10);
-            *it++ = u_char((b64Value >> 2) & 0xff);
+            *it++ = static_cast<u_char>(b64Value >> 10);
+            *it++ = static_cast<u_char>((b64Value >> 2) & 0xff);
             __attribute__ ((fallthrough));
           case 100:
             b64Cnt = 999; // Wenn noch ein = kommt -> fehler
             break;
           case 2:
-            *it++ = u_char(b64Value >> 4);
+            *it++ = static_cast<u_char>(b64Value >> 4);
             b64Cnt = 100; // es darf noch 1 = kommen
             break;
           case 1:
@@ -574,9 +574,9 @@ public:
         throw std::runtime_error("base64 invalid");
       b64Value = (b64Value << 6) + v;
       if (++b64Cnt == 4) {
-        *it++ = u_char(b64Value >> 16);
-        *it++ = u_char((b64Value >> 8) & 0xff);
-        *it++ = u_char(b64Value & 0xff);
+        *it++ = static_cast<u_char>(b64Value >> 16);
+        *it++ = static_cast<u_char>((b64Value >> 8) & 0xff);
+        *it++ = static_cast<u_char>(b64Value & 0xff);
         b64Cnt = 0;
         b64Value = 0;
       }
@@ -648,15 +648,15 @@ public:
       if (readLimit >= 0 and readLimit < c2)
         c2 = readLimit;
       if (c2)
-        inStb->read(&buf[0], c2);
+        inStb->read(buf.data(), c2);
       auto sr = c2 ? inStb->gcount() : 0;
       if (readLimit >= 0)
         readLimit -= sr;
-      char *cp = &lookahead[0];
+      char *cp = lookahead.data();
       for (std::streamsize i = 0; i < lookaheadCnt; i++)
         b64get(u_char(*cp++), it);
       lookaheadCnt = 0;
-      cp = &buf[0];
+      cp = buf.data();
       if (sr)
         for (std::streamsize i = 0; i < sr; i++)
           b64get(u_char(*cp++), it);
@@ -800,8 +800,8 @@ std::streamsize CryptBufBase::showmanyc() {
 
 CryptBufBase::int_type CryptBufBase::underflow() {
   TRACE("");
-  size_t sz = data->doRead(&data->buffer[0], data->buffer.size());
-  Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[sz]);
+  size_t sz = data->doRead(data->buffer.data(), data->buffer.size());
+  Base::setg(data->buffer.data(), data->buffer.data(), data->buffer.data() + sz);
 //  std::cout << "GC2 = " << sz << "  ";
   if (not sz)
     return Traits::eof();
@@ -816,7 +816,7 @@ CryptBufBase::int_type CryptBufBase::overflow(CryptBufBase::int_type ch) {
     Base::setp(data->buffer.begin(), data->buffer.end()); // buffer zurücksetzen
 #if 0
     // Debug:
-    for (auto ip = &buf[0]; ip != bp; ip++) {
+    for (auto ip = buf.data(); ip != bp; ip++) {
       auto const i = *ip;
       if (i == 0) {
         std::cout << "NULL";
@@ -963,7 +963,7 @@ public:
         rd = av;
       if (rd > binaryLength)
         rd = binaryLength;
-      sz = cbb->sgetn(&buffer[0], rd);
+      sz = cbb->sgetn(buffer.data(), rd);
     } else {
       CSBLOG(LM_DEBUG, "BinaryIstrBuf READ ohne cbb");
       if (inStb.eof())
@@ -973,7 +973,7 @@ public:
         auto rd = static_cast<std::streamsize>(buffer.size());
         if (rd > binaryLength)
           rd = binaryLength;
-        inStb.read(&buffer[0], rd);
+        inStb.read(buffer.data(), rd);
         sz = inStb.gcount();
       }
     }
@@ -1021,7 +1021,7 @@ BinaryIstBuf::BinaryIstBuf(CryptIstrBuf &ci, size_t len) {
     data->binaryLength -= sz;
     data->pos += off_type(sz);
   }
-  Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[sz]);
+  Base::setg(data->buffer.data(), data->buffer.data(), data->buffer.data() + sz);
 }
 
 BinaryIstBuf::~BinaryIstBuf() = default;
@@ -1032,7 +1032,7 @@ BinaryIstBuf::int_type BinaryIstBuf::underflow() {
     return Traits::eof();
   try {
     auto sz = data->underflow(); // immer >= 0 oder exception
-    Base::setg(&data->buffer[0], &data->buffer[0], &data->buffer[sz]);
+    Base::setg(data->buffer.data(), data->buffer.data(), data->buffer.data() + sz);
     if (not sz)
       return Traits::eof();
   } catch (std::exception &e) {
