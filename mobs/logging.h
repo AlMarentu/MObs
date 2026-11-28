@@ -26,23 +26,18 @@
 #include <string>
 #include <array>
 #include <functional>
-#ifdef _WIN32
-#include <windows.h>
-#endif
 
 /** \file logging.h
 \brief Hilfsfunktionen und Makros für logging und tracing
- 
+
  Kann leicht durch andere Tools ersetzt werden. Es müssen die Makros
- 
+
  LOG(level, streamOp)
  TRACE(streamOp)
  PARAM(par)
  THROW(streamOp)
- 
+
  sowie die Log_level-Makros existieren.
- 
- 
  */
 
 namespace logging {
@@ -70,7 +65,7 @@ extern std::function<void(char logType, const std::string &)> logFileCallback; /
 void logWithTime(char logType, const std::string &text);
 
 
-/// Interne Klasse für Tracing, bitte Makro TRACE verwenden
+/// Interne Klasse für Tracing; bitte Makro TRACE verwenden
 class Trace {
 public:
   /// \private
@@ -91,21 +86,15 @@ private:
  */
 
 class FileMultiLog {
+  class FileMultiLogData;
 public:
-  FileMultiLog(const std::string &filenamePart) : fileName(filenamePart) {}
+  explicit FileMultiLog(const std::string &filenamePart);
   ~FileMultiLog();
   void logString(const std::string &str);
-  int getVersion() const { return version; }
+  int getVersion() const;
 
-private:
-  std::string fileName;
-  int version = -1;
-#ifdef __MINGW32__
-  HANDLE handle{};
-#else
-  int handle{};
-#endif
-
+protected:
+  FileMultiLogData *data;
 };
 
 /// streambuf zu FileMultiLog für LogMultiStream
@@ -116,7 +105,7 @@ public:
   using Traits = std::char_traits<char_type>; ///< Traits-Typ
   using int_type = Base::int_type; ///< zugehöriger int-Typ
 
-  explicit LogMultiBuf(const std::string & filenamePart);
+  explicit LogMultiBuf(const std::string &filenamePart);
   /// \private
   LogMultiBuf(const LogMultiBuf &) = delete;
   LogMultiBuf &operator=(const LogMultiBuf &) = delete;

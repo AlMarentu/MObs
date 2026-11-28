@@ -22,10 +22,13 @@
 #include <iostream>
 #include <iomanip>
 #include <cstring>
+#include <utility>
 #include "logging.h"
 #include "mchrono.h"
 
-#ifndef __MINGW32__
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <fcntl.h>
 #include <unistd.h>
 #endif
@@ -107,65 +110,91 @@ Trace::~Trace ()
     std::cerr << "T E(" << lev-- << ") " << fun << std::endl;
 }
 
+class logging::FileMultiLog::FileMultiLogData
+{
+public:
+  FileMultiLogData(std::string  filenamePart): fileName(std::move(filenamePart)) {}
+  std::string fileName;
+  int version = -1;
+#ifdef __MINGW32__
+  HANDLE handle{};
+#else
+  int handle{};
+#endif
+};
+
+bool Trace::traceOn = false;
+
+int Trace::lev = 0;
+
+
+FileMultiLog::FileMultiLog(const std::string& filenamePart): data(new FileMultiLogData(filenamePart))
+{
+}
 
 FileMultiLog::~FileMultiLog() {
 #ifdef _WIN32
-  CloseHandle(handle);
+  CloseHandle(data->handle);
 #else
-  ::close(handle);
+  ::close(data->handle);
 #endif
+  delete data;
 }
 
-
 void FileMultiLog::logString(const std::string &str) {
-  if (version < 0) {
+  if (data->version < 0) {
     for (int v = 0;;v++) {
       if (v > 100)
         throw std::runtime_error("Cannot open log file");
-      std::string fn = fileName;
+      std::string fn = data->fileName;
       fn += '.';
       fn += std::to_string(v);
       // create file or append existing file
 #ifdef _WIN32
-      handle = CreateFile(fn.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr,
+      data->handle = CreateFile(fn.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr,
                           OPEN_ALWAYS, FILE_FLAG_WRITE_THROUGH, nullptr);
-      if (handle == INVALID_HANDLE_VALUE) {
+      if (data->handle == INVALID_HANDLE_VALUE) {
         if (GetLastError() != ERROR_ALREADY_EXISTS)
           continue;
         throw std::runtime_error(STRSTR("Cannot open log file " << GetLastError()));
       }
       // write and end of file
-      SetFilePointer(handle, 0, nullptr, FILE_END);
+      SetFilePointer(data->handle, 0, nullptr, FILE_END);
 #else
-      handle = open(fn.c_str(), O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0666);
-      if (handle < 0) {
+      data->handle = open(fn.c_str(), O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0666);
+      if (data->handle < 0) {
         throw std::runtime_error(STRSTR("Cannot open log file " << "errno=" << errno << " " << strerror(errno)));
       }
       /* l_type   l_whence  l_start  l_len  l_pid   */
       struct flock fl = {};
       fl.l_type = F_WRLCK;
       fl.l_whence = SEEK_SET;
-      if (fcntl(handle, F_SETLK, &fl) < 0) {
+      if (fcntl(data->handle, F_SETLK, &fl) < 0) {
         if (errno == EAGAIN || errno == EACCES) {
-          close(handle);
+          close(data->handle);
           continue;
         }
         throw std::runtime_error(STRSTR("Cannot lock log file " << "errno=" << errno << " " << strerror(errno)));
       }
 #endif
-      version = v;
+      data->version = v;
       break;
     }
   }
 #ifdef _WIN32
   DWORD written;
-  WriteFile(handle, str.c_str(), str.size(), &written, nullptr);
+  WriteFile(data->handle, str.c_str(), str.size(), &written, nullptr);
   if (written != str.size())
     throw std::runtime_error("Cannot write log file");
 #else
-  if (write(handle, str.c_str(), str.size()) != ssize_t(str.size()))
+  if (write(data->handle, str.c_str(), str.size()) != ssize_t(str.size()))
     throw std::runtime_error("Cannot write log file");
 #endif
+}
+
+int FileMultiLog::getVersion() const
+{
+  return data->version;
 }
 
 LogMultiBuf::LogMultiBuf(const std::string &filenamePart) : log(filenamePart) {
@@ -173,8 +202,9 @@ LogMultiBuf::LogMultiBuf(const std::string &filenamePart) : log(filenamePart) {
 }
 
 LogMultiBuf::~LogMultiBuf() {
-  sync();
+  LogMultiBuf::sync();
 }
+
 
 LogMultiBuf::int_type LogMultiBuf::overflow(int_type ch) {
   if (Base::pbase() != Base::pptr()) {
@@ -196,13 +226,8 @@ int LogMultiBuf::sync() {
 LogMultiStream::LogMultiStream(const std::string &filenamePart) : std::ostream(nullptr) {
   rdbuf(new LogMultiBuf(filenamePart));
 }
-
 LogMultiStream::~LogMultiStream() {
   delete rdbuf();
 }
-
-
-int Trace::lev = 0;
-bool Trace::traceOn = false;
 
 }
