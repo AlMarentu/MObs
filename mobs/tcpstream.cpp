@@ -87,7 +87,7 @@ socketHandle TcpAccept::initService(const std::string &service) {
   hints.ai_flags = AI_PASSIVE; // use my IP address
 
   if (auto rv = getaddrinfo(nullptr, service.c_str(), &hints, &servinfo)) {
-    LOG(LM_ERROR, "getaddrinfo: " << gai_strerror(rv));
+    LOG(LM_ERROR, "getaddrinfo (" << service << "): " << gai_strerror(rv));
     return invalidSocket;
   }
   // loop through all the results and bind to the first we can
